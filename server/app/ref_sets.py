@@ -703,6 +703,11 @@ def check_summary(session, ref):
     picture's reference id (or its row). 'none': the check did not run (no key, a model error, or not back yet)."""
     row = ref if isinstance(ref, dict) else (session.get('references') or {}).get(ref) or {}
     check = row.get('check')
+    from . import pictures
+    if pictures.claude_checks(session, row):   # design/217: a step-6 picture of a v2 film is checked by Claude's look too
+        view = pictures.check_view(session, row)
+        return {'state': {'not_checked': 'none'}.get(view['state'], view['state']), 'failed': [{'check': f, 'seen': ''} for f in view['faults']],
+                'error': (pictures.looked(row) or {}).get('not_checked') or None}
     if V.round_v2(session) and row.get('kind') == 'sheet' and row.get('set'):
         # design/214: a set of a v2 round is checked by Claude's look, line by line; a model's result stored before stays in the record and is not read here.
         # 'none': not checked (no look with line answers yet, or the picture could not be opened: `error` says why). The code checks stay.

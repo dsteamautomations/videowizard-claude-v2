@@ -73,7 +73,7 @@ def test_derived_work_from_an_item_with_an_open_question_is_refused():
         g(lambda: revise_start(store, role='start'))   # K1 among the parents
     with pytest.raises(Problem, match=waits):
         g(lambda: VS.approve_reference(store, USER, RUN, [], 'K1', 'a' * 64, '', FakeConn([])))
-    with pytest.raises(Problem, match=waits):
+    with pytest.raises(Problem, match='The fix round is retired'):   # design/217 (D3): the fix round is retired before any question is read
         g(lambda: VS.request_fix(FakeConn([]), store, USER, RUN, [], 'K1'))
     VS.answer(store, USER, RUN, [], 'K1', 'yes')
     VS.ask(store, USER, RUN, [], 'VS1', 'Shorten VS1 to 4 s?', ['yes', 'no'])

@@ -253,6 +253,8 @@ def check_prompt(prompt, fix=False, placed=True):
     # written by the server from the plan's approved words (`placed=False`): 'a mat in the middle of the floor' describes the thing, it places no shot.
     for sentence in re.split(r'(?<=[.;:!?\n])\s+', text) if placed else ():   # design/110 F2: a place is a landmark and a measured distance, never 'the centre' alone
         m = re.search(r'\b(centre|center|middle|nearby|closer|further)\b', sentence, re.I)
+        if m and m.group(1).lower() in ('centre', 'center', 'middle') and re.search(r'\b(hero|of the frame|in frame)\b', sentence, re.I):   # design/217 (R2): the framing the guidance invites ("the product may sit centred as the hero") places nothing in the world
+            continue
         if m and not re.search(r'\d|\b(one|two|three|four|five|six|half|bricks?|paces?|body-lengths?|arm-lengths?|hands?|doorways?|courses?|metres?|meters?)\b', sentence, re.I):
             raise ValueError(f'The prompt places something at {m.group(1)!r} with no landmark and measured distance ({sentence.strip()[:80]!r}): say the landmark and how far from it, '
                              'in a unit the picture shows (bricks, paces, a hand, a doorway).')

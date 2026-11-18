@@ -67,7 +67,9 @@ def test_the_text_says_what_the_program_does():
 
 
 def test_the_command_file_the_helper_and_the_operators_rules_say_the_same():
+    later = ('the reference drawings and the two steps', 'the reference drawings, the two steps')   # design/217: step 6 joined the page in the same sentence
     for old, new in W.COMMANDS:
+        new = new.replace(*later)
         assert new in CMD and old not in CMD, old[:60]
     assert W.before_commands(CMD) != CMD and 'tell the operator the spend)' not in CMD.split('the server refuses a call past')[0]
     refs = CMD[CMD.index('trial frames (`vw visuals trial --file`'):CMD.index('Other pictures:')]
@@ -77,5 +79,5 @@ def test_the_command_file_the_helper_and_the_operators_rules_say_the_same():
 
 
 def test_the_versions_of_this_release():
-    assert Settings.model_fields['SERVER_VERSION'].default == '0.114.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.98.0'
-    assert json.loads((ROOT / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.98.0'
+    assert Settings.model_fields['SERVER_VERSION'].default == '0.115.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.99.0'   # design/217
+    assert json.loads((ROOT / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.99.0'

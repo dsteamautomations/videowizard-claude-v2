@@ -1370,9 +1370,9 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
                 warnings.append(f"state {i} ({row['id']}) was not generated from state {i - 1} ({rows[i - 2]['id']}); check the drawing is the same")
     from . import lookalike   # design/91 N12: every state adds something visible
     prints = [(_fingerprints(store, r['key']) or {}).get('graphic') for r in rows]
-    for i in range(1, len(rows)):
-        need(prints[i - 1] is None or prints[i] is None or lookalike.distance(prints[i - 1], prints[i]) > lookalike.BITS_GRAPHIC,
-             f"state {i + 1} ({rows[i]['name']}) looks the same as state {i} ({rows[i - 1]['name']}): a state adds something visible; make it again from state {i} with what it adds.")
+    for i in range(1, len(rows)):   # design/217 (R3): two steps alike is the operator's to judge (shown as advice, asked once on the page), no longer a refusal
+        if not (prints[i - 1] is None or prints[i] is None or lookalike.distance(prints[i - 1], prints[i]) > lookalike.BITS_GRAPHIC):
+            warnings.append(f'steps {i} and {i + 1} look almost the same: approved on the operator\'s word')
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
     for row in rows:
         row.update(status='approved', approval={**stamp, 'sha256': row['sha256']})
@@ -2721,7 +2721,10 @@ def waiting(session, plan, code, take_rows, budget=None):
         if not any(i['label'] == label for _, i in items):
             items.append((at, {'label': label, 'kind': kind, 'step': step, 'group': group, 'item': item, 'link': item_link(code, step, group, item)}))
     title = lambda sh: f" · {sh['title']}" if sh.get('title') else ''
-    ready = lambda r: r.get('status') == 'candidate' and r.get('sha256') and not r.get('check_pending')
+    from . import pictures
+    now = datetime.now(timezone.utc)
+    # design/217 (C3): a picture Claude checks is offered with its look, or after pictures.PICTURE_LOOK_MINUTES as not checked; the model's `check_pending` no longer holds it
+    ready = lambda r: r.get('status') == 'candidate' and r.get('sha256') and (pictures.offered(session, r, plan, now) if pictures.claude_checks(session, r, plan) else not r.get('check_pending'))
     on_takes = lambda sh: route_of(sh) in ('video', 'drawn')   # the tab that shows the shot's card
     for r in session['references'].values():
         sh = shots.get(made_for(session, r) or '')
@@ -2755,7 +2758,7 @@ def waiting(session, plan, code, take_rows, budget=None):
                 chain = state_chain(session, sid) or []
             except ValueError:   # two pictures for one step: the page shows the problem
                 chain = []
-            if chain and len(chain) == len(sh.get('states') or []) and any(r['status'] == 'candidate' for r in chain) and not any(r.get('check_pending') for r in chain):
+            if chain and len(chain) == len(sh.get('states') or []) and any(r['status'] == 'candidate' for r in chain) and all(ready(r) for r in chain if r['status'] == 'candidate'):   # design/217: each step offered with its look
                 add(sh['start_frame'], f"Graphics · {sid}{title(sh)} · {len(chain)} states", 'pictures', sid, chain[-1]['id'], 'graphics to approve')
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec) and not correction_pending(session, sid, spec):
@@ -3958,7 +3961,8 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     need((body['kind'] == 'style') == (body['element_id'] == STYLE), f'The style sheet is kind style with element {STYLE}, and only it.')   # design/89 C2
-    element = {'id': STYLE, 'kind': 'style'} if body['element_id'] == STYLE else next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
+    need(not (body['kind'] == 'style' and round_v2(session) and not _has_steps(plan)), STYLE_NOT_NEEDED)   # design/217 (D5)
+    element ={'id': STYLE, 'kind': 'style'} if body['element_id'] == STYLE else next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
     need(not (body['kind'] == 'sheet' and element['kind'] == 'animal'), ANIMAL_NO_SHEET.format(eid=element['id']))   # design/207 (D4); design/207 point 4: a real speaker may have an AI picture (the older refusal, retired)
@@ -4005,10 +4009,13 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
     if body['kind'] == 'component':   # design/117 P1: a thing alone, in the approved style, on a transparent background; the style picture is Image 1
         need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
         style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
-        need(style_ref, 'A component is made in the approved style: approve the style picture first (the Pictures step).')
-        if style_ref['id'] not in (body.get('parents') or []) and not body.get('fix_of'):   # W4: a fix keeps the picture to fix as Image 1
+        no_style = round_v2(session) and not _has_steps(plan)   # design/217 (D5): a film with no graphic in steps has no style sheet; its components take the plan's palette from the words
+        need(style_ref or no_style, 'A component is made in the approved style: approve the style picture first (the Pictures step).')
+        if style_ref and style_ref['id'] not in (body.get('parents') or []) and not body.get('fix_of'):   # W4: a fix keeps the picture to fix as Image 1
             body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
         block = COMPONENT_BLOCK if provider_of(run) == 'openai' else COMPONENT_BLOCK_GREEN   # design/120: Gemini has no transparent output; the server keys the green out
+        if not style_ref:
+            block = block.replace(STYLE_IMAGE_ONE, '')
         body = {**body, 'prompt': with_composed(body['prompt'], block.format(name=element.get('name') or body['element_id']))}
     if body['kind'] == 'sheet' and body['element_id'] != STYLE and not is_set:   # design/119 rule 2: the server's lines on a reference sheet (not on a kept set: no labels in a picture)
         body = {**body, 'prompt': with_composed(body['prompt'], sheet_block(element))}
@@ -4273,6 +4280,16 @@ COMPONENT_BLOCK = ('Image 1 is the approved style of this film: take its palette
                    'on a transparent background: no ground, no setting, no shadow outside its own edge, the whole thing inside the frame.')   # design/117 P1
 COMPONENT_BLOCK_GREEN = ('Image 1 is the approved style of this film: take its palette, line and finish from it. One {name} alone, nothing else in the frame, '
                          'on a flat, even chroma green background (#00FF00) that touches every edge: no ground, no setting, no shadow outside its own edge, no green on the thing itself, the whole thing inside the frame.')   # design/120
+STYLE_IMAGE_ONE = 'Image 1 is the approved style of this film: take its palette, line and finish from it. '
+STYLE_NOT_NEEDED = ("This film has no graphic in steps, so it has no style sheet (design/217 D5): a drawn graphic takes the plan's palette and lettering from its brief. "
+                    'Make the style sheet only when the plan has a graphic in steps.')
+
+
+def _has_steps(plan):
+    """design/217 (D5): the plan has a graphic in steps (an animation shot), the only kind made from the style sheet."""
+    return any(sh.get('visual_type') == 'animation' for g in (plan or {}).get('gaps') or [] for sc in all_scenes(g) for sh in sc.get('shots') or [])
+
+
 GEMINI_MAX_INPUTS, GEMINI_KIND_CAPS = 14, {'object': 6, 'character': 5, 'style': 3}   # design/120: Google's limits for the Pro image model, 28 Oct 2026
 WATERMARK = {'check': 'no watermark', 'weight': 'must', 'pass_when': "no watermark, stock site's name or lettering across the picture"}   # design/121 change 5
 COMPONENT_LINES = [{'check': 'one thing only', 'pass_when': 'one thing alone: no background, no ground, no setting, no second object, no shadow outside its edge', 'weight': 'must'},
@@ -4688,7 +4705,7 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         if shot and route_of(shot) == 'still':
             placed = _place_still(store, user, run, outputs, session, sid, ref_id, quote)
     row['dhash'] = _fingerprints(store, row['key'])   # design/89 H6, finding 9: kept once, never read again for the look-alike check
-    if sid and row.get('kind') in ('keyframe', 'isolated'):   # design/111 F17: background figures against the approved pictures of the scene
+    if sid and row.get('kind') in ('keyframe', 'isolated') and not round_v2(session):   # design/111 F17: background figures against the approved pictures of the scene; design/217 (C5): on a v2 film a line of Claude's list, before the answer (this call kept until the older films close)
         try:
             pl_, _, sc_, sh_ = locate(store, session, sid)
         except ValueError:
@@ -4723,9 +4740,16 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     return {**row, 'next': _approved_next(store, session, row)}
 
 
+FIX_RETIRED = ('The fix round is retired (design/217): a picture is changed only by "Correct it", the operator\'s words with Claude\'s failed lines written in the box. '
+               'Reject the picture with the operator\'s words (`vw visuals reject --ref R --notes "…"`) and write the new request from them.')
+BARE_NO = ('no', 'no, make another', 'rejected', 'reject')   # design/217 (F4, D7): a button pressed, not a reason
+
+
 def request_fix(conn, store, user, run, outputs, ref_id):
     """design/96 X1, X4: one fix round of a candidate, only when the operator or the assistant asks: an edit with the one change its first failed must
-    line asks for, at the image price, inside the cap. Never for a fix, never twice, never for a line the check could not decide."""
+    line asks for, at the image price, inside the cap. Never for a fix, never twice, never for a line the check could not decide.
+    design/217 (D3, SK 18 Nov 2026): retired. "Correct it" is the one way to change a picture; its box opens with Claude's failed lines."""
+    need(False, FIX_RETIRED)
     session = session_of(store, run, outputs)
     ref = session['references'].get(ref_id)
     need(ref, f'{ref_id} is not a picture of this run.')
@@ -4787,7 +4811,7 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
     session = session_of(store, run, outputs)
     row = session['references'].get(ref_id)
     words = str(quote or '').strip()
-    reason = str(notes or '').strip() or words
+    reason = str(notes or '').strip() or ('' if words.lower().rstrip('.') in BARE_NO else words)   # design/217 (F4): a bare "No" stores no reason; nothing joins the not-this list or the library
     if row and row.get('status') == 'rejected' and reason and row.get('rejection'):   # design/99 C3: the reason given after the click joins the same rejection
         row['rejection']['notes'] = reason
         _feedback_image(session, run, user, row, 'reject', row['rejection']['quote'], reason)
@@ -5757,7 +5781,7 @@ def _finish_view(session, job, result):
     return {'finish': {'effects': carried, 'words': motion.finish_words(carried), 'left_off': result.get('finish_left_off') or '', 'taken_away': off}}
 
 
-def set_motion(store, user, run, outputs, shot_id, name, content):
+def set_motion(store, user, run, outputs, shot_id, name, content, rules_text=''):
     """design/130 §4: a drawn shot's HyperFrames project, one zip kept with the run and named by the plan through its sha256; refused with the reasons
     when it breaks a rule (never checked or rendered)."""
     from . import motion
@@ -5778,7 +5802,10 @@ def set_motion(store, user, run, outputs, shot_id, name, content):
     sha = hashlib.sha256(content).hexdigest()
     k = f"{run['id']}/visuals/motion/projects/{sha}.zip"
     store.put(k, content, 'application/zip')
-    session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
+    held = pictures.rules_of(rules_text)
+    session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
+                                                      **({'rules': held} if held else {})}
     save_session(store, run, session)
     effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
@@ -5867,13 +5894,13 @@ def render_motion(conn, store, user, run, outputs, body):
     session['preparations'][shot['id']] = {'preparation_id': identity, 'key': key_, 'drawn': True}
     if same:
         save_session(store, run, session)
-        return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this project (nothing changed): see it on the Takes step.'}
+        return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this project (nothing changed): it is on the Pictures and drawn graphics step (`vw visuals page`).'}
     row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
                         (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact}))).fetchone()
     save_session(store, run, session)
     return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames, **({'finish': request['finish'], 'tell_the_operator': motion.finish_words(request['finish'])} if request.get('finish') else {}),
-            'next': f'Rendering {frames} frames on the server, free: HyperFrames checks the project and the timing, renders, and the drawing and its sheet show on the Takes step; '
-                    'select it there or reject it with what to change.'}
+            'next': f'Rendering {frames} frames on the server, free: HyperFrames checks the project and the timing, renders, and the drawing and its sheet come to the Pictures and drawn graphics step '
+                    '(`vw visuals page`): the operator selects it there or rejects it with what to change.'}
 
 
 def motion_finish(conn, store, user, run, outputs, shot_id, on):
@@ -5899,7 +5926,7 @@ def motion_finish(conn, store, user, run, outputs, shot_id, on):
                         'entry': ('the finish put back: ' if on else 'the finish taken away: ') + ', '.join(asked), 'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': '', 'request_id': None})
     out = render_motion(conn, store, user, run, outputs, {'shot_id': shot['id']})
     return {**out, 'changed': True, 'finish': asked if on else [],
-            'next': ('The drawing is being rendered again with its finish' if on else 'The drawing is being rendered again without the finish') + ': a new take on the Takes step, in under a minute; select it there.'}
+            'next': ('The drawing is being rendered again with its finish' if on else 'The drawing is being rendered again without the finish') + ': it comes back to the Pictures and drawn graphics step in under a minute, for the operator to answer there.'}
 
 
 SUBJECT_RULES = Path(__file__).resolve().parents[1] / 'subject_rules'   # design/130 §4 step 8: one file per subject, seeded in the repo
@@ -5945,6 +5972,13 @@ def _subjects_of(plan, shot=None):
     return [stem for stem in subject_rule_files() if set(stem.split('-')) <= words]
 
 
+MOTION_RULE_OPEN = ('{shot}: the verdict leaves {n} rule(s) of the project without an answer, first: "{rule}". Every rule of rules.md gets pass true or false: '
+                    'add the missing ones and send the verdict again (`vw motion verdict`).')
+MOTION_RULE_UNKNOWN = ('{shot}: "{rule}" is not a rule of this project (rules.md as it was uploaded): copy each rule\'s words as they are, or upload the project again '
+                       'with its rules (`vw motion upload`).')
+MOTION_RULE_WORDS = '{shot}: the failed rule "{rule}" says nothing of what was seen: give `where` (or `fix`) in one plain sentence and send the verdict again.'
+
+
 def motion_verdict(store, user, run, outputs, body):
     """design/130 §4 step 5: a fresh checker's verdict on one uploaded project of a shot, kept per shot by round; the failed rules go back to a builder
     helper, at most two redo rounds; select holds a drawing whose project has no clean verdict."""
@@ -5956,6 +5990,18 @@ def motion_verdict(store, user, run, outputs, body):
     rules = body.get('rules') or []
     need(rules and all(isinstance(r, dict) and isinstance(r.get('pass'), bool) and str(r.get('rule') or '').strip() for r in rules),
          'The verdict lists the rules checked; every rule has pass true or false and its words (`rule`).')
+    held = ((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []
+    if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)
+        from . import pictures
+        known = {h['id']: h for h in held}
+        got = {pictures.rule_id(r.get('rule')): r for r in rules}
+        unknown = [r['rule'] for i, r in got.items() if i not in known and r.get('group') != 'seen']   # a fault the checker adds of its own is a new rule, group "seen"
+        need(not unknown, MOTION_RULE_UNKNOWN.format(shot=shot['id'], rule=str(unknown[0])[:160] if unknown else ''))
+        skipped = [h['rule'] for h in held if h['id'] not in got]
+        need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
+        mute = [r['rule'] for r in rules if r['pass'] is False and not str(r.get('where') or r.get('fix') or r.get('seen') or '').strip()]
+        need(not mute, MOTION_RULE_WORDS.format(shot=shot['id'], rule=str(mute[0])[:160] if mute else ''))
+        rules = [got[h['id']] for h in held] + [r for i, r in got.items() if i not in known]
     failed = [r for r in rules if r['pass'] is False]
     rec = {'sha256': sha, 'round': int(body.get('round') or 1), 'stranger': [str(x)[:500] for x in body.get('stranger') or []][:20],
            'rules': [{k: (str(r.get(k))[:500] if k != 'pass' else r[k]) for k in ('n', 'group', 'rule', 'pass', 'where', 'fix') if k in r} for r in rules][:80],
@@ -6358,9 +6404,12 @@ def status(conn, store, run, outputs, repair=True):
         return {'state': 'not_prepared', 'next': 'prepare'}
     fixed = reconcile(conn, run, session)
     marked = not kept(session) and mark_kept(session, run)   # design/151 hotfix: a new film is kept before its round
-    if (fixed or marked) and repair:
-        save_session(store, run, session)
     plan = current_plan(store, session) if session.get('current') else None
+    from . import pictures
+    stamped = bool(plan) and round_v2(session) and pictures.stamp(session, plan)   # design/217: a picture that waited for the model's check is given to Claude's check
+    if (fixed or marked or stamped) and repair:
+        save_session(store, run, session)
+    looks = pictures.waits_words(session, plan) if plan and round_v2(session) else ''
     gaps = []
     for gid, g in session['source']['gaps'].items():
         entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], **_accepted_words(session, gid)}
@@ -6379,7 +6428,7 @@ def status(conn, store, run, outputs, repair=True):
              for j in take_rows]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'busy': not repair, **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+    return {'state': 'prepared', 'busy': not repair, **({'pictures_waiting': looks} if looks else {}), **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6

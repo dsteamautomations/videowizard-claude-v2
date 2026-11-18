@@ -16,6 +16,7 @@ from io import BytesIO
 from PIL import Image
 
 from . import chat_flow as CF
+from . import pictures as P
 from . import film as F
 from . import runlog
 from . import visuals_stage as V
@@ -89,6 +90,46 @@ def sized(store, key, which, mark=''):
             store.put(out, shrink(store.get(key), side, quality), 'image/jpeg')
         _MADE.add(out)
     return out
+
+
+def video_copy(store, key, mark=''):
+    """design/217 (D6): the page copy of a drawing's video, stored beside it once: VIDEO_SIDE px wide, H.264 at VIDEO_CRF, no sound, faststart.
+    Raises when ffmpeg cannot make it (the page then shows the frame sheet)."""
+    import subprocess
+    import tempfile
+    out = key + ('.' + str(mark)[:10] if mark else '') + '.page.mp4'
+    if out not in _MADE:
+        if not store.exists(out):
+            with tempfile.TemporaryDirectory() as tmp:
+                src, dst = f'{tmp}/in.mp4', f'{tmp}/out.mp4'
+                with open(src, 'wb') as f:
+                    f.write(store.get(key))
+                subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vf', f'scale={VIDEO_SIDE}:-2', '-c:v', 'libx264', '-crf', str(VIDEO_CRF), '-pix_fmt', 'yuv420p',
+                                '-an', '-movflags', '+faststart', dst], check=True, timeout=120)
+                with open(dst, 'rb') as f:
+                    store.put(out, f.read(), 'video/mp4')
+        _MADE.add(out)
+    return out
+
+
+def _with_videos(store, page):
+    """design/217: each drawn line's video as its page copy, under a code in `videos` ({code, key}), sent as a large file like the large pictures
+    (`zoom_uploads`); a line whose copy cannot be made shows its frame sheet with `video.none`."""
+    videos = {}
+    for line in page['lines']:
+        v = line.get('video')
+        if not isinstance(v, dict) or '_key' not in v:
+            continue
+        key, mark = v.pop('_key'), v.pop('_mark', '')
+        code = 'v' + pic_code(key, mark)[1:]
+        try:
+            videos.setdefault(code, {'code': code, 'key': video_copy(store, key, mark)}) if key else None
+        except Exception:   # no copy: the frames stand in for it
+            key = ''
+        v.update(code=code if key else '', none='' if key else P.W['video_none'])
+    if videos:
+        page['videos'] = list(videos.values())
+    return page
 
 
 def _with_pictures(store, page):
@@ -415,7 +456,12 @@ SETS_WAIT = 'The sets are being made. Wait for them (`vw visuals status --wait 9
 SETS_STAND = ('No set waits for the operator now, and none is being made: the answers kept wait, and the reason is on each line. Tell the operator; when it is settled, '
               'run `vw visuals page`.')
 SETS_NONE = 'No set waits for the operator on the page now. Go on with `vw visuals next`: it gives the next decision.'
-ROUND_NEXT ='The reference round is complete. Go on with `vw visuals next`: it gives the next decision (the stills and the graphics are not on the page yet).'
+ROUND_NEXT = 'The reference round is complete. Go on with `vw visuals next`: it gives the next decision.'   # design/217: "(the stills and the graphics are not on the page yet)" retired: they are
+# design/217: step 6, the pictures and drawn graphics, on the page
+PICTURES_LEFT = '{n} line(s) still wait for the operator on the page: write the new round to the page and give them the link again.'
+PICTURES_WAIT = 'The pictures and drawings still being made are not ready. Wait for them (`vw visuals status --wait 900`), then run `vw visuals page`.'
+PICTURES_DONE = 'Every picture and drawing is answered. Go on with `vw visuals next`: it gives the next decision.'
+VIDEO_SIDE, VIDEO_CRF = 960, 30   # a drawing's page copy: 960 px wide, H.264, no sound (a flat drawing is tens of KB)
 ROUND_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
 OWN_PERMISSION = "A real person's photo is used only with their permission. Write in the box on this line that you have it, then add the photo again."
 OWN_MISSING = 'Your own picture did not reach VideoWizard. Add it again on this line, or give it to the assistant in the chat.'
@@ -882,7 +928,52 @@ def _plan_step(ctx):
         return 'draw', draws
     rd = ctx['session'].get('round') or {}
     at = V._round_pass(ctx['session'], rd) if quiet and rd.get('kept') else None
+    if at == 'complete' and V.round_v2(ctx['session']):   # design/217: step 6 once the round is complete; a round of before keeps the chat
+        lines, rows = _pictures_lines(ctx), P.coming(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run']))
+        if lines or rows:
+            return 'pictures', (lines, rows)
     return ('refs', []) if at == 1 else ('sets', []) if at in (2, 'making', 'looking', 'rewrite') else ('spec', specs) if specs else ('plan', [])
+
+
+def _pictures_lines(ctx):
+    """design/217: the lines of step 6: the chat's own items that carry a page line (`chat_flow._waiting_items`), in the server's order
+    (questions, the style sheet, then film order): the same id, the same buttons, the same run function."""
+    out = []
+    for i in CF._waiting_items(ctx):
+        if not i.get('_line'):
+            continue
+        line = dict(i['_line'])
+        line['pics'] = [{**pic(p['_key'], p['label'], p.get('_mark')), **{k: v for k, v in p.items() if k not in ('_key', 'label', '_mark')}} for p in line['pics'] if p.get('_key')]
+        out.append({'key': 'pic:' + i['id'], 'item': i['id'], 'state': 'open', **line})
+    return out
+
+
+def _pictures_page(ctx, base, lines, rows):
+    """design/217: the round of step 6 (design/217-contract.md sections 2 and 3). A round over the document's size loses the details of its
+    last lines first; a line is never cut."""
+    refused = ctx['session'].get('page_refused') or {}
+    lines = [{'line': f'l{n:02d}', **l, **({'refused': refused[l['key']]} if l['key'] in refused else {})} for n, l in enumerate(lines, 1)]
+    for l in reversed(lines):
+        if len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) <= ROUND_BYTES:
+            break
+        l['details'] = []
+    n = len(lines)
+    return {**base, 'step': P.W['step'], 'open': bool(n), 'lines': lines, 'say': P.say(lines, rows),
+            'summary': P.W['summary'].format(n=n, c=len(rows)) if rows else f'{n} to answer.', 'note': P.W['note'] if n else P.W['nothing'],
+            'layout': {'kind': 'pictures', 'made': P.W['made'], 'help': P.W['help'], 'coming': rows, 'words': {**page_words(), 'pictures': P.PAGE}}}
+
+
+def _pictures_answer(ctx, a, choice, words):
+    """design/217 (contract 3.11): one answer of step 6, through the chat item's own run function. None when the item no longer waits with
+    that content (stale). A choice not on the line, or words missing where the button needs them, is refused with the line's own sentence."""
+    item = next((i for i in CF._waiting_items(ctx) if i['id'] == a.get('item') and i.get('_line')), None)
+    if not item:
+        return None
+    buttons = item['_line']['buttons']
+    button = next((b for b in buttons if b['choice'] == choice), None)
+    V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in buttons) + '.')
+    V.need(not button['needs_words'] or words, button.get('need') or P.PAGE['words_need'])
+    return button['label'] + (f': {words}' if words else ''), item['_run'](choice, button['label'], words)
 
 
 def _spec_answer(ctx, key, choice, words, item_id, items=None):
@@ -928,7 +1019,7 @@ def _plan_answer(ctx, key, choice, words, item_id):
 
 def page(conn, store, user, run, outputs):
     """What the page shows now (`_page`), with the two sizes of every picture its lines name (design/210, `_with_pictures`)."""
-    return _with_pictures(store, _page(conn, store, user, run, outputs))
+    return _with_pictures(store, _with_videos(store, _page(conn, store, user, run, outputs)))
 
 
 def _page(conn, store, user, run, outputs):
@@ -947,6 +1038,8 @@ def _page(conn, store, user, run, outputs):
         step, lines = _plan_step(ctx)   # design/209: after the plan, the drawings and the materials; design/210: then the reference drawings, then the reference round
         if step in ('refs', 'sets'):
             return _round_page(ctx, base, step)
+        if step == 'pictures':   # design/217
+            return _pictures_page(ctx, base, *lines)
         out = _drawing_page(ctx, base, lines) if step == 'draw' else _spec_page(ctx, base, lines) if step == 'spec' else _plan_page(ctx, base)
         if _round_due(ctx, out):
             out['then'] = _start()   # nothing waits on the page and the round is not started: what the assistant does next
@@ -1012,6 +1105,12 @@ def page_record(conn, store, user, run, outputs, answers):
             answers.sort(key=lambda a: 2 if a.get('key') == 'sets:rest' and a.get('choice') == 'rest_out' else int(str(a.get('choice') or '') == 'yes'))   # the corrections first: a yes may rest on a size corrected in the same visit; design/213 review: "leave some out" stays last
     except Problem:
         pass
+    if any(str(a.get('key') or '').startswith('pic:') for a in answers):   # design/217: questions, the style sheet, then film order, as the server lists them
+        try:
+            order = {'pic:' + i['id']: n for n, i in enumerate(CF._waiting_items(CF._ctx(conn, store, user, run, outputs)))}
+        except Problem:
+            order = {}
+        answers.sort(key=lambda a: order.get(str(a.get('key') or ''), len(order)) if str(a.get('key') or '').startswith('pic:') else -1)
     for n, a in enumerate(answers):
         key, choice, words = str(a.get('key') or ''), str(a.get('choice') or ''), ' '.join(str(a.get('notes') or '').split())
         ctx = CF._ctx(conn, store, user, run, outputs)   # the session as the answer before left it
@@ -1031,6 +1130,13 @@ def page_record(conn, store, user, run, outputs, answers):
                     kept.append(key)
                     _log(conn, run, key, choice, said)
                     continue
+            elif _at_plan(ctx) and key.startswith('pic:'):   # design/217: a line of step 6
+                got = _pictures_answer(ctx, a, choice, words)
+                if not got:
+                    stale.append(key)
+                    continue
+                said, out = got
+                tell = tell or str((out or {}).get('tell') or '')
             elif _at_plan(ctx):   # design/206: a plan line; design/209: after the plan, a drawing's or a material's line
                 step = _plan_step(ctx)[0]
                 at_spec = step == 'spec'
@@ -1132,6 +1238,12 @@ def page_record(conn, store, user, run, outputs, answers):
         V.DIRECTION_ACCEPTED if alone_accepted else
         'Write the Direction alone, send it (`vw visuals treatment --file out/visual-treatment.json`, no `gaps` in it), then `vw visuals page`.' if not draft else
         'No line waits for the operator now: revise the lines that are back with you (their words are on each), send the draft again, then `vw visuals page`.')
+    if was == 'pictures' or now['step'] == P.W['step'] or any(k.startswith('pic:') for k in recorded + stale + [r['key'] for r in refused]):   # design/217: step 6's own "what next"
+        here = CF._ctx(conn, store, user, run, outputs)
+        looks = P.waits_words(here['session'], here['plan'])
+        rows = (now.get('layout') or {}).get('coming') if now['step'] == P.W['step'] else []
+        then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', looks,
+                                    PICTURES_LEFT.format(n=left) if now['step'] == P.W['step'] and left else PICTURES_WAIT if rows else PICTURES_DONE) if x)
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
             'log': said or 'nothing answered'}   # design/205: the record call's own log line

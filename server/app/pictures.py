@@ -1,0 +1,732 @@
+"""design/217 (SK, 18 Nov 2026): step 6, "Pictures and drawn graphics", on the decisions page, and Claude's check of its pictures.
+
+Two parts, one source each:
+- Claude's check (C1-C7): a still, a step of a graphic, the style sheet, a component and a remade picture of a film whose reference round
+  is v2 are no longer read by a model on the server. The server builds each picture's check list (`lines`), Claude answers every line
+  (`looks_due`, `record_looks`), and a picture is offered to the operator only with its look recorded, or after PICTURE_LOOK_MINUTES as
+  "not checked" (`offered`). The program's own measurements stay, as advice (`advice`).
+- The lines of the step: one per item that waits (a question, the style sheet, a still, a graphic in steps, a drawn graphic), in the shape
+  of design/217-contract.md section 3, built once here; the chat (`chat_flow._waiting_items`) says the same words from the same line.
+
+Nothing here changes a film whose round is not v2: such a film's pictures keep the check of before and the chat.
+"""
+import hashlib
+import re
+from datetime import datetime, timedelta, timezone
+from fractions import Fraction
+
+from . import image_check, ref_find, visuals_stage as V
+
+PICTURE_LOOK_MINUTES = 30   # C3: a picture whose look never comes is offered as "not checked" after this long; ponytail: one number, tune it on the first film
+LOOK_KINDS = ('style', 'keyframe', 'state', 'component')
+LOOK_SAY = 300   # a look's sentence, at most (ref_find.SEEN_CHARS)
+
+# ---------- the words: the page and the chat say these ----------
+W = {
+    'step': 'Pictures and drawn graphics',
+    'kind_question': 'A question about a picture already made', 'kind_style': 'The style sheet', 'kind_still': 'A still', 'kind_steps': 'A graphic in steps', 'kind_drawn': 'A drawn graphic',
+    'style_name': 'The look of the graphics',
+    'style_sub': 'One picture that sets the colours, lines and lettering of every graphic in the film.',
+    'q_from': 'The server asks this about a picture already made. Nothing is made until you answer.',
+    'ask_style': 'Is this the right look for the graphics?', 'ask_still': 'Is this picture right for this shot?', 'ask_steps': 'Are these {n} steps of the graphic right?',
+    'ask_drawn': 'Is this drawing right for the film?',
+    'yes_style': 'Yes, use this look', 'yes_still': 'Yes, put it in the film', 'no': 'No, make another', 'correct': 'Correct it',
+    'yes_steps': 'Yes, use all {n} steps', 'correct_step': 'Correct step {n}', 'select': 'Select: use it in the film', 'reject': 'Reject', 'plain': 'Take the effect away',
+    'say_style': 'Approved. The first picture of every graphic is made from it.', 'say_still': 'Approved and placed in the film at {at}.',
+    'say_no_style': 'Rejected. Claude asks for a new style sheet.', 'say_no_still': 'Rejected. Claude asks for {which} picture for this shot.',
+    'say_no_still_n': 'Rejected. Claude asks for {which} picture.',
+    'say_fix_style': 'Rejected. Claude asks for a new one with your words: "{words}"', 'say_fix_still': 'Rejected. Claude asks for a new picture with your words: "{words}"',
+    'say_steps': 'All {n} steps approved and placed in the film at {at}, played as a build.',
+    'say_step': 'Step {k} is made again with your words: "{words}". {later} made again from it.', 'say_step_last': 'Step {k} is made again from step {p} with your words: "{words}".',
+    'say_select': 'Selected. It goes in the film at {at}.', 'say_select_why': 'Selected. It goes in the film at {at}. Your reason: "{words}"',
+    'say_reject': 'Rejected. Claude\'s helpers rebuild it with your words: "{words}"', 'say_plain': 'It is made again without the {finish}. You see it again here.',
+    'say_answer': 'Your answer: {choice}. Claude acts on it.',
+    'hint_style': 'What should change?', 'hint_still': 'What should change in this picture?', 'hint_step': 'What should change in step {n}?', 'hint_reject': 'What is wrong with it?',
+    'hint_why': 'Why is it right for the film all the same?', 'go': 'Send these words', 'go_why': 'Select it with this reason', 'need_why': 'Write your reason first. It is kept with the film.',
+    'sure': "Claude's check found {problems} in this picture. Use it all the same?", 'sure_go': 'Use it all the same', 'back': 'Go back',
+    'sure_steps': "Claude's check found {problems}{alike}. Use all {n} steps all the same?", 'sure_steps_alike': "Steps {a} and {b} look almost the same. Use all {n} steps all the same?",
+    'sure_steps_go': 'Use all {n} steps all the same',
+    'where': 'In the film at {start} to {end} ({secs} s) · {gap}', 'words_head': 'The words under it:', 'try': 'Try {n}',
+    'foot_still': 'Your footage: click one to see it beside the new picture', 'foot_still_try': 'Your footage and the earlier try: click one to see it beside the new picture',
+    'foot_steps': 'Your footage: click one to see it beside the steps', 'foot_steps_try': 'Your footage and the earlier try: click one to see it beside the steps',
+    'foot_drawn': 'Your footage: click one to see it beside the drawing',
+    'strip_head': 'The steps, in order: click one to see it large',
+    'before': 'Your footage before this shot', 'after': 'Your footage after this shot', 'new': 'The new picture', 'new_try': 'The new picture (try {n})',
+    'earlier': 'Try {n}, not used', 'earlier_step': 'Step {s}, try {n}, not used', 'why': 'You said: {words}', 'why_none': 'You said no, with no words.',
+    'step_cap': "Step {n}: on '{words}': {what}", 'step_cap_bare': 'Step {n}: {what}', 'step_label': 'Step {n}',
+    'sheet': 'Its frames, in order', 'video': 'The drawing, playing', 'video_none': 'The video is not available here: these are its frames.',
+    'finish': 'Added by the server: {finish}.',
+    'held_fact': 'Its fact check did not pass: to select it all the same, say why.', 'held_none': 'It has no fact check yet: to select it all the same, say why.',
+    'held_server': "The server's check did not pass it: to select it all the same, say why.", 'held_unread': 'It was not checked: to select it all the same, say why.',
+    'held_short': 'It is shorter than its place in the film: to select it all the same, say why.',
+    # the check line (3.8)
+    'pass': "Claude's check found nothing wrong", 'fail': "Claude's check found {problems}: {first}",
+    'late': "Not checked: Claude's check did not come within {m} minutes. Judge it by eye.", 'unopened': 'Not checked: Claude could not open the picture. Judge it by eye.',
+    'none': 'Not checked: no check was run on this picture. Judge it by eye.',
+    'by': 'Claude looked at the picture against its list of {n} lines.', 'by_steps': 'Claude looked at each step against its list: {ns} lines.',
+    'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
+    'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
+    'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
+    'fact_none': 'Not fact-checked yet.', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
+    'fact_passed_head': 'All {n} rules of the fact check (round {round})', 'fact_saw': 'What the checker saw', 'passed_rule': 'Passed: {rule}',
+    'server_pass': "The server's check: passed.", 'server_fail': "The server's check: not passed. {k} lines are still open:", 'server_none': 'Not checked yet.',
+    'alike': 'Steps {a} and {b} look almost the same: the change between them is small.',
+    'size_ok': "Size: {seen}, the film's shape.", 'size_bad': 'Size: {seen}, not {want}.', 'parent_bad': 'Made from: a picture that was not approved ({seen}).',
+    # the step's sentences
+    'say_need': '{n} need your answer:', 'say_need_one': '1 thing needs your answer:', 'say_coming': '{n} more are being made or checked: they come to the page later.',
+    'say_coming_one': '1 more is being made or checked: it comes to the page later.', 'say_done': 'Then say done here.', 'say_nothing': 'Nothing waits for you on the page now.',
+    'summary': '{n} to answer, {c} still being made or checked.', 'note': 'Answer what is ready, then say done in the chat.', 'nothing': 'Nothing waits for you now.',
+    'making': 'Being made. It joins the list when it is ready.', 'checking': 'Claude is checking it. It joins the list when it is checked.',
+    'made': 'Nothing is recorded or made until you say done in the chat.',
+    'help': ['Each line on the left needs one answer. Answer them in any order, then say done in the chat.',
+             'A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.',
+             'Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.',
+             'New pictures arrive while the film is being made. Claude checks each one first; it joins the list when it is checked.'],
+    'later_step': 'Made from a step that was corrected.',
+}
+PAGE = {   # layout.words.pictures: the page's chrome
+    'todo': 'Needs your answer', 'coming': 'Still being made, nothing to do', 'nothing': W['nothing'], 'against': 'Against the check',
+    'done': {'answer': 'Answered', 'approve': 'Approved', 'again': 'Made again', 'fix': 'Made again, your words', 'select': 'Selected', 'reject': 'Rebuilt, your words', 'plain': 'Made again, no effect'},
+    'undo': 'Undo', 'cancel': 'Cancel', 'details': 'Details', 'more': 'See all {n}', 'fewer': 'Show fewer', 'compare': 'Compare with the earlier try', 'stop': 'Stop comparing',
+    'frames': 'Show its frames', 'video': 'Show the video', 'video_bad': 'The video could not be shown here; these are its frames.',
+    'loading': 'Loading…', 'missing': 'Not available', 'no_large': 'The large picture is not available.', 'gate_wait': 'The buttons work when every picture has shown.',
+    'gate_bad': 'A picture is missing: {pics}. This line cannot be answered here: tell the assistant in the chat.', 'words_need': 'Write what should change first.',
+    'left_one': '1 answer still needed', 'left_many': '{n} answers still needed', 'left_note': 'Choose one from the list on the left.',
+    'end_head': 'All answered', 'end_note': 'Go back to the chat and say done. This is what will happen then:', 'end_foot': 'Nothing is recorded or made before you say done.',
+    'foot': '{n} of {m} answered.', 'foot_wait': 'When all are answered, say done in the chat. Nothing is made before that.', 'foot_done': 'Go back to the chat and say done.',
+    'help': 'How this works', 'keys': 'Keys: the left and right arrows move between the things that need an answer. Escape closes what is open.', 'close': 'Close'}
+
+# ---------- Claude's check: the refusals (design/214's sentences, said of pictures) ----------
+PIC_LOOK_OPEN = ('{name}: the line "{check}" ({id}) has no answer: every line of the picture gets `pass`, true or false. Answer it in its `lines` and send the file again '
+                 '(`vw visuals pictures --looks <file>`).')
+PIC_LOOK_UNKNOWN = '{name}: {id} is not a line of this picture now: list the pictures again (`vw visuals pictures --looks`), answer the lines it gives and send the file again.'
+PIC_LOOK_WORDS = ('{name}: the line "{check}" ({id}) needs one plain sentence of what was seen (`seen`, at most {max} characters): a fail always, and a pass of a line marked '
+                  '`say`. Add it and send the file again (`vw visuals pictures --looks <file>`).')
+PIC_LOOK_NOT_CHECKED = ('{name}: `not_checked` is only for a picture that could not be opened, and then it carries no `lines`. This one carries both: take `not_checked` out if '
+                        'the picture was checked, or the lines if it was not, and send the file again (`vw visuals pictures --looks <file>`).')
+PIC_LOOK_GONE = ('{name}: it is not a picture waiting for its check now (made again, answered, or changed): list the pictures again (`vw visuals pictures --looks`).')
+PIC_LOOK_NONE = 'No picture of this film waits for Claude\'s check: its reference round is not of the new kind, so its pictures keep the check of before.'
+LOOKS_DUE = "{n} picture(s) wait for Claude's check: run `vw visuals pictures --looks`."
+LOOKS_THEN = ("Look at each picture against its lines, as `how` says, write work/visuals/pictures/looks.json and send it (`vw visuals pictures --looks work/visuals/pictures/looks.json`). "
+              'Above 5 pictures, give them to vw-picture-look helpers, about 5 each.')
+LOOKS_NONE = 'No picture waits for Claude\'s check now.'
+COMPONENT_APPROVED = "Approved by Claude's check: a component is a part of a drawn graphic and is judged with it (design/217 D4)."
+LOOK_HOW = {
+    'judge': ["Answer every line of the picture's `lines`, pass or fail, from what you see in the picture, never from the request. A line's `pass_when` says what passes.",
+              'Compare with the inputs where a line asks for it: a parent is what the picture was made from; `scene` pictures are the approved pictures of the same scene; '
+              '`earlier` is the picture this one was made again from; `step before` is the previous step of a graphic.',
+              'Exact words are read letter for letter. A face that matches a person of the footage fails "a real face". Anything the request did not ask for fails "nothing extra".',
+              'Never pass a line you did not look at. A picture you could not open is `not_checked`, with why, and then has no lines.',
+              'The light, the fine detail and the size are measured by the program: they are not your lines.'],
+    'file': {'by': 'assistant | helper',
+             'pictures': [{'ref': '<the picture id>', 'sha10': '<the first 10 characters of its sha256, as listed>',
+                           'lines': [{'id': '<a line id of its `lines`>', 'pass': 'true | false', 'seen': '<with a fail, and with a line marked `say`: one plain sentence, at most 300 characters>'}],
+                           'not_checked': '<only for a picture that could not be opened: why, one line; then no lines>'}]},
+    'send': '`vw visuals pictures --looks <file>`. A refused picture is named with its reason: fix its row and send it again; the others are recorded.'}
+
+ORDINAL = {2: 'a second', 3: 'a third', 4: 'a fourth', 5: 'a fifth'}
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
+def _say(check, words):
+    words = ' '.join(str(words or '').split()).rstrip('.')
+    return f'{check}: {words}.' if words else f'{check}.'
+
+
+def _problems(n):
+    return f"{n} problem{'' if n == 1 else 's'}"
+
+
+def _and(items):
+    items = [str(x) for x in items]
+    return items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' and ' + items[-1]
+
+
+def _plain_cost(text):
+    """D1: no amount of money on these sentences."""
+    return re.sub(r'\s*\((?:about\s*)?(?:₹\s*)?[\d.,]+\s*(?:INR)?\)', '', str(text or '')).strip()
+
+
+# ---------- which pictures Claude checks (C1) ----------
+
+def video_shot(session, plan, ref):
+    """True when the picture is made for an AI video shot (its start or end image, step 7): never Claude's step-6 check."""
+    if ref.get('role') in ('start', 'end') or ref.get('pending_end'):
+        return True
+    shot = _scene_of(plan, session, ref)[1] if plan else None
+    return bool(shot) and V.route_of(shot) == 'video'
+
+
+def claude_checks(session, ref, plan=None):
+    """C1: this picture is checked by Claude's look, not by a model on the server: a still, a step of a graphic, the style sheet, a component
+    or a remade one of these, of a film whose round is v2. Never a picture of a set (design/214), a footage picture, or an AI video's start."""
+    return (V.round_v2(session) and ref.get('kind') in LOOK_KINDS and not ref.get('set') and not (ref.get('kind') == 'keyframe' and video_shot(session, plan, ref)))
+
+
+def _line(check, pass_when, say=False):
+    lid = hashlib.sha1(f'{check}|{pass_when}'.encode('utf-8')).hexdigest()[:8]
+    return {'id': lid, 'check': check, 'pass_when': pass_when, **({'say': True} if say else {})}
+
+
+def _scene_of(plan, session, ref):
+    sid = V.made_for(session, ref)
+    for gap in (plan or {}).get('gaps') or []:
+        for sc in V.all_scenes(gap):
+            if any(sh.get('id') == sid for sh in sc.get('shots') or []):
+                return sc, next(sh for sh in sc['shots'] if sh.get('id') == sid)
+    return None, None
+
+
+def scene_pictures(session, plan, ref):
+    """The approved pictures of the same scene, for the line on background figures (C5): the question the second model call asked after an approval."""
+    scene, _ = _scene_of(plan, session, ref)
+    sids = {s.get('id') for s in (scene or {}).get('shots') or []}
+    return [r for r in session['references'].values() if r['id'] != ref['id'] and r.get('status') == 'approved' and r.get('kind') in ('keyframe', 'isolated')
+            and V.made_for(session, r) in sids and r.get('key')]
+
+
+def step_of(session, ref):
+    """A step's number in its graphic (1-based), or None."""
+    try:
+        chain = V.state_chain(session, V.made_for(session, ref)) or []
+    except ValueError:
+        return None
+    return next((n for n, r in enumerate(chain, 1) if r['id'] == ref['id']), None)
+
+
+def lines(session, plan, ref):
+    """C1, contract 5.3: the check list of one picture for Claude's look. The program's list for the picture (image_check.lines_of: the server's
+    lines, the writer's checklist, the fixed lines), plus per kind: the background-figure line of a still (C5), the step line of a step, the
+    style sheet's own lines, the original's list and two lines of a remade picture. Each line's id is made of its words."""
+    own = list(image_check.lines_of(ref))
+    kind = ref.get('kind')
+    orig = session['references'].get(ref.get('fix_of') or '') if ref.get('fix_of') else None
+    if orig:   # a remade picture is checked against its original's whole list, never a smaller one
+        have = {l['check'] for l in own}
+        own += [l for l in image_check.lines_of(orig) if l['check'] not in have]
+    out = [_line(l['check'], l['pass_when'], l['check'].startswith('drawn fact: ')) for l in own]
+    if kind == 'style':
+        palette = str((((plan or {}).get('foundation') or {}).get('graphic_style') or {}).get('palette') or '').strip()
+        if palette:
+            out.append(_line('the palette', f'only the colours of the plan: {palette}'))
+        out += [_line('sample labels readable', 'the sample labels read at film size, letter for letter'),
+                _line('no scene', 'a sample of the drawing language (lines, fills, lettering), not a scene of the film')]
+    elif kind == 'state':
+        n = step_of(session, ref)
+        if n and n > 1:
+            _scene, shot = _scene_of(plan, session, ref)
+            what = str((((shot or {}).get('states') or [{}] * n)[n - 1] or {}).get('what_appears') or '').strip() if shot and len(shot.get('states') or []) >= n else ''
+            out.append(_line(f'step {n} adds its part', f"it adds what the plan's step {n} names" + (f' ({what})' if what else '') + f'; the rest is as step {n - 1}'))
+    elif kind == 'keyframe' and scene_pictures(session, plan, ref):
+        _scene, shot = _scene_of(plan, session, ref)
+        if shot and V._has_figures(plan, shot):
+            out.append(_line('no background figure repeated', 'no person or animal in it is the same individual as one in the approved pictures of this scene sent with it'))
+    if orig:
+        if ref.get('fix_for'):
+            out.append(_line('the line it was made for', f"the line \"{ref['fix_for']}\" now passes"))
+        out.append(_line('nothing else changed', 'nothing else changed against the earlier picture sent with it'))
+    seen = {}
+    for l in out:
+        seen.setdefault(l['id'], l)
+    return list(seen.values())
+
+
+# ---------- when a picture is offered (C3) ----------
+
+def ready_at(ref):
+    try:
+        return datetime.fromisoformat(str(ref.get('ready_at')))
+    except ValueError:
+        return None
+
+
+def looked(ref):
+    """Claude's look of this picture as it is now (the same sha256), or None."""
+    look = ref.get('look') or {}
+    return look if look and look.get('sha256') == ref.get('sha256') else None
+
+
+def late(ref, now=None):
+    at = ready_at(ref)
+    return bool(at) and (now or _now()) - at >= timedelta(minutes=PICTURE_LOOK_MINUTES)
+
+
+def offered(session, ref, plan=None, now=None):
+    """C3: a picture Claude checks is offered with its look recorded, or PICTURE_LOOK_MINUTES after it became a candidate (as not checked).
+    Any other picture: as before."""
+    if not claude_checks(session, ref, plan):
+        return True
+    return bool(looked(ref)) or late(ref, now)
+
+
+def due(session, plan, now=None):
+    """The candidates that wait for Claude's look: checked by Claude, no look of their content yet. The ones past the time-out stay due: a look that comes before the operator's answer replaces "not checked"."""
+    return [r for r in session['references'].values() if r.get('status') == 'candidate' and r.get('sha256') and claude_checks(session, r, plan) and not looked(r)]
+
+
+def stamp(session, plan):
+    """At the deploy and after: a candidate Claude checks that still waits for the model's check (`check_pending`) or has no `ready_at` is due
+    for a look from now. Returns True when the session changed (the caller saves it)."""
+    changed = False
+    for r in session['references'].values():
+        if r.get('status') == 'candidate' and claude_checks(session, r, plan) and (r.get('check_pending') or not r.get('ready_at')):
+            r.pop('check_pending', None)
+            r.setdefault('ready_at', _now().isoformat())
+            changed = True
+    return changed
+
+
+def waits_words(session, plan):
+    """The first thing `next` and `status` say while pictures wait for Claude's look (C2: the duty is never silent)."""
+    n = len(due(session, plan))
+    return LOOKS_DUE.format(n=n) if n else ''
+
+
+def _big(store, session, ref_id):
+    from .page_flow import sized
+    key, mark = ((session['references'].get(ref_id) or {}).get(k) for k in ('key', 'sha256'))
+    try:
+        return sized(store, key, 'zoom', mark) if key else None
+    except Exception:   # a picture that cannot be shrunk is read at its full size
+        return key
+
+
+def name_of(session, plan, ref):
+    if ref.get('kind') == 'style':
+        return W['style_name']
+    _scene, shot = _scene_of(plan, session, ref)
+    title = str((shot or {}).get('title') or ref.get('name') or ref['id'])
+    n = step_of(session, ref) if ref.get('kind') == 'state' else None
+    return f'{title}, step {n}' if n else title
+
+
+def looks_due(store, run, outputs):
+    """`GET /api/runs/{run_id}/visuals/pictures/looks`: {pictures: [{ref, sha10, kind, name, shot_id, n?, key, inputs: [{ref, role, key}],
+    request, lines}], then, how}. The keys are the 1600 px copies. Stamps the pictures that waited for the model's check at the deploy."""
+    session = V.session_of(store, run, outputs)
+    if not V.round_v2(session):
+        return {'pictures': [], 'then': PIC_LOOK_NONE, 'how': LOOK_HOW}
+    plan = V.guarded(lambda: V.current_plan(store, session))
+    if stamp(session, plan):
+        V.save_session(store, run, session)
+    out = []
+    for r in due(session, plan):
+        inputs = [{'ref': p.get('id'), 'role': 'step before' if r.get('kind') == 'state' and (session['references'].get(p.get('id')) or {}).get('kind') == 'state' else
+                   'scene' if (session['references'].get(p.get('id')) or {}).get('kind') == 'frame' else 'parent'} for p in (r.get('generation') or {}).get('parents') or [] if p.get('id')]
+        if r.get('fix_of'):
+            inputs.append({'ref': r['fix_of'], 'role': 'earlier'})
+        if any(l['check'] == 'no background figure repeated' for l in lines(session, plan, r)):
+            inputs += [{'ref': s['id'], 'role': 'scene'} for s in scene_pictures(session, plan, r)]
+        out.append({'ref': r['id'], 'sha10': str(r['sha256'])[:10], 'kind': r.get('kind'), 'name': name_of(session, plan, r), 'shot_id': V.made_for(session, r),
+                    **({'n': step_of(session, r)} if r.get('kind') == 'state' else {}), 'key': _big(store, session, r['id']),
+                    'inputs': [{**i, 'key': _big(store, session, i['ref'])} for i in inputs], 'request': (r.get('generation') or {}).get('prompt') or '', 'lines': lines(session, plan, r)})
+    return {'pictures': out, 'then': LOOKS_THEN if out else LOOKS_NONE, 'how': LOOK_HOW}
+
+
+def _fault(name, want, sent):
+    """The first fault of one picture's row of a look against its list, as a refusal; None when every line is answered or it says why it was not opened."""
+    one = lambda t: ' '.join(str(t or '').split())
+    why = one(sent.get('not_checked'))
+    if why:
+        return PIC_LOOK_NOT_CHECKED.format(name=name) if sent.get('lines') else (PIC_LOOK_WORDS.format(name=name, check='not_checked', id='-', max=LOOK_SAY) if len(why) > LOOK_SAY else None)
+    got = {a.get('id'): a for a in sent.get('lines') or [] if isinstance(a, dict)}
+    unknown = [i for i in got if i not in {w['id'] for w in want}]
+    if unknown:
+        return PIC_LOOK_UNKNOWN.format(name=name, id=unknown[0])
+    for w in want:
+        a = got.get(w['id'])
+        if not a or not isinstance(a.get('pass'), bool):
+            return PIC_LOOK_OPEN.format(name=name, check=w['check'], id=w['id'])
+        words = one(a.get('seen'))
+        if len(words) > LOOK_SAY or (not words and (a['pass'] is False or w.get('say'))):
+            return PIC_LOOK_WORDS.format(name=name, check=w['check'], id=w['id'], max=LOOK_SAY)
+    return None
+
+
+def record_looks(store, user, run, outputs, pictures, by):
+    """`POST /api/runs/{run_id}/visuals/pictures/looks`: each picture's look, line by line (contract 5.4, 5.5). A refused picture records
+    nothing; the others record. Returns {recorded: [ref], refused: {ref: message}, left: [ref], then}."""
+    session = V.session_of(store, run, outputs)
+    V.need(V.round_v2(session), PIC_LOOK_NONE)
+    plan = V.guarded(lambda: V.current_plan(store, session))
+    stamp(session, plan)
+    who, recorded, refused, at = by if by in ref_find.WHO else 'assistant', [], {}, _now().isoformat()
+    for p in pictures or []:
+        p = p if isinstance(p, dict) else {}
+        rid = str(p.get('ref') or '')
+        r = session['references'].get(rid) or {}
+        name = name_of(session, plan, r) if r else rid
+        if not (r.get('status') == 'candidate' and r.get('sha256') and claude_checks(session, r, plan) and str(r['sha256'])[:10] == str(p.get('sha10') or '')[:10] and p.get('sha10')):
+            refused[rid] = PIC_LOOK_GONE.format(name=name)
+            continue
+        want = lines(session, plan, r)
+        fault = _fault(name, want, p)
+        if fault:
+            refused[rid] = fault
+            continue
+        why = ' '.join(str(p.get('not_checked') or '').split())
+        got = {a.get('id'): a for a in p.get('lines') or [] if isinstance(a, dict)}
+        r['look'] = {'who': who, 'at': at, 'sha256': r['sha256'],
+                     **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': ' '.join(str(got[w['id']].get('seen') or '').split())}
+                                                               for w in want]})}
+        recorded.append(rid)
+        if r.get('kind') == 'component' and not why and all(l['pass'] for l in r['look']['lines']) and not any(c.get('pass') is False for c in (r.get('check') or {}).get('code') or []):
+            # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
+            r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
+    V.save_session(store, run, session)
+    left = [r['id'] for r in due(session, plan)]
+    return {'recorded': recorded, 'refused': refused, 'left': left, 'then': (LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE)}
+
+
+# ---------- the check as the page and the chat say it (F1, contract 3.8) ----------
+
+def advice(ref):
+    """C4, D2: the program's measured lines (size, parents, light, fine detail, transparency) as advice, never a fault."""
+    out = []
+    for c in ((ref.get('check') or {}).get('code') or []):
+        name, seen = str(c.get('check') or ''), str(c.get('seen') or '')
+        if name == 'size':
+            if c.get('pass') is True:
+                out.append(W['size_ok'].format(seen=seen))
+            elif c.get('pass') is False:
+                out.append(W['size_bad'].format(seen=seen, want=str(c.get('pass_when') or '').replace('the picture is ', '')))
+        elif name == 'parent':
+            if c.get('pass') is False:
+                out.append(W['parent_bad'].format(seen=seen))
+        elif seen:
+            out.append(_say(name[:1].upper() + name[1:], seen))
+    return out
+
+
+def _view(state, head, by='', faults=(), passed=(), adv=(), show='first', passed_head=None, advice_head=None):
+    return {'state': state, 'head': head, 'by': by, 'show': show, 'faults': list(faults), 'passed_head': (W['passed_head'] if passed else '') if passed_head is None else passed_head,
+            'passed': list(passed), 'advice_head': (W['advice_head'] if adv else '') if advice_head is None else advice_head, 'advice': list(adv)}
+
+
+def check_view(session, ref, plan=None, now=None):
+    """F1: one picture's check, from Claude's look (`ref.look`) and the program's lines (`ref.check.code`); never from `ref.checklist`.
+    A film of before (round not v2) keeps its model's lines (`ref.check.lines`). States: pass, fail, not_checked, none."""
+    adv = advice(ref)
+    look = looked(ref)
+    if claude_checks(session, ref, plan):
+        if look and look.get('not_checked'):
+            return _view('not_checked', W['unopened'], adv=adv)
+        if look:
+            rows = look.get('lines') or []
+            fails = [_say(l['check'], l.get('seen')) for l in rows if l.get('pass') is False]
+            passed = [_say(l['check'], l.get('seen') or l['check']) for l in rows if l.get('pass') is True]
+            return _view('fail' if fails else 'pass', W['fail'].format(problems=_problems(len(fails)), first=fails[0]) if fails else W['pass'],
+                         W['by'].format(n=len(rows)), fails, passed, adv)
+        return _view('not_checked', W['late'].format(m=PICTURE_LOOK_MINUTES) if late(ref, now) else W['none'], adv=adv)
+    rows = [l for l in ((ref.get('check') or {}).get('lines') or []) if isinstance(l, dict)]
+    if not rows:
+        return _view('none', W['none'], adv=adv)
+    fails = [_say(l.get('check'), l.get('seen')) for l in rows if l.get('pass') is False and (l.get('weight') or 'must') == 'must' and l.get('check') != 'light and colour']
+    passed = [_say(l.get('check'), l.get('seen') or l.get('check')) for l in rows if l.get('pass') is True]
+    return _view('fail' if fails else 'pass', W['fail'].format(problems=_problems(len(fails)), first=fails[0]) if fails else W['pass'], W['by_older'].format(n=len(rows)), fails, passed, adv)
+
+
+def steps_view(store, session, chain, plan=None, now=None):
+    """The check of a graphic in steps: each step's own view, one line for all; two steps alike measured by the program is advice (R3)."""
+    views = [check_view(session, r, plan, now) for r in chain]
+    fails = [f'Step {n}: {f}' for n, v in enumerate(views, 1) for f in v['faults']]
+    passed = [f'Step {n}: {p}' for n, v in enumerate(views, 1) for p in v['passed']]
+    alike = alike_steps(store, chain)
+    adv = list(dict.fromkeys([W['alike'].format(a=a, b=b) for a, b in alike] + [x for v in views for x in v['advice']]))
+    state = 'fail' if fails else 'not_checked' if any(v['state'] in ('not_checked', 'none') for v in views) else 'pass'
+    head = (W['fail'].format(problems=_problems(len(fails)), first=fails[0][0].lower() + fails[0][1:]) if fails else
+            next((v['head'] for v in views if v['state'] in ('not_checked', 'none')), W['pass']) if state == 'not_checked' else W['pass'])
+    counts = [len((looked(r) or {}).get('lines') or []) for r in chain]
+    by = W['by_steps'].format(ns=_and(counts)) if any(counts) else ''
+    return {**_view(state, head, by, fails, passed, adv), '_views': views, '_alike': alike}
+
+
+def alike_steps(store, chain):
+    """R3: the neighbouring steps the program measures as almost the same (the fingerprint the old refusal used), as (n, n+1) pairs."""
+    from . import lookalike
+    prints = []
+    for r in chain:
+        try:
+            prints.append((V._fingerprints(store, r['key']) or {}).get('graphic'))
+        except Exception:
+            prints.append(None)
+    return [(i, i + 1) for i in range(1, len(chain)) if prints[i - 1] is not None and prints[i] is not None and lookalike.distance(prints[i - 1], prints[i]) <= lookalike.BITS_GRAPHIC]
+
+
+def rule_id(text):
+    """C6: a rule of a drawing's brief, known by its words (as `ref_sets.check_lines`)."""
+    return hashlib.sha1(' '.join(str(text or '').split()).lower().encode('utf-8')).hexdigest()[:8]
+
+
+def rules_of(text):
+    """C6: the rules of a drawing (`work/motion/<shot>/rules.md`) as the server keeps them: every list line, numbered or bulleted, with its id."""
+    out = {}
+    for raw in str(text or '').splitlines():
+        m = re.match(r'\s*(?:[-*]|\d+[.)])\s+(.*\S)', raw)
+        if m:
+            words = ' '.join(m.group(1).split())
+            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words})
+    return list(out.values())
+
+
+def fact_view(session, store, job, shot_id):
+    """F3, C6: a motion drawing's fact check, from the verdicts of the project it was rendered from (as `select_take` reads them): passed, not
+    passed with its open rules in full, or none yet. N is the number of rules the server holds for the project (else the verdict's)."""
+    try:
+        sha = (V.load_json(store, job['request']['request_key']) or {}).get('sha256')
+    except Exception:   # the request file cannot be read: no fact check is known
+        sha = None
+    rounds = [c for c in (session.get('motion_checks') or {}).get(shot_id) or [] if sha and c.get('sha256') == sha]
+    if not rounds:
+        return _view('none', W['fact_none'], show='all')
+    last = rounds[-1]
+    rules = last.get('rules') or []
+    n = len(((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []) or len(rules)
+    open_ = [str(r.get('rule')) for r in rules if r.get('pass') is False]
+    redo = max(int(last.get('round') or 1) - 1, 0)
+    r = f"{redo} redo round{'' if redo == 1 else 's'}"
+    return _view('fail' if open_ else 'pass', W['fact_fail'].format(k=len(open_), n=n, r=r) if open_ else W['fact_pass'].format(n=n, r=r), W['fact_by'].format(n=n), open_,
+                 [W['passed_rule'].format(rule=x.get('rule')) for x in rules if x.get('pass') is True], [str(x) for x in last.get('stranger') or []], 'all',
+                 W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'])
+
+
+def server_view(check):
+    """An older drawing (the svg route): the server's own checks, as before."""
+    if not check:
+        return _view('none', W['server_none'], show='all')
+    open_ = list(dict.fromkeys([str(c.get('check')) for c in check.get('must_failed') or []] + [str(l.get('line')) for l in check.get('scorecard') or [] if l.get('state') == 'Fail']))
+    return _view('fail' if open_ else 'pass', W['server_fail'].format(k=len(open_)) if open_ else W['server_pass'], faults=open_, show='all')
+
+
+# ---------- the context of a line ----------
+
+def _t(frames, fps):
+    s = frames / fps
+    return f'{int(s // 60)}:{s % 60:04.1f}'
+
+
+def where(session, plan, shot_id):
+    """The film-time line of a shot, its gap, and the words under it."""
+    fps = float(Fraction(str(V._fps(session) or 25)))
+    for gap, sh in V._accepted_shots(plan, session):
+        if sh['id'] == shot_id:
+            gap_words = f"Gap {gap['gap_id']}" + (f", {gap['title']}" if gap.get('title') else '')
+            return {'where': W['where'].format(start=_t(sh['start_frame'], fps), end=_t(sh['end_frame'], fps), secs=f"{(sh['end_frame'] - sh['start_frame']) / fps:.1f}", gap=gap_words),
+                    'at': _t(sh['start_frame'], fps), 'words': str(sh.get('narration') or ''), 'shot': sh, 'gap': gap}
+    return {'where': '', 'at': '', 'words': '', 'shot': None, 'gap': None}
+
+
+def footage(session, gap):
+    """Your footage before and after the shot's gap: an approved footage picture of the clip just before and just after it (none at the film's
+    start or end). ponytail: a picture of the neighbouring clip, not the exact frame at the cut; the master's in and out points if that matters."""
+    beside = (session.get('gap_neighbours') or {}).get((gap or {}).get('gap_id')) or {}
+    frames = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')]
+    pick = lambda clip: next((r for r in frames if clip and (r.get('source') or {}).get('media_id') == clip), None)
+    return pick(beside.get('before')), pick(beside.get('after'))
+
+
+def _pic(ref, label, role, **extra):
+    return {'_key': ref.get('key'), '_mark': str(ref.get('sha256') or ''), 'label': label, 'role': role, **extra}
+
+
+def _foot_pics(session, gap):
+    before, after = footage(session, gap)
+    return ([_pic(before, W['before'], 'before', cmp_cap=W['before'])] if before else []), ([_pic(after, W['after'], 'after', cmp_cap=W['after'])] if after else [])
+
+
+def earlier_tries(session, ref):
+    """The rejected pictures of the same place as this one (V._slot), newest first."""
+    try:
+        slot = V._slot(session, ref)
+    except Exception:
+        return []
+    out = []
+    for r in session['references'].values():
+        if r.get('status') == 'rejected' and r['id'] != ref['id'] and r.get('kind') == ref.get('kind') and r.get('key'):
+            try:
+                if V._slot(session, r) == slot:
+                    out.append(r)
+            except Exception:
+                continue
+    return sorted(out, key=lambda r: str((r.get('rejection') or {}).get('at') or ''), reverse=True)
+
+
+def _why(r):
+    notes = str((r.get('rejection') or {}).get('notes') or '').strip()
+    return W['why'].format(words=notes) if notes else W['why_none']
+
+
+def _details(ref, made_from=None):
+    gen = ref.get('generation') or {}
+    rows = [['How it was asked for', [str(gen.get('prompt') or '')[:1200]]]] if gen.get('prompt') else []
+    if made_from:
+        rows.append(['The approved looks it was made from', made_from])
+    how = [f"Picture AI: {'an edit of earlier pictures' if gen.get('parents') else 'a new picture'}"] + ([f"Size: {ref['width']}x{ref['height']}"] if ref.get('width') else [])
+    return rows + [['How it was made', how]]
+
+
+def _made_from(session, plan, ref):
+    names = {e['id']: e.get('name') or e['id'] for e in (plan or {}).get('elements') or []}
+    out = []
+    for p in (ref.get('generation') or {}).get('parents') or []:
+        r = session['references'].get(p.get('id')) or {}
+        if r.get('kind') in ('sheet', 'frame', 'supplied'):
+            n = names.get(r.get('element_id')) or r.get('element_id')
+            if n and n not in out:
+                out.append(n)
+    return out
+
+
+def _fix_button(which, hint, faults, say):
+    return {'label': W['correct'] if which == 'correct' else which, 'choice': 'correct', 'act': 'fix', 'needs_words': True, 'hint': hint, 'go': W['go'],
+            'prefill': ' '.join(faults), 'say': say}
+
+
+def picture_line(store, session, plan, ref, style=False, now=None):
+    """Kind `style` or `still` (contract 3.4, 3.5): the picture, its footage before and after, its earlier tries, its check, three answers."""
+    check = check_view(session, ref, plan, now)
+    tries = earlier_tries(session, ref)
+    kind = 'style' if style else 'still'
+    w = where(session, plan, V.made_for(session, ref)) if not style else {'where': '', 'at': '', 'words': '', 'gap': None}
+    before, after = _foot_pics(session, w['gap']) if not style else ([], [])
+    main = _pic(ref, W['style_name'] if style else (W['new_try'].format(n=len(tries) + 1) if tries else W['new']), 'main', faults=check['faults'],
+                **({'check_head': W['check_head']} if check['faults'] else {}))
+    earlier = [_pic(t, W['earlier'].format(n=len(tries) - i), 'earlier', cmp_cap=W['earlier'].format(n=len(tries) - i), why=_why(t)) for i, t in enumerate(tries)]
+    which = ORDINAL.get(len(tries) + 1, 'a new') if tries else 'a new'
+    yes = {'label': W['yes_' + kind], 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_style'] if style else W['say_still'].format(at=w['at']),
+           **({'sure': {'ask': W['sure'].format(problems=_problems(len(check['faults']))), 'go': W['sure_go'], 'back': W['back']}} if check['state'] == 'fail' else {})}
+    no = {'label': W['no'], 'choice': 'no', 'act': 'again', 'needs_words': False,
+          'say': W['say_no_style'] if style else (W['say_no_still_n'].format(which=which) if tries else W['say_no_still'].format(which=which))}
+    fix = _fix_button('correct', W['hint_style' if style else 'hint_still'], check['faults'], W['say_fix_' + kind])
+    line = {'kind': kind, 'name': W['style_name'] if style else name_of(session, plan, ref), 'kind_words': W['kind_' + kind], 'ask': W['ask_' + kind],
+            'pics': before + [main] + after + earlier, 'check': check, 'buttons': [yes, no, fix], 'details': _details(ref, None if style else _made_from(session, plan, ref))}
+    if style:
+        line['sub'] = W['style_sub']
+    else:
+        line.update(where=w['where'], words_head=W['words_head'], words=w['words'], **{'try': W['try'].format(n=len(tries) + 1) if tries else ''},
+                    foot_head=W['foot_still_try' if tries else 'foot_still'])
+    return line
+
+
+def steps_line(store, session, plan, shot_id, chain, now=None):
+    """Kind `steps` (contract 3.6): every step side by side with what appears on which words, one check, "Yes, use all N steps" and one
+    "Correct step n" per step (F2). Two steps alike is advice and asks once (R3)."""
+    n = len(chain)
+    check = steps_view(store, session, chain, plan, now)
+    views, alike = check.pop('_views'), check.pop('_alike')
+    w = where(session, plan, shot_id)
+    states = (w['shot'] or {}).get('states') or []
+    before, after = _foot_pics(session, w['gap'])
+    cap = lambda i: (W['step_cap'].format(n=i + 1, words=states[i]['words'], what=states[i].get('what_appears') or '') if i < len(states) and states[i].get('words') else
+                     W['step_cap_bare'].format(n=i + 1, what=(states[i] if i < len(states) else {}).get('what_appears') or ''))
+    steps = [_pic(r, W['step_label'].format(n=i + 1), 'step', n=i + 1, caption=cap(i), faults=views[i]['faults'],
+                  **({'check_head': W['check_head_step'].format(n=i + 1)} if views[i]['faults'] else {})) for i, r in enumerate(chain)]
+    tries = [t for r in chain for t in earlier_tries(session, r)]
+    earlier = [_pic(t, W['earlier_step'].format(s=step_of(session, t) or '?', n=1), 'earlier', cmp_cap=W['earlier_step'].format(s=step_of(session, t) or '?', n=1), why=_why(t)) for t in tries]
+    sure = None
+    if check['state'] == 'fail' or alike:
+        bad = sorted({int(f.split(':')[0].split()[1]) for f in check['faults']})
+        problems = f"{_problems(len(check['faults']))} in step{'s' if len(bad) > 1 else ''} {_and(bad)}" if bad else ''
+        alike_w = (f", and steps {alike[0][0]} and {alike[0][1]} look almost the same" if problems else '') if alike else ''
+        sure = {'ask': W['sure_steps'].format(problems=problems, alike=alike_w, n=n) if problems else W['sure_steps_alike'].format(a=alike[0][0], b=alike[0][1], n=n),
+                'go': W['sure_steps_go'].format(n=n), 'back': W['back']}
+    buttons = [{'label': W['yes_steps'].format(n=n), 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_steps'].format(n=n, at=w['at']), **({'sure': sure} if sure else {})}]
+    for k in range(1, n + 1):
+        later = list(range(k + 1, n + 1))
+        say = (W['say_step'].format(k=k, words='{words}', later=(f'Step {later[0]} is' if len(later) == 1 else f'Steps {_and(later)} are')) if later else
+               W['say_step_last'].format(k=k, p=k - 1, words='{words}'))
+        b = _fix_button(W['correct_step'].format(n=k), W['hint_step'].format(n=k), views[k - 1]['faults'], say)
+        buttons.append({**b, 'choice': f'correct:{k}'})
+    return {'kind': 'steps', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_steps'], 'ask': W['ask_steps'].format(n=n), 'where': w['where'],
+            'words_head': W['words_head'], 'words': w['words'], 'try': W['try'].format(n=2) if tries else '', 'strip_head': W['strip_head'],
+            'foot_head': W['foot_steps_try' if tries else 'foot_steps'], 'pics': before + steps + after + earlier, 'check': check, 'buttons': buttons,
+            'details': _details(chain[0]) if chain else []}
+
+
+def finish_listed(fin):
+    from . import motion
+    parts = [motion.FINISH_PHRASE[n] for n in motion.FINISH if n in (fin or [])]
+    return _and(parts) if parts else ''
+
+
+def drawn_line(store, session, plan, job, check, fin, motion_take):
+    """Kind `drawn` (contract 3.7): the video (its page copy) with the frame sheet one click away, the fact check with every open rule in full,
+    select (with the operator's reason when it is held, F3), reject, and "Take the effect away" when it has a finish (no confirmation, D8)."""
+    res, shot_id = job.get('result') or {}, job['unit']
+    view = fact_view(session, store, job, shot_id) if motion_take else server_view(check)
+    w = where(session, plan, shot_id)
+    ev = res.get('evidence') or {}
+    held = (W['held_fact'] if view['state'] == 'fail' and motion_take else W['held_none'] if view['state'] == 'none' and motion_take else
+            W['held_server'] if view['state'] == 'fail' else W['held_unread'] if check.get('not_read') else W['held_short'] if ev.get('timing_matches_placement') is False else '')
+    listed = finish_listed(fin)
+    before, after = _foot_pics(session, w['gap'])
+    sheet_key = res.get('sheet_key') or check.get('sheet_key')
+    pics = before + ([{'_key': sheet_key, '_mark': str(res.get('sha256') or ''), 'label': W['sheet'], 'role': 'sheet', 'faults': []}] if sheet_key else []) + after
+    select = {'label': W['select'], 'choice': 'select', 'act': 'select', 'needs_words': bool(held), 'say': W['say_select_why' if held else 'say_select'].format(at=w['at'], words='{words}'),
+              **({'hint': W['hint_why'], 'go': W['go_why'], 'prefill': '', 'need': W['need_why']} if held else {})}
+    buttons = [select, {'label': W['reject'], 'choice': 'reject', 'act': 'reject', 'needs_words': True, 'hint': W['hint_reject'], 'go': W['go'],
+                        'prefill': ' '.join(view['faults']) if view['state'] == 'fail' else '', 'say': W['say_reject']}]
+    if listed:
+        buttons.append({'label': W['plain'], 'choice': 'plain', 'act': 'plain', 'needs_words': False, 'say': W['say_plain'].format(finish=listed)})
+    secs = ev.get('exact_seconds') or ((job.get('request') or {}).get('duration_seconds'))
+    return {'kind': 'drawn', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_drawn'], 'ask': W['ask_drawn'], 'where': w['where'],
+            'words_head': W['words_head'], 'words': w['words'], 'try': '', 'foot_head': W['foot_drawn'],
+            'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['video'], 'none': W['video_none']},
+            'finish': W['finish'].format(finish=listed) if listed else '', 'held': held, 'pics': pics, 'check': view, 'buttons': buttons,
+            'details': [['How it was made', ['Built as a web animation by Claude helpers on the laptop, rendered to video by the server. No picture AI.' if motion_take else 'Drawn by the server from the scene file.']
+                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]]}
+
+
+def question_line(session, plan, item, q, ref):
+    """Kind `question` (contract 3.3): the server's question in plain words (no reference ids, no amounts), one button per choice."""
+    choices = [str(c) for c in q.get('choices') or []]
+    plain = lambda t: _plain_cost(re.sub(r'\b[0-9a-f]{8}(?:-[0-9a-f-]{4,})?(?:…|\.\.\.)?', 'this picture', str(t or '')))
+    labels = [plain(c)[:1].upper() + plain(c)[1:] for c in choices]
+    return {'kind': 'question', 'name': (name_of(session, plan, ref) if ref else str(item)), 'kind_words': W['kind_question'], 'ask': plain(q.get('question')), 'from': W['q_from'],
+            'pics': [_pic(ref, name_of(session, plan, ref), 'main')] if ref and ref.get('sha256') and ref.get('key') else [],
+            'buttons': [{'label': l[:60], 'choice': f'c{i}', 'act': 'answer', 'needs_words': False, 'say': W['say_answer'].format(choice=l)} for i, l in enumerate(labels, 1)][:4],
+            'details': []}
+
+
+def chat_text(line):
+    """One flow, two front ends: what the chat shows of a page line: the check line, its faults, the measured advice, the place, the finish, why it is held."""
+    c = line.get('check') or {}
+    rows = ([line['where']] if line.get('where') else []) + ([c['head']] if c.get('head') else []) + (c.get('faults') or [])[1 if c.get('state') == 'fail' and c.get('show') != 'all' else 0:6] \
+        + (c.get('advice') or [])[:4] + ([line['finish']] if line.get('finish') else []) + ([line['held']] if line.get('held') else [])
+    return '\n'.join('- ' + r for r in rows if r)
+
+
+# ---------- what is still coming (layout.coming) ----------
+
+def coming(session, plan, take_rows, now=None):
+    """The items with no answer yet: being made (a picture `generating`, a drawing whose render is not ready) or made and waiting for Claude's check."""
+    out = []
+    kinds = {'keyframe': W['kind_still'], 'state': W['kind_steps'], 'style': W['kind_style']}
+    for r in session['references'].values():
+        if r.get('kind') not in kinds or r.get('set') or (r.get('kind') == 'keyframe' and video_shot(session, plan, r)):
+            continue
+        state = 'making' if r.get('status') == 'generating' else 'checking' if r.get('status') == 'candidate' and r.get('sha256') and not offered(session, r, plan, now) else None
+        if state:
+            name = W['style_name'] if r['kind'] == 'style' else name_of(session, plan, r)
+            row = {'name': name, 'kind_words': kinds[r['kind']], 'state': state, 'note': W[state]}
+            if row not in out:
+                out.append(row)
+    shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
+    for j in take_rows or []:
+        if j.get('provider') == 'drawn' and j.get('status') in ('queued', 'running') and j.get('unit') in shots:
+            row = {'name': str(shots[j['unit']].get('title') or j['unit']), 'kind_words': W['kind_drawn'], 'state': 'making', 'note': W['making']}
+            if row not in out:
+                out.append(row)
+    return out
+
+
+def say(lines, rows):
+    """The one message the assistant posts with the link (contract 2.4)."""
+    more = (W['say_coming_one'] if len(rows) == 1 else W['say_coming'].format(n=len(rows))) if rows else ''
+    if not lines:
+        return ' '.join(x for x in (W['say_nothing'], more) if x)
+    head = W['say_need_one'] if len(lines) == 1 else W['say_need'].format(n=f'{len(lines)} things')
+    return head + ''.join('\n- ' + l['name'] for l in lines) + '\n' + ' '.join(x for x in (more, W['say_done']) if x)

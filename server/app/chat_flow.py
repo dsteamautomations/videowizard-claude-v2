@@ -18,6 +18,7 @@ from fractions import Fraction
 from io import BytesIO
 from pathlib import Path
 
+from . import pictures as P
 from . import visuals_stage as V
 
 NOTHING = 'Nothing is needed from you now.'
@@ -1569,31 +1570,50 @@ def _waiting_items(ctx):
             q = session['questions'][it]
             choices = [str(c) for c in (q.get('choices') or [])]
             buttons = [_button(c[:40], f'c{i + 1}') for i, c in enumerate(choices)]   # a question always has two or more (the server refuses fewer)
-            items.append(_item(f'question:{it}', 'question', where, q['question'],
-                               lambda choice, quote, words, it=it, choices=choices: V.answer(store, user, run, outputs, it, words or choices[int(choice[1:]) - 1]), buttons[:4],
-                               text='\n'.join(f'- {c}' for c in choices) if len(choices) > 4 or any(len(c) > 40 for c in choices) else '', more=buttons[4:],
-                               show=[_pic(run, it, f'question-{it}')] if ref and ref.get('sha256') else []))
+            item = _item(f'question:{it}', 'question', where, q['question'],
+                         lambda choice, quote, words, it=it, choices=choices: V.answer(store, user, run, outputs, it, words or choices[int(choice[1:]) - 1]), buttons[:4],
+                         text='\n'.join(f'- {c}' for c in choices) if len(choices) > 4 or any(len(c) > 40 for c in choices) else '', more=buttons[4:],
+                         show=[_pic(run, it, f'question-{it}')] if ref and ref.get('sha256') else [])
+            if w.get('step') != 'references' and len(choices) <= 4 and not (ref and P.video_shot(session, plan, ref)):   # design/217: a question about a made picture is a line of step 6; a size or fact question stays in the chat
+                item['_line'] = P.question_line(session, plan, it, q, ref)
+            items.append(item)
         elif kind in ('style sheet to approve', 'sheet to approve', 'picture to answer') and ref:
+            line = P.picture_line(store, session, plan, ref, style=kind.startswith('style')) if kind.startswith('style') or (kind == 'picture to answer' and w.get('step') == 'pictures') else None
             what = 'The style sheet of the graphics' if kind.startswith('style') else names.get(ref.get('element_id')) or w['label']
 
             def run_(choice, quote, words, ref=ref):
                 if choice == 'yes':
                     return V.approve_reference(store, user, run, outputs, ref['id'], ref['sha256'], quote, conn)
-                return V.reject_reference(store, user, run, outputs, ref['id'], words, quote)
-            items.append(_item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f'{what}: is this picture right?', run_,
-                               [_button('Yes', 'yes'), _button('No', 'no'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')],
-                               text='\n'.join('- ' + str((x.get('line') or x.get('check') or x.get('text') or '') if isinstance(x, dict) else x) for x in (ref.get('checklist') or [])[:6]),
-                               show=[_pic(run, ref['id'], f"picture-{ref['id']}")]))
+                return V.reject_reference(store, user, run, outputs, ref['id'], '' if choice == 'no' else words, quote)   # design/217 (F4): a bare No carries no reason
+            if line:   # design/217: the style sheet and a still say the page's words in the chat too (F1: the check from Claude's look and the program's lines)
+                item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_,
+                             [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct.' if b['needs_words'] else '') for b in line['buttons']],
+                             text=P.chat_text(line), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
+                item['_line'] = line
+            else:
+                item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f'{what}: is this picture right?', run_,
+                             [_button('Yes', 'yes'), _button('No', 'no'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')],
+                             text=P.chat_text({'check': P.check_view(session, ref, plan)}), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
+            items.append(item)
         elif kind == 'graphics to approve':
             chain = V.state_chain(session, group) or []
 
             def run_(choice, quote, words, group=group, chain=chain):
                 if choice == 'yes':
                     return V.sequence(store, user, run, outputs, group, [r['id'] for r in chain], quote)
-                return V.reject_reference(store, user, run, outputs, chain[-1]['id'], words, quote)
-            items.append(_item(f'graphics:{group}:{len(chain)}', 'graphics', where, f'{title(group)}: are these {len(chain)} steps of the graphic right?', run_,
-                               [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')],
-                               show=[_pic(run, r['id'], f'{group}-step-{i + 1}') for i, r in enumerate(chain)]))
+                k = int(choice.split(':')[1]) if choice.startswith('correct:') else len(chain)   # design/217 (F2): the step the operator named; "correct" alone is the last, as before
+                V.need(1 <= k <= len(chain), f'{title(group)}: there is no step {k}.')
+                out = V.reject_reference(store, user, run, outputs, chain[k - 1]['id'], words, quote)
+                for later in chain[k:]:   # each later step was made from the one before it: made again from the corrected one
+                    if (session['references'].get(later['id']) or {}).get('status') in ('candidate', 'approved'):
+                        V.reject_reference(store, user, run, outputs, later['id'], P.W['later_step'], quote)
+                return out
+            line = P.steps_line(store, session, plan, group, chain)
+            buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct in this step.' if b['needs_words'] else '') for b in line['buttons']]
+            item = _item(f'graphics:{group}:{len(chain)}', 'graphics', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:],
+                         text=P.chat_text(line), show=[_pic(run, r['id'], f'{group}-step-{i + 1}') for i, r in enumerate(chain)])
+            item['_line'] = line
+            items.append(item)
         elif kind in ('drawing spec to approve', 'material spec to approve'):
             key = V.material_key(group) if kind.startswith('material') else group
             specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once
@@ -1619,32 +1639,44 @@ def _waiting_items(ctx):
             look = [f"Look at: {watch.get('what')}" + (f" at {watch['at_s']} s" if watch.get('at_s') is not None else '')] if watch.get('what') else []
             if check.get('blocked'):   # the guide came back unedited, or the wrong length: not a take, nothing to select; the word to send it again is asked with the shot
                 continue
-            fact = ((session.get('motion_checks') or {}).get(group) or [None])[-1] if (job.get('request') or {}).get('kind') == 'motion' else None
-            fact_line = [f"Fact check: {'passed' if fact.get('pass') else 'not passed'}" + (f" ({str(fact.get('notes'))[:160]})" if fact.get('notes') else '')] if isinstance(fact, dict) else []
+            motion_take = (job.get('request') or {}).get('kind') == 'motion'
+            drawn = job.get('provider') == 'drawn'
             ev = res.get('evidence') or {}
-            failed = [str(c.get('check')) for c in (check.get('must_failed') or [])] + [str(l.get('line')) for l in (check.get('scorecard') or []) if l.get('state') == 'Fail']
-            hold = bool(failed or check.get('not_read') or (isinstance(fact, dict) and fact.get('pass') is False) or ev.get('timing_matches_placement') is False)
-            why_hold = ('The checks did not pass it (' + ', '.join(dict.fromkeys(failed)) + ')' if failed else 'It was not checked' if check.get('not_read')
-                        else 'Its fact check did not pass' if isinstance(fact, dict) and fact.get('pass') is False else 'It is shorter than its place in the film' if hold else '')
-            text = '\n'.join('- ' + x for x in ([motion.finish_words(fin)] if fin else []) + fact_line + lines + look
-                             + ([why_hold + ': to select it all the same, the operator says why.'] if hold else []) if x)
+            line = P.drawn_line(store, session, plan, job, check, fin, motion_take) if drawn else None
+            if line:   # design/217 (F3): held as select_take holds it: the fact check of the project it was rendered from, no fact check yet, the server's lines, the timing
+                hold, why_hold = bool(line['held']), line['held'].split(':')[0] if line['held'] else ''
+                text = P.chat_text(line)
+            else:
+                failed = [str(c.get('check')) for c in (check.get('must_failed') or [])] + [str(l.get('line')) for l in (check.get('scorecard') or []) if l.get('state') == 'Fail']
+                hold = bool(failed or check.get('not_read') or ev.get('timing_matches_placement') is False)
+                why_hold = ('The checks did not pass it (' + ', '.join(dict.fromkeys(failed)) + ')' if failed else 'It was not checked' if check.get('not_read')
+                            else 'It is shorter than its place in the film' if hold else '')
+                text = '\n'.join('- ' + x for x in lines + look + ([why_hold + ': to select it all the same, the operator says why.'] if hold else []) if x)
+            short = ev.get('timing_matches_placement') is False
 
-            def run_(choice, quote, words, job=job, group=group):
-                if choice == 'select':   # a held take is selected only with the operator's own reason (never a note written for them)
-                    return V.select_take(conn, store, user, run, outputs, str(job['id']), quote, words if hold else (words or 'selected in the chat'), words if hold else '', None)
-                if choice == 'no-effect':
+            def run_(choice, quote, words, job=job, group=group, hold=hold, short=short):
+                if choice == 'select':   # a held take is selected only with the operator's own reason; design/217 (F3): never a note the operator did not give
+                    if not hold:   # nothing holds it: the accepted review carries the operator's click, no words
+                        V.review_take(conn, store, user, run, outputs, str(job['id']), 'accepted', '', '', quote)
+                    return V.select_take(conn, store, user, run, outputs, str(job['id']), quote, words if hold else '', words if hold and short else '', None)
+                if choice in ('plain', 'no-effect'):   # design/217: "plain" on the page; "no-effect", the chat's older word, kept
                     out = V.motion_finish(conn, store, user, run, outputs, group, False)
                     V.review_take(conn, store, user, run, outputs, str(job['id']), 'rejected', "made again without the effect, at the operator's word", '', quote)   # the drawing with the effect is not asked about again
                     return {**out, 'tell': 'The drawing is being made again without the effect. ' + NOTHING}
                 return V.review_take(conn, store, user, run, outputs, str(job['id']), 'rejected', words, '', quote)
-            drawn = job.get('provider') == 'drawn'
             show = [{'key': res['key'], 'name': f"{group}-{'drawing' if drawn else 'take'}.mp4"}] if res.get('key') else []
             sheet_key = res.get('sheet_key') or check.get('sheet_key')
             show += [{'key': sheet_key, 'name': f'{group}-frames.jpg'}] if sheet_key else []
-            items.append(_item(f"take:{job['id']}", 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_,
-                               [_button('Select', 'select', words=hold, tell=why_hold + ': ask the operator why it is right for the film all the same.'),
-                                _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with it.')] + ([_button('Take the effect away', 'no-effect')] if fin else []),
-                               text=text, show=show))
+            if line:
+                buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell=(why_hold + ': ask the operator why it is right for the film all the same.') if b['choice'] == 'select'
+                                   else 'Ask the operator what is wrong with it.' if b['needs_words'] else '') for b in line['buttons']]
+            else:
+                buttons = [_button('Select', 'select', words=hold, tell=why_hold + ': ask the operator why it is right for the film all the same.'),
+                           _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with it.')] + ([_button('Take the effect away', 'no-effect')] if fin else [])
+            item = _item(f"take:{job['id']}", 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show)
+            if line:
+                item['_line'] = line
+            items.append(item)
     return items
 
 
@@ -1986,6 +2018,23 @@ def card_answer(conn, store, user, run, outputs, card_id, answers, one=False):
 
 
 def next_item(conn, store, user, run, outputs, one=False):
+    """design/217 (C2): the pictures that wait for Claude's check are said first, in `then`: the duty is never silent."""
+    out = _next_item(conn, store, user, run, outputs, one)
+    try:
+        session = V.session_of(store, run, outputs)
+        plan = V.current_plan(store, session) if session.get('current') and V.round_v2(session) else None
+    except (ValueError, V.Problem):
+        plan = None
+    if plan:
+        if P.stamp(session, plan):   # a picture that waited for the model's check at the deploy is given to Claude's check
+            V.save_session(store, run, session)
+        looks = P.waits_words(session, plan)
+        if looks:
+            out['then'] = looks + (' ' + out['then'] if out.get('then') else '')
+    return out
+
+
+def _next_item(conn, store, user, run, outputs, one=False):
     """The one decision the operator takes now; or, for the treatment's lines and the plan's gaps, all of them on one card (design/190; `one` asks
     them one at a time, the older way, kept for a machine that cannot show the card); or that nothing is needed and what is being made."""
     try:

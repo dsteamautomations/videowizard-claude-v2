@@ -79,7 +79,7 @@ def sheet_alone(s):
     s.pop('round')
 
 
-CASES = {'a still of a shot': (still, 0), 'the start picture of a video shot': (start, 0), 'a set of an older round': (lambda s: s['round'].pop('v'), 2),
+CASES = {'the start picture of a video shot': (start, 0),   # design/217 (C1): a still of a shot of a v2 film is Claude's now (test_design217_server_pure) 'a set of an older round': (lambda s: s['round'].pop('v'), 2),
          "a person's sheet with no round": (sheet_alone, 2)}
 
 
@@ -438,5 +438,5 @@ def test_the_instructions_and_the_helper_say_that_the_look_checks_and_no_text_sa
 
 
 def test_the_versions_of_this_release():
-    assert Settings.model_fields['SERVER_VERSION'].default == '0.114.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.98.0'   # design/216b; design/216: 0.113.0 / 0.97.0; design/215: 0.112.0 / 0.96.0
-    assert json.loads((REPO / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.98.0'
+    assert Settings.model_fields['SERVER_VERSION'].default == '0.115.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.99.0'   # design/217; design/216b: 0.114.0 / 0.98.0; design/216: 0.113.0 / 0.97.0; design/215: 0.112.0 / 0.96.0
+    assert json.loads((REPO / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.99.0'

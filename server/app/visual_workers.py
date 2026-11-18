@@ -445,6 +445,14 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
             from . import image_check
             for pic in made:
                 pic['check'] = image_check.code_only(session, pic)
+        elif status == 'retained' and _claude_checks(store, session, ref):
+            # design/217 (C1): a still, a step, the style sheet, a component or a remade one of a v2 film is checked by Claude's look (pictures.lines);
+            # no model call. The code checks now; the measured light, detail and transparency after this transaction (check_image), as advice.
+            from . import image_check
+            ref['check'] = image_check.code_only(session, ref)
+            ref['ready_at'] = datetime.now(timezone.utc).isoformat()   # C3: offered after its look, or PICTURE_LOOK_MINUTES from now as not checked
+            ref.pop('check_pending', None)
+            due = True
         elif status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
             due = True   # design/92: checked after this transaction, with no lock held (check_image)
             for pic in made:   # design/211: every picture of a set is checked, not the first only
@@ -462,6 +470,8 @@ def check_image(job, result):
     k, rid = f"{job['run_id']}/visuals/session.json", job['request']['reference']['id']
     try:
         session = json.loads(store.get(k).decode('utf-8'))
+        if _claude_checks(store, session, session['references'][rid]):   # design/217 (C1, C4): no model reads it; the program's measurements only
+            return _measure(store, k, job, rid, result)
         records = {rid: image_check.run_check(store, session, session['references'][rid], result, transport_factory)}
         for n in range(2, 2 + len((result or {}).get('extra') or [])):   # design/211: the other pictures of a set, each with its own check (one model call each)
             pic = session['references'].get(f'{rid}-{n}')
@@ -482,6 +492,47 @@ def check_image(job, result):
                 return
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
     except Exception:   # a picture is never held back by its check
+        return
+
+
+def _claude_checks(store, session, ref):
+    """design/217 (C1): this picture is checked by Claude's look (pictures.claude_checks), with the plan when it can be read (an AI video's start is not)."""
+    from . import pictures, visuals_stage as V
+    try:
+        plan = V.current_plan(store, session) if session.get('current') else None
+    except Exception:
+        plan = None
+    return pictures.claude_checks(session, ref, plan)
+
+
+def _measure(store, k, job, rid, result):
+    """design/217 (C4, D2): the program's measurements of a picture Claude checks, as advice beside its code lines: the light and the fine detail
+    against the footage, a component's transparency. Never a fault, never a model call. A picture changed meanwhile keeps what it has. Never raises."""
+    from . import image_check
+    try:
+        session = json.loads(store.get(k).decode('utf-8'))
+        ref = session['references'][rid]
+        png = store.get(result['key'])
+        added = []
+        for fn in (lambda: image_check.light_line(store, session, ref, png), lambda: image_check.detail_line(store, session, ref, png),
+                   lambda: image_check.alpha_line(png) if ref.get('kind') == 'component' else None):
+            try:
+                line = fn()
+            except Exception:
+                line = None
+            if line:
+                added.append({**line, 'weight': 'advice', 'advice': True})
+        if not added:
+            return
+        with connect() as conn:
+            conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
+            session = json.loads(store.get(k).decode('utf-8'))
+            ref = session['references'].get(rid)
+            if not ref or ref.get('job_id') != str(job['id']) or ref.get('status') != 'candidate' or ref.get('sha256') != result.get('sha256'):
+                return
+            ref.setdefault('check', {}).setdefault('code', []).extend(added)
+            store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+    except Exception:   # a measurement never holds a picture back
         return
 
 

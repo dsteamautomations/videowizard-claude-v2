@@ -32,6 +32,7 @@ def test_a_failed_check_no_longer_makes_a_fix_on_its_own(monkeypatch):
     assert row['check']['must_failed'] and 'fix_queued' not in row and not hasattr(IC, 'queue_fix')
 
 
+@pytest.mark.skip(reason='design/217 (D3): the fix round is retired; test_design217_server_pure asserts the refusal')
 def test_a_fix_on_request_names_its_line_and_cost_and_is_labelled():
     doc, sess = film(references=refs(checked('K1')))
     store = store_with(sess, doc)
@@ -44,6 +45,7 @@ def test_a_fix_on_request_names_its_line_and_cost_and_is_labelled():
     assert view[out['reference_id']]['fix_for'] == 'label: Rat-trap bond'   # X2: the page labels it
 
 
+@pytest.mark.skip(reason='design/217 (D3): the fix round is retired; test_design217_server_pure asserts the refusal')
 def test_a_fix_whose_failed_line_runs_to_two_clauses_is_not_refused_as_two_changes():
     """design/124 A4: one change per edit; a fix's one change is the failed line, which may hold a ';' or two sentences."""
     row = {**checked('K1'), 'server_checklist': [{'check': FAILED['check'], 'pass_when': 'the label reads exactly; nothing else is lettered. The leader line ends on the wall', 'weight': 'must'}]}
@@ -52,6 +54,7 @@ def test_a_fix_whose_failed_line_runs_to_two_clauses_is_not_refused_as_two_chang
     assert out['of'] == 'K1'
 
 
+@pytest.mark.skip(reason='design/217 (D3): the fix round is retired; test_design217_server_pure asserts the refusal')
 @pytest.mark.parametrize('row, message', [
     (pic('K1', 'DG1', check={'lines': [], 'must_failed': []}), 'nothing to fix: no must line failed'),
     (checked('K1', fix_of='K0'), 'a fix is not fixed again'),
@@ -76,6 +79,7 @@ def test_the_spend_counts_fixes_apart_and_knows_an_old_fix_by_its_name():
     assert sp['images'] == 4 and sp['fixes'] == 2
 
 
+@pytest.mark.skip(reason='design/217 (D3): the fix round is retired; test_design217_server_pure asserts the refusal')
 def test_a_fix_job_records_what_it_fixes():
     doc, sess = film(references=refs(checked('K1')))
     conn = FakeConn([])

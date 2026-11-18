@@ -68,9 +68,9 @@ def sequence_store(second):
 
 
 def test_a_state_that_adds_nothing_visible_is_refused():
-    """N12: the same fingerprint as the state before."""
-    with pytest.raises(Problem, match='state 2'):
-        g(lambda: VS.sequence(sequence_store(drawing((10, 10, 150, 80))), USER, RUN, [], 'AN1', ['R1', 'R2'], 'yes'))
+    """N12: the same fingerprint as the state before. design/217 (R3): no longer refused: a warning, the operator's to judge (asked once on the page)."""
+    out = VS.sequence(sequence_store(drawing((10, 10, 150, 80))), USER, RUN, [], 'AN1', ['R1', 'R2'], 'yes')
+    assert any('steps 1 and 2 look almost the same' in w for w in out['warnings'])
     out = VS.sequence(sequence_store(drawing((10, 10, 150, 80), (20, 20, 40, 70), (100, 20, 140, 70))), USER, RUN, [], 'AN1', ['R1', 'R2'], 'yes')
     assert out['states'] == 2
 

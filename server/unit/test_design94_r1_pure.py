@@ -199,8 +199,8 @@ def test_a_look_alike_state_names_both_cards(monkeypatch):
     monkeypatch.setattr(VS, '_fingerprints', lambda store, k: {'graphic': 0, 'picture': 0})
     monkeypatch.setattr(lookalike, 'distance', lambda a, b: 0)
     doc, sess = film(references=refs(*build()))
-    with pytest.raises(Problem, match=r'state 2 \(state-TITLE-b\) looks the same as state 1 \(keyframe-TITLE-a\)'):
-        g(lambda: VS.sequence(store_with(sess, doc), USER, RUN, [], 'AN1', [], 'yes'))
+    out = VS.sequence(store_with(sess, doc), USER, RUN, [], 'AN1', [], 'yes')   # design/217 (R3): a warning, no longer a refusal
+    assert any('steps 1 and 2 look almost the same' in w for w in out['warnings'])
 
 
 def test_states_with_no_shot_recorded_use_the_given_order_with_a_warning():

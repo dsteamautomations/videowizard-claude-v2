@@ -1389,6 +1389,7 @@ class MotionUpload(Write):   # design/130
     shot_id: str
     name: str
     content_base64: str
+    rules: str = Field(default='', max_length=60000)   # design/217 (C6): work/motion/<shot>/rules.md, held by the server per project
 
 
 class ChatAnswer(Write):   # design/188: the operator's answer to the one decision the server handed out
@@ -1456,7 +1457,7 @@ def visuals_motion_rule(run_id: UUID, body: SubjectRule, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/motion/upload')
 def visuals_motion_upload(run_id: UUID, body: MotionUpload, user=User, conn=DB):   # design/130 §4: the shot's HyperFrames project as one zip
     import base64 as b64
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_motion(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64)))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_motion(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64), body.rules))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/tool', status_code=201)
@@ -1888,6 +1889,25 @@ def visuals_round_looks_due(run_id: UUID, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/round/looks')
 def visuals_round_looks(run_id: UUID, body: RoundLooks, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_looks(storage(), user, run, outputs, body.sets, body.by))
+
+
+class PictureLooks(Write):   # design/217 (C2): `vw visuals pictures --looks <file>`
+    by: str = 'assistant'
+    pictures: list[dict[str, Any]] = Field(min_length=1, max_length=200)
+
+
+@app.get('/api/runs/{run_id}/visuals/pictures/looks')
+def visuals_picture_looks_due(run_id: UUID, user=User, conn=DB):
+    """design/217: the step-6 pictures that wait for Claude's check, with their lines. It makes the large copies and stamps the pictures that waited for the model's check, so it takes the run's lock."""
+    from . import pictures
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: pictures.looks_due(storage(), run, outputs)))
+
+
+@app.post('/api/runs/{run_id}/visuals/pictures/looks')
+def visuals_picture_looks(run_id: UUID, body: PictureLooks, user=User, conn=DB):
+    from . import pictures
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: pictures.record_looks(storage(), user, run, outputs, body.pictures, body.by))
 
 
 @app.post('/api/runs/{run_id}/visuals/round/rest')
