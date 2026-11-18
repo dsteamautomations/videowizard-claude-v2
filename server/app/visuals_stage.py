@@ -6042,8 +6042,23 @@ def drawing_note(session, plan, user, shots, text):
     return rows[-1]
 
 
+def withdraw_note(session, shots, text):
+    """design/218b: the named drawings leave the note that reads `text`; a note with no drawing left is deleted."""
+    text = ' '.join(str(text or '').split())
+    rows = session.get('drawing_notes') or []
+    for shot in shots:
+        row = next((r for r in rows if r['text'] == text and shot in r['shots']), None)
+        need(row, f'No note on {shot} reads "{text}": nothing to withdraw (the notes are in its brief, `vw motion brief --shot {shot}`).')
+        row['shots'].remove(shot)
+    session['drawing_notes'] = [r for r in rows if r['shots']]
+
+
 def add_note(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
+    if (body.get('remove') or '').strip():
+        withdraw_note(session, body['shots'], body['remove'])
+        save_session(store, run, session)
+        return {'notes': session['drawing_notes'], 'next': f"Withdrawn from {', '.join(body['shots'])}: the next briefs of those drawings no longer carry it."}
     row = drawing_note(session, current_plan(store, session), user, body['shots'], body['text'])
     save_session(store, run, session)
     return {'note': row, 'next': f"Recorded for {', '.join(row['shots'])}: the next briefs of those drawings carry it (`vw motion brief`); the operator sees it under Details, nothing is asked."}
@@ -6052,8 +6067,10 @@ def add_note(store, user, run, outputs, body):
 def palette_line(plan, session):
     """design/218: the brief's palette: the plan's, then the colours added since (design/218 A), so every drawing agrees."""
     base = ((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or 'the approved style picture'
-    added = '; '.join(f"{r['thing']} {r['colour']} ({r['words']})" for r in (session.get('added_colours') or {}).values())
-    return f"Palette: {base.rstrip('.')}." + (f' Added for every drawing of this film: {added}.' if added else '')
+    from .font_sample import drawn_shots
+    drawn = {s['id'] for s in drawn_shots(plan)}   # a colour whose drawings all left the plan is not given (existence only)
+    added = '; '.join(f"{r['thing']} {r['colour']} ({r['words']})" for r in (session.get('added_colours') or {}).values() if drawn & set(r['shots']))
+    return f"Palette: {base.rstrip('.')}." + (f' Added for every drawing of this film (the spec wins where they differ): {added}.' if added else '')
 
 
 def add_subject_rule(store, user, run, subject, rule, quote):
@@ -6163,7 +6180,7 @@ def motion_brief(store, run, outputs, shot_id):
                  '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else ''),
               f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; text at least 2.6 % of the frame height, inside the inner 90 %; "
               'every label sentence case as written above.',
-              *(f'Recorded for this drawing (keep it): {n["text"]}' for n in session.get('drawing_notes') or [] if shot['id'] in n['shots']),   # design/218b
+              *(f'Note on the view (the spec above wins where they differ): {n["text"]}' for n in session.get('drawing_notes') or [] if shot['id'] in n['shots']),   # design/218b: below the spec; this shot is a drawn shot of the plan (located above)
               '', film.style_part(run)]   # design/179 S4: the film's motion style; the fixed 'flat, clean, technical' is gone
     for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16)
         lines += ['', f'Subject rules ({stem}): every one holds in this drawing.', *(f'- {r}' for r in _subject_rules(store, stem))]

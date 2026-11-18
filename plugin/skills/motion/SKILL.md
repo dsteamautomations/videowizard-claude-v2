@@ -18,6 +18,7 @@ The server places these at check and render; refer to them, never create them:
 
 ## The brief is the contract
 
+- A note on the view or a colour the brief lists as added is below the spec: the spec wins where they differ.
 - The root's `data-duration`, `data-fps`, `data-width`, `data-height` are exactly the brief's. The length is to the frame.
 - A part another drawing shows from another direction or at another scale is the same part: draw it as this drawing's spec and view say, and make the change of view readable (the view visibly turns or cuts; a label such as "section" only where the brief lists it); never a part that morphs into another shape.
 - Every text on screen is one of the brief's labels, word for word, and nothing else. Put each label in an element with a stable `id`.

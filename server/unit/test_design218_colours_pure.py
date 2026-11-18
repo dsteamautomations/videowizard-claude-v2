@@ -71,7 +71,7 @@ def test_every_later_brief_gets_the_plans_palette_and_the_added_colours():
     s, p = {}, plan(drawn('D1'))
     assert V.palette_line(p, s) == 'Palette: navy #12324A, orange #FF8800, concrete mid grey #8A8A8A.'
     add(s, p)
-    assert V.palette_line(p, s) == ('Palette: navy #12324A, orange #FF8800, concrete mid grey #8A8A8A. Added for every drawing of this film: '
+    assert V.palette_line(p, s) == ('Palette: navy #12324A, orange #FF8800, concrete mid grey #8A8A8A. Added for every drawing of this film (the spec wins where they differ): '
                                      'walls #5A524C (dark warm grey).')
     assert 'palette_line(plan, session)' in open(V.__file__, encoding='utf-8').read()   # motion_brief's palette line is this one
 
@@ -83,7 +83,7 @@ def test_the_drawn_line_shows_it_under_details_without_asking(monkeypatch):
     assert P.colour_notes(s, 'D1') == ['Added by Claude: dark warm grey for the walls, because the palette named none.']
     assert P.colour_notes(s, 'D9') == []
     src = open(P.__file__, encoding='utf-8').read()
-    assert "['Colours', colour_notes(session, shot_id)]" in src
+    assert "['Colours', colour_notes(session, shot_id, plan)]" in src
 
 
 # ---------- B: the cause, earlier ----------

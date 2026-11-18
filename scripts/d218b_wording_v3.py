@@ -16,7 +16,8 @@ VIEW = ('A part that two drawings show from different directions (from the side,
         'same part, not a change of shape, and is never asked: each drawing follows its own approved spec and view, the later one makes the change of '
         'view readable (the view visibly turns or cuts, or a short label such as "section" where the spec\'s labels allow it; never a part that morphs '
         'into another shape), and you record one plain line: `vw motion note --shot D1,D2 --text "The steel is shown from the side in D1 and cut '
-        'across here."` (carried in those drawings\' briefs, shown under Details on them; where a spec does not state its view, the line states it). '
+        'across here."` (carried in those drawings\' briefs below their spec, which wins where they differ, and shown under Details on them; withdrawn '
+        'with `vw motion note --shot D2 --remove "<the line>"`; where a spec does not state its view, the line states it). '
         'A drawing that passed its fact check is not redrawn to match another view. Only two approved specs that truly contradict (the same view '
         'and scale, and a different count, size, material or arrangement of the same part) are asked, naming both specs and what differs.')
 PAIRS = [('later', ANCHOR, ANCHOR + ' ' + VIEW)]
@@ -29,6 +30,10 @@ HELPERS = [   # (file under plugin/, the old sentence, the new one)
     ('agents/vw-motion-check.md', 'Read the brief\'s "Motion style" part:',
      "Judge each part against this drawing's own spec and its stated view: the same part drawn from another direction or at another scale in "
      'another drawing is never a fault here. Read the brief\'s "Motion style" part:'),
+    ('skills/motion/SKILL.md', "## The brief is the contract\n\n",
+     "## The brief is the contract\n\n- A note on the view or a colour the brief lists as added is below the spec: the spec wins where they differ.\n"),
+    ('agents/vw-motion-shot.md', 'read `brief.md` and the pictures in `refs/`,',
+     'read `brief.md` (its drawing spec wins over a note on the view or an added colour where they differ) and the pictures in `refs/`,'),
     ('skills/motion/SKILL.md', "- Every text on screen is one of the brief's labels",
      "- A part another drawing shows from another direction or at another scale is the same part: draw it as this drawing's spec and view say, "
      'and make the change of view readable (the view visibly turns or cuts; a label such as "section" only where the brief lists it); never a '

@@ -696,14 +696,23 @@ def finish_listed(fin):
     return _and(parts) if parts else ''
 
 
-def colour_notes(session, shot_id):
+def _drawn_here(plan, shot_id):
+    from .font_sample import drawn_shots
+    return plan is None or any(s['id'] == shot_id for s in drawn_shots(plan))   # design/218b: a shot a revision took out shows no note
+
+
+def colour_notes(session, shot_id, plan=None):
     """design/218 A: the colours added for a thing this drawing shows, said without asking (by Claude, or with the operator's words)."""
+    if not _drawn_here(plan, shot_id):
+        return []
     return [f"Added {'by Claude' if r['by'] == 'claude' else 'with your words'}: {r['words']} for the {r['thing']}, because {r['reason']}."
             for r in (session.get('added_colours') or {}).values() if shot_id in r['shots']]
 
 
-def drawing_notes(session, shot_id):
+def drawing_notes(session, shot_id, plan=None):
     """design/218b: the plain lines Claude recorded for this drawing (a part seen from another direction), said without asking."""
+    if not _drawn_here(plan, shot_id):
+        return []
     return [n['text'] for n in session.get('drawing_notes') or [] if shot_id in n['shots']]
 
 
@@ -732,8 +741,8 @@ def drawn_line(store, session, plan, job, check, fin, motion_take):
             'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['video'], 'none': W['video_none']},
             'finish': W['finish'].format(finish=listed) if listed else '', 'held': held, 'pics': pics, 'check': view, 'buttons': buttons,
             'details': [['How it was made', ['Built as a web animation by Claude helpers on the laptop, rendered to video by the server. No picture AI.' if motion_take else 'Drawn by the server from the scene file.']
-                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]] + ([['Colours', colour_notes(session, shot_id)]] if colour_notes(session, shot_id) else [])
-                + ([['Notes', drawing_notes(session, shot_id)]] if drawing_notes(session, shot_id) else [])}   # design/218 A, 218b
+                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]] + ([['Colours', colour_notes(session, shot_id, plan)]] if colour_notes(session, shot_id, plan) else [])
+                + ([['Notes', drawing_notes(session, shot_id, plan)]] if drawing_notes(session, shot_id, plan) else [])}   # design/218 A, 218b
 
 
 def question_line(session, plan, item, q, ref):

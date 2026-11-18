@@ -1496,7 +1496,8 @@ def visuals_motion_colour(run_id: UUID, body: MotionColour, user=User, conn=DB):
 
 class MotionNote(Write):   # design/218b: one plain line for the drawings it names
     shots: list[str] = Field(min_length=1, max_length=60)
-    text: str = Field(min_length=1, max_length=300)
+    text: str = Field(default='', max_length=300)
+    remove: str = Field(default='', max_length=300)   # the line to withdraw from these drawings
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/note')
