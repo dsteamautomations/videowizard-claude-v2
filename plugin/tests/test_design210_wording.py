@@ -67,11 +67,11 @@ def test_what_waits_on_the_page_is_not_sent_to_the_chat(harness, monkeypatch, ca
     wt = [{'label': 'Set to judge · E2', 'kind': 'set to judge'}, {'label': 'Set to make · P1', 'kind': 'set to make'}, {'label': 'Drawing spec to approve · DG1', 'kind': 'drawing spec to approve'}]
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {**jobs_answer(), 'waiting': wt})
     code, out, err = run(args(), capsys)
-    assert '3 waiting for the operator: all answered on the page in one visit (`vw visuals page`): the drawings and materials and the reference sets' in err
+    assert '3 waiting for the operator: all answered on the page in one visit (`vw visuals page`): the sizes, materials and graphic specs, and the reference sets' in err
     assert '`vw visuals next`' not in err
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {**jobs_answer(), 'waiting': wt + [{'label': 'Still · DG1', 'kind': 'picture to answer'}]})
     code, out, err = run(args(), capsys)
-    assert ('4 waiting for the operator: 3 of them are answered on the page in one visit (`vw visuals page`): the drawings and materials and the reference sets; '
+    assert ('4 waiting for the operator: 3 of them are answered on the page in one visit (`vw visuals page`): the sizes, materials and graphic specs, and the reference sets; '
             'ask the others one at a time with `vw visuals next` (design/188), never from this list') in err
 
 
@@ -83,7 +83,7 @@ def test_vw_next_at_the_visuals_stage_says_what_is_on_the_page_and_what_is_in_th
     with pytest.raises(SystemExit):
         vw.cmd_next(argparse.Namespace(take_over=False))
     out, err = capsys.readouterr()
-    said = ('The treatment, the plan, the drawings and materials, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
+    said = ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
             'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')
     assert json.loads(out)['visuals_in_chat'] == said and said in err and "decisions of this stage are taken in the chat" not in err
 
@@ -100,7 +100,7 @@ def test_a_frame_grabbed_alone_is_a_candidate_for_the_round_not_approved_by_its_
 # ---------- the instruction texts ----------
 
 def test_the_command_file_says_where_each_decision_is_taken():
-    assert ('The treatment, the plan, the drawings and materials, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
+    assert ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
             'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time:') in CMD
     assert 'every other decision of this stage is asked in the chat' not in CMD
     assert "the card's buttons" not in CMD and '`vw visuals next` hands' in CMD                       # C2: a question is handed out by `vw visuals next`

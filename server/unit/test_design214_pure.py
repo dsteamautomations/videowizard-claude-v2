@@ -438,5 +438,5 @@ def test_the_instructions_and_the_helper_say_that_the_look_checks_and_no_text_sa
 
 
 def test_the_versions_of_this_release():
-    assert Settings.model_fields['SERVER_VERSION'].default == '0.111.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.95.0'
-    assert json.loads((REPO / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.95.0'
+    assert Settings.model_fields['SERVER_VERSION'].default == '0.112.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.96.0'   # design/215
+    assert json.loads((REPO / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.96.0'

@@ -261,7 +261,7 @@ def test_the_approved_drawings_follow_the_footage_pictures_with_their_facts_and_
 def test_a_person_is_made_from_the_description_alone_and_from_their_photo_only_with_the_permission():
     r = request('MASON')
     assert r['inputs'] == [] and r['search'] is False and r['parts']['source'] == 'words' and RS.FROM_WEB not in r['prompt'] and 'Google' not in r['prompt']
-    assert r['prompt'].startswith('Character sheet of The mason, a person in this film.') and 'Garments: a white shirt, a checked lungi.' in r['prompt']   # design/211 review: no code name
+    assert r['prompt'].startswith('Reference set of The mason, a person in this film.') and 'Garments: a white shirt, a checked lungi.' in r['prompt']   # design/211 review: no code name
     assert RS.PERSON_SET.format(a='a full-length front view, standing at ease', b='right hand and forearm, the same person', c='a close view of the face') in r['prompt']
     s = ready()
     s['references']['own-1'] = {'id': 'own-1', 'kind': 'supplied', 'element_id': 'MASON', 'status': 'approved', 'created_at': F.NOW}

@@ -1107,7 +1107,7 @@ def cmd_next(a):
     if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
         nxt['review_page_url'] = signed_link(review_page_url(m['code']))
     if nxt.get('stage') == 'visuals':   # design/188 (SK, 12 Nov 2026): the later decisions in the chat, one thing at a time; design/204 to 210: the earlier ones on the Claude artifact page
-        nxt['visuals_in_chat'] = ('The treatment, the plan, the drawings and materials, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
+        nxt['visuals_in_chat'] = ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
                                   'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')
     emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
          + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else '') + (f" {nxt['visuals_in_chat']}" if nxt.get('visuals_in_chat') else ''))
@@ -2353,7 +2353,7 @@ def cmd_visuals(a):
         (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
         paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show
         item['show_files'] = paths
-        on_page = ('The drawings and the materials are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
+        on_page = ('The sizes, materials and graphic specs are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
                    if item.get('kind') == 'spec' else   # design/209
                    'The reference drawings are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
                    if str(item.get('id') or '').startswith('drawing:') else   # design/210
@@ -2849,7 +2849,7 @@ def cmd_visuals(a):
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
         paged = len([w for w in wt if 'spec to approve' in str(w.get('kind') or '') or str(w.get('kind') or '').startswith('set to ')])   # design/209: the drawings and the materials are approved on the page; design/210: the reference sets too
-        on_page = 'answered on the page in one visit (`vw visuals page`): the drawings and materials and the reference sets'
+        on_page = 'answered on the page in one visit (`vw visuals page`): the sizes, materials and graphic specs, and the reference sets'
         waiting_line = (f"; {len(wt)} waiting for the operator: " + (f'all {on_page}' if paged == len(wt) else (f'{paged} of them are {on_page}; ' if paged else '')
                         + f"ask {'the others' if paged else 'them'} one at a time with `vw visuals next` (design/188), never from this list")) if wt else ''
         due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs

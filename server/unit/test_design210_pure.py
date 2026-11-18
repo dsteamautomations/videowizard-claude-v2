@@ -267,8 +267,10 @@ def test_the_instructions_send_the_reference_drawings_to_the_page_and_the_chat_i
     sys.path.insert(0, str(root / 'scripts'))
     import copy
     import d210_wording_v3 as W
-    parts = copy.deepcopy(st['parts'])
-    assert W.apply(st['prompt'], parts) == st['prompt'] and parts == st['parts'], 'applying twice changes nothing'
+    import d215_wording_v3 as D215   # design/215: a later script that changes a sentence of this one (the step's new name): the text as it was before it
+    was = D215.before(st)
+    parts = copy.deepcopy(was['parts'])
+    assert W.apply(was['prompt'], parts) == was['prompt'] and parts == was['parts'], 'applying twice changes nothing'
     assert 'The operator approves the reference drawings on the page (`vw visuals page`' in search and 'only where the page cannot be shown' in search
     assert '`vw visuals next` then shows the operator the labelled sheets' not in search
     vw = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')

@@ -140,6 +140,8 @@ if __name__ == '__main__':
         prompt = d213(prompt, parts)
         from d214_wording_v3 import apply as d214   # design/214: Claude checks the sets of a reference round (each picture's check list answered by the look); no model checks them
         prompt = d214(prompt, parts)
+        from d215_wording_v3 import apply as d215   # design/215: the references fix set (three labels for "Leave out", how the making goes, no cost word, one order of authority, the corrections per thing, the search record, the step's new name, the look and an object in use by category)
+        prompt = d215(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

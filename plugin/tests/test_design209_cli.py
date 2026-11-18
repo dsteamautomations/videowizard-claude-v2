@@ -9,11 +9,11 @@ LINE = {'line': 'l01', 'key': 'G1-S1', 'item': 'spec:G1-S1:abc', 'title': 'The b
 
 
 def test_the_page_command_names_the_step_of_the_drawings_and_materials(harness, monkeypatch, capsys):
-    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'step': 'Drawings and materials', 'round': 'r1', 'how': 'HOW', 'capabilities': {'db': {}}, 'title': 'VideoWizard decisions VW-9',
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'step': 'Sizes, materials and graphic specs', 'round': 'r1', 'how': 'HOW', 'capabilities': {'db': {}}, 'title': 'VideoWizard decisions VW-9',
                                                                      'open': True, 'lines': [LINE], 'summary': '1 drawing: 1 to answer, 0 recorded, 0 with the assistant.',
                                                                      'note': 'Answer each line, then say done in the chat.'})
     code, out, err = run(args(what='page', record=False), capsys)
-    assert code == 0 and err.startswith('Drawings and materials page: 1 line(s) to answer. Answer each line, then say done in the chat.') and out['waiting'] == 1
+    assert code == 0 and err.startswith('Sizes, materials and graphic specs page: 1 line(s) to answer. Answer each line, then say done in the chat.') and out['waiting'] == 1
 
 
 def test_a_drawing_asked_in_the_chat_points_to_the_page_first(harness, monkeypatch, capsys):
@@ -21,7 +21,7 @@ def test_a_drawing_asked_in_the_chat_points_to_the_page_first(harness, monkeypat
             'buttons': [{'label': 'Yes', 'choice': 'yes'}], 'how': 'HOW', 'show': []}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'item': dict(item)})
     code, out, err = run(args(what='next', one=False), capsys)
-    assert code == 0 and err.startswith('The drawings and the materials are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. 1 of 1 waiting.')
+    assert code == 0 and err.startswith('The sizes, materials and graphic specs are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. 1 of 1 waiting.')
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'item': {**item, 'kind': 'picture'}})
     assert 'on the page' not in run(args(what='next', one=False), capsys)[2]
 

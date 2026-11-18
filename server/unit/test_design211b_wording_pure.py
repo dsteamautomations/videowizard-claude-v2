@@ -16,6 +16,7 @@ import d211b_wording_v3 as W   # noqa: E402
 import d212_wording_v3 as LATER   # noqa: E402  (design/212: a later script still; it changes a sentence part C put beside this one's)
 import d211d_wording_v3 as REVIEW   # noqa: E402  (design/211, the review: a later script that changes sentences of this one; these tests read the text as it was before it)
 import d213_wording_v3 as D213   # noqa: E402  (design/213: a later script still; it changes sentences of this one; these tests read the text as it was before it)
+import d215_wording_v3 as D215   # noqa: E402  (design/215: a later script still: the references fix set)
 import d214_wording_v3 as D214   # noqa: E402  (design/214: a later script still: the check of a set is the look's)
 
 OTHERS = ('`vw visuals elements` shows where each is seen', 'A clip frame is free and exact', 'never a blurred one for identity', 'The operator answers both steps on the page',
@@ -23,7 +24,7 @@ OTHERS = ('`vw visuals elements` shows where each is seen', 'A clip frame is fre
 
 
 def stage():
-    return REVIEW.before(LATER.before(D213.before(D214.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))))
+    return REVIEW.before(LATER.before(D213.before(D214.before(D215.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))))))
 
 
 def applied():
@@ -74,7 +75,7 @@ def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_rea
     now = prompt + ''.join(p['text'] for p in parts)
     before = st['prompt'] + ''.join(p['text'] for p in st['parts'])
     import d213_wording_v3 as D213   # design/213 review: the command file's sentence on step 2 was reworded by that script
-    cmd_before = REVIEW.before_commands(D213.before_commands(D214.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8'))))
+    cmd_before = REVIEW.before_commands(D213.before_commands(D214.before_commands(D215.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')))))
     cmd = commands(cmd_before)
     agents = ''.join(p.read_text(encoding='utf-8') for p in (ROOT / 'plugin' / 'agents').glob('*.md'))
     listed = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
@@ -98,7 +99,7 @@ def test_the_instruction_the_request_and_the_check_agree_that_a_way_of_working_m
     assert 'hands and a tool are allowed, not required' in lines['the action is shown'] and 'no person' not in lines and 'no person' in dict(RS._kind_lines('object'))
     assert 'hands and a tool are allowed, never required' in RS.LOOK_HOW['may_show'] and '`how.may_show`' in (ROOT / 'plugin' / 'agents' / 'vw-set-look.md').read_text(encoding='utf-8')
     assert [v['name'] for v in RS.WAY] == ['the action at its key moment', 'the result just after', 'close on where it happens']
-    assert 'an object whole, as the film uses it, and its telling detail (no person; in use, the hand and the material the description names)' in text and 'the hand that holds it' in RS.MAY_SHOW['object']
+    assert 'an object whole, as the film uses it, and its telling detail (the thing stays the subject; in use, the person who wears, holds or uses it as far as the use needs; on a documentary-explainer film no person, only the hand that holds it and the material the description names)' in text and 'the hand that holds it' in RS.MAY_SHOW['object']
 
 
 def test_the_commands_the_sentences_name_are_the_tools():

@@ -31,6 +31,6 @@ Then record all your things in one file, `work/visuals/refs/<group>.looks.json`,
             {"element": "<id>", "not_searched": "<why>"}]}
 ```
 
-Give a look for every frame you opened, kept or not: the frames you did not keep are what the operator falls back on. The server decides each thing's result from your looks. Read its answer: a refused thing is named with the reason, and the other things were recorded; fix what it names and send that thing again. Stop when the answer lists none of your things under `refused` and none of them is in `left`.
+Give a look for every frame you opened, kept or not: the frames you did not keep are what the operator falls back on. A note says where the thing is seen or why it is not; it never names a cost or a cost word (never "free" or "paid"). The server decides each thing's result from your looks. Read its answer: a refused thing is named with the reason, and the other things were recorded; fix what it names and send that thing again. Stop when the answer lists none of your things under `refused` and none of them is in `left`.
 
 You never approve a picture, never call a picture model, never show the operator anything, and never write the round file. Your last message is one line per thing: its id, then found, weak, not found (with the closest frame, if any) or not searched (with the reason).

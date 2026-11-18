@@ -327,16 +327,18 @@ def test_the_instructions_send_the_drawings_and_materials_to_the_page_and_the_ch
     d = json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
     st = next(s for s in d['stages'] if s['name'] == 'visuals')
     part = {p['name']: p['text'] for p in st['parts']}
-    assert 'then the drawings and the materials, on the page (`vw visuals page`)' in st['prompt']
-    assert 'after the plan is accepted they approve the drawings and the materials on the page' in part['plan'] and 'only where the page cannot be shown' in part['plan']
+    assert 'then the sizes, materials and graphic specs, on the page (`vw visuals page`)' in st['prompt']
+    assert 'after the plan is accepted they approve the sizes, materials and graphic specs on the page' in part['plan'] and 'only where the page cannot be shown' in part['plan']
     assert 'approved once, on the page with the drawings' in part['later']
     assert "they approve the run's specs in one table" not in part['plan'] and 'shown on the References step beside the sheet' not in part['later']
     retired = json.loads((root / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     assert "they approve the run's specs in one table" in retired and 'it is shown on the References step beside the sheet and approved once' in retired
     sys.path.insert(0, str(root / 'scripts'))
     import d209_wording_v3 as W
-    parts = copy.deepcopy(st['parts'])
-    assert W.apply(st['prompt'], parts) == st['prompt'] and parts == st['parts'], 'applying twice changes nothing'
+    import d215_wording_v3 as D215   # design/215: a later script that changes sentences of this one (the step's new name): the text as it was before it
+    was = D215.before(st)
+    parts = copy.deepcopy(was['parts'])
+    assert W.apply(was['prompt'], parts) == was['prompt'] and parts == was['parts'], 'applying twice changes nothing'
     src = Path(V.__file__).read_text(encoding='utf-8')   # the tool's own lines point to the page first
     assert 'approves the specs as one table' not in src and 'approves the sizes, materials and graphic specs on the page (`vw visuals page`)' in src
 

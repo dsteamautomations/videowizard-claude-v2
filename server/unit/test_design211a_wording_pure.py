@@ -13,10 +13,11 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import d211a_wording_v3 as W   # noqa: E402
 import d211d_wording_v3 as REVIEW   # noqa: E402  (design/211, the review: a later script that changes sentences of this one; these tests read the text as it was before it)
 import d213_wording_v3 as D213   # noqa: E402  (design/213: a later script still; it changes sentences of this one; these tests read the text as it was before it)
+import d215_wording_v3 as D215   # noqa: E402  (design/215: a later script still: the references fix set)
 
 
 def stage():
-    return REVIEW.before(D213.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))
+    return REVIEW.before(D213.before(D215.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))))
 
 
 def applied():
@@ -38,7 +39,7 @@ def test_each_anchor_is_found_once_and_applying_twice_changes_nothing():
 
 def test_the_old_sentences_are_retired_and_gone_from_what_the_assistant_reads():
     st, prompt, parts = applied()
-    cmd = REVIEW.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8'))
+    cmd = REVIEW.before_commands(D215.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')))
     for old, new in W.COMMANDS:
         assert new in cmd or cmd.count(old) == 1, old
         cmd = cmd if new in cmd else cmd.replace(old, new)

@@ -506,7 +506,7 @@ def test_the_instruction_the_request_and_the_check_agree_after_the_review():
     assert 'a way of working as the action or the change at its key moment, its result, and close on where it happens (hands and a tool allowed where the description names them, never required; no face)' in text
     assert [v['name'] for v in RS.WAY] == ['the action at its key moment', 'the result just after', 'close on where it happens'] and 'never required' in RS.MAY_SHOW['technique']
     assert 'a material as a surface, as the film uses it, and very close' in text and 'lettering only where the description names it' in text
-    assert "the operator's words, the film's own pictures (the approved drawing for shape and size, the footage picture for look, colour and wear), your added words, the plan's description, then web photographs" in text
+    assert "the operator's words, your added words, the film's own pictures (the approved drawing for shape and size, the footage picture for look, colour and wear), the plan's description, then web photographs" in text
     assert 'a make that returned no picture not counted' in text and 'says how many sets are made first and that the others are asked after' in text   # design/212: no price
     assert 'brings back only a thing that is new in the plan or whose entry in the plan changed' in text and '`vw visuals round --back E`' in text and 'A set is never made with `vw visuals image --kind sheet`' in text
     assert "each given a group name, its thing ids, the run folder's path and the tool's command line" in text and 'its `how` gives the points to judge by' in text

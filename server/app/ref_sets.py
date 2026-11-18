@@ -193,6 +193,19 @@ MAY_SHOW = {'object': ('What may be shown: the thing itself. No person and no fa
             'technique': ('What may be shown: the action or the change itself, on its material. Hands, forearms and a tool are allowed where the description names them, never required. '
                           'No face.')}
 MAY_SHOW.update(process=MAY_SHOW['technique'])
+# design/215 (change 4, W8): the rules above that fit a documentary only (a photograph-like reference, natural colours and no stylisation, an object with only the
+# hand that holds it) are filed under its category; every other category reads these general ones: the reference follows the film's look, and a product may be shown
+# in use (worn, held, at work) while it stays the subject.
+DOCUMENTARY = 'documentary-explainer'
+OPENING_ANY = OPENING.replace('a photograph-like image', 'an image')
+FINISH_ANY = FINISH.replace('Natural colours, no filters, no stylisation, no illustration. ', "Colour and finish follow the film's look given above. ")
+MAY_SHOW_ANY = ('What may be shown: the thing itself, which stays the subject of every picture. In a picture whose view shows it in use, the person who wears, holds or uses it '
+                'may be shown as far as the use needs, with the material it works on, where the description names them.')
+USE_ANY = 'the same {name} as the film uses it: worn, held or at work, as the description names; it stays the subject'
+SUBJECT_LINE = ('the thing is the subject', "the thing stays the subject of the picture; a person only where the picture's view shows it in use, as far as the use needs")
+MAY_SHOW_LOOK = ('An object or a material with no person; a hand, and the material the thing works on, only in a picture that shows it in use.',
+                 'An object as the subject: the person who wears, holds or uses it only in a picture that shows it in use. A material with no person; a hand only in a picture that '
+                 'shows it in use.')
 NO_PLACE = 'a plain real setting that fits the description'
 
 PERSON_FRONT = {'name': 'full length, front', 'ask': 'a full-length front view, standing at ease'}
@@ -379,11 +392,17 @@ def _place(element, facts):
     return ((facts['scene'] or {}).get('place') or '').rstrip('.')
 
 
-def _look(plan):
-    """The film's look as a photograph can take it: the sentences on drawn or lettered pictures are left out (design/211 review, S8)."""
+def look_how(category):
+    """How a made set is looked at, by the film's category (design/215): a documentary's "what may be shown" as before, the general one for the others."""
+    return LOOK_HOW if category in ('', DOCUMENTARY) else {**LOOK_HOW, 'may_show': LOOK_HOW['may_show'].replace(*MAY_SHOW_LOOK)}
+
+
+def _look(plan, photo=True):
+    """The film's look as a photograph can take it: the sentences on drawn or lettered pictures are left out (design/211 review, S8).
+    design/215: `photo` false (a category whose references follow the film's look): the look whole."""
     # ponytail: a word list decides what is about a drawn picture; a look written as one long sentence is kept or dropped whole
     text = ' '.join(str((plan.get('foundation') or {}).get('appearance') or '').split())
-    return ' '.join(s for s in re.split(r'(?<=[.;])\s+', text) if s and not NOT_PHOTO.search(s)).rstrip('.;') or 'as the footage'
+    return ' '.join(s for s in re.split(r'(?<=[.;])\s+', text) if s and not (photo and NOT_PHOTO.search(s))).rstrip('.;') or 'as the footage'
 
 
 def _plain_words(element, text):
@@ -408,7 +427,7 @@ def fp(plan, session, element):
     return ref_find.fingerprint(element) + '|' + _place(element, thing_facts(plan, session, element))
 
 
-def _lines(element, facts, inputs, added='', operator='', n=3):
+def _lines(element, facts, inputs, added='', operator='', n=3, doc=True):
     """The check lines of a v2 set (design/211 section 3.7), all must. `pictures` on a line: the pictures of the set it is asked of. The
     line on the description carries the operator's words and the writer's added words, in the request's own order of authority.
     design/213: `n`, how many pictures the set has: a later picture is the same thing as picture A, seen as its own view asks (no such line
@@ -431,7 +450,7 @@ def _lines(element, facts, inputs, added='', operator='', n=3):
     out.append(line('matches the description', 'it agrees with the description of the plan: ' + described if not first else
                     'it agrees with these, the earlier winning where two differ: ' + '; '.join(first + ['the description of the plan: ' + described])))
     face = [dict(l) for l in image_check.FIXED if l['check'] == 'a real face'] if film and kind != 'person' else []
-    return out + [line(*x) for x in _kind_lines(kind)] + face
+    return out + [line(*(SUBJECT_LINE if x[0] == 'no person' and kind == 'object' and not doc else x)) for x in _kind_lines(kind)] + face
 
 
 def _kind_lines(kind):
@@ -471,11 +490,14 @@ def set_request(plan, run, session, element, row):
     carried = corrections_line(session, plan, eid, skip=operator)   # design/215: the thing's corrections, above everything else
     kept = [w for w in corrections_of(session, plan, eid) if w != operator]
     place = _place(element, facts)
-    look = _look(plan)
     try:
         category = V.category_of(run)
     except Problem:
         category = ''
+    doc = category in ('', DOCUMENTARY)   # design/215: a documentary's own rules; a film with no category recorded reads them, as before
+    look = _look(plan, photo=doc)
+    if not doc and kind == 'object':
+        views = [{**v, 'ask': USE_ANY.format(name=name)} if v['name'] == THING[1]['name'] else v for v in views]
     sizes = [] if element.get('material_spec') else _sizes(element)   # the material spec carries its own
     material = ' '.join(V.material_sentence(m) for m in V.materials_of(plan, eid) if V.material_approved(session, m))
     signs = [] if kind != 'place' or str(element.get('staged_clean') or '').strip() else [s for s in facts['signs'] if s][:2]
@@ -488,7 +510,8 @@ def set_request(plan, run, session, element, row):
     if kind == 'person':
         others = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] != eid]
         outfits = [o for o in dict.fromkeys(str((sc.get('outfit') or {}).get(eid) or '').strip() for gap in plan.get('gaps') or [] for sc in all_scenes(gap)) if o]
-        text = [f'Character sheet of {name}, a person in this film.', *words('Who they are', facts['requirements']), *words('Fixed look', facts['description']),
+        text = [f'Reference set of {name}, a person in this film.',   # design/215: one word, "set"
+                *words('Who they are', facts['requirements']), *words('Fixed look', facts['description']),
                 *(['Garments: ' + '; '.join(outfits) + '.'] if outfits else []), LOOK_PERSON.format(look=look), *told,
                 *[f"This person is not {o.get('name') or o['id']} ({str(o.get('description') or '').strip().rstrip('.')})." for o in others],
                 *([LIKENESS_FOOTAGE_LINE.format(images="Image 1 is the film's own picture" if len(inputs) == 1 else f"Images 1 to {len(inputs)} are the film's own pictures",
@@ -503,13 +526,14 @@ def set_request(plan, run, session, element, row):
                    f"Setting: {place or NO_PLACE}{', as a soft hint at the edges' if kind in ('object', 'material') else ''}; the light of that place and time.")
         subject = [f'The subject: {name}, {KIND_WORDS.get(kind, "a thing")} in this film.',
                    *words("Its description, from the film's plan", facts['description']), *words('What it must meet', facts['requirements']), *told]
-        text = [OPENING + ' ' + (FROM_FOOTAGE if footage else FROM_WEB) + '\n' + (ONE_THING_FOOTAGE if footage else ONE_THING),
+        text = [(OPENING if doc else OPENING_ANY) + ' ' + (FROM_FOOTAGE if footage else FROM_WEB) + '\n' + (ONE_THING_FOOTAGE if footage else ONE_THING),
                 (SET_LINE + ' The three views: ' + '; '.join(f"{n}, {v['name']}" for n, v in enumerate(views, 1)) + '.') if len(views) > 1 else f"{ONE_LINE} The view: {views[0]['name']}.",
                 '\n'.join(subject), *pictures,
-                MAY_SHOW.get(kind, MAY_SHOW['object']) + '\n' + setting + ' ' + LOOK_LINE.format(look=look) + '\n' + FINISH, NOTES_FOOTAGE if footage else NOTES]
+                (MAY_SHOW_ANY if not doc and kind == 'object' else MAY_SHOW.get(kind, MAY_SHOW['object'])) + '\n' + setting + ' ' + LOOK_LINE.format(look=look) + '\n' + (FINISH if doc else FINISH_ANY),
+                NOTES_FOOTAGE if footage else NOTES]
         prompt, source = '\n\n'.join(text), 'footage' if footage else 'web'
     prompt = re.sub(r'(?<!\.)\.\.(?!\.)', '.', prompt).replace('.;', ';')   # a sentence of the plan that ends in a full stop gets no second one
-    lines = _lines(element, facts, inputs, added, '; '.join(w.rstrip('.') for w in kept + [operator] if w), len(views))
+    lines = _lines(element, facts, inputs, added, '; '.join(w.rstrip('.') for w in kept + [operator] if w), len(views), doc)
     if drawn or sheets:   # the facts of the drawing set are checked on the picture, and it must be a photograph
         lines += [{'check': 'drawn fact: ' + f, 'weight': 'must', 'pass_when': f'the picture shows it as the approved drawings do: {f}'} for f in drawn] + [V.DRAWN_LOOK_LINE]
     parts = {'kind': kind, 'subject': name, 'description': facts['description'], 'requirements': facts['requirements'], 'sizes': sizes, 'material': material, 'signs': signs,
@@ -936,7 +960,11 @@ def looks_due(store, run, outputs):
                      'request': (pics[0].get('generation') or {}).get('prompt') or '', 'inputs': [{**i, 'key': big(i['ref'])} for i in facts['inputs']],
                      'pictures': [{'ref': p['ref'], 'n': p['n'], 'view': p['view'], 'key': big(p['ref']), 'lines': check_lines(session['references'][p['ref']])} for p in facts['pictures']],
                      'notes': facts['notes'], 'footage': [{**i, 'key': big(i['ref'])} for i in facts['footage']]})
-    return {'sets': sets, 'then': SETS_LOOK if sets else then_of(session), 'how': LOOK_HOW}
+    try:
+        category = V.category_of(run)
+    except Problem:
+        category = ''
+    return {'sets': sets, 'then': SETS_LOOK if sets else then_of(session), 'how': look_how(category)}
 
 
 def round_looks(store, user, run, outputs, sets, by):
