@@ -589,6 +589,23 @@ def footage_beside(session, element, inputs):
     return [{'ref': f['ref'], 'view': f.get('view') or ''} for f in ref_find.frames_of(session, eid) if (refs.get(f['ref']) or {}).get('status') == 'approved' and f['ref'] not in used]
 
 
+def searched_said(state, pages, source):
+    """design/215 (change 3): the sentence of a set's search record, by its state; a set made from the film's picture that did not search is as asked."""
+    from .chat_flow import WORDS
+    if state == 'yes':
+        return WORDS['web_yes'].format(n=f"{len(pages)} page{'' if len(pages) == 1 else 's'}") if pages else WORDS['web_yes_bare']
+    return WORDS[{'no': 'web_no_footage' if source == 'footage' else 'web_no', 'not asked': 'web_not_asked'}.get(state, 'web_unknown')]
+
+
+def searched_of(pics, parts):
+    """What the picture model searched for a set: {'state': 'yes'|'no'|'not asked'|'not known', 'text', 'pages': [{'url', 'title'}]}. The state the job
+    stored on a picture; a person's set was never asked to search; a set stored before the record was kept is 'not known', unless its pages were kept."""
+    pages = next((p.get('sources') for p in pics if p.get('sources')), []) or []
+    stored = [p['searched'] for p in pics if p.get('searched')]
+    state = 'yes' if 'yes' in stored or pages else stored[0] if stored else 'not asked' if parts.get('kind') == 'person' else 'not known'
+    return {'state': state, 'text': searched_said(state, pages, parts.get('source')), 'pages': pages if state == 'yes' else []}
+
+
 def set_facts(session, plan, eid, row):
     """What the page and the chat show of one made (or failed) set (design/211 section 3.7): {'pictures': [{'ref', 'n', 'view', 'check':
     check_summary, 'look': look or None, 'notes'}], 'inputs': [{'ref', 'role', 'view'}], 'from': 'footage'|'web'|'words', 'notes', 'sources': [{'url',
@@ -620,6 +637,7 @@ def set_facts(session, plan, eid, row):
             'model': {'chose': look.get('chose') or '', 'aside': look.get('aside') or ''} if pics and look.get('set') == row.get('set') and (look.get('chose') or look.get('aside')) else None,
             'footage': footage_beside(session, element, parts.get('inputs')),
             'notes': ' '.join(said), 'sources': next((p.get('sources') for p in pics if p.get('sources')), []) or [],
+            'searched': searched_of(pics, parts) if pics else None,   # design/215
             'partial': {'made': len(pics), 'asked': len(names), 'missing': names[len(pics):]} if pics and len(pics) < len(names) else None,
             'rec': {'do': look.get('recommend'), 'golden': look.get('golden'), 'reason': look.get('reason') or ''} if pics and look.get('set') == row.get('set') else None,
             'makes': makes(session, eid, row), 'makes_left': max(0, MAKES_MAX - makes(session, eid, row)),

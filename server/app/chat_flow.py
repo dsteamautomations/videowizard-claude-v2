@@ -536,6 +536,13 @@ WORDS = {
     'all_tick': 'This applies to every picture of this thing',
     'say_fix_all': 'Make it again with your words: "{words}". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you.',
     'corrections': "The operator's corrections: {words}",
+    # design/215 (change 3): what the picture model searched, each state in its own words
+    'web_yes': 'The picture model searched the web: {n}.',
+    'web_yes_bare': 'The picture model searched the web. It gave no list of pages.',
+    'web_no': 'The picture model did not search the web.',
+    'web_no_footage': "The picture model did not search the web. It was asked to search only for what the film's picture does not show.",
+    'web_not_asked': "No search was asked: a person's set is made from the description and the film's own pictures.",
+    'web_unknown': 'Searched: not known.',
     'fix1': 'Make a set with words',            # step 1 (W1): it makes a new set with the operator's words; it corrects no picture
     'go_set': 'Make a set with these words',       # the button of the words box
     'go_fix': 'Make it again with these words',
@@ -803,6 +810,7 @@ def _told(line):
     parts += [check['by']] if check else []
     parts += list(check.get('lines') or []) + list(line.get('changes') or [])
     parts += [WORDS['model_' + k].format(words=v) for k, v in (line.get('look') or {}).items() if v]   # design/213: the image model's notes as Claude's two plain lines; the raw notes stay in the record
+    parts += [line['searched']['text']] if line.get('searched') else []   # design/215
     parts += [line['asked']] if isinstance(line.get('asked'), str) else []
     parts += [WORDS['earlier'].format(labels=', '.join(p['label'] for p in line['earlier']))] if line.get('earlier') else []   # design/211 review, S14: the chat shows the set before too
     parts += [WORDS['corrections'].format(words='; '.join(line['corrections']))] if line.get('corrections') else []   # design/215
@@ -1187,6 +1195,7 @@ def _round_v2(ctx, every, step):
                     **({'rec': {'do': do, 'label': WORDS['rec_use_one' if one and do == 'use' else 'rec_' + do], 'reason': str(proposed.get('reason') or '')}} if do else {}),
                     'pics': pics, 'check': check, **({'look': {k: str(model.get(k) or '') for k in ('chose', 'aside')}} if model.get('chose') or model.get('aside') else {}),
                     **({'differs': WORDS['added'].format(words=added)} if added else {}),   # the plan against the footage, said openly (design/213)
+                    **({'searched': sf['searched']} if sf.get('searched') else {}),   # design/215: what the picture model searched
                     **({'rule': WORDS['rule_person']} if person else {}), **({'pick': True} if not person and not one else {}),
                     **({'made_n': WORDS['made_twice'] if n_made == 2 else WORDS['made_n'].format(n=n_made)} if n_made > 1 else {}),
                     **({'most': most} if most else {}), **({'changed': WORDS['set_changed']} if sf.get('changed') else {}),

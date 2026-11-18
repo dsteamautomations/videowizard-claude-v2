@@ -498,10 +498,11 @@ def _named(plan, eid):
 
 def _details(line):
     """design/213: the folded "Details" of a line of step 2: [[label, text or texts]], only what the line has."""
-    look, made = line.get('look') or {}, [p for p in line.get('pics') or [] if not p.get('ref_only')]
+    look, made, searched = line.get('look') or {}, [p for p in line.get('pics') or [] if not p.get('ref_only')], line.get('searched')
     rows = [[page_words()['corrections_head'], line.get('corrections')], ['Description', line.get('desc')], ['Shots', line.get('used')], ['Why Claude suggests this', (line.get('rec') or {}).get('reason')],
             ['What Claude saw in each picture', [f"{p['label']}: {p['note']}" for p in made if p.get('note')]], ["What Claude's check found", (line.get('check') or {}).get('lines')],
             ['What the image model did', [CF.WORDS['model_' + k].format(words=look[k]) for k in ('chose', 'aside') if look.get(k)]],
+            [page_words()['searched_head'], [searched['text']] + [f"{p['title']}: {p['url']}" if p.get('title') else str(p.get('url')) for p in searched.get('pages') or []] if searched else None],   # design/215
             ['Why it could not be made', line.get('why')], ['Where it stands', line.get('note')]]
     return [r for r in rows if r[1]]
 

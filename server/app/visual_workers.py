@@ -115,8 +115,36 @@ def _error(r, idx):
     return out
 
 
+def _grounding(cand):
+    meta = cand.get('groundingMetadata') if isinstance(cand, dict) else None
+    return meta if isinstance(meta, dict) else None
+
+
 def _sources(cand):
-    return [{'url': c['web'].get('uri'), 'title': c['web'].get('title')} for c in ((cand.get('groundingMetadata') or {}).get('groundingChunks') or []) if isinstance(c, dict) and c.get('web')]
+    """The pages the model consulted: every chunk of the grounding record that gives an address (a web page; design/215: an image chunk too, whatever its name)."""
+    chunks = (_grounding(cand) or {}).get('groundingChunks') or []
+    return [{'url': v['uri'], 'title': v.get('title')} for c in chunks if isinstance(c, dict) for v in c.values() if isinstance(v, dict) and v.get('uri')]
+
+
+SEARCH_SIGNS = ('groundingChunks', 'webSearchQueries', 'imageSearchQueries', 'searchEntryPoint', 'groundingSupports')
+
+
+def _searched(req, cands):
+    """design/215 (change 3): whether the picture model searched, for one request (a set: every turn's answer): 'not asked' (no search was offered),
+    'yes' (a grounding record shows a search: a page, a query or the search entry), 'no' (the record is there and empty), 'not known' (no record in
+    the answer). The field for image search is not verified, so the record is read defensively and nothing is guessed."""
+    if not req.get('search'):
+        return 'not asked'
+    metas = [m for m in (_grounding(c) for c in cands or []) if m is not None]
+    if not metas:
+        return 'not known'
+    return 'yes' if any(m.get(k) for m in metas for k in SEARCH_SIGNS) else 'no'
+
+
+def keep_search(ref, result):
+    """The state of the search on a picture's reference, where the job gave one."""
+    if result.get('searched'):
+        ref['searched'] = result['searched']
 
 
 def _gemini_set(req, parents, tries):
@@ -125,6 +153,7 @@ def _gemini_set(req, parents, tries):
     set with a note naming the missing view; a limit or an outage on any turn answers as that turn did, so the whole set is requeued."""
     views = list(req['views'])
     contents = [{'role': 'user', 'parts': _parent_parts(parents) + [{'text': req['prompt'] + f'\n\nImage 1 of {len(views)}: {views[0].rstrip(".")}.'}]}]
+    seen = []   # design/215: every turn's answer, for the search record
     images, notes, sources, usage_in, usage_out, idx = [], [], [], 0, 0, None   # design/213: `notes` holds one entry per picture that came, the words of its own turn
     for n, view in enumerate(views, 1):
         if n > 1:
@@ -155,8 +184,9 @@ def _gemini_set(req, parents, tries):
         images.append(got[0])
         notes.append(words)
         sources += [x for x in _sources(cand) if x not in sources]
+        seen.append(cand)
         contents.append({'role': 'model', 'parts': parts})
-    out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage_in, 'output_tokens': usage_out}, 'notes': ' '.join(x for x in notes if x), 'notes_each': notes, 'sources': sources})
+    out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage_in, 'output_tokens': usage_out}, 'notes': ' '.join(x for x in notes if x), 'notes_each': notes, 'sources': sources, 'searched': _searched(req, seen)})
     out.key_index = idx
     return out
 
@@ -192,7 +222,7 @@ def _gemini_image(req, parents):
     usage = body.get('usageMetadata') or {}
     sources = _sources(cands[0]) if cands else []
     out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')},
-                        **({'notes': words, 'sources': sources} if req.get('set') else {})})
+                        **({'notes': words, 'sources': sources, 'searched': _searched(req, cands[:1])} if req.get('set') else {})})
     out.key_index = idx
     return out
 
@@ -292,6 +322,7 @@ def process_image(job):
             cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
         return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
                             **({'extra': extra, 'notes': body.get('notes') or '', 'sources': body.get('sources') or []} if req.get('set') else {}),   # design/151
+                            **({'searched': body['searched']} if req.get('set') and body.get('searched') else {}),   # design/215: whether the model searched
                             **({'notes_each': body['notes_each']} if req.get('set') and body.get('notes_each') else {}),   # design/213: the notes of each picture's own turn
                             **({'key_index': r.key_index} if getattr(r, 'key_index', None) is not None else {}),   # design/114: which key, never the key
                             **({'edit': edit} if edit else {})}, None, cost, None
@@ -373,6 +404,7 @@ def apply_image_result(conn, run_id, ref, status, result, error, cost):
         ref['generation'] = {**ref.get('generation', {}), 'cost': cost, 'revised_prompt': result.get('revised_prompt')}
         if 'notes' in result:   # design/151: the model's four notes and the pages it consulted, shown under the set
             ref.update(notes=result.get('notes') or '', sources=result.get('sources') or [])
+            keep_search(ref, result)   # design/215
         jobs.record_file(conn, run_id, 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'image/png')
         return True
     if status in ('rejected', 'failed'):

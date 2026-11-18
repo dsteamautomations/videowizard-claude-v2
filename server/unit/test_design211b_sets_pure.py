@@ -468,7 +468,7 @@ def facts(s, eid, plan=None):
 def test_set_facts_of_a_made_set_its_pictures_checks_looks_notes_and_the_recommendation():
     s = F.session('2')
     f = facts(s, 'T_LAY')
-    assert set(f) == {'pictures', 'inputs', 'from', 'notes', 'sources', 'partial', 'rec', 'makes', 'makes_left', 'asked', 'history', 'changed', 'fail', 'model', 'footage'}   # design/213
+    assert set(f) == {'pictures', 'inputs', 'from', 'notes', 'sources', 'partial', 'rec', 'makes', 'makes_left', 'asked', 'history', 'changed', 'fail', 'model', 'footage', 'searched'}   # design/213
     assert [(p['ref'], p['n'], p['view']) for p in f['pictures']] == [('s-t_lay-1', 1, F.VIEWS['T_LAY'][0]), ('s-t_lay-1-2', 2, F.VIEWS['T_LAY'][1]), ('s-t_lay-1-3', 3, F.VIEWS['T_LAY'][2])]
     assert [p['check']['state'] for p in f['pictures']] == ['pass', 'fail', 'pass'] and f['pictures'][1]['look']['verdict'] == 'weak' and f['pictures'][0]['look']['ref'] == 's-t_lay-1'
     assert f['rec'] == {'do': 'remake', 'golden': None, 'reason': 'Picture B shows no hand at work.'} and f['from'] == 'web' and f['inputs'] == []
