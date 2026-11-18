@@ -17,7 +17,25 @@
    "Waiting to be made",
    "Settled"
   ],
-  "pick": "Choose the picture that is the reference first."
+  "pick": "Choose the picture that is the reference first.",
+  "words": {
+   "leave": "No reference needed",
+   "leave_set": "Go on without a reference",
+   "set": "Make a set",
+   "fix": "Make a set with words",
+   "loss_head": "With no reference of it",
+   "done": {
+    "use": "Approved",
+    "set": "Make a set",
+    "fix": "Set with your words",
+    "own": "Own picture",
+    "ignore": "No reference"
+   },
+   "wait_out": "Not made",
+   "wait_made": "Will be made",
+   "corrections_head": "The operator's corrections",
+   "searched_head": "What the picture model searched"
+  }
  },
  "lines": [
   {
@@ -37,16 +55,16 @@
      "big": "Make the other 17"
     },
     {
-     "label": "Leave some out",
+     "label": "Do not make these sets",
      "choice": "rest_out",
      "needs_words": false,
      "act": "rest_out",
-     "say": "6 sets will be made. 11 are left out.",
+     "say": "6 sets will be made. 11 are not made.",
      "loss": {
-      "head": "If you leave these 11 out",
-      "intro": "These shots are then made with no reference of the thing named. Nothing is left out until you choose it below.",
+      "head": "Without these 11 sets",
+      "intro": "These shots are then made with no reference of the thing named. Nothing changes until you choose it below.",
       "cols": [
-       "Left out",
+       "Not made",
        "Shots",
        "Which shots lose it"
       ],
@@ -107,12 +125,12 @@
         "shot 20 of gap 1"
        ]
       ],
-      "people": "The 6 people always get a set: Thing Helper, Thing Tilemaker, Thing Mother, Thing Father, Thing Child, Thing Neighbour. Leaving the others out also has their 6 sets made, on the same word, when you say done in the chat.",
-      "button": "Leave these 11 out and make the other 6"
+      "people": "The 6 people always get a set: Thing Helper, Thing Tilemaker, Thing Mother, Thing Father, Thing Child, Thing Neighbour. Not making the others also has their 6 sets made, on the same word, when you say done in the chat.",
+      "button": "Do not make these 11 sets; make the other 6"
      }
     }
    ],
-   "cost": "If you leave these 11 out, these shots are made with no reference: Thing Tile: shot 10 of gap 1; Thing Ceiling_Finish: shot 11 of gap 1; Thing Shutter_Oil: shot 12 of gap 1; Thing Oil_Brush: shot 13 of gap 1; Thing Oil_Tin: shot 14 of gap 1; Thing Prop_Post: shot 15 of gap 1; Thing Cement_Bag: shot 16 of gap 1; Thing Shutter_Window: shot 17 of gap 1; Thing Site_Below: shot 18 of gap 1; Thing Lane: shot 19 of gap 1; Thing T_Bricklay: shot 20 of gap 1.",
+   "cost": "Without these 11 sets, these shots are made with no reference: Thing Tile: shot 10 of gap 1; Thing Ceiling_Finish: shot 11 of gap 1; Thing Shutter_Oil: shot 12 of gap 1; Thing Oil_Brush: shot 13 of gap 1; Thing Oil_Tin: shot 14 of gap 1; Thing Prop_Post: shot 15 of gap 1; Thing Cement_Bag: shot 16 of gap 1; Thing Shutter_Window: shot 17 of gap 1; Thing Site_Below: shot 18 of gap 1; Thing Lane: shot 19 of gap 1; Thing T_Bricklay: shot 20 of gap 1.",
    "head": "17 more sets wait for your word",
    "why": "Judge the first sets first: a fault here would repeat in all of them.",
    "show": "Show the 17",
@@ -167,7 +185,8 @@
      "choice": "correct",
      "needs_words": true,
      "act": "fix",
-     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words"
     }
    ],
    "group": "To judge",
@@ -293,7 +312,8 @@
      "choice": "correct",
      "needs_words": true,
      "act": "fix",
-     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words"
     }
    ],
    "group": "To judge",
@@ -439,7 +459,8 @@
      "choice": "correct",
      "needs_words": true,
      "act": "fix",
-     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words"
     },
     {
      "label": "Make again",
@@ -527,7 +548,8 @@
      "choice": "correct",
      "needs_words": true,
      "act": "fix",
-     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words"
     },
     {
      "label": "Make again",
@@ -653,11 +675,11 @@
      "sug": true
     },
     {
-     "label": "Leave out",
+     "label": "Go on without a reference",
      "choice": "aside",
      "needs_words": false,
      "act": "leave",
-     "say": "Leave it out. 1 shot will be made with no reference of it."
+     "say": "Go on without a reference. 1 shot will be made with no reference of it."
     }
    ],
    "group": "To judge",
@@ -711,9 +733,9 @@
    },
    "pick": true,
    "made_n": "made 3 times",
-   "most": "This set was made 3 times, which is the most: use one of these pictures, add your own, or leave it out.",
+   "most": "This set was made 3 times, which is the most: use one of these pictures, add your own, or go on without a reference.",
    "loss": {
-    "text": "If you leave it out, this 1 shot is made with no reference of it:",
+    "text": "This 1 shot is then made with no reference of it:",
     "shots": [
      "shot 1 of gap 1"
     ]
@@ -771,7 +793,8 @@
      "choice": "correct",
      "needs_words": true,
      "act": "fix",
-     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words"
     },
     {
      "label": "Make again",
@@ -884,7 +907,8 @@
      "choice": "correct",
      "needs_words": true,
      "act": "fix",
-     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words"
     },
     {
      "label": "Make again",
@@ -1001,14 +1025,15 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make a set, with your words: \"{words}\". It comes back to you to judge.",
-     "hint": "What must the picture show?"
+     "hint": "What must the picture show?",
+     "go": "Make a set with these words"
     },
     {
-     "label": "Leave out",
+     "label": "No reference needed",
      "choice": "ignore",
      "needs_words": false,
      "act": "leave",
-     "say": "Leave it out. 1 shot will be made with no reference of it."
+     "say": "No reference needed. 1 shot will be made with no reference of it."
     }
    ],
    "group": "To judge",
@@ -1019,7 +1044,7 @@
    "shots": "Used in 1 shot · closest: a wide shot",
    "head": "It is new in the plan, so it is back with you. Nothing was made.",
    "loss": {
-    "text": "If you leave it out, this 1 shot is made with no reference of it:",
+    "text": "This 1 shot is then made with no reference of it:",
     "shots": [
      "shot 1 of gap 3"
     ]
@@ -1053,11 +1078,11 @@
      "say": "Make it. The set comes back to you to judge."
     },
     {
-     "label": "Leave out",
+     "label": "Go on without a reference",
      "choice": "aside",
      "needs_words": false,
      "act": "leave",
-     "say": "Leave it out. 1 shot will be made with no reference of it."
+     "say": "Go on without a reference. 1 shot will be made with no reference of it."
     }
    ],
    "group": "Could not be made",
@@ -1067,7 +1092,7 @@
    "used": "Used in 1 shot; the closest is a medium shot (shot 3 of gap 1).",
    "shots": "Used in 1 shot · closest: a medium shot",
    "loss": {
-    "text": "If you leave it out, this 1 shot is made with no reference of it:",
+    "text": "This 1 shot is then made with no reference of it:",
     "shots": [
      "shot 3 of gap 1"
     ]
@@ -1274,7 +1299,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1295,7 +1320,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1316,7 +1341,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1337,7 +1362,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1358,7 +1383,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1379,7 +1404,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1400,7 +1425,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1421,7 +1446,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1442,7 +1467,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1463,7 +1488,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [
@@ -1484,7 +1509,7 @@
    "note": "Not ordered yet: it is offered when the first sets are judged.",
    "head": "Not made yet. It is made when you choose \"Make them\".",
    "tag": "Waiting",
-   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
    "details": [
     [

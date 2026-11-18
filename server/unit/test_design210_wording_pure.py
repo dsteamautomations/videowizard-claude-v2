@@ -21,7 +21,7 @@ from test_design210b_pure import A, NEW, USER, ans, at_sets, back, film, page, r
 
 APP = Path(__file__).resolve().parents[1] / 'app'
 KEPT = {**H.RUN, 'film': NEW['film']}   # the harness film as a new one: its references are made as sets
-GAPS_DONE, SPECS_DONE, DRAWN = 'Every gap of the plan is accepted. ', 'Every drawing and material is approved. ', 'Every reference drawing is approved. '
+GAPS_DONE, SPECS_DONE, DRAWN = 'Every gap of the plan is accepted. ', 'Every size, material and graphic spec is approved. ', 'Every reference drawing is approved. '
 
 
 @pytest.fixture(autouse=True)
@@ -209,7 +209,7 @@ def test_the_wording_scripts_old_sentences_are_retired():   # design/211: its ne
 def test_no_text_of_the_server_sends_a_page_step_to_the_chat():
     stage, drawings = (APP / 'visuals_stage.py').read_text(encoding='utf-8'), (APP / 'drawings.py').read_text(encoding='utf-8')
     assert 'approves it in the chat, in its turn' not in stage   # a drawing's parts and sizes: the page
-    assert stage.count('is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`)') == 3
+    assert stage.count('is not approved, or changed since: the operator approves the sizes, materials and graphic specs on the page (`vw visuals page`)') == 3
     assert 'looks at them in the chat' not in drawings
     assert 'on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown' in drawings
     for text in (P.PLAN_NEXT, P.SPEC_NEXT, P.DRAW_NEXT, P.REFS_START, P.REFS_GO, P.REFS_HERE, CF.FRAMES_ON_PAGE, VS.NO_UNDO):

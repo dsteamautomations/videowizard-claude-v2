@@ -131,7 +131,7 @@ def test_step_1_in_its_new_layout(monkeypatch, browser, size, scheme):
     assert pg.evaluate('getComputedStyle(document.body).backgroundColor') == ('rgb(16, 22, 28)' if scheme == 'dark' else 'rgb(245, 247, 248)')  # 6: both themes
     # case 1, footage pictures: everything for a thing with three pictures in one view
     thing(pg, "Mason's trowel")
-    assert bar(pg) == ['Approve Suggested', 'Make a set', 'Minor corrections', 'Upload my own', 'Leave out']                                    # 7: the suggested answer first, and marked
+    assert bar(pg) == ['Approve Suggested', 'Make a set', 'Make a set with words', 'Upload my own', 'No reference needed']                                    # 7: the suggested answer first, and marked
     assert pg.locator('#tmain .tbar button').first.get_attribute('class') == 'tbtn go'                                                         # 8
     assert pg.locator('#tmain .ttile').count() == 3 and pg.locator('#tmain .tweak').count() == 2                                                 # 9
     tops = pg.evaluate("[...document.querySelectorAll('#tmain .ttile')].map(e => Math.round(e.getBoundingClientRect().top))")
@@ -183,15 +183,15 @@ def test_step_1_in_its_new_layout(monkeypatch, browser, size, scheme):
     assert pg.locator('#tanswer').count() == 0                                                                                                  # 32: undo
     # leaving out: the shots that lose the thing, then Leave it out or Cancel
     pg.locator('#tmain [data-act="ignore"]').click()
-    assert pg.locator('#tpanel p').first.text_content() == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'   # 33
-    assert pg.locator('#tpanel button').all_text_contents() == ['Leave it out', 'Cancel']                                                      # 34
+    assert pg.locator('#tpanel p').first.text_content() == 'These shots are then made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'   # 33
+    assert pg.locator('#tpanel button').all_text_contents() == ['No reference needed', 'Cancel']                                                      # 34
     shot(pg, f'leave-out-{tag}')
     pg.locator('#tcancel').click()
     assert pg.locator('#tpanel').count() == 0 and 'l06' not in answers(pg)                                                                      # 35
     pg.locator('#tmain [data-act="ignore"]').click()
     pg.locator('#tleave').click()
     a = saved(pg, 'l06', 'ignore')
-    assert a['pics'] == {} and pg.locator('#tanswer p').text_content() == 'Your answer: Leave it out.'                                         # 36
+    assert a['pics'] == {} and pg.locator('#tanswer p').text_content() == 'Your answer: No reference needed.'                                         # 36
     # the upload panel, for a thing: no words of permission
     pg.locator('#tmain [data-act="own"]').click()
     assert pg.locator('#tpanel input[type=file]').count() == 1 and pg.locator('#tpanel input[type=text]').count() == 0                          # 37
@@ -201,7 +201,7 @@ def test_step_1_in_its_new_layout(monkeypatch, browser, size, scheme):
     assert a['own']['name'] == 'mine.png' and a['permission'] == '' and pg.locator('#tanswer img.ownpic').count() == 1                          # 39
     # case 2, only a "closest found" picture: Approve needs its tick
     thing(pg, 'Wall fan regulator')
-    assert bar(pg) == ['Leave out Suggested', 'Approve', 'Make a set', 'Upload my own']                                                         # 40
+    assert bar(pg) == ['No reference needed Suggested', 'Approve', 'Make a set', 'Upload my own']                                                         # 40
     assert pg.locator('#tmain .tisit').text_content() == 'Closest found: is this it?' and pg.locator('#tck0').is_checked() is False             # 41
     pg.locator('#tmain [data-act="use"]').click()
     assert pg.locator('#tmsg').text_content() == 'Tick the picture first, if that is it.' and 'l07' not in answers(pg)                          # 42
@@ -211,7 +211,7 @@ def test_step_1_in_its_new_layout(monkeypatch, browser, size, scheme):
     shot(pg, f'closest-{tag}')
     # case 3, no picture, a thing
     thing(pg, 'Brick')
-    assert bar(pg) == ['Make a set Suggested', 'Upload my own', 'Leave out'] and pg.locator('#tmain [data-act="words"]').text_content() == 'Add words for the picture (optional)'   # 44
+    assert bar(pg) == ['Make a set Suggested', 'Upload my own', 'No reference needed'] and pg.locator('#tmain [data-act="words"]').text_content() == 'Add words for the picture (optional)'   # 44
     assert pg.locator('#tmain .tnopics').text_content() == 'Not in your footage. why'                                                          # 45
     pg.locator('#tsearchwhy').click()
     assert pg.locator('#tmain .tnopics').text_content() == 'Not in your footage. The helper was stopped. less'                                 # 46: the reason behind "why"
@@ -264,7 +264,7 @@ def test_the_list_its_filters_its_folding_and_the_routine_things(monkeypatch, br
     assert pg.locator('#tmain .tprow').count() == 4 and pg.locator('#tmain h2').text_content() == "Accept Claude's proposals for the 4 routine things"   # 8
     tile = pg.locator('#tmain .tprow', has_text='Roof tile')
     assert tile.locator('.tpim').count() == 1 and 'Claude suggests: Make a set' in tile.text_content() and 'It has approved drawings' in tile.text_content()   # 9: its pictures, the suggestion and the reason
-    assert 'You answered: Left out' in pg.locator('#tmain .tprow', has_text='The street').text_content()                                       # 10
+    assert 'You answered: No reference' in pg.locator('#tmain .tprow', has_text='The street').text_content()                                       # 10
     shot(pg, 'routine-list')
     pg.locator('#taccepthere').click()
     a = saved(pg, 'l01', 'accept_all')
@@ -303,12 +303,12 @@ def test_the_keys_the_large_picture_and_auto_advance(monkeypatch, browser):
     assert pg.locator('#tleave').count() == 1                                                                                                  # 6
     pg.keyboard.press('Escape')
     pg.locator('[data-pop="tkeys"]').click()
-    assert pg.locator('#tkeys').is_visible() and 'Minor corrections' in pg.locator('#tkeys').text_content()                                    # 7
+    assert pg.locator('#tkeys').is_visible() and 'Make a set with words' in pg.locator('#tkeys').text_content()                                    # 7
     pg.keyboard.press('Escape')
     assert pg.locator('#tkeys').is_hidden()                                                                                                    # 8
     pg.locator('[data-pop="thow"]').click()
     how = pg.locator('#thow').text_content()
-    assert 'A set is three pictures of one thing, which become its reference; for a person, their three views.' in how and 'C003.mp4' in how   # 9: what a set is, and the clips nobody could search, said once
+    assert 'A set is three pictures of one thing, which become its reference; for a person, their three views; a place gets one picture.' in how and 'C003.mp4' in how   # 9: what a set is, and the clips nobody could search, said once
     pg.keyboard.press('Escape')
     # the large picture is the page's own
     pg.locator('#tmain .timg').first.click()

@@ -241,7 +241,7 @@ def test_done_orders_the_three_marked_sets_and_the_others_wait():
     post(store, conn)
     out = done(store, conn)
     assert out['queued'] == ['MASON', 'STREET', 'T_LAY'] and out['rest'] == ['BRICK', 'TILE'] and out['from_footage'] == ['TROWEL'] and out['errors'] == {} and out['pass'] == 'making'
-    assert out['then'] == RS.GO1_MAKING.format(k=3, x='106', r=2) and out['cost_inr'] == 106.13
+    assert out['then'] == RS.goes_said(5) + ' ' + RS.GO1_MAKING.format(r=2) and 'cost_inr' not in out   # design/215: how the making goes, said first; no amount
     s = saved(store)
     rd = s['round']
     assert rd['rest'] == ['BRICK', 'TILE'] and rd['go'] == 1 and list(jobs(conn)) == ['MASON', 'STREET', 'T_LAY'] and state(store) == 'making'
@@ -293,18 +293,18 @@ def test_three_sets_or_fewer_in_all_are_ordered_at_once():
     store, conn = film()
     post(store, conn)
     out = done(store, conn, BRICK={'verdict': 'ignore'}, TILE={'verdict': 'ignore'})
-    assert out['queued'] == ['MASON', 'STREET', 'T_LAY'] and out['rest'] == [] and out['then'] == RS.ALL_MAKING.format(k=3, x='106')
+    assert out['queued'] == ['MASON', 'STREET', 'T_LAY'] and out['rest'] == [] and out['then'] == 'All 3 sets are made now. ' + RS.ALL_MAKING.format(k=3)
     store, conn = film()
     post(store, conn)
     out = done(store, conn, **{e: {'verdict': 'ignore'} for e in ('BRICK', 'TILE', 'STREET', 'T_LAY')})
-    assert out['queued'] == ['MASON'] and out['then'] == RS.ALL_MAKING.format(k=1, x=SET_INR) and saved(store)['round']['rest'] == []
+    assert out['queued'] == ['MASON'] and out['then'] == 'The set is made now. ' + RS.ALL_MAKING.format(k=1) and saved(store)['round']['rest'] == []
 
 
 def test_a_marked_thing_the_operator_left_out_gives_its_place_to_another():
     store, conn = film()
     post(store, conn)
     out = done(store, conn, STREET={'verdict': 'ignore'})
-    assert out['queued'] == ['MASON', 'BRICK', 'T_LAY'] and out['rest'] == ['TILE'] and out['then'] == RS.GO1_MAKING.format(k=3, x='106', r=1)
+    assert out['queued'] == ['MASON', 'BRICK', 'T_LAY'] and out['rest'] == ['TILE'] and out['then'] == RS.goes_said(4) + ' ' + RS.GO1_MAKING.format(r=1)
 
 
 def test_nothing_to_make_completes_the_round_and_says_so():
@@ -556,7 +556,7 @@ def test_the_first_sets_are_judged_from_the_chat_tool_while_the_others_wait():
 def test_the_other_sets_are_ordered_on_the_operators_word():
     store, conn = at_two()
     out = VS.guarded(lambda: RS.round_rest(conn, store, USER, RUN, [], 'make the other two'))
-    assert out == {'pass': 'making', 'queued': ['BRICK', 'TILE'], 'errors': {}, 'cost_inr': 70.75, 'then': RS.ALL_MAKING.format(k=2, x='71')}
+    assert out == {'pass': 'making', 'queued': ['BRICK', 'TILE'], 'errors': {}, 'then': RS.SAID_REST.format(n='2 sets are', m=3) + ' ' + RS.ALL_MAKING.format(k=2)}
     rd = saved(store)['round']
     assert rd['rest'] == [] and rd['go'] == 2 and rd['rest_word']['quote'] == 'make the other two' and list(jobs(conn)) == ['MASON', 'STREET', 'T_LAY', 'BRICK', 'TILE']
     tile = jobs(conn)['TILE']
@@ -629,7 +629,7 @@ def test_the_rewrite_keeps_the_earlier_request_and_orders_the_set_once():
     before = saved(store)['round']['elements']['T_LAY']['set']
     judge(store, conn, {'T_LAY': {'verdict': 'correct', 'words': 'Show the hand pressing the brick down.'}})
     out = rewritten(store, conn)
-    assert out == {'pass': 'making', 'queued': ['T_LAY'], 'errors': {}, 'cost_inr': 35.38, 'then': RS.REWRITE_MAKING.format(n=1, x=SET_INR)} and len(conn.inserted) == 4
+    assert out == {'pass': 'making', 'queued': ['T_LAY'], 'errors': {}, 'then': RS.REWRITE_MAKING.format(n=1)} and len(conn.inserted) == 4
     s = saved(store)
     row, job = s['round']['elements']['T_LAY'], req(conn.inserted[-1])
     assert row['history'] == [{'n': 1, 'set': before, 'added': 'The brick is wet from soaking.', 'operator': 'Show the hand pressing the brick down.', 'at': row['history'][0]['at']}]
@@ -720,7 +720,7 @@ def test_a_second_send_orders_nothing_and_only_a_new_thing_goes_back_to_the_oper
     put(store, s)
     out = post(store, conn, rows(FAN={'rec': 'set', 'reason': 'Seen close after all.'}, BRICK={'prompt': 'A wire-cut face.'}, STREET={'prompt': 'Another street.'}))
     assert out == {'pass': 2, 'kept': True, 'v': 2, 'merged': ['BRICK'], 'reopened': ['TILE'], 'left': ['MASON', 'TROWEL', 'FAN', 'STREET', 'T_LAY'], 'queued': [], 'errors': {}, 'elements': 7,
-                   'cost_inr': 0, 'then': RS.MERGE_ASK.format(n=1)}
+                   'then': RS.MERGE_ASK.format(n=1)}
     assert len(conn.inserted) == 3                                       # nothing was ordered
     e = saved(store)['round']['elements']
     assert 'reopened' not in e['FAN'] and e['FAN']['ignored'] is True and e['FAN']['rec'] == 'no_set' and e['FAN']['reason'] != 'Seen close after all.'   # left out: the new row is not taken
@@ -742,7 +742,7 @@ def test_a_thing_that_came_back_is_answered_with_the_meaning_of_step_1():
     store, conn = at_two()
     VS.set_aside(store, USER, RUN, [], 'FAN', back=True)
     out = VS.guarded(lambda: RS.round_reopen(conn, store, USER, RUN, [], 'FAN', 'approve', 'The white one.', 'yes, make it'))
-    assert out == {'element_id': 'FAN', 'queued': True, 'pass': 'making', 'cost_inr': 35.38, 'then': RS.ALL_MAKING.format(k=1, x=SET_INR)} and len(conn.inserted) == 4
+    assert out == {'element_id': 'FAN', 'queued': True, 'pass': 'making', 'then': RS.ALL_MAKING.format(k=1)} and len(conn.inserted) == 4
     row = saved(store)['round']['elements']['FAN']
     assert 'reopened' not in row and row['ignored'] is False and row['verdict'] == 'approve' and row['operator_words'] == ['The white one.'] and row['answered']['quote'] == 'yes, make it'
     assert "The operator's words: The white one." in req(conn.inserted[-1])['prompt']

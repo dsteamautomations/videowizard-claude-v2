@@ -46,7 +46,7 @@ def test_the_four_groups_in_order_and_the_layout_of_step_2(monkeypatch):
     film = Film(monkeypatch, '2')
     p = film.page()
     assert G == ['To judge', 'Could not be made', 'Waiting to be made', 'Settled']
-    assert p['layout'] == {'kind': 'sets', 'made': 'Nothing is made until you say done in the chat.', 'help': [p['note'], W['help_set'], W['help_rest']], 'groups': G, 'pick': W['pick']}
+    assert p['layout'] == {'kind': 'sets', 'made': 'Nothing is made until you say done in the chat.', 'help': [p['note'], W['help_set'], W['help_rest']], 'groups': G, 'pick': W['pick'], 'words': P.page_words()}
     assert [(l['key'], l.get('group'), l.get('case')) for l in p['lines']] == [
         ('sets:rest', None, None), ('set:T_LAY', G[0], 'judge'), ('set:MASON', G[0], 'judge'), ('set:STREET', G[0], 'judge'),   # the set Claude would make again first
         ('set:BRICK', G[2], 'wait'), ('set:TILE', G[2], 'wait'), ('set:TROWEL', G[3], 'settled')]
@@ -55,7 +55,7 @@ def test_the_four_groups_in_order_and_the_layout_of_step_2(monkeypatch):
         assert l['name'] and l['kind'] and l['tag'] and 'text' not in l and 'comment' not in l and 'notes' not in l, l['key']
     assert lines['set:T_LAY']['tag'] == 'Make again' and lines['set:MASON']['tag'] == 'Use it' and lines['set:BRICK']['tag'] == 'Waiting' and lines['set:TROWEL']['tag'] == 'Settled'
     assert lines['set:TROWEL']['head'] == W['settled_footage'] and 'buttons' not in lines['set:TROWEL'] and 'buttons' not in lines['set:BRICK']
-    assert lines['set:BRICK']['head'] == W['wait_head'] and lines['set:BRICK']['wait_note'] == 'If left out, 2 shots would have no reference of it.' and lines['set:BRICK']['out'] is True
+    assert lines['set:BRICK']['head'] == W['wait_head'] and lines['set:BRICK']['wait_note'] == 'If not made, 2 shots would have no reference of it.' and lines['set:BRICK']['out'] is True
     assert 'Doubtful' not in read(p) and not MONEY.search(read(p)) and 'limit' not in read(p)
     assert [i['_key'] for i in film.items(every=False)] == ['set:T_LAY', 'set:MASON', 'set:STREET', 'sets:rest']   # the chat: the same order, the other sets asked last
 
@@ -116,12 +116,12 @@ def test_vw24s_stored_round_shows_in_the_new_layout_as_it_is(monkeypatch):
     assert acts(deck) == ['again', 'approve', 'fix'] and btn(deck, 'approve')['choice'] == 'use' and deck['rec']['label'] == 'Make it again'
     assert deck['check']['state'] == 'fail' and deck['check']['chip'] == "Claude's check found 1 fault" and deck['pics'][4].get('flag') is True
     assert room['case'] == 'notmade' and room['head'] == 'This set could not be made.' and room['why'].startswith('The request places') and acts(room) == ['make', 'leave']
-    assert rest['head'] == '17 more sets wait for your word' and rest['show'] == 'Show the 17' and len(rest['covers']) == 17 and labels(rest) == ['Make them', 'Leave some out']
+    assert rest['head'] == '17 more sets wait for your word' and rest['show'] == 'Show the 17' and len(rest['covers']) == 17 and labels(rest) == ['Make them', 'Do not make these sets']
     assert rest['buttons'][0]['big'] == 'Make the other 17' and rest['buttons'][0]['say'] == 'The other 17 sets will be made.'
     loss = rest['buttons'][1]['loss']
-    assert len(loss['rows']) == 11 and loss['head'] == 'If you leave these 11 out' and loss['button'] == 'Leave these 11 out and make the other 6' == chat(film, 'sets:rest')['buttons'][1]['label'] and loss['people'].startswith('The 6 people always get a set: ') \
-        and loss['people'].endswith('Leaving the others out also has their 6 sets made, on the same word, when you say done in the chat.')
-    assert rest['buttons'][1]['say'] == '6 sets will be made. 11 are left out.' and 'waits' not in rest
+    assert len(loss['rows']) == 11 and loss['head'] == 'Without these 11 sets' and loss['button'] == 'Do not make these 11 sets; make the other 6' == chat(film, 'sets:rest')['buttons'][1]['label'] and loss['people'].startswith('The 6 people always get a set: ') \
+        and loss['people'].endswith('Not making the others also has their 6 sets made, on the same word, when you say done in the chat.')
+    assert rest['buttons'][1]['say'] == '6 sets will be made. 11 are not made.' and 'waits' not in rest
     assert len([l for l in lines if l.get('wait_note') == W['wait_person']]) == 6 and len([l for l in lines if l.get('out')]) == 11
     assert all(l['case'] == 'settled' and l['pics'] and l['head'] == W['settled_footage'] for l in lines if l['group'] == G[3])
     assert film.session() == before                                                                              # showing it stores nothing: no re-post is needed
@@ -161,9 +161,9 @@ def test_a_set_made_the_most_times_offers_no_remake_and_a_thing_may_be_left_out(
     film.change(lambda s: [s['round']['elements'][e].update(round=3) for e in ('MASON', 'STREET')])
     m, s = film.lines()['set:MASON'], film.lines()['set:STREET']
     assert acts(m) == ['approve'] and m['most'] == 'This set was made 3 times, which is the most: use it, or add your own picture.' and m['made_n'] == 'made 3 times'
-    assert acts(s) == ['approve', 'leave'] and s['most'] == 'This set was made 3 times, which is the most: use one of these pictures, add your own, or leave it out.'
-    assert s['loss'] == {'text': 'If you leave it out, this 1 shot is made with no reference of it:', 'shots': s['loss']['shots']} and len(s['loss']['shots']) == 1
-    assert btn(s, 'leave')['say'] == 'Leave it out. 1 shot will be made with no reference of it.' and s['most'] in chat(film, 'set:STREET')['text']
+    assert acts(s) == ['approve', 'leave'] and s['most'] == 'This set was made 3 times, which is the most: use one of these pictures, add your own, or go on without a reference.'
+    assert s['loss'] == {'text': 'This 1 shot is then made with no reference of it:', 'shots': s['loss']['shots']} and len(s['loss']['shots']) == 1
+    assert btn(s, 'leave')['say'] == 'Go on without a reference. 1 shot will be made with no reference of it.' and s['most'] in chat(film, 'set:STREET')['text']
     film.change(lambda x: x['round']['elements']['STREET'].update(round=2))
     assert film.lines()['set:STREET']['made_n'] == 'made twice'
 
@@ -226,7 +226,7 @@ def test_a_set_not_made_a_refused_photo_and_a_thing_back(monkeypatch):
     film.change(lambda s: [r.update(status='failed') for r in s['references'].values() if r.get('set') == 's-street-1'])
     s = film.lines()['set:STREET']
     assert (s['group'], s['case'], s['head'], s['why']) == (G[1], 'notmade', 'This set could not be made.', 'Google refused the request.')
-    assert [(b['label'], b['choice'], b['act']) for b in s['buttons']] == [('Make it', 'make', 'make'), ('Leave out', 'aside', 'leave')] and s['own']['label'] == 'Upload my own'
+    assert [(b['label'], b['choice'], b['act']) for b in s['buttons']] == [('Make it', 'make', 'make'), ('Go on without a reference', 'aside', 'leave')] and s['own']['label'] == 'Upload my own'
     assert ['Why it could not be made', 'Google refused the request.'] in s['details']
     film.record(ans(s, 'make'))
     assert film.called('set_make') == [('STREET', 'Make it')]
@@ -239,7 +239,7 @@ def test_a_set_not_made_a_refused_photo_and_a_thing_back(monkeypatch):
     film.change(lambda x: x['round']['elements']['FAN'].update(reopened='new', ignored=False))
     f = film.lines()['set:FAN']
     assert (f['group'], f['case'], f['head']) == (G[0], 'back', W['reopen_new']) and [(b['label'], b['choice'], b['act']) for b in f['buttons']] == [
-        ('Make a set', 'approve', 'set'), ('Add words for the picture', 'words', 'fix'), ('Leave out', 'ignore', 'leave')]
+        ('Make a set', 'approve', 'set'), ('Add words for the picture', 'words', 'fix'), ('No reference needed', 'ignore', 'leave')]
     film.record(ans(f, 'words', 'The blades are brown.'))
     assert film.called('round_reopen') == [('FAN', 'approve', 'The blades are brown.', 'Add words for the picture')]
 
@@ -249,11 +249,11 @@ def test_the_waiting_sets_make_them_and_leave_some_out(monkeypatch):
     aside = []
     monkeypatch.setattr(VS, 'set_aside', lambda store, user, run, outputs, eid, words='', back=False: aside.append(eid) or {'element_id': eid})
     rest = film.lines()['sets:rest']
-    assert [(b['label'], b['choice']) for b in rest['buttons']] == [('Make them', 'rest'), ('Leave some out', 'rest_out')] and rest['why'] == W['rest_why']
-    assert rest['buttons'][1]['say'] == '2 are left out. No other set waits.' and len(rest['buttons'][1]['loss']['rows']) == 2
+    assert [(b['label'], b['choice']) for b in rest['buttons']] == [('Make them', 'rest'), ('Do not make these sets', 'rest_out')] and rest['why'] == W['rest_why']
+    assert rest['buttons'][1]['say'] == '2 are not made. No other set waits.' and len(rest['buttons'][1]['loss']['rows']) == 2
     item = chat(film, 'sets:rest')
-    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Make the other 2 sets', 'rest'), ('Leave these 2 out', 'rest_out')]
-    assert rest['buttons'][1]['loss']['button'] == 'Leave these 2 out'                                              # no person waits: the same words on the page and in the chat
+    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Make the other 2 sets', 'rest'), ('Do not make these 2 sets', 'rest_out')]
+    assert rest['buttons'][1]['loss']['button'] == 'Do not make these 2 sets'                                              # no person waits: the same words on the page and in the chat
     film.record(ans(rest, 'rest'))
     assert len(film.called('round_rest')) == 1 and not aside
     out = film.record(ans(rest, 'rest_out'))                                                                       # the server refuses it while a first set is unjudged: the page is not the only door
@@ -267,7 +267,7 @@ def test_leave_some_out_makes_the_people_who_always_get_a_set_on_the_same_word(m
     film, _ = vw24(monkeypatch)
     aside = []
     monkeypatch.setattr(VS, 'set_aside', lambda store, user, run, outputs, eid, words='', back=False: aside.append(eid) or {'element_id': eid})
-    assert chat(film, 'sets:rest')['buttons'][1]['label'] == 'Leave these 11 out and make the other 6'
+    assert chat(film, 'sets:rest')['buttons'][1]['label'] == 'Do not make these 11 sets; make the other 6'
     lines = film.lines()
     judged = [ans(lines['set:MASON'], 'yes'), ans(lines['set:SITE_DECK'], next(x['choice'] for x in lines['set:SITE_DECK']['pics'] if x.get('choice')))]
     monkeypatch.setattr(VS, '_set_budget', lambda run, s, spend: (F.CAP, F.CAP, F.SET_PRICE))                      # the limit has no room for the people's sets

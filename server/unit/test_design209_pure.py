@@ -132,12 +132,12 @@ def test_with_no_spec_waiting_the_page_stays_on_the_plan_step_as_before():
 def test_the_step_lists_the_materials_first_then_the_drawings_in_the_films_order_each_with_the_chats_own_item():
     store, conn = start(plan_with([drawing([dim('box', 'length', 600)]), None, drawing([dim('lid', 'thickness')])], PANEL))
     p = page(store, conn)
-    assert p['step'] == 'Drawings and materials' and p['open'] is True
+    assert p['step'] == 'Sizes, materials and graphic specs' and p['open'] is True
     assert [(l['line'], l['key'], l['title'], l['state']) for l in p['lines']] == [('l01', 'element:panel', 'Floor panel', 'open'), ('l02', 'G1-S1', 'Shot G1-S1', 'open'), ('l03', 'G3-S1', 'Shot G3-S1', 'open')]
     assert [l['item'] for l in p['lines']] == [i['id'] for i in chat(store, conn)] and all(l['item'].startswith('spec:' + l['key'] + ':') for l in p['lines'])
     assert [l['ask'] for l in p['lines']] == ['Are these facts right?', 'Are the parts and the known sizes right?', 'Are the parts right?']
     assert all([(b['label'], b['choice'], b['needs_words']) for b in l['buttons']] == [('Yes', 'yes', False), ('Correct it', 'correct', True)] for l in p['lines'])
-    assert p['summary'] == '1 material and 2 drawings: 3 to answer, 0 recorded, 0 with the assistant.' and p['note'] == 'Answer each line, then say done in the chat.'
+    assert p['summary'] == '1 material and 2 graphic specs: 3 to answer, 0 recorded, 0 with the assistant.' and p['note'] == 'Answer each line, then say done in the chat.'
     text = json.dumps(p['lines'], ensure_ascii=False)
     assert 'S_DIAGRAM' not in text and not [f for f in FIELDS if f in text]
     assert p['how'] == P.HOW and p['capabilities'] == P.CAPABILITIES
@@ -203,7 +203,7 @@ def test_one_done_records_every_answer_through_the_specs_own_functions_and_the_p
     now = by_key(r['page'])
     assert now['element:panel']['state'] == 'recorded' and now['element:panel']['spec']['facts'][0][0] == 'How it is laid' and 'buttons' not in now['element:panel']
     assert now['G2-S1']['state'] == 'with_assistant' and now['G2-S1']['note'] == 'the lid is hinged, not loose'
-    assert r['page']['summary'] == '1 material and 2 drawings: 0 to answer, 2 recorded, 1 with the assistant.'
+    assert r['page']['summary'] == '1 material and 2 graphic specs: 0 to answer, 2 recorded, 1 with the assistant.'
     assert r['then'] == P.SPEC_BACK and 'vw visuals page' in r['then'] and 'propose' in r['then']
     assert len(conn.log) == 3 and [x for x in conn.log if 'the lid is hinged, not loose' in json.dumps(x, default=str)], 'one log line per answer, with the operator\'s words'
 
@@ -211,7 +211,7 @@ def test_one_done_records_every_answer_through_the_specs_own_functions_and_the_p
 def test_every_spec_approved_keeps_its_content_on_its_recorded_line_and_names_what_is_next():
     store, conn = start(plan_with([drawing([dim('box', 'length', 600)])], PANEL))
     r = record(store, conn, [ans(l, 'yes') for l in page(store, conn)['lines']])
-    assert r['open'] == 0 and r['page']['open'] is False and r['page']['step'] == 'Drawings and materials' and r['then'] == P.SPEC_NEXT and 'vw visuals next' in r['then']
+    assert r['open'] == 0 and r['page']['open'] is False and r['page']['step'] == 'Sizes, materials and graphic specs' and r['then'] == P.SPEC_NEXT and 'vw visuals next' in r['then']
     assert all(l['state'] == 'recorded' and l['spec']['sizes'] for l in r['page']['lines']) and 'approved' in r['page']['note']
     assert chat(store, conn) == []
 
@@ -338,7 +338,7 @@ def test_the_instructions_send_the_drawings_and_materials_to_the_page_and_the_ch
     parts = copy.deepcopy(st['parts'])
     assert W.apply(st['prompt'], parts) == st['prompt'] and parts == st['parts'], 'applying twice changes nothing'
     src = Path(V.__file__).read_text(encoding='utf-8')   # the tool's own lines point to the page first
-    assert 'approves the specs as one table' not in src and 'approves the drawings and the materials on the page (`vw visuals page`)' in src
+    assert 'approves the specs as one table' not in src and 'approves the sizes, materials and graphic specs on the page (`vw visuals page`)' in src
 
 
 def test_a_yes_that_relied_on_a_size_corrected_in_the_same_visit_is_not_recorded():

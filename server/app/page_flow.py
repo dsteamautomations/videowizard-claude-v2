@@ -264,10 +264,10 @@ def _plan_page(ctx, base):
                     else 'Every gap of the plan is accepted. Nothing more to answer here.'}
 
 
-SPEC_STEP = 'Drawings and materials'
-SPEC_DONE = 'Every drawing and material is approved. '
+SPEC_STEP = 'Sizes, materials and graphic specs'   # design/215 (change 6): the step holds the sizes and materials of things and the specs of drawn graphics; "drawings" is the step after it
+SPEC_DONE = 'Every size, material and graphic spec is approved. '
 SPEC_NEXT = SPEC_DONE + 'Go on with `vw visuals next`: it gives the next decision.'
-SPEC_BACK = ('No line waits for the operator now: correct the drawings and materials that are back with you (their words are on each) in out/visual-plan.json, '
+SPEC_BACK = ('No line waits for the operator now: correct the sizes, materials and graphic specs that are back with you (their words are on each) in out/visual-plan.json, '
              'propose the plan again, then `vw visuals page`.')
 
 
@@ -297,7 +297,7 @@ def _spec_page(ctx, base, lines):
     the recorded lines, then holds the later lines to answer for the next "done", as the plan does."""
     many = lambda n, word: f"{n} {word}{'' if n == 1 else 's'}"
     kinds = [many(n, word) for n, word in ((len([l for l in lines if l['key'].startswith('element:')]), 'material'),
-                                           (len([l for l in lines if not l['key'].startswith('element:')]), 'drawing')) if n]
+                                           (len([l for l in lines if not l['key'].startswith('element:')]), 'graphic spec')) if n]
     held = 0
     while len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) > ROUND_BYTES:
         read = next((l for l in reversed(lines) if l['state'] == 'recorded' and 'spec' in l), None)
@@ -317,7 +317,7 @@ def _spec_page(ctx, base, lines):
             'summary': f"{' and '.join(kinds)}: {left} to answer, {count('recorded')} recorded, {count('with_assistant')} with the assistant" + (f', {held} more after these' if held else '') + '.',
             'note': f'This list is long: {held} more appear here after you answer these and say done in the chat.' if held else
                     'Answer each line, then say done in the chat.' if left else 'The assistant is correcting the lines you sent back; they will appear here.' if count('with_assistant')
-                    else 'Every drawing and material is approved. Nothing more to answer here.'}
+                    else SPEC_DONE + 'Nothing more to answer here.'}
 
 
 SPEC_REFUSED = ('The server refused an answer on the page; its reason is in `refused` and on the line. When the reason is about the drawing itself (a size with nothing '
@@ -446,7 +446,8 @@ def _drawn(session, eid):
 def _round_buttons(item, paid):
     """The chat item's own buttons, every one of them, for the page: one that leads to a paid set says so, with the price of one set."""
     if item.get('_v2'):   # design/211: the labels are the chat's own, the price already on them; a picture's own answer is under the picture
-        return [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words')), **{k: b[k] for k in ('small', 'say', 'hint') if b.get(k)}}   # design/212: `small`: a link under the buttons; design/213: `say`, what the answer will do, and the hint of its words box
+        return [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words')), **{k: b[k] for k in ('small', 'say', 'hint', 'go', 'note') if b.get(k)}}   # design/215: `go`, the words box's button; `note`, a hint beside the button
+                  # design/212: `small`: a link under the buttons; design/213: `say`, what the answer will do, and the hint of its words box
                 for b in item['buttons'] + list(item.get('other_choices') or []) if not (item['id'].startswith('round1:') and b['choice'].startswith(('not:', 'use:')))]
 
     def label(b):
@@ -694,7 +695,7 @@ def _round_page(ctx, base, step):
                         f'This list is long: {held} more things appear here after you answer these and say done in the chat. Nothing is made until after the last one.' if held else
                         'Look at each thing and answer it, then say done in the chat. Nothing is made until you say done.' if left else
                         'Every thing is answered. Say done in the chat.',
-                'layout': {'kind': 'things', 'made': CF.WORDS['made_note'], 'help': CF.WORDS['help'], **({'stopped': stopped} if stopped else {})}}
+                'layout': {'kind': 'things', 'made': CF.WORDS['made_note'], 'help': CF.WORDS['help'], 'words': page_words(), **({'stopped': stopped} if stopped else {})}}
     if v2:   # design/211: step 2; while Claude looks at the sets, or writes a request again, the page says so
         from . import ref_sets
         state = V._round_pass(session, session['round'])
@@ -707,7 +708,7 @@ def _round_page(ctx, base, step):
                 'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}.",   # design/212: no cost is named
                 'note': note, **({'then': then} if then else {}),
                 # design/213 (17 Nov 2026): the sets in the new layout: one set at a time beside the list, in the server's four groups
-                'layout': {'kind': 'sets', 'made': CF.WORDS['made_note'], 'help': [note, CF.WORDS['help_set'], CF.WORDS['help_rest']], 'groups': CF.STEP2_GROUPS, 'pick': CF.WORDS['pick']}}
+                'layout': {'kind': 'sets', 'made': CF.WORDS['made_note'], 'help': [note, CF.WORDS['help_set'], CF.WORDS['help_rest']], 'groups': CF.STEP2_GROUPS, 'pick': CF.WORDS['pick'], 'words': page_words()}}
     if step == 'refs':
         stopped = refused.get('references')
         return {**base, 'step': REFS_STEP, 'open': bool(left), 'lines': lines,
@@ -725,6 +726,14 @@ def _round_page(ctx, base, step):
             **({} if left or not making else {'then': SETS_WAIT})}
 
 
+def page_words():
+    """design/215: the words of the references screens that the page used to hold itself: sent with the layout, so the page and the chat say the same."""
+    w = CF.WORDS
+    return {'leave': w['leave'], 'leave_set': w['leave_failed'], 'set': w['set'], 'fix': w['fix1'], 'loss_head': 'With no reference of it',
+            'done': {'use': 'Approved', 'set': w['set'], 'fix': 'Set with your words', 'own': 'Own picture', 'ignore': 'No reference'},
+            'wait_out': 'Not made', 'wait_made': 'Will be made', 'corrections_head': "The operator's corrections", 'searched_head': 'What the picture model searched'}
+
+
 def _sets_asked(ctx, items):
     """How many paid sets the kept answers of step 1 ask for, as `visuals_stage._from_footage` will decide."""
     return len([i for i in items if (i['_does'].get(i['_kept']['verdict']) == 'set' if i.get('_v2') and not i['_kept'].get('own') else   # design/211: a clean set is a set too
@@ -739,6 +748,9 @@ def _round_close(ctx):
         return None
     n = _sets_asked(ctx, items)
     (spent, cap, one), _paid = _money(ctx)
+    from . import ref_sets
+    V.need(not V.round_v2(ctx['session']) or spent + n * one <= cap + 1e-9,   # design/215 (W3): no amount on the references page
+           ref_sets.LIMIT_PLAIN + ' Nothing was made and nothing is recorded: your answers are kept.')
     V.need(spent + n * one <= cap + 1e-9, f"The answers ask for {n} set{'' if n == 1 else 's'}, about ₹{n * one:,.0f}, and ₹{spent:,.0f} is spent of the ₹{cap:,.0f} limit of this film. "
                                           'Nothing was made and nothing is recorded: the answers are kept. Leave some things out, or ask the owner to set another limit for this film; then say done again.')
     return CF.round_close(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], 'Done, on the page')

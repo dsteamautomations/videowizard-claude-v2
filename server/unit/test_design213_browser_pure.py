@@ -195,7 +195,7 @@ def test_what_each_button_of_a_set_writes(browser):
     fix, again = btn(PERSON, 'fix'), btn(PERSON, 'again')
     # minor corrections: the words are required, and travel with the choice
     pg.locator('#tmain [data-act="fix"]').click()
-    assert pg.locator('#tpanel label').text_content() == 'What should change?' and pg.locator('#tpanel button').all_text_contents() == ['Send corrections', 'Cancel']
+    assert pg.locator('#tpanel label').text_content() == 'What should change?' and pg.locator('#tpanel button').all_text_contents() == ['Make it again with these words', 'Cancel']
     pg.locator('#tfixsend').click()
     assert pg.locator('#tmsg').text_content() == 'Write what should change first.' and PERSON['line'] not in answers(pg)
     pg.locator('#tfix').fill('Picture B: only the hand.')
@@ -275,7 +275,7 @@ def test_not_made_waiting_and_settled(browser):
     gone(pg, NOTMADE['line'])
     pg.locator('#tmain [data-act="leave"]').click()
     assert pg.locator('#tpanel p').text_content() == NOTMADE['loss']['text'] and pg.locator('#tpanel li').all_text_contents() == NOTMADE['loss']['shots']
-    assert pg.locator('#tpanel button').all_text_contents() == ['Leave it out', 'Cancel'] and pg.evaluate('document.activeElement.id') == 'tcancel'   # never one key away
+    assert pg.locator('#tpanel button').all_text_contents() == ['Go on without a reference', 'Cancel'] and pg.evaluate('document.activeElement.id') == 'tcancel'   # never one key away
     assert NOTMADE['line'] not in answers(pg)
     shot(pg, 'leave-out')
     pg.locator('#tleave').click()
@@ -353,7 +353,7 @@ def test_the_waiting_sets_are_made_or_left_out_together(browser):
     assert pg.locator('#tpeople').text_content() == loss['people'] and pg.locator('#trestout').text_content() == loss['button']
     assert pg.evaluate('document.activeElement.id') == 'tclose' and pg.locator('#tclose').text_content() == 'Cancel' and REST['line'] not in answers(pg)
     # design/213 review: the button says all it does (the people's sets are made with it), and waits for the judged sets as "Make them" does
-    assert loss['button'] == next(b['label'] for b in CHAT_REST) and 'and make the other' in loss['button'] and 'made' in loss['people']
+    assert loss['button'] == next(b['label'] for b in CHAT_REST) and '; make the other' in loss['button'] and 'made' in loss['people']
     assert pg.locator('#trestout').is_disabled() and pg.locator('#trestoutwhy').text_content() == REST['why']
     pg.locator('#trestout').click(force=True)
     assert REST['line'] not in answers(pg)
@@ -384,9 +384,9 @@ def test_the_waiting_sets_are_made_or_left_out_together(browser):
     pg.locator('#trestout').click()
     saved(pg, REST['line'], OUT['choice'])
     assert pg.locator('#trail .tprop p').first.text_content() == OUT['say']
-    assert tags() == ['Left out' if l.get('out') else 'Will be made' for l in WAITING]
+    assert tags() == ['Not made' if l.get('out') else 'Will be made' for l in WAITING]
     open_set(pg, next(l for l in WAITING if l.get('out')))
-    assert 'Left out' in pg.locator('#tmain .tnopics').text_content()
+    assert 'Not made' in pg.locator('#tmain .tnopics').text_content()
     pg.locator('#trail [data-rest="undo"]').click()
     gone(pg, REST['line'])
     assert tags() == [l['tag'] for l in WAITING]

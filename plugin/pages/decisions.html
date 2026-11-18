@@ -287,16 +287,16 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
         <dt><kbd>C</kbd></dt><dd>Minor corrections</dd>
         <dt><kbd>M</kbd></dt><dd>Make again, or make it</dd>
         <dt><kbd>U</kbd></dt><dd>Upload my own</dd>
-        <dt><kbd>L</kbd></dt><dd>Leave out</dd>
+        <dt><kbd>L</kbd></dt><dd id="tk2leave"></dd>
         <dt><kbd>Esc</kbd></dt><dd>Close what is open</dd>
       </dl><dl id="tkeys1">
         <dt><kbd>←</kbd> <kbd>→</kbd> or <kbd>J</kbd> <kbd>K</kbd></dt><dd>Previous or next thing</dd>
         <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Tick or untick a picture</dd>
         <dt><kbd>A</kbd></dt><dd>Approve</dd>
         <dt><kbd>S</kbd></dt><dd>Make a set</dd>
-        <dt><kbd>C</kbd></dt><dd>Minor corrections, or words for the picture</dd>
+        <dt><kbd>C</kbd></dt><dd id="tk1fix"></dd>
         <dt><kbd>U</kbd></dt><dd>Upload my own</dd>
-        <dt><kbd>L</kbd></dt><dd>Leave out</dd>
+        <dt><kbd>L</kbd></dt><dd id="tk1leave"></dd>
         <dt><kbd>Esc</kbd></dt><dd>Close what is open</dd>
       </dl></div></div>
     <span class="tgrow"></span>
@@ -711,8 +711,8 @@ function tTick(l,p,on,fig){   // a tick changed: an answer already given follows
   if((l.tick||{})[a.choice]&&!tKept(l).length){ T.msg=l.tick[a.choice]; tUndo(l); }
   else write(l,a.choice,a.notes,{pics:tMarks(l)});
 }
-const T_DONE={use:'Approved',set:'Make a set',fix:'Corrections',own:'Own picture',ignore:'Left out'};
-function tTag(l){ const a=tOwn(l); if(tSets()) return a?(sBtn(l,a).label||a.choice):l.kept||sWaitTag(l)||l.tag||''; return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||((l.buttons||[]).find(x=>x.choice===a.choice)||{}).label||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
+const W=()=>(round&&(round.layout||{}).words)||{};   // design/215: the words of these screens are the server's (`layout.words`); the page holds none of them
+function tTag(l){ const a=tOwn(l), T_DONE=W().done||{}; if(tSets()) return a?(sBtn(l,a).label||a.choice):l.kept||sWaitTag(l)||l.tag||''; return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||((l.buttons||[]).find(x=>x.choice===a.choice)||{}).label||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
 function tSays(l){   // the answer as it stands, said back
   const a=tOwn(l), q=s=>'“'+s+'”', has=(l.pics||[]).length>0;
   if(tSets()){ if(!a) return ['Kept from before: ',l.kept+'.'+(l.kept_note?' '+l.kept_note:'')];   // the sentence is the server's: the chosen picture's, else the button's
@@ -722,8 +722,8 @@ function tSays(l){   // the answer as it stands, said back
   // what will happen, said plainly: which pictures the answer uses, or that the set is made from the description
   const n=tKept(l).length, pic=n+' ticked picture'+(n===1?'':'s'), from=n?'from the '+pic:'from the description; the footage pictures are not used';
   const s={use:has?'Approve: the '+pic+(n===1?' is':' are')+' the reference.':'Approve.',set:(has?'Make a set '+from+'.':'Make a set.')+(a.notes?' Your words: '+q(a.notes):''),
-    fix:has?'Minor corrections: '+q(a.notes)+' A set is made '+from+', with these words.':'Make a set, with your words: '+q(a.notes),
-    own:'My own picture'+(a.own&&a.own.name?': '+a.own.name:'')+'.'+(a.permission?' Permission: '+q(a.permission):''),ignore:'Leave it out.'}[a.choice]||String(a.choice);
+    fix:has?(W().fix||'')+': '+q(a.notes)+' A set is made '+from+', with these words.':'Make a set, with your words: '+q(a.notes),
+    own:'My own picture'+(a.own&&a.own.name?': '+a.own.name:'')+'.'+(a.permission?' Permission: '+q(a.permission):''),ignore:(W().leave||'')+'.'}[a.choice]||String(a.choice);
   return ['Your answer: ',s];
 }
 function tLarge(p,btn){   // on a wide screen the row's pictures are wider than the small picture: the large one from the file store takes its place
@@ -737,6 +737,7 @@ function tTop(list){
   if(s) $('thow').replaceChildren(...[].concat(lay.help||[]).map(x=>mk('p',{},x))); else
   $('thow').replaceChildren(mk('p',{},lay.help||round.note||''),round.summary&&mk('p',{},round.summary)); $('tauto').checked=!!T.auto;
   $('tnextopen').textContent=s?'Next to judge':'Next to answer'; $('tkeys1').hidden=s; $('tkeys2').hidden=!s;
+  $('tk1leave').textContent=W().leave||''; $('tk2leave').textContent=W().leave_set||''; $('tk1fix').textContent=(W().fix?W().fix+', or words':'Words')+' for the picture';
   $('tstop').hidden=!lay.stopped; $('tstop').textContent=lay.stopped?'Not recorded: '+lay.stopped:'';
 }
 function tAccept(prop){ const b=(prop.buttons||[])[0]; if(b) write(prop,b.choice,''); }
@@ -778,9 +779,11 @@ function tPanel(l){   // what opens under the buttons: the words box, the operat
   const cancel=mk('button',{class:'tbtn quiet',id:'tcancel',type:'button',on:{click:()=>tOpen(null)}},'Cancel');
   if(tSets()&&T.panel!=='own'){   // design/213: the words box, the small confirm of "make again", or what leaving out loses; every sentence is the server's
     const b=(l.buttons||[])[+String(T.panel).slice(1)]||{}, loss=l.loss||{}, go=(id,cls,label,words)=>mk('button',{class:'tbtn '+cls,id:id,type:'button',on:{click:()=>{
-      const w=words?words.value.trim().slice(0,MAX):''; if(words&&!w){ tRefuse('Write what should change first.'); words.focus(); return; } tAnswer(l,b.choice,w); }}},label);
-    if(b.needs_words){ const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)}); return [mk('label',{for:'tfix'},b.hint||'What should change?'),ta,mk('div',{class:'tacts'},go('tfixsend','go',b.act==='fix'?'Send corrections':b.label,ta),cancel)]; }
-    if(b.act==='leave') return [mk('p',{},loss.text||''),(loss.shots||[]).length?mk('ul',{},loss.shots.map(x=>mk('li',{},x))):null,mk('div',{class:'tacts'},go('tleave','stop','Leave it out'),cancel)];
+      const w=words?words.value.trim().slice(0,MAX):''; if(words&&!w){ tRefuse('Write what should change first.'); words.focus(); return; }
+      const all=b.all&&$('tall'); tAnswer(l,all&&all.checked?b.all.choice:b.choice,w); }}},label);   // design/215: "applies to every picture of this thing", off unless ticked
+    if(b.needs_words){ const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)}); return [mk('label',{for:'tfix'},b.hint||'What should change?'),ta,
+      b.all?mk('label',{class:'tnote',for:'tall'},mk('input',{type:'checkbox',id:'tall'}),' '+b.all.label):null,mk('div',{class:'tacts'},go('tfixsend','go',b.go||b.label,ta),cancel)]; }
+    if(b.act==='leave') return [mk('p',{},loss.text||''),(loss.shots||[]).length?mk('ul',{},loss.shots.map(x=>mk('li',{},x))):null,mk('div',{class:'tacts'},go('tleave','stop',b.label),cancel)];
     return [mk('p',{},b.ask||''),mk('div',{class:'tacts'},go('tagain','go',b.label),cancel)];
   }
   const wb=(l.buttons||[]).find(x=>x.choice===T.panel&&x.needs_words&&x.choice!=='fix');
@@ -797,10 +800,10 @@ function tPanel(l){   // what opens under the buttons: the words box, the operat
       mk('div',{class:'tacts'},mk('button',{class:'tbtn go',id:'tfixsend',type:'button',on:{click:()=>{ const w=ta.value.trim().slice(0,MAX);
         if(!w){ tRefuse('Write what should change first.'); ta.focus(); return; }
         const need=(l.tick||{}).fix; if(need&&!tKept(l).length) return tRefuse(need);
-        tAnswer(l,'fix',w); }}},has?'Send corrections':'Make a set with these words'),cancel)]; }
+        tAnswer(l,'fix',w); }}},((l.buttons||[]).find(x=>x.choice==='fix')||{}).go||''),cancel)]; }
   if(T.panel==='own') return [ownBox(l),mk('div',{class:'tacts'},cancel)];
   return [mk('p',{},l.cost||'This thing will have no reference picture.'),
-    mk('div',{class:'tacts'},mk('button',{class:'tbtn stop',id:'tleave',type:'button',on:{click:()=>tAnswer(l,'ignore','')}},'Leave it out'),cancel)];
+    mk('div',{class:'tacts'},mk('button',{class:'tbtn stop',id:'tleave',type:'button',on:{click:()=>tAnswer(l,'ignore','')}},((l.buttons||[]).find(x=>x.choice==='ignore')||{}).label||''),cancel)];
 }
 function tMain(list){
   const main=$('tmain'), l=list[T.cur], prop=tProp(), fold=tFold;
@@ -868,7 +871,8 @@ function tMain(list){
   const sug=(l.rec||{}).choice;
   (l.buttons||[]).filter(b=>!b.small).forEach((b,i)=>{   // the server's buttons for this thing's case, the suggested one first and marked
     const first=i===0&&!!sug&&b.choice===sug, pan=b.needs_words||b.choice==='ignore';
-    bar.push(mk('button',{class:'tbtn'+(first?' go':b.choice==='ignore'?' quiet':''),type:'button','data-act':b.choice,'aria-expanded':pan?String(T.panel===b.choice):null,on:{click:()=>tAct(l,b)}},b.label,first&&[' ',mk('span',{class:'tsug'},'Suggested')])); });
+    bar.push(mk('button',{class:'tbtn'+(first?' go':b.choice==='ignore'?' quiet':''),type:'button','data-act':b.choice,'aria-expanded':pan?String(T.panel===b.choice):null,on:{click:()=>tAct(l,b)}},b.label,first&&[' ',mk('span',{class:'tsug'},'Suggested')]));
+    if(b.note) bar.push(mk('span',{class:'tnote','data-note':b.choice},b.note)); });   // design/215: a hint beside a button, the server's
   }
   if(l.own&&assets&&(bar.length||!tSets())){ const at=bar.findIndex((x,i)=>i>0&&/^(ignore|leave)$/.test(x.getAttribute('data-act')));
     bar.splice(at<0?bar.length:at,0,mk('button',{class:'tbtn',type:'button','data-act':'own','aria-expanded':String(T.panel==='own'),on:{click:()=>tOpen(T.panel==='own'?null:'own')}},l.own.label)); }
@@ -886,7 +890,8 @@ function tMain(list){
     l.used&&[mk('dt',{},'Shots'),mk('dd',{},l.used)],
     l.search&&[mk('dt',{},'What the search found'),mk('dd',{},l.search.text+(l.search.why?' '+l.search.why:''))],
     (l.warnings||[]).length?[mk('dt',{},'Take care'),l.warnings.map(w=>mk('dd',{},w))]:null,
-    l.cost&&[mk('dt',{},'If you leave it out'),mk('dd',{},l.cost)],
+    (l.corrections||[]).length?[mk('dt',{},W().corrections_head||''),l.corrections.map(c=>mk('dd',{},c))]:null,
+    l.cost&&[mk('dt',{},W().loss_head||''),mk('dd',{},l.cost)],
     pics.length?[mk('dt',{},'What Claude saw in each picture'),pics.map(p=>mk('dd',{},mk('b',{},p.label+': '),p.note))]:null]));
   const detBtn=mk('button',{class:'tfold',id:'tdetb',type:'button','aria-expanded':'false','aria-controls':'tdetails'},'Details'); fold(detBtn,det);
   kids.push(detBtn,det);
@@ -896,10 +901,10 @@ function tMain(list){
 // The server sends every group, the order, each set's case, its buttons (each with its slot `act` and the sentence `say` its answer reads back),
 // and the waiting sets as one line (`sets:rest`). Nothing is parsed here: this draws them and writes the answers as every line's answer is written.
 const tFold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!target.hidden; btn.setAttribute('aria-expanded',String(!target.hidden)); });
-function sBtn(l,a){ return a.choice==='own'?(l.own||{}):(l.buttons||[]).find(b=>b.choice===a.choice)||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{}; }   // the button an answer came from
+function sBtn(l,a){ return a.choice==='own'?(l.own||{}):(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{}; }   // the button an answer came from
 const sRestAns=()=>{ const r=tProp(), a=r&&answers[r.line]; return a?((r.buttons||[]).find(b=>b.choice===a.choice)||{choice:a.choice}):null; };   // how the waiting sets were answered
 const sJudged=list=>list.every(l=>l.case!=='judge'||tDone(l));
-const sWaitTag=l=>{ const r=tProp(), b=sRestAns(); return b&&(r.covers||[]).indexOf(l.key)>=0?(b.loss&&l.out?'Left out':'Will be made'):''; };
+const sWaitTag=l=>{ const r=tProp(), b=sRestAns(); return b&&(r.covers||[]).indexOf(l.key)>=0?(b.loss&&l.out?W().wait_out||'':W().wait_made||''):''; };
 function sPicked(l){   // the picture chosen as the reference: the only one that can be, the one clicked here, or the one of the answer given
   const c=(l.pics||[]).filter(p=>p.choice), t=T.tick[l.line], a=tOwn(l);
   return c.length===1?c[0]:c.find(p=>t!==undefined?p.code===t:!!a&&p.choice===a.choice)||null; }

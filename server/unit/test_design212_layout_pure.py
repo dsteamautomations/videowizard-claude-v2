@@ -36,12 +36,12 @@ def read(x):
 def test_the_five_groups_and_their_order_on_the_fixture(monkeypatch):
     film = Film(monkeypatch)
     p = film.page()
-    assert G == ['Routine: accept together', 'With footage pictures', 'No picture: a set is suggested', 'No picture: suggested to leave out', 'No action needed']
+    assert G == ['Routine: accept together', 'With footage pictures', 'No picture: a set is suggested', 'No picture: no reference suggested', 'No action needed']
     assert [(l['key'], l.get('group')) for l in p['lines']] == [
         ('refs:proposals', None), ('ref:BRICK', G[0]), ('ref:STREET', G[0]), ('ref:T_LAY', G[0]), ('ref:TILE', G[0]),
         ('ref:TROWEL', G[1]), ('ref:FAN', G[1]), ('ref:MASON', G[4])]
     assert p['layout']['kind'] == 'things' and p['layout']['made'] == 'Nothing is made until you say done in the chat.'
-    assert p['layout']['help'].endswith('A set is three pictures of one thing, which become its reference; for a person, their three views.')
+    assert p['layout']['help'].endswith('A set you ask to change is made again, at most 3 times.')
     chat = [i['id'] for i in film.items(every=False)]
     assert chat == ['round1:all', 'round1:BRICK', 'round1:STREET', 'round1:T_LAY', 'round1:TILE', 'round1:TROWEL', 'round1:FAN']   # the same order; the person not in the footage is not asked
     assert 'Doubtful' not in read(p) and 'Doubtful' not in read(film.items())
@@ -105,15 +105,15 @@ def test_the_four_cases_and_their_buttons(monkeypatch):
     l = Film(monkeypatch).lines()
     trowel, fan, brick, mason = l['ref:TROWEL'], l['ref:FAN'], l['ref:BRICK'], l['ref:MASON']
     # 1: footage pictures
-    assert trowel['case'] == 'footage' and labels(trowel) == ['Approve', 'Make a set', 'Minor corrections', 'Leave out'] and choices(trowel) == ['use', 'set', 'fix', 'ignore']
+    assert trowel['case'] == 'footage' and labels(trowel) == ['Approve', 'Make a set', 'Make a set with words', 'No reference needed'] and choices(trowel) == ['use', 'set', 'fix', 'ignore']
     assert trowel['own']['label'] == 'Upload my own' and [b.get('needs_words', False) for b in trowel['buttons']] == [False, False, True, False]
     assert trowel['rec'] == {'do': 'footage', 'label': 'Use footage', 'choice': 'use', 'reason': 'The film shows it whole and sharp from the side.'}
     assert trowel['tick'] == {'use': 'Tick at least one picture first.', 'set': 'Tick at least one picture first: the set is made from it.', 'fix': 'Tick at least one picture first: the set is made from it.'}
     # 2: only a "closest found" picture: Approve needs its tick
-    assert fan['case'] == 'closest' and labels(fan) == ['Leave out', 'Approve', 'Make a set'] and fan['tick'] == {'use': 'Tick the picture first, if that is it.'}
-    assert fan['rec']['label'] == 'Leave out' and fan['rec']['choice'] == 'ignore' and fan['own']['label'] == 'Upload my own'
+    assert fan['case'] == 'closest' and labels(fan) == ['No reference needed', 'Approve', 'Make a set'] and fan['tick'] == {'use': 'Tick the picture first, if that is it.'}
+    assert fan['rec']['label'] == 'No reference needed' and fan['rec']['choice'] == 'ignore' and fan['own']['label'] == 'Upload my own'
     # 3: no picture, a thing: an optional small link for words
-    assert brick['case'] == 'none' and labels(brick) == ['Make a set', 'Leave out', 'Add words for the picture'] and choices(brick) == ['set', 'ignore', 'fix']
+    assert brick['case'] == 'none' and labels(brick) == ['Make a set', 'No reference needed', 'Add words for the picture'] and choices(brick) == ['set', 'ignore', 'fix']
     assert brick['buttons'][2].get('small') is True and 'tick' not in brick and brick['rec']['label'] == 'Make a set'
     assert brick['search'] == {'text': 'Not in your footage.', 'why': 'The helper was stopped.'}
     # 4: a person the footage does not show: nothing to decide
@@ -132,8 +132,8 @@ def test_a_person_with_footage_pictures_and_a_thing_with_approved_drawings_have_
     film.change(lambda s: s['references'].update({'f-mason-1': {'id': 'f-mason-1', 'element_id': 'MASON', 'kind': 'frame', 'status': 'candidate', 'key': f"{RUN['id']}/visuals/references/f-mason-1.png",
                                                                 'view': 'front', 'look': {'verdict': 'pass', 'seen': 'The mason, front.'}, 'weak': False}}))
     l = film.lines()
-    assert l['ref:MASON']['case'] == 'footage' and labels(l['ref:MASON']) == ['Make a set', 'Minor corrections'] and 'tick' not in l['ref:MASON']   # a set is made of every person, with or without a tick
-    assert l['ref:TILE']['case'] == 'footage' and labels(l['ref:TILE']) == ['Make a set', 'Minor corrections', 'Leave out']                       # approved drawings: a set, never the bare footage
+    assert l['ref:MASON']['case'] == 'footage' and labels(l['ref:MASON']) == ['Make a set', 'Make a set with words'] and 'tick' not in l['ref:MASON']   # a set is made of every person, with or without a tick
+    assert l['ref:TILE']['case'] == 'footage' and labels(l['ref:TILE']) == ['Make a set', 'Make a set with words', 'No reference needed']                       # approved drawings: a set, never the bare footage
 
 
 # ---------- the auto-answer: a person the footage does not show ----------
@@ -189,7 +189,7 @@ def test_a_refusal_after_done_still_names_the_limit(monkeypatch):
     l = film.lines()
     out = film.record(ans(l['refs:proposals'], 'accept_all'), ans(l['ref:TROWEL'], 'use'), ans(l['ref:FAN'], 'ignore'))
     said = next(r['message'] for r in out['refused'] if r['key'] == 'references')
-    assert '₹3,754 limit' in said and not film.called('round_done')
+    assert said.startswith('These cannot be made now: the film has reached the limit its owner set.') and '₹' not in said and not film.called('round_done')
     assert out['page']['layout']['stopped'] == said and not MONEY.search(read(out['page']['lines']))
 
 
@@ -249,7 +249,7 @@ def test_minor_corrections_is_make_a_set_with_the_operators_words_which_are_requ
 def test_leave_out_is_ignore_and_names_the_shots_that_lose_the_thing(monkeypatch):
     film = Film(monkeypatch)
     l = film.lines()
-    assert l['ref:TROWEL']['cost'] == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'
+    assert l['ref:TROWEL']['cost'] == 'These shots are then made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'
     film.record(ans(l['ref:TROWEL'], 'ignore', pics={'f-trowel-use': 'not'}))
     assert kept(film, 'TROWEL')['verdict'] == 'ignore'
 
@@ -303,8 +303,8 @@ def test_the_proposals_line_lists_the_routine_things_for_show_the_n(monkeypatch)
     for key in prop['covers']:
         assert l[key]['group'] == G[0] and l[key]['rec']['reason'] and l[key]['rec']['label'] and l[key]['name'] and l[key]['kind']
     assert [p['label'] for p in l['ref:TILE']['pics']] == ['underside']                                             # its footage pictures, for the list
-    assert prop['text'] == ('7 things have a proposal from Claude. Accepting the 4 routine ones asks for 4 sets, takes the footage pictures of 0 things as they are, and leaves 0 out. '
-                            'At most 3 sets are made first, when you say done; any others are offered after you have judged those, and made only on your word. '
+    assert prop['text'] == ('7 things have a proposal from Claude. Accepting the 4 routine ones asks for 4 sets, takes the footage pictures of 0 things as they are, and makes no reference for 0. '
+                            'The first 3 sets are made to check the method; after you judge them, the others are made in one go. A set you ask to change is made again, at most 3 times. '
                             'A thing you answer yourself keeps your answer.')
 
 

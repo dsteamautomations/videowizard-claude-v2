@@ -28,8 +28,13 @@ STATES = (1, 'making', 'looking', 'rewrite', 2, 'complete')   # what visuals_sta
 
 ROUND_POSTED = ('The round is posted for {n} things, {d} of them doubtful. Run `vw visuals page`: the operator answers step 1 there, in one visit; in the chat '
                 '(`vw visuals next`) only where the page cannot be shown.')
-GO1_MAKING = "Step 1 is recorded. The first {k} sets are being made (about ₹{x}); {r} more wait for the operator's word. Wait: `vw visuals status --wait 900`."
-ALL_MAKING = '{k} set(s) are being made (about ₹{x}). Wait: `vw visuals status --wait 900`.'
+# design/215 (change 7): how many sets are made first, said to the operator by the server, when step 1 is recorded and again at "Make them"; no amount (W3)
+SAID_FIRST = ('The first {k} sets are made to check the method. After you judge them, the other {n} made in one go. '
+              'A set you ask to change is made again, at most {m} times.')
+SAID_ALL, SAID_ONE = 'All {n} sets are made now.', 'The set is made now.'
+SAID_REST = 'The other {n} made now, in one go. A set you ask to change is made again, at most {m} times.'
+GO1_MAKING = "Step 1 is recorded; {r} more wait for the operator's word. Wait: `vw visuals status --wait 900`."   # said after `goes_said`
+ALL_MAKING = '{k} set(s) are being made. Wait: `vw visuals status --wait 900`.'
 SETS_LOOK = ('The sets are back. Look at them before the operator does: `vw visuals round --looks` lists them, fetches the pictures and says how to judge them and the '
              "shape of the file to send (`how`, in work/visuals/sets/looks.json); every line of every picture's check list gets its answer. "
              'With more than 5 sets start `vw-set-look` helpers, about 5 sets each, each given its group name, '
@@ -43,7 +48,7 @@ SETS_PAGE = 'Every set has its look. Run `vw visuals page`: the operator judges 
 REWRITE_DUE = ("{n} set(s) wait for your rewrite: {things}. For each, write the request again from the operator's words, the check and your look: out/round-rewrites.json, "
                'rows {{element_id, prompt}}. Send it: `vw visuals round --rewrite out/round-rewrites.json`. The sets are made then, not before.')
 REWRITE_WORDS, REWRITE_NO_WORDS = '{eid} ("{words}")', '{eid} (no words: from the check and your look)'
-REWRITE_MAKING = '{n} set(s) are being made again (about ₹{x}). Wait: `vw visuals status --wait 900`.'
+REWRITE_MAKING = '{n} set(s) are being made again. Wait: `vw visuals status --wait 900`.'
 MERGE_ASK = 'The round is past step 1: nothing was made. {n} thing(s) are back with the operator as open lines. Run `vw visuals page`.'
 MERGE_NONE = ('The round is past step 1: nothing was made and nothing came back. Only a thing that is new in the plan, or whose entry in the plan changed, comes back by a round '
               'file sent again; a thing the operator left out stays left out until they ask for it by name (`vw visuals round --back <element>`).')
@@ -51,7 +56,7 @@ BACK_ASKED = '{eid} is back with the operator as an open line: nothing was made.
 STEP1_NO_SET = 'Step 1 is recorded. No set was ordered.'
 STEP1_WAIT = " {r} more wait for the operator's word."
 NOT_ORDERED = ' Not ordered: {things}. Each is on the page with its reason (`vw visuals page`).'
-WORD_NEEDED = "This step of the reference round is paid on the operator's word: give their words (`--quote`). Nothing was recorded."
+WORD_NEEDED = "This step of the reference round is ordered only on the operator's word: give their words (`--quote`). Nothing was recorded."
 
 # how a made set is looked at: the judging points and the shape of the file (design/211 review, N2 and S16). One source: the server gives
 # it with the sets to look at (`looks_due`), and the helper file points to it.
@@ -89,7 +94,7 @@ REC_NO_FRAME = '{eid}: the proposal {rec} needs a footage picture with a recorde
 REC_PERSON = '{eid} is a person a picture is made of: every such person gets a set, so the proposal is set.'
 REASON_MISSING = '{eid}: give the reason of its proposal in one line, at most {max} characters.'
 FIRST_TOO_MANY = '{n} rows are marked `first`: at most {max} sets are made in the first go.'
-CLEAN_NO_FRAME = '{eid} has no footage picture: a clean set is made from one. Have a set made, or leave it out.'
+CLEAN_NO_FRAME = '{eid} has no footage picture: a clean set is made from one. Have a set made, or say it needs no reference.'
 SET_NO_LOOK = '{eid}: its set has no recorded look yet: it is not shown or answered before (`vw visuals round --looks`).'
 LOOK_SET_UNKNOWN = '{eid}: {set} is not its set now (it was made again, or never made): list the sets to look at again (`vw visuals round --looks`).'
 LOOK_PICTURES = '{eid}: every picture of the set needs its look; missing: {missing}.'
@@ -114,8 +119,8 @@ LIMIT_PLAIN = 'These cannot be made now: the film has reached the limit its owne
 REWRITE_NOT_DUE = '{eid}: no rewrite is asked for it now.'
 REWRITE_EMPTY = '{eid}: the rewritten request is empty.'
 REWRITE_SAME = '{eid}: the request is the same as before: the same words would buy the same picture. Change it from the operator\'s words, the check and your look.'
-MAKES_LIMIT = '{eid}: its set was made {max} times. Use one of these, add your own picture, or leave it out.'
-MAKE_NO_QUOTE = "{eid}: making a set is paid: give the operator's words (`--quote`)."
+MAKES_LIMIT = '{eid}: its set was made {max} times. Use one of these, add your own picture, or go on without a reference.'
+MAKE_NO_QUOTE = "{eid}: a set is made only on the operator's word: give their words (`--quote`)."
 REOPEN_NOT_DUE = '{eid} is not back with the operator: there is nothing to answer for it here.'
 
 # ---------- the fixed text of a set's request (design/211 section 3.6): generic, for every category of film ----------
@@ -222,12 +227,12 @@ def _element(plan, eid):
     return next((e for e in plan.get('elements') or [] if e['id'] == eid), None)
 
 
-def _inr(amount):
-    return f'{amount:,.0f}'
-
-
-def _price(run, n):
-    return round(n * V.image_price_inr(run, provider='gemini') * V.SET_MAX, 2)
+def goes_said(n):
+    """design/215 (change 7): how the making goes for `n` sets asked, in the operator's words: '' for none; all at once up to three; else
+    the first three, then the others in one go."""
+    if n <= FIRST_MAX:
+        return '' if n < 1 else SAID_ONE if n == 1 else SAID_ALL.format(n=n)
+    return SAID_FIRST.format(k=FIRST_MAX, n=f'{n - FIRST_MAX} are' if n - FIRST_MAX != 1 else '1 is', m=MAKES_MAX)
 
 
 # ---------- the facts of a thing (parts A, B and C read this) ----------
@@ -767,7 +772,7 @@ def merge(conn, store, user, run, session, plan, kinds, elements):
     if reopened and rd.get('pass') == 'complete':
         rd['pass'] = 2   # an open line: the round is with the operator again
     V.save_session(store, run, session)
-    return {'pass': state(session, rd), 'kept': True, 'v': 2, 'merged': merged, 'reopened': reopened, 'left': left, 'queued': [], 'errors': {}, 'elements': len(rd['elements']), 'cost_inr': 0,
+    return {'pass': state(session, rd), 'kept': True, 'v': 2, 'merged': merged, 'reopened': reopened, 'left': left, 'queued': [], 'errors': {}, 'elements': len(rd['elements']),
             'then': MERGE_ASK.format(n=len(reopened)) if reopened or merged else MERGE_NONE}
 
 
@@ -801,7 +806,7 @@ def done_then(run, queued, rest, errors=None, complete=False):
     """The "what next" after step 1 is recorded: the sets being made; with none ordered, that none was, how many wait, and what was not
     ordered with its reason (design/211 review, N8); `complete`: no set was asked for, so the round is over."""
     if queued:
-        said = GO1_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued))), r=len(rest)) if rest else ALL_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued))))
+        said = goes_said(len(queued) + len(rest)) + ' ' + (GO1_MAKING.format(r=len(rest)) if rest else ALL_MAKING.format(k=len(queued)))
     else:
         said = STEP1_NO_SET + (STEP1_WAIT.format(r=len(rest)) if rest else '') + (' ' + V._round_complete_words() if complete else '')
     return said + (NOT_ORDERED.format(things='; '.join(f"{eid}: {V._plain(msg).rstrip('.')}." for eid, msg in errors.items()).rstrip('.')) if errors else '')
@@ -961,8 +966,8 @@ def round_rest(conn, store, user, run, outputs, quote):
     rd.update(go=2, rest=[], rest_word={'by': user['id'], 'at': _now(), 'quote': V.said(quote, 'Make the other sets', user)})
     V.save_session(store, run, session)
     session, queued, errors = _order(conn, store, user, run, outputs, rest)
-    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'cost_inr': _price(run, len(queued)),
-            'then': ALL_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued))))}
+    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors,   # design/215: no amount in an answer of these steps
+            'then': SAID_REST.format(n=f'{len(queued)} sets are' if len(queued) != 1 else 'set is', m=MAKES_MAX) + ' ' + ALL_MAKING.format(k=len(queued))}
 
 
 def round_rewrite(conn, store, user, run, outputs, rows):
@@ -994,8 +999,7 @@ def round_rewrite(conn, store, user, run, outputs, rows):
         row.update(prompt=prompt, error=None)
     V.save_session(store, run, session)
     session, queued, errors = _order(conn, store, user, run, outputs, list(new))
-    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'cost_inr': _price(run, len(queued)),
-            'then': REWRITE_MAKING.format(n=len(queued), x=_inr(_price(run, len(queued))))}
+    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'then': REWRITE_MAKING.format(n=len(queued))}
 
 
 def round_reopen(conn, store, user, run, outputs, eid, verdict, words, quote):
@@ -1028,5 +1032,4 @@ def round_reopen(conn, store, user, run, outputs, eid, verdict, words, quote):
             session, queued, _ = _order(conn, store, user, run, outputs, [eid])
     if not queued:
         V.save_session(store, run, session)
-    return {'element_id': eid, 'queued': bool(queued), 'pass': V._round_pass(session, session['round']), 'cost_inr': _price(run, len(queued)),
-            'then': ALL_MAKING.format(k=1, x=_inr(_price(run, 1))) if queued else then_of(session)}
+    return {'element_id': eid, 'queued': bool(queued), 'pass': V._round_pass(session, session['round']), 'then': ALL_MAKING.format(k=1) if queued else then_of(session)}

@@ -184,7 +184,7 @@ def test_C4_the_proposals_say_how_many_sets_are_made_first_and_that_the_rest_are
     assert lines['refs:proposals']['buttons'][0]['label'] == 'Accept all 2'                         # the routine things; the person not in the footage is not among them
     film.record(ans(lines['ref:TROWEL'], 'set'), ans(lines['ref:BRICK'], 'set'))                  # two more sets asked for on other lines
     line = film.lines()['refs:proposals']
-    assert 'At most 3 sets are made first' in line['text'] and 'made only on your word' in line['text']
+    assert 'The first 3 sets are made to check the method' in line['text'] and 'at most 3 times' in line['text']
     assert '₹' not in line['text'] and 'paid' not in line['text'] and line['buttons'][0]['label'] == 'Accept all 2'
     item = film.next()['item']
     assert item['id'] == 'round1:all' and item['text'] == line['text'] and item['buttons'][0]['label'] == line['buttons'][0]['label']   # the same words in the chat
@@ -203,10 +203,10 @@ def test_C5_leave_these_out_never_covers_a_person_and_names_the_shots_that_lose_
     assert film.session()['round']['rest'] == ['MASON', 'TILE']
     line = film.lines()['sets:rest']
     said = chat(film, 'sets:rest')   # design/213: the page line has its parts and short labels; the chat says the same as one text
-    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make them', 'Leave some out'] and line['buttons'][1]['loss']['button'] == 'Leave it out and make the other 1'   # design/213 review: the words pressed say all the click does
-    assert [b['label'] for b in said['buttons']] == ['Make the other 2 sets', 'Leave it out and make the other 1']
-    assert 'The mason: a person shown in a made picture always gets a set' in said['text'] and line['buttons'][1]['loss']['people'] == 'This person always gets a set: The mason. Leaving the others out also has their set made, on the same word, when you say done in the chat.'
-    assert line['cost'] == 'If you leave it out, these shots are made with no reference: Roof tile: shot 2 of gap 3.'
+    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make them', 'Do not make this set'] and line['buttons'][1]['loss']['button'] == 'Do not make this set; make the other 1'   # design/213 review: the words pressed say all the click does
+    assert [b['label'] for b in said['buttons']] == ['Make the other 2 sets', 'Do not make this set; make the other 1']
+    assert 'The mason: a person shown in a made picture always gets a set' in said['text'] and line['buttons'][1]['loss']['people'] == 'This person always gets a set: The mason. Not making the others also has their set made, on the same word, when you say done in the chat.'
+    assert line['cost'] == 'Without this set, these shots are made with no reference: Roof tile: shot 2 of gap 3.'
     assert film.record(ans(line, 'rest_out'))['refused'][0]['message'] == CF.WORDS['rest_first'] and not film.row('TILE').get('ignored')   # design/213 review: not while a first set is unjudged
     judged = [ans(l, next((p['choice'] for p in l['pics'] if p.get('choice')), 'yes')) for l in film.lines().values() if l.get('case') == 'judge']
     assert film.record(ans(line, 'rest_out'), *judged)['refused'] == []                                                                  # judged in the same visit: taken after them
@@ -286,7 +286,7 @@ def test_what_the_operator_reads_at_step_1_says_the_unread_clips_once_and_holds_
     lines = {l['key']: l for l in page['lines']}
     assert lines['ref:T_LAY']['title'] == 'Laying a brick (a way of working)' and lines['ref:T_LAY']['group'] == CF.STEP1_GROUPS[0]
     assert 'the closest is a close-up (shot 2 of gap 2).' in lines['ref:TROWEL']['used'] and not re.search(r'G\d-S\d-SH\d', json.dumps(page['lines']))
-    assert lines['ref:TROWEL']['cost'] == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'
+    assert lines['ref:TROWEL']['cost'] == 'These shots are then made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'
     film.decide(first['id'], 'each', 'ask me each one')
     nxt = film.next()['item']
     film.decide(nxt['id'], nxt['buttons'][0]['choice'], 'yes')

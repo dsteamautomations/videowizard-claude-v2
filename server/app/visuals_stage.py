@@ -3667,8 +3667,8 @@ def set_make(conn, store, user, run, outputs, element_id, quote=None):
     session['round']['elements'][element_id].pop('answer', None)   # it was for the set before
     session['round']['pass'] = 'making'
     save_session(store, run, session)
-    return {'element_id': element_id, 'queued': True, 'pass': 'making', 'cost_inr': round(image_price_inr(run, provider='gemini') * SET_MAX, 2), 'next': f'{element_id}: its set is being made; it comes back on step 2.',
-            **({'then': ref_sets.ALL_MAKING.format(k=1, x=f"{image_price_inr(run, provider='gemini') * SET_MAX:,.0f}")} if v2 else {})}
+    return {'element_id': element_id, 'queued': True, 'pass': 'making', 'next': f'{element_id}: its set is being made; it comes back on step 2.',
+            **({'then': ref_sets.ALL_MAKING.format(k=1)} if v2 else {'cost_inr': round(image_price_inr(run, provider='gemini') * SET_MAX, 2)})}   # design/215: no amount in a v2 round
 
 
 def set_aside(store, user, run, outputs, element_id, words='', back=False):
@@ -3789,7 +3789,8 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
             rd = session['round']
         rd['pass'] = 'making' if queued else ('complete' if not todo else 2)   # every set refused before the call: step 2 shows them (No or Correct it makes them again)
         save_session(store, run, session)
-        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'from_footage': from_footage, 'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2),
+        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'from_footage': from_footage,
+                **({} if v2 else {'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2)}),   # design/215: no amount in an answer of a v2 round
                 **({'rest': list(rd.get('rest') or []), 'then': ref_sets.done_then(run, queued, rd.get('rest') or [], errors, complete=rd['pass'] == 'complete')} if v2 else {})}
     searched = [eid for eid, r in rd['elements'].items() if r['verdict'] == 'search']
     rd['pass'] = 2 if searched else 'complete'
@@ -4313,7 +4314,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     for sh in shots:
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`)")   # design/124 A4 item 19
+            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: the operator approves the sizes, materials and graphic specs on the page (`vw visuals page`)")   # design/124 A4 item 19
     return _dedupe(lines + label_lines), warns
 
 
@@ -5553,7 +5554,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     spec = shot.get('drawing_spec')
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`), before the drawing is rendered.")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the sizes, materials and graphic specs on the page (`vw visuals page`), before the drawing is rendered.")
     fps = session['source']['fps']
     res = session['source'].get('resolution') or [1920, 1080]   # defect 33: a run stores [1920, 1080] (the master's summary), the fixtures '1920x1080'; both read, as defect 26 did
     W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
@@ -5805,7 +5806,7 @@ def render_motion(conn, store, user, run, outputs, body):
     _no_question(session, shot['id'])   # design/110 rule 0
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`), before the drawing is rendered.")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the sizes, materials and graphic specs on the page (`vw visuals page`), before the drawing is rendered.")
     missing = motion.missing_labels(files, request['labels'])
     need(not missing, '; '.join(f'the project does not show the label "{l}" word for word' for l in missing) + ': fix the text in the project or the label in the plan.')
     lost = motion.missing_selectors(files, [c['selector'] for c in (shot.get('scene_motion') or {}).get('cues') or []])

@@ -295,7 +295,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     out = film.record(ans(lines['ref:TROWEL'], 'fix', 'Show the blade clean.'), ans(lines['ref:FAN'], 'use'), ans(lines['ref:BRICK'], 'set'), ans(lines['ref:TILE'], 'ignore'))
     assert out['kept'] == ['ref:TROWEL', 'ref:FAN', 'ref:BRICK', 'ref:TILE'] and film.ordered() == [] and film.state() == 1
     out = film.record(ans(film.lines()['refs:proposals'], 'accept_all'))
-    assert says(out, 'vw visuals status') == RS.GO1_MAKING.format(k=3, x='106', r=2) and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'making'
+    assert says(out, 'vw visuals status') == RS.goes_said(5) + ' ' + RS.GO1_MAKING.format(r=2) and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'making'
     s = film.session()
     assert s['round']['rest'] == ['TROWEL', 'BRICK'] and s['round']['elements']['TROWEL']['clean'] and s['round']['elements']['TROWEL']['operator_words'] == ['Show the blade clean.']
     assert s['round']['elements']['FAN']['from_footage'] and s['golden']['FAN'] and s['round']['elements']['TILE']['ignored'] and 'chat_round' not in s
@@ -318,7 +318,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     lines = {l['key']: l for l in page['lines']}
     assert [l['key'] for l in page['lines']] == ['sets:rest', 'set:T_LAY', 'set:MASON', 'set:STREET', 'set:TROWEL', 'set:BRICK', 'set:FAN']
     assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make them' and lines['sets:rest']['buttons'][0]['big'] == 'Make the other 2'
-    assert [b['label'] for b in chat(film, 'sets:rest')['buttons']] == ['Make the other 2 sets', 'Leave these 2 out']
+    assert [b['label'] for b in chat(film, 'sets:rest')['buttons']] == ['Make the other 2 sets', 'Do not make these 2 sets']
     lay = lines['set:T_LAY']
     assert lay['group'] == CF.STEP2_GROUPS[0] and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'pass', 'by': "Claude's check passed: no fault found.", 'chip': "Claude's check passed", 'lines': []}   # design/214: the look passed every line; the model's stored fault ("Not the view asked.") is no longer shown
     assert 'notes' not in lay and lay['look'] == {'chose': 'The most common variant.', 'aside': 'Nothing of the request.'} and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
@@ -327,7 +327,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     # one visit: "Minor corrections", "Make again", a picture chosen, and "make the other sets". Nothing is made again before Claude's rewrite; the others are ordered
     out = film.record(ans(lay, 'correct', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], approve(lines['set:STREET'])), ans(lines['sets:rest'], 'rest'))
     assert out['recorded'] == ['set:T_LAY', 'set:MASON', 'set:STREET', 'sets:rest'] and out['stale'] == [] and out['refused'] == []
-    assert film.ordered()[3:] == ['TROWEL', 'BRICK'] and film.state() == 'making' and says(out, 'vw visuals status') == RS.ALL_MAKING.format(k=2, x='71')
+    assert film.ordered()[3:] == ['TROWEL', 'BRICK'] and film.state() == 'making' and says(out, 'vw visuals status') == RS.SAID_REST.format(n='2 sets are', m=3) + ' ' + RS.ALL_MAKING.format(k=2)
     s = film.session()
     assert s['golden']['STREET'] and s['round']['go'] == 2 and s['round']['rest'] == [] and s['round']['elements']['T_LAY']['rewrite_due']['words'] == 'Show the hand pressing the brick down.'
     assert s['round']['elements']['MASON']['rewrite_due'] and s['round']['elements']['T_LAY']['corrections'] == []
@@ -358,7 +358,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     film.back()
     film.set_looks()
     lay = film.lines()['set:T_LAY']
-    assert [b['choice'] for b in lay['buttons']] == ['use', 'aside'] and [p['choice'][:4] for p in lay['pics'] if p.get('choice')] == ['use:', 'use:', 'use:'] and lay['buttons'][1]['label'] == 'Leave out'
+    assert [b['choice'] for b in lay['buttons']] == ['use', 'aside'] and [p['choice'][:4] for p in lay['pics'] if p.get('choice')] == ['use:', 'use:', 'use:'] and lay['buttons'][1]['label'] == 'Go on without a reference'
     assert lay['most'] == CF.WORDS['set_made_max_thing'].format(n=3) and lay['most'] in chat(film, 'set:T_LAY')['text']
     assert film.record(ans(lay, 'no'))['refused'][0]['key'] == 'set:T_LAY'
     held = film.do(lambda: VS.round_sets(film.store, USER, film.run, film.outputs, {'T_LAY': {'verdict': 'no'}}, 'No', conn=film.conn, partial=True))['held']
@@ -425,7 +425,7 @@ def test_the_main_path_in_the_chat_one_question_at_a_time():
         asked.append(item['id'])
         out = film.decide(item['id'], item['buttons'][0]['choice'], item['buttons'][0]['label'])
     assert asked == ['round1:TROWEL', 'round1:FAN', 'round1:TILE', 'round1:BRICK'] and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'making'
-    assert RS.GO1_MAKING.format(k=3, x='106', r=2) in says(out, 'vw visuals status')
+    assert RS.goes_said(5) + ' ' + RS.GO1_MAKING.format(r=2) in says(out, 'vw visuals status')
     assert 'then' not in film.next()                                                           # while the sets are made: nothing to do
     film.back()
     assert says(film.next(), 'vw visuals round --looks') == RS.SETS_LOOK and film.next()['item'] is None      # Claude's turn: the chat says so too
@@ -498,7 +498,7 @@ def older_view(state):
 
 
 OLDER = {'step1': 'ad40300f115390166ae596bd425c9e242642c2ab3475522018ffcd10a4270577', 'making': 'f3ae90372d4fff132776ac21c001e5c3a2d74bb4e4a89ac126052cb7a634cdd3',
-         'step2': '379099b3917b77ee604baebde94d75f3dba11edfb8302a465b938719bfecae69', 'complete': 'b00170c2ca9659316c629b0d1806415489fc1449448ac6484a622abe121eb0be'}   # taken on main at d255486, before the three parts
+         'step2': '379099b3917b77ee604baebde94d75f3dba11edfb8302a465b938719bfecae69', 'complete': 'a35701aa32d83bc88bd3bd99c2f0c62dd49dbed01690390ba5554bbcdf4842cc'}   # taken on main at d255486, before the three parts; design/215: 'complete' again, only the step's new name and its sentence differ ("Sizes, materials and graphic specs")
 
 
 @pytest.mark.parametrize('state', sorted(OLDER))

@@ -46,7 +46,7 @@ def test_a_later_answer_to_one_line_wins_over_accept_the_proposals(monkeypatch):
     l = film.lines()
     film.record(ans(l['ref:BRICK'], 'ignore'), ans(l['refs:proposals'], 'accept_all'))   # in any order on the page: the line's own answer stands
     held = film.session()['chat_round']
-    assert held['BRICK']['verdict'] == 'ignore' and held['BRICK']['quote'] == 'Leave out' and held['STREET']['verdict'] == 'approve'
+    assert held['BRICK']['verdict'] == 'ignore' and held['BRICK']['quote'] == 'No reference needed' and held['STREET']['verdict'] == 'approve'
     film.record(ans(film.lines()['ref:STREET'], 'ignore'))                             # and on a later visit
     assert film.session()['chat_round']['STREET']['verdict'] == 'ignore'
 
@@ -83,7 +83,7 @@ def test_the_sets_alone_passing_the_limit_still_refuses_the_step_and_nothing_els
     monkeypatch.setattr(P.V, '_set_budget', lambda run, s, spend: (3700.0, F.CAP, F.SET_PRICE))
     l = film.lines()
     out = film.record(ans(l['refs:proposals'], 'accept_all'), ans(l['ref:TROWEL'], 'use'), ans(l['ref:FAN'], 'ignore'))
-    assert film.called('round_done') == [] and out['refused'][0]['key'] == 'references' and 'The answers ask for 5 sets, about ₹175' in out['refused'][0]['message']
+    assert film.called('round_done') == [] and out['refused'][0]['key'] == 'references' and out['refused'][0]['message'].startswith(ref_sets.LIMIT_PLAIN) and '₹' not in out['refused'][0]['message']
     assert out['then'].startswith('The references are not recorded yet: ')
 
 
@@ -139,7 +139,7 @@ def test_the_last_picture_rejected_leaves_the_line_open_with_make_a_set_and_leav
     out = film.record(ans(film.lines()['ref:TROWEL'], 'pics', pics={'f-trowel-use': 'not', 'f-trowel-side': 'not'}))   # the pictures alone (design/212: with "Approve" the page and the server refuse it: no picture is ticked)
     assert len(film.called('not_this')) == 2 and out['kept'] == []                     # no picture stands: the line is asked again
     t = {x['key']: x for x in out['page']['lines']}['ref:TROWEL']
-    assert [b['label'] for b in t['buttons']] == ['Make a set', 'Leave out', 'Add words for the picture'] and t['search']['text'] == 'Not in your footage.' and 'pics' not in t
+    assert [b['label'] for b in t['buttons']] == ['Make a set', 'No reference needed', 'Add words for the picture'] and t['search']['text'] == 'Not in your footage.' and 'pics' not in t
 
 
 # ---------- step 2 ----------
