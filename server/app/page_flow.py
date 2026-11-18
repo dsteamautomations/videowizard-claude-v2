@@ -1248,7 +1248,8 @@ def page_record(conn, store, user, run, outputs, answers):
         looks = P.waits_words(here['session'], here['plan'])
         rows = (now.get('layout') or {}).get('coming') if now['step'] == P.W['step'] else []
         then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', looks,
-                                    PICTURES_LEFT.format(n=left) if now['step'] == P.W['step'] and left else PICTURES_WAIT if rows else PICTURES_DONE) if x)
+                                    PICTURES_LEFT.format(n=left) if now['step'] == P.W['step'] and left else PICTURES_WAIT if rows else
+                                    PICTURES_DONE if was == 'pictures' or any(k.startswith('pic:') for k in recorded + stale + [r['key'] for r in refused]) else ROUND_NEXT) if x)   # hotfix: the round just ended, nothing of step 6 is made yet
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
             'log': said or 'nothing answered'}   # design/205: the record call's own log line
