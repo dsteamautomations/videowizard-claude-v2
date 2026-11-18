@@ -22,13 +22,17 @@
 - **R3.** `sequence` warns for two steps alike; the page line carries it as advice and asks once (`sure`).
 - **R4.** The three motion "Takes step" sentences name the Pictures and drawn graphics step.
 - **D1.** No amount on these lines (a question's choice loses its price).
-- **D4.** A component is approved by a clean look and transparency line (`COMPONENT_APPROVED`), never asked.
+- **D4.** A component is approved by a clean look (`COMPONENT_APPROVED`; the program's advice lines never decide it), never asked. One that fails stays a candidate and is named with its failed lines in the looks route's `then` and in `next`, `status` and the page's record (`pictures.components_failed`), so the assistant makes it again.
+
+## The merge (18 Nov)
+
+- The together test (`server/unit/test_design217_together_pure.py`): a film with every kind, the server's round, the real page, every line answered, recorded through `page_record`. The round has the fixture's shape. Changes from the page builder's points: a still's `faults` sent once (`check.faults`), `layout.made` dropped (`end_foot` says it), the main picture's label without "(try 2)" (the tag says it), `film_at` under the name in the list, "Correct n" on the step buttons, 4 steps in a low window as two rows of two, a video sent again under the round's `zoom_docs` (the page and the tool), a video copy over 15 MB shown as its frames.
+- The critic's review: `asked_at` (the 30 minutes count from Claude being asked), a picture the model checked before the deploy keeps its check and stays offered, `V.parent_failed` reads Claude's lines, a later step corrected stores no reason (`cause` instead), a failed component is said, "free" dropped, the chat's question says the page's words.
 - **D5.** The style sheet is refused on a v2 film whose plan has no graphic in steps (`STYLE_NOT_NEEDED`); its components are made without it.
 - **D6, D8.** `video` on a drawn line, the sheet as a picture; "Take the effect away" (`plain`) has no `sure`.
 
 ## Not covered
 
 - Real films: Claude's look quality and token load, the 30-minute time-out on a real run, a video page copy made by ffmpeg on the VM (not run here), footage before and after taken from an approved footage picture of the neighbouring clip, not the frame at the cut (`pictures.footage`).
-- A component whose look fails stays a candidate: the assistant makes it again; no line tells it so.
 - Question wording per fork: one generic sentence for every fork (`say_answer`).
 - `server/tests` (Docker) and the browser tests (Builder P).

@@ -348,9 +348,10 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 @media (max-width:860px){ #sets{overflow:auto;display:block} .sapp{grid-template-columns:minmax(0,1fr)} .srail{border-right:0;border-bottom:1px solid var(--line)} .smain{padding:16px;overflow:visible} .sbigrow.two{grid-template-columns:minmax(0,1fr)} }
 /* design/217 (SK, 18 Nov 2026): step 6, "Pictures and drawn graphics", in the sets screen's frame: the media large on the left (it gives way first, to
    about 200 px), beside it where it sits in the film, the check as one coloured line, the question and the buttons; captions wrap, never cut. */
-.sstage.pstage{grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr);gap:20px} .sstage.pstage.wide{grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr)}
+.sstage.pstage{grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr);gap:20px} .sstage.pstage.wide{grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr)} #sets .pstage.wide .sbtn,#sets .pstage.split .sbtn{padding:9px 13px}   /* the step buttons on one line at 1536 px */ .sstage.pstage.split{grid-template-columns:minmax(0,1.1fr) minmax(320px,1fr)}
 .pmedia{min-height:200px} .pmedia.psteps{min-height:170px;flex:0 1 auto}
-.psteps{grid-template-rows:minmax(0,auto) auto auto auto;align-content:start;column-gap:10px;row-gap:0} #sets .psteps .sbigb{height:auto;aspect-ratio:16/9;max-height:100%} .psteps .sbigf{grid-row:span 4;grid-template-rows:subgrid}   /* the steps shrink together: one picture height, their captions under them */
+.psteps{grid-template-columns:repeat(var(--n),minmax(0,1fr));grid-template-rows:minmax(0,auto) auto auto auto;align-content:start;column-gap:10px;row-gap:0}
+.psteps.split{grid-template-columns:repeat(var(--half),minmax(0,1fr));grid-template-rows:minmax(0,1fr) auto auto auto minmax(0,1fr) auto auto auto;row-gap:0} .psteps.split .sbigf:nth-child(-n+2) figcaption{padding-bottom:8px}   /* 4 steps in a low window: two rows of two, the footage beside the answers */ #sets .psteps .sbigb{height:auto;aspect-ratio:16/9;max-height:100%} .psteps .sbigf{grid-row:span 4;grid-template-rows:subgrid}   /* the steps shrink together: one picture height, their captions under them */
 .sbigf figcaption{overflow-wrap:anywhere;line-height:1.35}
 .pfaults{font-size:12px;line-height:1.35;color:var(--chg);margin-top:2px;overflow-wrap:anywhere} .pfaults ul{margin:0;padding-left:16px}
 .pvbox{position:relative;width:100%;height:100%;min-height:0;border-radius:10px;overflow:hidden;background:#000}
@@ -495,7 +496,7 @@ function spec(line){   // design/209: a drawing's parts and sizes, or a material
 // row is near the screen; the large one is a file of the page's file store whose link is the document zoom/<code> ({url}), read on a click.
 const picData={}, picSeen={}, zoomUrl={};   // per code: the promise of its small picture, whether it has shown ('ok' or 'bad'), the promise of its large picture's link
 let zoomed=null;
-function docId(coll,code){ const m=round&&round[coll==='pics'?'pic_docs':'zoom_docs'], id=m&&m[code]; return typeof id==='string'&&/^p[0-9a-f]{12}-[0-9]{1,4}$/.test(id)?id:code; }   // a picture sent again is in another document; the round says which
+function docId(coll,code){ const m=round&&round[coll==='pics'?'pic_docs':'zoom_docs'], id=m&&m[code]; return typeof id==='string'&&/^[pv][0-9a-f]{12}-[0-9]{1,4}$/.test(id)?id:code; }   // a picture (or a drawing's video, design/217) sent again is in another document; the round says which
 function picDoc(coll,code,field){ return db.doc(coll+'/'+docId(coll,code)).get().then(s=>{ const d=s&&s.exists?s.data():null; return d&&typeof d[field]==='string'?d[field]:''; }).catch(()=>''); }
 function loadThumb(p,btn,onChange,tries){
   if(!picData[p.code]) picData[p.code]=picDoc('pics',p.code,'data');
@@ -1106,6 +1107,7 @@ function sThing(l){
 // ---------- design/217 (SK, 18 Nov 2026): step 6, "Pictures and drawn graphics" (`round.layout.kind==='pictures'`), as on the trial SK corrected ----------
 // A question of Claude, the style sheet, a still, a graphic in steps, a drawn graphic: the media large, the footage only ever beside it, where it sits in
 // the film, the check as one coloured line, the question and the buttons. Every word is the round's (the line's own and `layout.words.pictures`).
+const STEPS_ROW_MIN_H=700;   // below this window height a graphic of 4 steps is drawn as two rows of two; ponytail: one number, a measured row height if other sizes need it
 const PV={};   // a drawn graphic's video element per code, kept so that drawing the line again does not start it over
 function pVideo(l,onBad){   // the video page copy, on a loop with no sound; no link of the file store, or it does not play: the frame sheet takes its place
   const code=(l.video||{}).code; if(!code||S.vbad[code]) return null;
@@ -1135,11 +1137,12 @@ function pThing(l){
   const fig=(p,cap,more)=>mk('figure',{class:'sbigf','data-code':p.code,'data-role':p.role},sBig(p,pics,check),cap?mk('figcaption',{},cap):null,more||null);
   const beside=p=>fig(p,p.cmp_cap||p.label,p.why?mk('figcaption',{class:'pwhy'},p.why):null);
   const kids=[mk('h2',{class:'sname'},l.name),mk('p',{class:'skind'},l.kind_words||'')], side=[];
-  let media=null, cap=null;
+  let media=null, cap=null, split=false;
   if(l.kind==='steps'){   // every step side by side, one answer; footage or an earlier try clicked joins the row in film order
-    const row=steps.map(p=>fig(p,p.caption||p.label,faults(p)));
+    split=steps.length>3&&window.innerHeight<STEPS_ROW_MIN_H;   // in one row, 4 steps at a page height like 510 are about 55 px high each: two rows of two instead
+    const row=steps.map(p=>fig(p,p.caption||p.label,split?null:faults(p)));   // two rows leave no room for a step's own lines: they are the check's, beside the answers
     if(other){ if(other.role==='before') row.unshift(beside(other)); else row.push(beside(other)); }
-    media=mk('div',{class:'sbigrow pmedia psteps',id:'sbig',style:'grid-template-columns:repeat('+row.length+',minmax(0,1fr))'},row);
+    media=mk('div',{class:'sbigrow pmedia psteps'+(split?' split':''),id:'sbig',style:'--n:'+row.length+';--half:'+Math.ceil(row.length/2)},row);
     cap=mk('p',{class:'pcap',id:'pcap'},mk('span',{},l.strip_head||''),mk('span',{class:'sgrow'}),other?mk('button',{class:'slink',id:'scompare',type:'button',on:{click:()=>{ delete S.cmp[l.line]; sMainDraw(); }}},w.stop):null);
   } else if(l.kind==='drawn'){   // the video first; its frames one click away; without the video, the frames with the round's sentence
     const v=S.view[l.line]==='sheet'?null:pVideo(l,()=>{ if(S.cur===l.line) sMainDraw(); }), why=!(l.video||{}).code?l.video&&l.video.none:S.vbad[(l.video||{}).code]?w.video_bad:'';
@@ -1176,10 +1179,11 @@ function pThing(l){
   if(l.refused) side.push(mk('p',{class:'smsg',id:'srefused'},l.refused));   // the server's refusal of the last "done", kept on its line
   side.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
   if(a){ const ag=sAgainst(l); side.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},mk('p',{},sSays(l)[1],ag?[' ',mk('span',{class:'pagt'},'('+w.against+')')]:null),mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo))); }
+  if(split&&thumbs) side.push(thumbs);   // two rows of steps leave no room under them: the footage and the earlier tries beside the answers
   const c=l.check||{};
   side.push(sDetails({details:[[c.passed_head,c.passed||[]],[c.advice_head,c.advice||[]]].filter(d=>d[0]&&d[1].length).concat(l.details||[])}));
   const sideBox=mk('div',{class:'sside'},...side.flat(6).filter(Boolean));
-  if(media) kids.push(mk('div',{class:'sstage pstage'+(l.kind==='steps'?' wide':'')},mk('div',{class:'sviewer'},l.kind==='steps'?[cap,media]:[media,cap],thumbs),sideBox)); else kids.push(mk('div',{style:'max-width:760px'},sideBox));
+  if(media) kids.push(mk('div',{class:'sstage pstage'+(split?' split':l.kind==='steps'?' wide':'')},mk('div',{class:'sviewer'},l.kind==='steps'?[cap,media]:[media,cap],split?null:thumbs),sideBox)); else kids.push(mk('div',{style:'max-width:760px'},sideBox));
   setTimeout(check,0);
   return kids; }
 const pVideoOk=l=>!!(l.video||{}).code&&!S.vbad[l.video.code];
@@ -1205,7 +1209,7 @@ function sRail(){
   const w=SW(), it=sItems(), kids=[mk('h2',{},w.todo)];
   kids.push(mk('ul',{},it.map((l,i)=>{ const d=sDone(l), ag=l.key!=='sets:rest'&&sAgainst(l), a=sAns(l), b=a&&sBtn(l,a);
     return mk('li',{},mk('button',{class:'srow'+(d?(ag?' against':' done'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},
-      mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},l.kind_words)),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
+      mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},[l.kind_words,l.film_at].filter(Boolean).join(' · '))),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
   const coming=PIC()&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
   if(coming.length){ const o=!!S.fold.coming;
     kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':'coming',on:{click:()=>{ S.fold.coming=!o; sRail(); }}},mk('span',{},w.coming),String(coming.length)));

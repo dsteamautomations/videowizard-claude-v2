@@ -10,7 +10,6 @@
  "preparing": "Getting 21 pictures ready for the page: about 2 minutes.",
  "layout": {
   "kind": "pictures",
-  "made": "Nothing is recorded or made until you say done in the chat.",
   "help": [
    "Each line on the left needs one answer. Answer them in any order, then say done in the chat.",
    "A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.",
@@ -62,7 +61,7 @@
    "name": "The look of the graphics", "kind_words": "The style sheet",
    "sub": "One picture that sets the colours, lines and lettering of every graphic in the film.",
    "ask": "Is this the right look for the graphics?",
-   "pics": [{"code": "pf96f42e70000", "label": "The style sheet", "role": "main", "faults": []}],
+   "pics": [{"code": "pf96f42e70000", "label": "The style sheet", "role": "main"}],
    "check": {
     "state": "pass", "head": "Claude's check found nothing wrong", "by": "Claude looked at the picture against its list of 6 lines.", "show": "first",
     "faults": [],
@@ -82,14 +81,14 @@
    "line": "l03", "key": "pic:picture:798dfe0e-0000:798dfe0e00", "item": "picture:798dfe0e-0000:798dfe0e00", "kind": "still", "state": "open",
    "name": "The finished three-storey building", "kind_words": "A still",
    "ask": "Is this picture right for this shot?",
-   "where": "In the film at 1:35.1 to 1:40.6 (5.6 s) · Gap 5, Strong enough for three storeys",
+   "film_at": "1:35.1", "where": "In the film at 1:35.1 to 1:40.6 (5.6 s) · Gap 5, Strong enough for three storeys",
    "words_head": "The words under it:",
    "words": "When constructed properly, buildings up to three storeys can be safely built using this technology.",
    "try": "",
    "foot_head": "Your footage: click one to see it beside the new picture",
    "pics": [
     {"code": "pe0cad4cb3a79", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
-    {"code": "p798dfe0e0000", "label": "The new picture", "role": "main", "faults": []},
+    {"code": "p798dfe0e0000", "label": "The new picture", "role": "main"},
     {"code": "pf7b6e6385e7a", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
    ],
    "check": {
@@ -111,16 +110,14 @@
    "line": "l04", "key": "pic:picture:0b24f420-0000:0b24f42000", "item": "picture:0b24f420-0000:0b24f42000", "kind": "still", "state": "open",
    "name": "The kiln worker with the clay pan", "kind_words": "A still",
    "ask": "Is this picture right for this shot?",
-   "where": "In the film at 1:40.6 to 1:44.8 (4.2 s) · Gap 6, Where bricks come from",
+   "film_at": "1:40.6", "where": "In the film at 1:40.6 to 1:44.8 (4.2 s) · Gap 6, Where bricks come from",
    "words_head": "The words under it:",
    "words": "Every brick manufactured consumes soil, fuel, and energy.",
    "try": "Try 2",
    "foot_head": "Your footage and the earlier try: click one to see it beside the new picture",
    "pics": [
     {"code": "pe0cad4cb3a79", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
-    {"code": "p0b24f4200000", "label": "The new picture (try 2)", "role": "main",
-     "faults": ["the start state: the pan is on the ground, held, not on the worker's head.", "the people: three distant workers are visible, not two.", "a real face: the worker has the recognisable face of a person in your footage.", "group alike: one distant worker wears a blue shirt, not pale cream or white."],
-     "check_head": "Claude's check of this picture:"},
+    {"code": "p0b24f4200000", "label": "The new picture", "role": "main"},
     {"code": "pf7b6e6385e7a", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"},
     {"code": "p13e339d10000", "label": "Try 1, not used", "role": "earlier", "cmp_cap": "Try 1, not used", "why": "You said: make a new picture. It already showed the worker walking away with the pan."}
    ],
@@ -146,7 +143,7 @@
    "line": "l05", "key": "pic:graphics:BEAT_06-B1_sh3:3", "item": "graphics:BEAT_06-B1_sh3:3", "kind": "steps", "state": "open",
    "name": "Fewer bricks, fewer resources", "kind_words": "A graphic in steps",
    "ask": "Are these 3 steps of the graphic right?",
-   "where": "In the film at 1:44.8 to 1:52.6 (7.8 s) · Gap 6, Where bricks come from",
+   "film_at": "1:44.8", "where": "In the film at 1:44.8 to 1:52.6 (7.8 s) · Gap 6, Where bricks come from",
    "words_head": "The words under it:",
    "words": "By reducing brick usage, Rat-Trap Bond Masonry conserves natural resources and lowers the environmental footprint of construction.",
    "try": "",
@@ -172,11 +169,11 @@
    "buttons": [
     {"label": "Yes, use all 3 steps", "choice": "yes", "act": "approve", "needs_words": false, "say": "All 3 steps approved and placed in the film at 1:44.8, played as a build.",
      "sure": {"ask": "Claude's check found 1 problem in step 3, and steps 2 and 3 look almost the same. Use all 3 steps all the same?", "go": "Use all 3 steps all the same", "back": "Go back"}},
-    {"label": "Correct step 1", "choice": "correct:1", "act": "fix", "needs_words": true, "hint": "What should change in step 1?", "go": "Send these words", "prefill": "",
+    {"label": "Correct 1", "choice": "correct:1", "act": "fix", "needs_words": true, "hint": "What should change in step 1?", "go": "Send these words", "prefill": "",
      "say": "Step 1 is made again with your words: \"{words}\". Steps 2 and 3 are made again from it."},
-    {"label": "Correct step 2", "choice": "correct:2", "act": "fix", "needs_words": true, "hint": "What should change in step 2?", "go": "Send these words", "prefill": "",
+    {"label": "Correct 2", "choice": "correct:2", "act": "fix", "needs_words": true, "hint": "What should change in step 2?", "go": "Send these words", "prefill": "",
      "say": "Step 2 is made again with your words: \"{words}\". Step 3 is made again from it."},
-    {"label": "Correct step 3", "choice": "correct:3", "act": "fix", "needs_words": true, "hint": "What should change in step 3?", "go": "Send these words", "prefill": "The label should read 'Lower environmental footprint', letter for letter.",
+    {"label": "Correct 3", "choice": "correct:3", "act": "fix", "needs_words": true, "hint": "What should change in step 3?", "go": "Send these words", "prefill": "The label should read 'Lower environmental footprint', letter for letter.",
      "say": "Step 3 is made again from step 2 with your words: \"{words}\"."}
    ],
    "details": [["How step 1 was asked for", ["Image 1 is the film's approved style picture: take its palette, line weight, label style and flat cream background, nothing else."]], ["How it was made", ["Picture AI. Step 1 is made from the style sheet; each later step from the step before it."]]]
@@ -185,7 +182,7 @@
    "line": "l06", "key": "pic:take:b8025a17-0000", "item": "take:b8025a17-0000", "kind": "drawn", "state": "open",
    "name": "What the cavities do", "kind_words": "A drawn graphic",
    "ask": "Is this drawing right for the film?",
-   "where": "In the film at 0:38.2 to 0:45.0 (6.9 s) · Gap 4, What the cavities do, and the buildings",
+   "film_at": "0:38.2", "where": "In the film at 0:38.2 to 0:45.0 (6.9 s) · Gap 4, What the cavities do, and the buildings",
    "words_head": "The words under it:",
    "words": "They serve an important purpose, reducing the use of bricks and mortar while improving the thermal performance of the building.",
    "try": "",
@@ -195,7 +192,7 @@
    "held": "",
    "pics": [
     {"code": "p85d3848516a4", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
-    {"code": "pb8025a170000", "label": "Its frames, in order", "role": "sheet", "faults": []},
+    {"code": "pb8025a170000", "label": "Its frames, in order", "role": "sheet"},
     {"code": "pa0d773a77ff5", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
    ],
    "check": {
@@ -217,7 +214,7 @@
    "line": "l07", "key": "pic:take:59161cc8-0000", "item": "take:59161cc8-0000", "kind": "drawn", "state": "open",
    "name": "The wall builds itself", "kind_words": "A drawn graphic",
    "ask": "Is this drawing right for the film?",
-   "where": "In the film at 0:53.0 to 0:57.0 (4.0 s) · Gap 5, The wall assembles itself",
+   "film_at": "0:53.0", "where": "In the film at 0:53.0 to 0:57.0 (4.0 s) · Gap 5, The wall assembles itself",
    "words_head": "The words under it:",
    "words": "The greatest advantage of Rat-Trap Bond Masonry lies in its efficiency.",
    "try": "",
@@ -227,7 +224,7 @@
    "held": "Its fact check did not pass: to select it all the same, say why.",
    "pics": [
     {"code": "p85d3848516a4", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
-    {"code": "p59161cc80000", "label": "Its frames, in order", "role": "sheet", "faults": []},
+    {"code": "p59161cc80000", "label": "Its frames, in order", "role": "sheet"},
     {"code": "pa0d773a77ff5", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
    ],
    "check": {
@@ -252,13 +249,13 @@
    "line": "l08", "key": "pic:picture:c0ffee01-0000:c0ffee0100", "item": "picture:c0ffee01-0000:c0ffee0100", "kind": "still", "state": "open",
    "name": "The housing site", "kind_words": "A still",
    "ask": "Is this picture right for this shot?",
-   "where": "In the film at 2:10.4 to 2:15.0 (4.6 s) · Gap 8, Homes that last",
+   "film_at": "2:10.4", "where": "In the film at 2:10.4 to 2:15.0 (4.6 s) · Gap 8, Homes that last",
    "words_head": "The words under it:",
    "words": "Across the state, housing schemes now use the bond for low-cost homes.",
    "try": "",
    "foot_head": "Your footage: click one to see it beside the new picture",
    "pics": [
-    {"code": "pc0ffee010000", "label": "The new picture", "role": "main", "faults": []},
+    {"code": "pc0ffee010000", "label": "The new picture", "role": "main"},
     {"code": "pd00d00d00d00", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
    ],
    "check": {

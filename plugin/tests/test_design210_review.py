@@ -69,7 +69,7 @@ def test_a_page_published_at_a_new_link_starts_from_the_code_again(harness, monk
 
 def test_the_page_reads_a_pictures_document_from_the_round():
     html = PAGE.read_text(encoding='utf-8')
-    for needed in ("function docId(coll,code)", "round[coll==='pics'?'pic_docs':'zoom_docs']", "/^p[0-9a-f]{12}-[0-9]{1,4}$/", "db.doc(coll+'/'+docId(coll,code))",
+    for needed in ("function docId(coll,code)", "round[coll==='pics'?'pic_docs':'zoom_docs']", "/^[pv][0-9a-f]{12}-[0-9]{1,4}$/", "db.doc(coll+'/'+docId(coll,code))",
                    "(line.pics||[]).map(p=>docId('pics',p.code))"):
         assert needed in html, needed
     assert 'innerHTML' not in html

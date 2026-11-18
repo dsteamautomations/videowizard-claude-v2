@@ -2418,7 +2418,8 @@ def cmd_visuals(a):
                             'Nothing was written to the page yet.')
             rnd = page['round']
             suffix = _doc_suffix(_pictures_sent(folder))
-            names = {c: c + suffix for c in _pic_codes(page.get('pictures'))} if suffix else {}   # design/210 review: pictures offered again are in other documents; the round says which
+            vcodes = [str(v.get('code')) for v in page.get('videos') or [] if re.fullmatch(r'v[0-9a-f]{12}', str(v.get('code') or ''))]   # design/217: a drawing's video page copy, offered again with them
+            names = {c: c + suffix for c in _pic_codes(page.get('pictures')) + vcodes} if suffix else {}   # design/210 review: pictures offered again are in other documents; the round says which
             doc = {'round': rnd, 'at': datetime.now(timezone.utc).isoformat(), 'run': m['code'], 'step': page['step'], 'open': page['open'], 'summary': page.get('summary') or '',
                    'note': page.get('note') or '', 'lines': page['lines'], **({'pic_docs': names, 'zoom_docs': names} if names else {}),
                    **({'layout': page['layout']} if isinstance(page.get('layout'), dict) else {})}   # design/212: how the page lays this step out (step 1 of the references: one thing at a time beside the list)

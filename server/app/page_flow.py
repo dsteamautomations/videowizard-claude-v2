@@ -960,7 +960,7 @@ def _pictures_page(ctx, base, lines, rows):
     n = len(lines)
     return {**base, 'step': P.W['step'], 'open': bool(n), 'lines': lines, 'say': P.say(lines, rows),
             'summary': P.W['summary'].format(n=n, c=len(rows)) if rows else f'{n} to answer.', 'note': P.W['note'] if n else P.W['nothing'],
-            'layout': {'kind': 'pictures', 'made': P.W['made'], 'help': P.W['help'], 'coming': rows, 'words': {**page_words(), 'pictures': P.PAGE}}}
+            'layout': {'kind': 'pictures', 'help': P.W['help'], 'coming': rows, 'words': {**page_words(), 'pictures': P.PAGE}}}
 
 
 def _pictures_answer(ctx, a, choice, words):

@@ -92,7 +92,8 @@ def page(browser, d=None, size='fit-large', video=True, scheme='light', nopic=()
     pg.on('console', lambda m: pg.errors.append(m.text) if m.type == 'error' else None)
     pg.on('pageerror', lambda e: pg.errors.append(str(e)))
     zoom = {p['code']: LARGE for l in d['lines'] for p in l['pics']} if large else {}   # the large copies of the file store
-    zoom.update({'vb8025a170000': BLOB} if video else {})
+    zoom.update({l['video']['code']: BLOB for l in d['lines'] if (l.get('video') or {}).get('code')} if video else {})   # each drawing's video page copy: `zoom/<code>`, as the tool writes it
+    zoom = {(d.get('zoom_docs') or {}).get(k, k): v for k, v in zoom.items()}   # offered again: the document the round names
     html = ('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>'
             f"<script>window.__round = {json.dumps(d).replace('</', '<\\/')}; window.__zoom = {json.dumps(zoom)}; window.__nopic = {json.dumps(list(nopic))};"
             f"window.__pic = 'data:image/png;base64,{base64.b64encode(picture()).decode()}';{STUB}</script>" + PAGE.read_text(encoding='utf-8') + '</body></html>')
@@ -224,7 +225,8 @@ def test_the_screen_the_list_the_fold_and_the_count(browser):
     assert pg.locator('#sstep').text_content() == ROUND['step'] and pg.locator('#shelp').text_content() == W['help']
     # only what needs an answer, numbered, in the round's order; the kind under the name
     assert rail(pg) == [[str(n), l['name']] for n, l in enumerate(ROUND['lines'], 1)]
-    assert pg.locator('#srail .srow .pkw').all_text_contents() == [l['kind_words'] for l in ROUND['lines']]
+    assert pg.locator('#srail .srow .pkw').all_text_contents() == [' · '.join(x for x in (l['kind_words'], l.get('film_at')) if x) for l in ROUND['lines']]   # the film time under the name, as the trial
+    assert pg.locator('#srail .srow[data-line="l03"] .pkw').text_content() == 'A still · 1:35.1'
     assert pg.locator('#srail h2').first.text_content() == W['todo']
     # `layout.coming`: one folded row, not counted
     fold = pg.locator('#srail [data-fold="coming"]')
@@ -323,7 +325,7 @@ def test_a_failed_still_asks_once_and_is_marked_against_the_check(browser):
     assert pg.locator('#pcheck li').count() == 0 and pg.locator('#pmore').text_content() == W['more'].replace('{n}', '4')   # F1: the first fault in view, the rest behind "See all 4"
     pg.locator('#pmore').click()
     assert pg.locator('#pcheck li').all_text_contents() == c['faults'][1:] and pg.locator('#pmore').text_content() == W['fewer']
-    assert KILN['pics'][1]['faults'] == c['faults'] and pg.locator('#sbig .pfaults').count() == 0   # the picture's own failed lines are the check's, beside it: said once
+    assert 'faults' not in KILN['pics'][1] and pg.locator('#sbig .pfaults').count() == 0   # the picture's failed lines are the check's: sent once, said once
     assert pg.locator('#ptry').text_content() == KILN['try']
     assert 'primary' not in (pg.locator('#pbar [data-choice="yes"]').get_attribute('class') or '')
     yes = btn(KILN, 'yes')
@@ -375,7 +377,7 @@ def test_a_graphic_in_steps(browser):
     assert pg.locator('#sbig figure >> nth=2').locator('.pfaults li').all_text_contents() == steps[2]['faults'] and pg.locator('#sbig figure >> nth=2').locator('.pfaults b').text_content() == steps[2]['check_head']
     assert pg.locator('#sbig .pfaults').count() == 1 and pg.locator('#pcap').text_content().startswith(STEPS['strip_head'])
     assert pg.locator('#pcap').bounding_box()['y'] < pg.locator('#sbig').bounding_box()['y']   # the heading of the steps above them
-    assert bar(pg) == [b['label'] for b in STEPS['buttons']] == ['Yes, use all 3 steps', 'Correct step 1', 'Correct step 2', 'Correct step 3']   # F2: one per step, no "No"
+    assert bar(pg) == [b['label'] for b in STEPS['buttons']] == ['Yes, use all 3 steps', 'Correct 1', 'Correct 2', 'Correct 3']   # F2: one per step, no "No"
     assert pg.locator('#sfootage .sth').evaluate_all('t => t.map(x => x.getAttribute("data-role"))') == ['before', 'after', 'earlier']
     pg.locator('#sfootage [data-role="before"]').click()                                  # the footage before joins the row first, in film order
     assert pg.locator('#sbig figure').evaluate_all('f => f.map(x => x.getAttribute("data-role"))') == ['before', 'step', 'step', 'step']
@@ -391,7 +393,7 @@ def test_a_graphic_in_steps(browser):
     pg.close()
 
 
-@pytest.mark.parametrize('n', [2, 4])
+@pytest.mark.parametrize('n', [2, 3, 4])
 def test_a_graphic_of_two_and_of_four_steps(browser, n):
     def change(l, d):
         s = l['l05']
@@ -400,13 +402,20 @@ def test_a_graphic_of_two_and_of_four_steps(browser, n):
             steps.append({**copy.deepcopy(steps[0]), 'code': f'pfeed{len(steps):08d}', 'n': len(steps) + 1, 'label': f'Step {len(steps) + 1}', 'caption': f'Step {len(steps) + 1}: on \'the words\': one more thing appears.', 'faults': []})
         steps = steps[:n]
         s['pics'] = [p for p in s['pics'] if p['role'] == 'before'] + steps + [p for p in s['pics'] if p['role'] in ('after', 'earlier')]
-        s['buttons'] = [{**s['buttons'][0], 'label': f'Yes, use all {n} steps'}] + [{**s['buttons'][1], 'label': f'Correct step {i}', 'choice': f'correct:{i}'} for i in range(1, n + 1)]
+        s['buttons'] = [{**s['buttons'][0], 'label': f'Yes, use all {n} steps'}] + [{**s['buttons'][1], 'label': f'Correct {i}', 'choice': f'correct:{i}'} for i in range(1, n + 1)]
     for size in ('fit-small', 'fit-large'):
         pg = page(browser, doc(change), size=size)
         go(pg, STEPS)
         assert pg.locator('#sbig figure').count() == n and len(bar(pg)) == n + 1
         boxes = [inside(pg, f'#sbig .sbigb >> nth={i}') for i in range(n)]
         assert len({round(b['height']) for b in boxes}) == 1
+        rows = sorted({round(b['y']) for b in boxes})
+        if n == 4 and size == 'fit-small':   # 4 steps at 1536 x 510: two rows of two, each large enough to judge
+            assert len(rows) == 2 and len({round(b['x']) for b in boxes}) == 2 and boxes[0]['height'] >= 120, boxes
+        else:   # 2 and 3 steps, and 4 at 1900 x 830: one row
+            assert len(rows) == 1, boxes
+        tops = {round(pg.locator(f'#pbar button >> nth={i}').bounding_box()['y']) for i in range(n + 1)}
+        assert len(tops) == 1, tops   # the step buttons on one line
         for i in range(n + 1):
             inside(pg, f'#pbar button >> nth={i}')
         assert pg.evaluate("(() => { const m = document.querySelector('#smain'); return m.scrollHeight <= m.clientHeight; })()")
@@ -451,6 +460,22 @@ def test_a_drawn_graphic_with_open_rules_and_no_video_needs_a_reason(browser):
     pg.locator('#sfixsend').click()
     got = saved(pg, 'l07', 'select')
     assert got['notes'] == 'The end frames hold long enough.' and sel['say'].replace('{words}', got['notes']) in pg.locator('#sanswer').text_content()
+    pg.close()
+
+
+def test_the_servers_video_field_a_code_its_zoom_document_offered_again_and_none(browser):
+    """design/217: the server's `video` of a drawn line: a code `v` + 12 hex whose page copy the tool uploads and links as `zoom/<code>` (or the
+    document `zoom_docs` names when the pictures were offered again); `code` "" with `none` when no copy could be made: the frames, with that sentence."""
+    code = 'v' + '0123456789ab'
+    pg = page(browser, doc(lambda l, d: (l['l06']['video'].update(code=code), d.update(zoom_docs={code: code + '-1'}))))
+    go(pg, CAVITIES)
+    pg.wait_for_function("(() => { const v = document.querySelector('#pvideo'); return v && v.readyState >= 2 && !v.paused; })()")
+    assert pg.evaluate("document.querySelector('#pvideo').src").endswith(BLOB) and pg.locator('#pnone').count() == 0
+    pg.close()
+    pg = page(browser, doc(lambda l, d: l['l06']['video'].update(code='', none=WALL['video']['none'])))
+    go(pg, CAVITIES)
+    assert pg.locator('#pvideo').count() == 0 and pg.locator('#pnone').text_content() == WALL['video']['none'] and pg.locator('#sbig figure').get_attribute('data-role') == 'sheet'
+    assert pg.locator('#pframes').count() == 0 and pg.locator('#pfinish').text_content() == CAVITIES['finish']
     pg.close()
 
 

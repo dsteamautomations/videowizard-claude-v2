@@ -167,8 +167,10 @@ def test_d4_a_component_is_approved_by_a_clean_look_and_never_asked(held):
 # ---------- C3, F6: offered only with the look, else after the time-out as not checked ----------
 
 def test_c3_a_picture_waits_for_its_look_then_is_offered_after_the_time_out_as_not_checked():
-    s, p = session(ref('k1', ready_at=NOW.isoformat())), plan(shot('S1'))
+    s, p = session(ref('k1', ready_at=(NOW - timedelta(hours=12)).isoformat())), plan(shot('S1'))
     r = s['references']['k1']
+    assert not P.offered(s, r, p, NOW) and not P.late(r, NOW)                               # the critic's review (1): a film paused overnight: made long ago, never asked
+    r['asked_at'] = NOW.isoformat()                                                         # the time-out counts from when Claude was first asked
     assert not P.offered(s, r, p, NOW + timedelta(minutes=29))
     assert P.offered(s, r, p, NOW + timedelta(minutes=P.PICTURE_LOOK_MINUTES))
     v = P.check_view(s, r, p, NOW + timedelta(minutes=31))
@@ -181,7 +183,7 @@ def test_c3_a_picture_waits_for_its_look_then_is_offered_after_the_time_out_as_n
 
 
 def test_c3_waiting_lists_a_still_only_with_its_look(held, monkeypatch):
-    s = session(ref('k1', ready_at=datetime.now(timezone.utc).isoformat()))
+    s = session(ref('k1', ready_at=datetime.now(timezone.utc).isoformat(), asked_at=datetime.now(timezone.utc).isoformat()))
     p = plan(shot('S1'))
     held(s, p)
     monkeypatch.setattr(V, 'route_of', lambda sh: 'still')
@@ -243,7 +245,7 @@ def test_the_style_line_and_the_page_words_are_the_fixture_words(monkeypatch):
     want = fixture_line('style')
     assert set(line) | {'line', 'key', 'item', 'state'} == set(want)
     assert [(b['label'], b['say']) for b in line['buttons']] == [(b['label'], b['say']) for b in want['buttons']] and line['sub'] == want['sub']
-    assert P.PAGE == FIXTURE['layout']['words']['pictures'] and P.W['help'] == FIXTURE['layout']['help'] and P.W['made'] == FIXTURE['layout']['made']
+    assert P.PAGE == FIXTURE['layout']['words']['pictures'] and P.W['help'] == FIXTURE['layout']['help'] and 'made' not in FIXTURE['layout'] and 'made' not in P.W
     assert [P.W[c['state']] for c in FIXTURE['layout']['coming']] == [c['note'] for c in FIXTURE['layout']['coming']]
 
 
@@ -274,12 +276,17 @@ def test_f2_correct_step_one_rejects_it_and_every_later_step(monkeypatch, held):
     monkeypatch.setattr(V, '_set_budget', lambda *a_: None)
     monkeypatch.setattr(V, 'visuals_spend', lambda *a_: 0)
     monkeypatch.setattr(P, 'alike_steps', lambda store, chain: [])
-    monkeypatch.setattr(V, 'reject_reference', lambda store, user, run, outputs, rid, notes, quote: done.append((rid, notes)) or {})
+    def reject(store, user, run, outputs, rid, notes, quote):
+        done.append((rid, notes, quote))
+        box['s']['references'][rid].update(status='rejected', rejection={'notes': notes, 'quote': quote})
+        return {}
+    monkeypatch.setattr(V, 'reject_reference', reject)
     ctx = {'session': box['s'], 'plan': box['p'], 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
     item = CF._waiting_items(ctx)[0]
     assert [x['choice'] for x in item['buttons'] + item.get('other_choices', [])] == ['yes', 'correct:1', 'correct:2']
-    item['_run']('correct:1', 'Correct step 1', 'Two icons, not three.')
-    assert done == [('a', 'Two icons, not three.'), ('b', P.W['later_step'])]
+    item['_run']('correct:1', 'Correct 1', 'Two icons, not three.')
+    assert done == [('a', 'Two icons, not three.', 'Correct 1'), ('b', '', 'No')]                # the critic's review (4): a later step carries no reason: nothing reaches the library
+    assert box['s']['references']['b']['rejection']['cause'] == P.W['later_step'] and P._why(box['s']['references']['b']) == P.W['later_step']
 
 
 # ---------- F3, C6: the drawn graphic ----------

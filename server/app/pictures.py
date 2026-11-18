@@ -31,7 +31,7 @@ W = {
     'ask_style': 'Is this the right look for the graphics?', 'ask_still': 'Is this picture right for this shot?', 'ask_steps': 'Are these {n} steps of the graphic right?',
     'ask_drawn': 'Is this drawing right for the film?',
     'yes_style': 'Yes, use this look', 'yes_still': 'Yes, put it in the film', 'no': 'No, make another', 'correct': 'Correct it',
-    'yes_steps': 'Yes, use all {n} steps', 'correct_step': 'Correct step {n}', 'select': 'Select: use it in the film', 'reject': 'Reject', 'plain': 'Take the effect away',
+    'yes_steps': 'Yes, use all {n} steps', 'correct_step': 'Correct {n}', 'select': 'Select: use it in the film', 'reject': 'Reject', 'plain': 'Take the effect away',
     'say_style': 'Approved. The first picture of every graphic is made from it.', 'say_still': 'Approved and placed in the film at {at}.',
     'say_no_style': 'Rejected. Claude asks for a new style sheet.', 'say_no_still': 'Rejected. Claude asks for {which} picture for this shot.',
     'say_no_still_n': 'Rejected. Claude asks for {which} picture.',
@@ -51,7 +51,7 @@ W = {
     'foot_steps': 'Your footage: click one to see it beside the steps', 'foot_steps_try': 'Your footage and the earlier try: click one to see it beside the steps',
     'foot_drawn': 'Your footage: click one to see it beside the drawing',
     'strip_head': 'The steps, in order: click one to see it large',
-    'before': 'Your footage before this shot', 'after': 'Your footage after this shot', 'new': 'The new picture', 'new_try': 'The new picture (try {n})',
+    'before': 'Your footage before this shot', 'after': 'Your footage after this shot', 'new': 'The new picture',
     'earlier': 'Try {n}, not used', 'earlier_step': 'Step {s}, try {n}, not used', 'why': 'You said: {words}', 'why_none': 'You said no, with no words.',
     'step_cap': "Step {n}: on '{words}': {what}", 'step_cap_bare': 'Step {n}: {what}', 'step_label': 'Step {n}',
     'sheet': 'Its frames, in order', 'video': 'The drawing, playing', 'video_none': 'The video is not available here: these are its frames.',
@@ -77,7 +77,6 @@ W = {
     'say_coming_one': '1 more is being made or checked: it comes to the page later.', 'say_done': 'Then say done here.', 'say_nothing': 'Nothing waits for you on the page now.',
     'summary': '{n} to answer, {c} still being made or checked.', 'note': 'Answer what is ready, then say done in the chat.', 'nothing': 'Nothing waits for you now.',
     'making': 'Being made. It joins the list when it is ready.', 'checking': 'Claude is checking it. It joins the list when it is checked.',
-    'made': 'Nothing is recorded or made until you say done in the chat.',
     'help': ['Each line on the left needs one answer. Answer them in any order, then say done in the chat.',
              'A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.',
              'Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.',
@@ -592,8 +591,7 @@ def picture_line(store, session, plan, ref, style=False, now=None):
     kind = 'style' if style else 'still'
     w = where(session, plan, V.made_for(session, ref)) if not style else {'where': '', 'at': '', 'words': '', 'gap': None}
     before, after = _foot_pics(session, w['gap']) if not style else ([], [])
-    main = _pic(ref, W['style_name'] if style else (W['new_try'].format(n=len(tries) + 1) if tries else W['new']), 'main', faults=check['faults'],
-                **({'check_head': W['check_head']} if check['faults'] else {}))
+    main = _pic(ref, W['style_name'] if style else W['new'], 'main')   # its failed lines are the check's, said once (`check.faults`); a new try says so in `try` only
     earlier = [_pic(t, W['earlier'].format(n=len(tries) - i), 'earlier', cmp_cap=W['earlier'].format(n=len(tries) - i), why=_why(t)) for i, t in enumerate(tries)]
     which = ORDINAL.get(len(tries) + 1, 'a new') if tries else 'a new'
     yes = {'label': W['yes_' + kind], 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_style'] if style else W['say_still'].format(at=w['at']),
@@ -606,7 +604,7 @@ def picture_line(store, session, plan, ref, style=False, now=None):
     if style:
         line['sub'] = W['style_sub']
     else:
-        line.update(where=w['where'], words_head=W['words_head'], words=w['words'], **{'try': W['try'].format(n=len(tries) + 1) if tries else ''},
+        line.update(where=w['where'], film_at=w['at'], words_head=W['words_head'], words=w['words'], **{'try': W['try'].format(n=len(tries) + 1) if tries else ''},
                     foot_head=W['foot_still_try' if tries else 'foot_still'])
     return line
 
@@ -640,7 +638,7 @@ def steps_line(store, session, plan, shot_id, chain, now=None):
                W['say_step_last'].format(k=k, p=k - 1, words='{words}'))
         b = _fix_button(W['correct_step'].format(n=k), W['hint_step'].format(n=k), views[k - 1]['faults'], say)
         buttons.append({**b, 'choice': f'correct:{k}'})
-    return {'kind': 'steps', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_steps'], 'ask': W['ask_steps'].format(n=n), 'where': w['where'],
+    return {'kind': 'steps', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_steps'], 'ask': W['ask_steps'].format(n=n), 'where': w['where'], 'film_at': w['at'],
             'words_head': W['words_head'], 'words': w['words'], 'try': W['try'].format(n=2) if tries else '', 'strip_head': W['strip_head'],
             'foot_head': W['foot_steps_try' if tries else 'foot_steps'], 'pics': before + steps + after + earlier, 'check': check, 'buttons': buttons,
             'details': _details(chain[0]) if chain else []}
@@ -664,7 +662,7 @@ def drawn_line(store, session, plan, job, check, fin, motion_take):
     listed = finish_listed(fin)
     before, after = _foot_pics(session, w['gap'])
     sheet_key = res.get('sheet_key') or check.get('sheet_key')
-    pics = before + ([{'_key': sheet_key, '_mark': str(res.get('sha256') or ''), 'label': W['sheet'], 'role': 'sheet', 'faults': []}] if sheet_key else []) + after
+    pics = before + ([{'_key': sheet_key, '_mark': str(res.get('sha256') or ''), 'label': W['sheet'], 'role': 'sheet'}] if sheet_key else []) + after
     select = {'label': W['select'], 'choice': 'select', 'act': 'select', 'needs_words': bool(held), 'say': W['say_select_why' if held else 'say_select'].format(at=w['at'], words='{words}'),
               **({'hint': W['hint_why'], 'go': W['go_why'], 'prefill': '', 'need': W['need_why']} if held else {})}
     buttons = [select, {'label': W['reject'], 'choice': 'reject', 'act': 'reject', 'needs_words': True, 'hint': W['hint_reject'], 'go': W['go'],
@@ -672,7 +670,7 @@ def drawn_line(store, session, plan, job, check, fin, motion_take):
     if listed:
         buttons.append({'label': W['plain'], 'choice': 'plain', 'act': 'plain', 'needs_words': False, 'say': W['say_plain'].format(finish=listed)})
     secs = ev.get('exact_seconds') or ((job.get('request') or {}).get('duration_seconds'))
-    return {'kind': 'drawn', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_drawn'], 'ask': W['ask_drawn'], 'where': w['where'],
+    return {'kind': 'drawn', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_drawn'], 'ask': W['ask_drawn'], 'where': w['where'], 'film_at': w['at'],
             'words_head': W['words_head'], 'words': w['words'], 'try': '', 'foot_head': W['foot_drawn'],
             'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['video'], 'none': W['video_none']},
             'finish': W['finish'].format(finish=listed) if listed else '', 'held': held, 'pics': pics, 'check': view, 'buttons': buttons,

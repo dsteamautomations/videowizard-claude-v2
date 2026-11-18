@@ -34,14 +34,13 @@ New, named plainly:
 | `layout` | object | below |
 | `pic_docs`, `zoom_docs` | map | as today, when a picture was sent again |
 | `picture_batches`, `zoom_uploads`, `pictures_failed` | as today | added by `page()`; `zoom_uploads` also carries each drawn line's video page copy |
-| `videos` | [{code, key}] | added by `page()` (S, build): each drawn line's video page copy (`v` + 12 hex, 960 px H.264), which the tool fetches as `zoom/<code>.mp4` and uploads with the large pictures; never in the round document. A copy that cannot be made leaves `video.code` "" and `video.none` set |
+| `videos` | [{code, key}] | added by `page()` (S, build): each drawn line's video page copy (`v` + 12 hex, 960 px H.264), which the tool fetches as `zoom/<code>.mp4` and uploads with the large pictures; the page reads its link at `zoom/<code>` (or the document `zoom_docs` names when the pictures are offered again, as for a picture); never in the round document. A copy that cannot be made, or one over the page's file limit (15 MB, `OWN_PICTURE_MAX`), leaves `video.code` "" and `video.none` set |
 
 `layout`:
 
 | Field | Type | Meaning |
 |---|---|---|
 | `kind` | `"pictures"` | the page draws the pictures screen |
-| `made` | str | "Nothing is recorded or made until you say done in the chat." |
 | `help` | [str] | the help panel's paragraphs |
 | `coming` | [row] | the fold "Still being made, nothing to do", one row per item with no answer yet (section 3.7) |
 | `words` | object | `page_words()`; the pictures screen reads only `words.pictures` |
@@ -89,8 +88,9 @@ Lines of kind `style`, `still`, `steps`, `drawn` also carry `check` (3.8). Lines
 | Field | Type | Meaning |
 |---|---|---|
 | `where` | str | "In the film at 1:35.1 to 1:40.6 (5.6 s) · Gap 5, Strong enough for three storeys" (film-time format of the rest of the page) |
+| `film_at` | str | the shot's start, "1:35.1": shown under the name in the list, after `kind_words` ("A still · 1:35.1"), as on the trial |
 | `words_head`, `words` | str | "The words under it:" and the narration |
-| `try` | str | "Try 2" when there were earlier tries, else "" |
+| `try` | str | "Try 2" when there were earlier tries, else "" (the main picture's label stays "The new picture": the try is said once, here) |
 | `foot_head` | str | the head of the strip of footage and earlier tries |
 
 ### 3.2 A picture entry (`pics[]`)
@@ -101,8 +101,8 @@ As `pic(key, label, mark)` plus:
 |---|---|---|
 | `code`, `label` | str | as today; `missing: true` when `page()` could not make it |
 | `role` | str | `main` (the picture answered), `step` (one step of a graphic), `sheet` (a drawing's frame sheet), `before` / `after` (your footage, only ever shown beside), `earlier` (an earlier try, not used) |
-| `faults` | [str] | `main`, `step`, `sheet` only: Claude's failed lines for this picture, in full |
-| `check_head` | str | with `faults`: "Claude's check of this picture:" / "of step 3:" |
+| `faults` | [str] | `step` only: Claude's failed lines for this step, in full (a still's, the style sheet's and a drawing's are `check.faults`, sent once) |
+| `check_head` | str | with `faults`: "Claude's check of step 3:" |
 | `n`, `caption` | int, str | `step` only: its number and "Step n: on '<words>': <what appears>" |
 | `cmp_cap` | str | `before`, `after`, `earlier`: the caption when shown beside the main picture |
 | `why` | str | `earlier` only: "You said: …" (the rejection's notes, or the question's answer that sent it back) |
@@ -123,7 +123,7 @@ Extra: `sub` (str). `pics`: one `main`. Buttons: `yes` "Yes, use this look", `no
 
 ### 3.6 Kind `steps` (a graphic in steps, 2 to 4)
 
-Extra: `strip_head` ("The steps, in order: click one to see it large"). `pics`: `before`?, `step` × N (all shown side by side), `after`?, `earlier`*. Buttons: `yes` "Yes, use all N steps", then `correct:1` … `correct:N` "Correct step n" (one per step, F2). No "No".
+Extra: `strip_head` ("The steps, in order: click one to see it large"). `pics`: `before`?, `step` × N (all shown side by side), `after`?, `earlier`*. Buttons: `yes` "Yes, use all N steps", then `correct:1` … `correct:N` "Correct n" (one per step, F2; the question above them already says they are steps, so the row fits one line at 1536 px). No "No". Four steps in a window under 700 px high are drawn as two rows of two, each step's own lines then only in the check line.
 
 ### 3.7 Kind `drawn` (a drawn graphic) and the `coming` rows
 
@@ -191,7 +191,7 @@ Collection `rounds/<round>/answers`, doc id `<line>`, exactly as `write()` does 
 | style, still | `no` | `V.reject_reference(…, ref_id, '', quote)`: no reason stored, nothing added to "not this" or the library (F4) |
 | style, still | `correct` | `V.reject_reference(…, ref_id, words, quote)` |
 | steps | `yes` | `V.sequence(…, shot_id, [ids], quote)`; two steps alike is no longer a refusal (R3), it is advice and `sure` |
-| steps | `correct:<n>` | `V.reject_reference(…, chain[n-1].id, words, quote)`; every later step is rejected too as "Made from a step that was corrected." and made again from it (F2) |
+| steps | `correct:<n>` | `V.reject_reference(…, chain[n-1].id, words, quote)`; every later step is rejected too, with no reason (nothing reaches the feedback or the library, as F4), its rejection's `cause` "Made from a step that was corrected." shown with the earlier try, and made again from it (F2) |
 | drawn | `select` | `V.select_take(conn, store, user, run, outputs, job_id, quote, notes, timing_notes, None)`: `notes` = the operator's words when held, else ""; never a note the operator did not give (F3); `timing_notes` = the words when shorter than its slot |
 | drawn | `reject` | `V.review_take(conn, store, user, run, outputs, job_id, 'rejected', words, '', quote)` |
 | drawn | `plain` | `V.motion_finish(…, shot, False)` then `review_take(… 'rejected', "made again without the effect, at the operator's word" …)`; `next` says the step's own sentence, never "the Takes step" (R4) |
@@ -258,7 +258,10 @@ Reuse the design/214 sentences with "picture" wording: `LOOK_LINE_OPEN` (a line 
 ### 5.6 Where it is stored, the time-out, the drawn graphic
 
 - Stored on the reference: `ref.look = {who, at, sha256, lines: [{id, check, pass, seen}]}` or `{who, at, sha256, not_checked}`. The program's lines stay in `ref.check.code`. `check_summary` reads `look` for these kinds. A helper that stops half-way: the pictures it did not answer stay due (never marked passed).
-- Offered: `waiting()` lists a picture only with a look recorded, or after `PICTURE_LOOK_MINUTES = 30` from `ready_at`, then as `not_checked` with "Claude's check did not come within 30 minutes" (C3, F6). A look that arrives later and before the operator's answer replaces it.
+- Offered: `waiting()` lists a picture only with a look recorded, or after `PICTURE_LOOK_MINUTES = 30` from `asked_at` (stamped the first time `looks_due` lists it or `waits_words` reports it, never from when it was made: a film paused overnight is not offered as not checked), then as `not_checked` with "Claude's check did not come within 30 minutes" (C3, F6). A look that arrives later and before the operator's answer replaces it.
+- A candidate the model checked before the deploy (`check.lines` or `check.model`, no `look`, no `ready_at`) keeps that check: offered as before, its check line from those lines; only a picture still `check_pending` at the deploy goes to Claude. Its chat item keeps its id and answers.
+- A component whose look fails (or could not be opened) stays a candidate and is named, with its failed lines, in the `then` of the looks route and in `next` / `status` / the page's record ("make it again …"); the program's advice lines never decide its approval.
+- Rule 0, fork 4 (a parent approved with a failed line): on a v2 film the failed lines are Claude's (`V.parent_failed`).
 - Meanwhile its row is in `layout.coming` as `checking`.
 - C6: `motion_verdict` is held to the whole rule list of the project: the server keeps the rules of the brief per project sha (ids from their words, as `check_lines`), and refuses a verdict that skips a rule, names an unknown one, or fails one with no words (the same three sentences). "All N rules held" uses the real N.
 - C7: the svg drawn route (one drawing file read by Gemini) and AI video's take check are unchanged.
@@ -271,7 +274,7 @@ The files are disjoint. Neither edits the other's files. Both read this contract
 
 Files: `plugin/pages/decisions.html`; `server/unit/test_design217_browser_pure.py`; `plugin/tests/test_design217_page.py`; the preview tool under `ux1-mockup/` (e.g. `ux1-mockup/step6-trial/preview217.html` or a script that renders the fixture). Nothing else.
 
-Owns: **Part 1** on the page: the `pictures` layout and every kind of section 3; the fold of `layout.coming`; one count; the end card; "asks once" (`sure`); the `prefill` box (D3 on the page); the video loop with the sheet one click away and the fallbacks (D6); no amounts (D1 on the page); no confirmation on `plain` (D8); fits 1536 by 510 and 1900 by 830 with no scrolling for each kind, measured by its tests; **F1** shown on the page (check `head`, `faults`, per-picture `faults`); **F2** on the page (one "Correct step n" per step); **F3** on the page (select asks for the reason when `needs_words`, refuses an empty box with `need`); **C3** on the page ("Claude is checking it" rows, `not_checked` line).
+Owns: **Part 1** on the page: the `pictures` layout and every kind of section 3; the fold of `layout.coming`; one count; the end card; "asks once" (`sure`); the `prefill` box (D3 on the page); the video loop with the sheet one click away and the fallbacks (D6); no amounts (D1 on the page); no confirmation on `plain` (D8); fits 1536 by 510 and 1900 by 830 with no scrolling for each kind, measured by its tests; **F1** shown on the page (check `head`, `faults`, per-picture `faults`); **F2** on the page (one "Correct n" per step); **F3** on the page (select asks for the reason when `needs_words`, refuses an empty box with `need`); **C3** on the page ("Claude is checking it" rows, `not_checked` line).
 
 Builds and tests against `server/unit/d217_pictures_round.json` (it may copy and mutate it inside its tests, e.g. to add `refused`, drop the zoom link of the video, a steps line of 2 and of 4). The sets screen's code may be reused inside `decisions.html`.
 
