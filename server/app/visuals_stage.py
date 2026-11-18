@@ -3356,6 +3356,11 @@ def _queue_sets(conn, store, user, run, outputs, eids):
         if round_v2(session):   # design/211: the server writes the whole request (ref_sets.set_request); the operator's words are placed there, nothing is appended here
             prompt = row['prompt']
             from . import ref_sets
+            waits = ref_sets.pending_things(plan, session, eid)
+            if waits:   # design/216 (the critic's points 1 and 2): a place is held until its things' sets are approved; ref_sets.release orders it then
+                row['held'] = [t['id'] for t in waits]
+                save_session(store, run, session)
+                continue
             if ref_sets.makes(session, eid, row) >= ref_sets.MAKES_MAX:   # design/211 review, M1: every order of a set passes here, so the limit holds whatever way it comes
                 errors[eid] = ref_sets.MAKES_LIMIT.format(eid=eid, max=ref_sets.MAKES_MAX)
                 continue
@@ -3486,11 +3491,13 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     rd['quote'] = quote
     save_session(store, run, session)
     queued, errors = _queue_sets(conn, store, user, run, outputs, again) if again and not v2 else ([], {})
+    if v2:   # design/216: a place held for these things is ordered in the same call as their approval
+        queued = queued + ref_sets.release(conn, store, user, run, outputs)
     session = session_of(store, run, outputs)
     rd = session['round']
     left = unanswered + [eid for eid in again if eid not in queued] + list(held)   # still on step 2: the sets with no answer yet, a set that could not be made again (the page offers Make it now), a remake the cap holds
     if v2:
-        left += ref_sets.rest_of(rd) + [eid for eid, r in rd['elements'].items() if r.get('reopened')]   # design/211: the round stays open while sets wait for the second go, or a thing is back with the operator
+        left += ref_sets.rest_of(rd) + [eid for eid, r in rd['elements'].items() if r.get('reopened') or r.get('held')]   # design/216: a held place is not judged yet; design/211: the round stays open while sets wait for the second go, or a thing is back with the operator
     rd['pass'] = 'making' if queued else (2 if left else 'complete')
     save_session(store, run, session)
     return {'pass': _round_pass(session, rd) if v2 else rd['pass'], 'queued': queued, 'errors': errors, 'approved': [eid for eid in active if verdicts[eid]['verdict'] == 'yes'], 'held': held, **({'unanswered': unanswered} if partial else {}),
@@ -3683,6 +3690,9 @@ def set_make(conn, store, user, run, outputs, element_id, quote=None):
     need(not cause, ref_sets.LIMIT_PLAIN if v2 and (cause or {}).get('kind') == 'cap' else f"{element_id}: its set cannot be made yet: {(cause or {}).get('text')}.")   # design/213: the limit of a v2 round, with no amount
     what ='the photo or the permission changed' if _photo_changed(session, plan, element_id, row) else 'the plan changed' if plan_changed else 'the spec changed'   # design/207 (D1)
     queued, errors = _queue_sets(conn, store, user, run, outputs, [element_id])
+    held = ((session_of(store, run, outputs).get('round') or {}).get('elements') or {}).get(element_id, {}).get('held') if v2 else None
+    if held:   # design/216: a place waits for its things' sets; it is made by itself when they are approved
+        return {'element_id': element_id, 'queued': False, 'held': held, 'then': ref_sets.place_waiting(guarded(lambda: current_plan(store, session)), session_of(store, run, outputs), element_id, again=False)}
     need(queued, f'{element_id}: its set was not made: {_plain(errors.get(element_id))}')
     session = session_of(store, run, outputs)
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'notes': what + ' after this set was made; the set is made again'}

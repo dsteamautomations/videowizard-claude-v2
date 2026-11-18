@@ -122,7 +122,7 @@ def test_one_set_one_large_picture_one_answer(browser):
     pg.locator('#smore').click()
     assert DECK['rec']['more'] in pg.locator('#srec').text_content()
     # B4: the place says what it waits for
-    assert pg.locator('#swaits').text_content() == DECK['things_wait'] == 'This place shows the Mangalore clay roof tile, whose set is not approved yet: answer that first, or it is made from words.'
+    assert pg.locator('#swaits').text_content() == DECK['things_wait'] == 'It will be made again after the set of Mangalore clay roof tile is approved, so that it shows the real Mangalore clay roof tile.'
     # A9: the details, folded, in the server's rows
     titles = [d[0] for d in DECK['details']]
     assert pg.locator('.smore .sacc > button span:first-child').all_text_contents() == titles and pg.locator('.smore .sbody').count() == 0

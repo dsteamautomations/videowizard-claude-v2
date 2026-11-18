@@ -504,16 +504,43 @@ def thing_ref(session, eid):
     return sheet[0]['id'] if sheet else None
 
 
-def place_waiting(plan, session, eid):
-    """design/216 (B4): what a place's line says while one of its things is to be made and has no approved reference yet: '' when none."""
+def pending_things(plan, session, eid):
+    """design/216 (the critic's point 1): the things a place waits for: an object or a material it shows whose set is in the round and has
+    no approved reference yet. One the operator said needs no reference, gave their own picture of, or that is settled from its footage
+    does not hold the place (an own picture and a footage picture are approved references). [] for anything but a place."""
     element = _element(plan, eid)
     if not element or element.get('kind') != 'place':
-        return ''
-    from .chat_flow import WORDS, _and, the
+        return []
     rows = (session.get('round') or {}).get('elements') or {}
-    names = [the(t.get('name') or t['id']) for t, ref in place_things(plan, session, element) if not ref and t['id'] in rows and not rows[t['id']].get('ignored')]
+    return [t for t, ref in place_things(plan, session, element) if not ref and t['id'] in rows and not rows[t['id']].get('ignored') and not rows[t['id']].get('from_footage')]
+
+
+def place_waiting(plan, session, eid, again=True):
+    """design/216 (B4; the critic's point 2): what a place's line says while one of its things has no approved reference yet: that the place
+    is made (again) after that thing's set is approved. '' when none."""
+    names = [t.get('name') or t['id'] for t in pending_things(plan, session, eid)]
+    if not names:
+        return ''
+    from .chat_flow import WORDS, _and
     one = len(names) == 1
-    return WORDS['place_waits'].format(names=_and(names), sets='set is' if one else 'sets are', that='that' if one else 'those') if names else ''
+    return WORDS['place_waits'].format(again=' again' if again else '', sets='set' if one else 'sets', names=_and(names), are='is' if one else 'are', what=names[0] if one else 'things')
+
+
+def release(conn, store, user, run, outputs):
+    """design/216 (the critic's point 1): the places held for their things (`held`) whose things now all have an approved reference (or need
+    none) are ordered by themselves, through `_order` (the limit, three makes, the log). Returns the ids ordered."""
+    session = V.session_of(store, run, outputs)
+    rd = session.get('round') or {}
+    if not V.round_v2(session) or not any(r.get('held') for r in (rd.get('elements') or {}).values()):
+        return []
+    plan = V.guarded(lambda: V.current_plan(store, session))
+    free = [eid for eid, r in rd['elements'].items() if r.get('held') and not r.get('ignored') and not pending_things(plan, session, eid)]
+    for eid in free:
+        rd['elements'][eid].pop('held')
+    if not free:
+        return []
+    V.save_session(store, run, session)
+    return _order(conn, store, user, run, outputs, free)[1]
 
 
 def set_request(plan, run, session, element, row):

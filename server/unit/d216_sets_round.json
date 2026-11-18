@@ -359,7 +359,7 @@
     "go": "Approve the set all the same",
     "back": "Go back"
    },
-   "things_wait": "This place shows the Mangalore clay roof tile, whose set is not approved yet: answer that first, or it is made from words."
+   "things_wait": "It will be made again after the set of Mangalore clay roof tile is approved, so that it shows the real Mangalore clay roof tile."
   },
   {
    "line": "l03",
@@ -1488,5 +1488,5 @@
    }
   }
  },
- "say": "3 things need your answer: the representative filler slab roof, from above, the mason and the family room under the filler slab ceiling. Then choose whether the other 17 sets are made. Then say done here."
+ "say": "3 things need your answer:\n- The representative filler slab roof, from above\n- The mason\n- The family room under the filler slab ceiling\nThen choose whether the other 17 sets are made. Then say done here."
 }

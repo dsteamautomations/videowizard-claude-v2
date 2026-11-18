@@ -738,10 +738,14 @@ WORDS = {
     'own_instead': 'Use my own picture instead',
     'rest_name': 'The other {sets}',
     'rest_some': 'Make only some of them',
-    'place_waits': 'This place shows {names}, whose {sets} not approved yet: answer {that} first, or it is made from words.',
+    'place_waits': 'It will be made{again} after the {sets} of {names} {are} approved, so that it shows the real {what}.',   # design/216 (the critic's point 2): before, "answer that first"
+    'held': 'Waits for {names}: it is made when their sets are approved.',
+    'tag_held': 'Waits',
+    'rest_now': '{sets} {are} made now.',
+    'rest_held': '{places} {wait} for {names}: made when their sets are approved.',
     # design/216 (B1, B2): what the assistant posts with the page's link, and before the pictures are prepared; it adds nothing to them
     'say_page': 'Open this page, answer each line, then tell me you are done:',
-    'say_need': '{things} your answer: {names}.',
+    'say_need': '{things} your answer:',
     'say_rest': 'Then choose whether the other {sets} are made.',
     'say_rest_only': 'Choose whether the other {sets} are made.',
     'say_done': 'Then say done here.',
@@ -787,12 +791,6 @@ def _and(words):
     """'A', 'A and B', 'A, B and C'."""
     words = list(words)
     return ', '.join(words[:-1]) + ' and ' + words[-1] if len(words) > 1 else ''.join(words)
-
-
-def the(name):
-    """A thing's name as a sentence names it: 'The mason' reads 'the mason'; 'Cement bag' reads 'the Cement bag'."""
-    name = str(name or '')
-    return 'the ' + name[4:] if name.startswith('The ') else name if name.lower().startswith('the ') else 'the ' + name
 
 
 def _first(text):
@@ -1190,7 +1188,7 @@ def _round_v2(ctx, every, step):
                                  lambda choice, quote, words, eid=eid: ref_sets.round_reopen(conn, store, user, run, outputs, eid, 'approve' if choice == 'words' else choice, words, quote),
                                  chat, line, _key=f'set:{eid}', _eid=eid, _person=person))
             continue
-        if row.get('ignored') or row.get('from_footage') or row.get('rewrite_due') or eid in waiting:
+        if row.get('ignored') or row.get('from_footage') or row.get('rewrite_due') or row.get('held') or eid in waiting:   # design/216: a held place is a line with nothing to answer
             continue
         live = V._set_rows(session, eid, row.get('set'))
         if live:
@@ -1332,6 +1330,8 @@ def _round_v2(ctx, every, step):
             line = {**head(eid, f, STEP2_GROUPS[1], 'notmade', WORDS['tag_not_made']), 'cost': _cost(f, where), 'loss': loss, 'head': said, **({'why': why} if why else {}),
                     **({'things_wait': waits_for} if (waits_for := ref_sets.place_waiting(plan, session, eid)) else {}),
                     'text': '\n'.join(x for x in (about(eid, f), said, why) if x), 'buttons': page}
+            if line.get('things_wait'):   # not made yet: "It will be made after ...", not "made again"
+                line['things_wait'] = ref_sets.place_waiting(plan, session, eid, again=False)
 
             def run_(choice, quote, words, eid=eid):
                 if choice == 'make':
@@ -1350,7 +1350,14 @@ def _round_v2(ctx, every, step):
         sets_n = lambda n: _n(n, 'set')
         said_people = WORDS['rest_people'].format(names=', '.join(names[e] for e in people), them='them' if len(people) != 1 else 'this one') if people and out_ else ''
         chat, page, add = answers()
-        add(WORDS['rest_make'].format(sets=len(waiting) if many else 'set'), 'rest', 'rest', WORDS['rest_say'].format(sets=sets_n(len(waiting))))   # design/216 (A12): one label, on the page and in the chat
+        later = {e: [t.get('name') or t['id'] for t in ref_sets.pending_things(plan, session, e)] for e in waiting}
+        later = {e: n for e, n in later.items() if n}   # design/216 (the critic's point 1): a place waits for its things' sets
+        made_now = len(waiting) - len(later)
+        rest_said = WORDS['rest_say'].format(sets=sets_n(len(waiting))) if not later else ' '.join(
+            [WORDS['rest_now'].format(sets=sets_n(made_now), are='is' if made_now == 1 else 'are')] + [
+                WORDS['rest_held'].format(places=_and(names[e] for e in later if later[e] == n), wait='waits' if sum(later[e] == n for e in later) == 1 else 'wait', names=_and(n))
+                for n in [list(x) for x in dict.fromkeys(tuple(v) for v in later.values())]])
+        add(WORDS['rest_make'].format(sets=len(waiting) if many else 'set'), 'rest', 'rest', rest_said)   # design/216 (A12): one label, on the page and in the chat
         page[0].update(big=page[0]['label'])
         if out_:   # design/213: what is left out is left out, and the others (the people, who always get a set) are made on the same word
             out_say = (WORDS['rest_out_say'].format(made=sets_n(len(people)), out=f"{len(out_)} {'are' if len(out_) != 1 else 'is'}") if people else
@@ -1720,6 +1727,10 @@ def flush_sets(conn, store, user, run, outputs, quote=''):
     if not (rd and rd.get('kept') and s.get('current')):
         return None
     kinds = _kinds(V.current_plan(store, s))
+    from . import ref_sets
+    if V.round_v2(s) and any(r.get('held') for r in rd['elements'].values()) and ref_sets.release(conn, store, user, run, outputs):   # design/216: a held place whose things are approved now
+        s = V.session_of(store, run, outputs)
+        rd = s['round']
     kept = {e: a for e, r in rd['elements'].items() if e in kinds and not r.get('ignored') for a in [V._answered(s, kinds, e, r)] if a and V._set_rows(s, e, r.get('set'))}
     if not kept:
         if V.round_v2(s) and rd.get('pass') != 'complete' and V._round_pass(s, rd) == 'complete':   # design/211: nothing is left with the operator (the others were left out): the state says complete; it is stored here, once, for both front ends

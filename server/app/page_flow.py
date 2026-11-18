@@ -576,6 +576,9 @@ def _sets_lines_v2(ctx):
             mine = rest.get(f'set:{eid}') or {}   # design/213: one of the sets that wait for the operator's word: what the list of them says of it
             wait.append({**head, 'state': 'making', 'group': CF.STEP2_GROUPS[2], 'case': 'wait', 'note': words[said[0]], 'head': words['wait_head'] if mine else words[said[0]],
                          'tag': words[said[1]] if said[1] else words['tag_making'], **({'wait_note': mine['note'], **({'out': True} if mine['out'] else {})} if mine else {})})
+            if row.get('held'):   # design/216 (the critic's point 1): held until its things' sets are approved, then made by itself
+                names = CF._and(next((e.get('name') or e['id'] for e in plan['elements'] if e['id'] == t), t) for t in row['held'])
+                wait[-1].update(note=words['held'].format(names=names), head=words['held'].format(names=names), tag=words['tag_held'])
             wait[-1]['details'] = _details(wait[-1])
     return [_v2_line(ctx, i, paid) for i in items] + wait + done
 
@@ -750,9 +753,10 @@ def sets_say(lines):
     if not todo and not rest:
         return w['say_nothing']
     sets = CF._n(len(rest.get('covers') or []), 'set') if rest else ''
-    said = [w['say_need'].format(things=CF._n(len(todo), 'thing') + (' needs' if len(todo) == 1 else ' need'), names=CF._and(CF.the(l.get('name') or l['title']) for l in todo))] if todo else []
-    said += [w['say_rest' if todo else 'say_rest_only'].format(sets=sets)] if rest else []
-    return ' '.join(said + [w['say_done']])
+    # the critic's point 3: one name per line under the first sentence, the plan's names as they are (a name may hold a comma)
+    said = [w['say_need'].format(things=CF._n(len(todo), 'thing') + (' needs' if len(todo) == 1 else ' need')) + ''.join('\n- ' + str(l.get('name') or l['title']) for l in todo)] if todo else []
+    end = ' '.join(([w['say_rest' if todo else 'say_rest_only'].format(sets=sets)] if rest else []) + [w['say_done']])
+    return '\n'.join(said + [end])
 
 
 def _sets_asked(ctx, items):

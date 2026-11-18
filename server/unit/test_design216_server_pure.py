@@ -15,6 +15,11 @@ from test_design211b_sets_pure import RUN, el, finder, ready   # noqa: F401 (`fi
 from test_design211c_kit_pure import Film
 
 W = CF.WORDS
+
+
+@pytest.fixture(autouse=True)
+def _v2_round(monkeypatch, _older_round_tests):   # conftest: a module not named test_design211* posts an older round; these post the round of today
+    monkeypatch.setattr(VS, 'ROUND_V', 2)
 REPO = Path(__file__).resolve().parents[2]
 
 
@@ -75,9 +80,9 @@ def line(key, state='open', **more):
 def test_b1_the_message_with_the_link_names_what_needs_an_answer():
     lines = [line('sets:rest', covers=['a'] * 17), line('set:MASON', name='The mason'), line('set:DECK', name='The roof deck'), line('set:ROOM', name='Family room'), line('set:X', 'recorded', name='Y')]
     said = P.sets_say(lines)
-    assert said == '3 things need your answer: the mason, the roof deck and the Family room. Then choose whether the other 17 sets are made. Then say done here.'
+    assert said == '3 things need your answer:\n- The mason\n- The roof deck\n- Family room\nThen choose whether the other 17 sets are made. Then say done here.'   # the critic's point 3
     assert not re.search(r'\bpictures?\b|\blines?\b', said)
-    assert P.sets_say([line('set:MASON', name='The mason')]) == '1 thing needs your answer: the mason. Then say done here.'
+    assert P.sets_say([line('set:MASON', name='The mason')]) == '1 thing needs your answer:\n- The mason\nThen say done here.'
     assert P.sets_say([line('sets:rest', covers=['a', 'b'])]) == 'Choose whether the other 2 sets are made. Then say done here.'        # only the other sets
     assert P.sets_say([line('set:M', 'recorded'), line('set:K', kept='Approve all 3', name='K')]) == 'Nothing needs your answer on this page now.'   # nothing to answer
     assert 'Say to the operator `say`, exactly as it is, then the link' in P.HOW and 'no count' in P.HOW and 'Open this page, answer each line' not in P.HOW
@@ -85,7 +90,7 @@ def test_b1_the_message_with_the_link_names_what_needs_an_answer():
 
 def test_b1_the_sets_page_carries_its_message_and_every_page_one(monkeypatch):
     p = Film(monkeypatch, '2').page()
-    assert p['say'] == P.sets_say(p['lines']) and p['say'].startswith('3 things need your answer: ')
+    assert p['say'] == P.sets_say(p['lines']) and p['say'].startswith('3 things need your answer:\n- ')
     assert P.CF.WORDS['say_page'] == 'Open this page, answer each line, then tell me you are done:'
 
 
@@ -166,9 +171,9 @@ def test_b4_a_thing_with_no_reference_or_no_reference_needed_is_in_words_and_the
     s['drawings'] = {}
     assert RS.thing_ref(s, 'FAN') is None and RS.thing_ref(s, 'TILE') is None
     said = RS.place_waiting(plan, s, 'STREET')
-    assert said == 'This place shows the Roof tile and the Brick, whose sets are not approved yet: answer those first, or it is made from words.'   # the fan needs no reference: not named
+    assert said == 'It will be made again after the sets of Roof tile and Brick are approved, so that it shows the real things.'   # the fan needs no reference: not named
     s['round']['elements']['BRICK']['ignored'] = True
-    assert RS.place_waiting(plan, s, 'STREET') == 'This place shows the Roof tile, whose set is not approved yet: answer that first, or it is made from words.'
+    assert RS.place_waiting(plan, s, 'STREET') == 'It will be made again after the set of Roof tile is approved, so that it shows the real Roof tile.'
     assert RS.place_waiting(plan, s, 'TROWEL') == ''
 
 
@@ -199,3 +204,107 @@ def test_b6_no_left_out_in_the_sentences_and_labels_and_the_flag():
     assert "_button('Leave it out'" not in src and "'Leave it out', 'ignore', 'none'" not in src
     vw = (REPO / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
     assert "'--every-picture'" in vw and "{'all': True}" in vw
+
+
+# ---------- the critic's points 1 and 2: a place waits for its things' sets ----------
+
+def held_film(fail=()):
+    """The fixture's round on a plan where the street shows the roof tile and the brick (both made in the round), the trowel (taken from its
+    footage at step 1) and the fan (no reference needed)."""
+    from test_design211b_round_pure import back, done, film, look, post
+    store, conn = film(plan=street_plan())
+    post(store, conn)
+    done(store, conn)
+    back(store, fail=fail)
+    look(store)
+    return store, conn
+
+
+def test_point1_a_place_is_held_until_its_things_sets_are_approved_and_then_made_by_itself():
+    from test_design211b_round_pure import back, jobs, judge, look, yes
+    from test_design211b_older_pure import saved
+    store, conn = held_film()
+    rd = saved(store)['round']
+    assert rd['elements']['STREET'].get('held') and set(rd['elements']['STREET']['held']) <= {'TILE', 'BRICK'} and 'STREET' not in jobs(conn)   # not ordered
+    assert 'TROWEL' not in rd['elements']['STREET']['held'] and 'FAN' not in rd['elements']['STREET']['held']                      # a footage reference, no reference needed: no hold
+    s = saved(store)
+    assert RS.state(s, s['round']) != 'complete'                                                                                   # a held place is not judged yet
+    for _ in range(3):   # judge what is back, make the others, until the things are approved
+        s = saved(store)
+        if s['round'].get('rest') and RS.state(s, s['round']) == 2:
+            VS.guarded(lambda: RS.round_rest(conn, store, F.USER if hasattr(F, 'USER') else {'id': 'u1'}, RUN, [], 'make the others'))
+            back(store)
+            look(store)
+        s = saved(store)
+        due = {e: yes(store, e) for e, r in s['round']['elements'].items() if r.get('set') and VS._set_rows(s, e, r['set'], ('candidate',)) and e != 'STREET'}
+        if due:
+            judge(store, conn, due)
+    assert 'STREET' in jobs(conn) and not saved(store)['round']['elements']['STREET'].get('held')                                   # ordered in the same call as the last approval
+    street = jobs(conn)['STREET']
+    assert any(p['id'] == saved(store)['golden'].get('TILE') for p in street['parents'])                                            # with the tile's approved reference
+
+
+def test_point1_a_thing_set_aside_releases_the_place_with_that_thing_in_words():
+    from test_design211b_older_pure import saved
+    from test_design211b_round_pure import jobs, judge, yes
+    store, conn = held_film(fail=('BRICK',))   # the brick's set failed: the operator goes on without a reference for it
+    rd = saved(store)['round']
+    never = ['BRICK']
+    made = [e for e in rd['elements']['STREET']['held'] if e not in never]
+    assert 'BRICK' in rd['elements']['STREET']['held']   # the tile has an approved drawing: it holds nothing
+    if made:
+        judge(store, conn, {e: yes(store, e) for e in made})
+    assert 'STREET' not in jobs(conn)                                                       # still held: a thing waits
+    for eid in never:   # the operator goes on without a reference for it
+        VS.set_aside(store, {'id': 'u1'}, RUN, [], eid, 'Go on without a reference')
+    assert RS.release(conn, store, {'id': 'u1'}, RUN, []) == ['STREET']
+    names = [next(e['name'] for e in street_plan()['elements'] if e['id'] == x) for x in never]
+    assert all(n in jobs(conn)['STREET']['prompt'].split('from their descriptions: ')[1] for n in names)   # made with that thing in words
+
+
+def test_point1_make_it_on_a_held_place_answers_that_it_waits(monkeypatch):
+    plan = street_plan()
+    s = ready('2', plan)
+    words = RS.place_waiting(plan, s, 'STREET', again=False)
+    assert words.startswith('It will be made after the sets of ') and words.endswith('approved, so that it shows the real things.') or words.startswith('It will be made after the set of ')
+
+
+def test_point2_the_line_says_when_it_is_made_again_and_never_answer_that_first():
+    plan, s = street_plan(), ready('making', street_plan())
+    s['round']['elements']['BRICK']['ignored'] = True
+    for r in s['references'].values():
+        if r.get('element_id') == 'TILE':
+            r['status'] = 'candidate'
+    s['drawings'] = {}
+    assert RS.place_waiting(plan, s, 'STREET') == 'It will be made again after the set of Roof tile is approved, so that it shows the real Roof tile.'
+    assert RS.place_waiting(plan, s, 'STREET', again=False) == 'It will be made after the set of Roof tile is approved, so that it shows the real Roof tile.'
+    assert 'answer that first' not in json.dumps(W) and W['held'].format(names='Roof tile') == 'Waits for Roof tile: it is made when their sets are approved.'
+
+
+def test_point2_a_rewrite_of_a_held_place_is_stored_and_not_made():
+    from test_design211b_older_pure import saved
+    store, conn = held_film()
+    s = saved(store)
+    s['round']['elements']['STREET'].pop('held')
+    s['round']['elements']['STREET']['rewrite_due'] = {'words': 'The tiles in pairs.', 'set': None, 'at': 'now'}
+    from test_design211b_round_pure import jobs, put
+    put(store, s)
+    VS.guarded(lambda: RS.round_rewrite(conn, store, {'id': 'u1'}, RUN, [], [{'element_id': 'STREET', 'prompt': 'The roof tiles laid in pairs in each bay.'}]))
+    row = saved(store)['round']['elements']['STREET']
+    assert row['prompt'] == 'The roof tiles laid in pairs in each bay.' and row.get('held') and 'STREET' not in jobs(conn)   # the paid make waits for the things
+
+
+def test_point1_the_other_sets_say_how_many_now_and_what_waits(monkeypatch):
+    from test_design213_layout_pure import vw24
+    film, things = vw24(monkeypatch)
+    monkeypatch.setattr(RS, 'pending_things', lambda plan, session, eid: [{'id': 'TILE', 'name': 'Thing Tile'}] if eid in ('SITE_BELOW', 'LANE') else [])
+    rest = next(l for l in film.page()['lines'] if l['key'] == 'sets:rest')
+    assert rest['buttons'][0]['say'] == '15 sets are made now. Thing Site_Below and Thing Lane wait for Thing Tile: made when their sets are approved.'
+
+
+# ---------- the critic's point 3: one name per line, the plan's names as they are ----------
+
+def test_point3_the_message_lists_one_name_per_line():
+    lines = [line('sets:rest', covers=['a'] * 17), line('set:DECK', name='The representative filler slab roof, from above'), line('set:R', name='Revathi')]
+    assert P.sets_say(lines) == '2 things need your answer:\n- The representative filler slab roof, from above\n- Revathi\nThen choose whether the other 17 sets are made. Then say done here.'
+    assert not hasattr(CF, 'the')
