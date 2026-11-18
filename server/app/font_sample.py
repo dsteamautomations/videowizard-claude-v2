@@ -22,6 +22,9 @@ ENGLISH_ONLY, NOT_INSTALLED = 'English only', 'not installed on the server'
 NOT_AVAILABLE = 'The font sample is not available.'
 NOT_ASKED = 'This film has no drawn graphic: its font is not asked, so there is no sample.'
 BACKGROUND, TEXT, LIGHT = '#FFFFFF', '#1A1A1A', '#FFFFFF'
+CARD = 4   # the chat card holds four options (the question tool's limit; it adds "Other" itself): the offer's first four, in its order
+ON_CARD, OTHERS = 'On the card', 'Others you can name'
+TWO_COLUMNS = 10   # more others than this are drawn in two columns, smaller
 
 
 def _shots(plan):
@@ -120,10 +123,9 @@ def colours_of(words):
 
 
 def page(rows_, bg, fg):
-    """The HTML Chromium draws: each row's faces as @font-face from the server's files, its lines in its own families."""
-    faces, body = [], []
-    noto = (FONTS / 'NotoSans-Variable.ttf').as_uri()
-    faces.append(f"@font-face{{font-family:'vwnoto';src:url('{noto}') format('truetype');font-weight:100 900}}")
+    """The HTML Chromium draws: the card's fonts first, then the others; each row's faces as @font-face from the server's files."""
+    faces = [f"@font-face{{font-family:'vwnoto';src:url('{(FONTS / 'NotoSans-Variable.ttf').as_uri()}') format('truetype');font-weight:100 900}}"]
+    blocks = []
     for i, r in enumerate(rows_):
         fams = []
         for j, x in enumerate(r['faces']):
@@ -131,16 +133,22 @@ def page(rows_, bg, fg):
             static = any(y['bold'] for y in r['faces'] if y['family'] == x['family'])
             weight = (700 if x['bold'] else 400) if static else '100 900'
             faces.append(f"@font-face{{font-family:'{fam}';src:url('{(FONTS / x['file']).as_uri()}') format('truetype');font-weight:{weight}}}")
-            if fam not in fams:
-                fams.append(fam)
+            fams.append(fam)
         family = ','.join(f"'{f}'" for f in fams) if fams else "'vwnoto'"
         lines = ''.join(f'<div class="{ln["kind"]}">{_html.escape(ln["text"])}</div>' for ln in r['lines'])
-        body.append(f'<div class="row" style="font-family:{family}">{lines}</div>')
+        blocks.append(f'<div class="row" style="font-family:{family}">{lines}</div>')
+    card, rest = blocks[:CARD], blocks[CARD:]
+    body = f'<h2>{ON_CARD}</h2>' + ''.join(card)
+    if rest:
+        body += f'<h2>{OTHERS}</h2>' + (f'<div class="cols">{"".join(rest)}</div>' if len(rest) > TWO_COLUMNS else ''.join(rest))
     css = (f"html,body{{margin:0;padding:0;width:{WIDTH}px;background:{bg};color:{fg}}}"
-           'body{padding:16px 32px;box-sizing:border-box}.row{padding:14px 0;border-bottom:2px solid;border-color:currentColor;overflow-wrap:normal}'
-           '.row:last-child{border-bottom:none}.name{font-size:20px;opacity:.7}.label{font-size:36px;font-weight:600;line-height:1.35}'
-           '.numbers{font-size:30px;font-weight:400;line-height:1.35}.note{font-size:24px;font-style:italic;opacity:.8}')
-    return f'<!doctype html><html><head><meta charset="utf-8"><style>{"".join(faces)}{css}</style></head><body>{"".join(body)}</body></html>'
+           "body{padding:8px 32px 16px;box-sizing:border-box}h2{font-family:'vwnoto';font-size:18px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;"
+           'margin:18px 0 2px;opacity:.75}.row{padding:12px 0;border-top:2px solid;border-color:currentColor}'
+           '.name{font-size:20px;opacity:.7}.label{font-size:36px;font-weight:600;line-height:1.35}'
+           '.numbers{font-size:30px;font-weight:400;line-height:1.35}.note{font-size:24px;font-style:italic;opacity:.8}'
+           '.cols{display:grid;grid-template-columns:1fr 1fr;column-gap:28px}.cols .label{font-size:26px}.cols .numbers{font-size:22px}'
+           '.cols .name{font-size:17px}.cols .note{font-size:19px}')
+    return f'<!doctype html><html><head><meta charset="utf-8"><style>{"".join(faces)}{css}</style></head><body>{body}</body></html>'
 
 
 def render(html):
@@ -172,4 +180,5 @@ def sample(offer, scripts, plan, colours_words, render=render):
         png = render(page(rs, *colours_of(colours_words)))
     except Exception as exc:   # the renderer missing or failing: the question goes on without the picture
         return {'available': False, 'asked': True, 'message': NOT_AVAILABLE, 'reason': f'{exc.__class__.__name__}: {exc}'[:300]}
-    return {'available': True, 'asked': True, 'message': '', 'png': png, 'rows': [{'name': r['name'], 'missing': r['missing']} for r in rs]}
+    return {'available': True, 'asked': True, 'message': '', 'png': png, 'rows': [{'name': r['name'], 'missing': r['missing']} for r in rs],
+            'on_card': [r['name'] for r in rs[:CARD]]}

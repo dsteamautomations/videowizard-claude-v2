@@ -157,6 +157,27 @@ def test_the_wording_is_in_once_retired_by_name_and_registered():
     assert split.index('d217(prompt, parts)') < split.index('d218(prompt, parts)')
 
 
+def test_the_cards_fonts_come_first_under_their_heading_then_the_others():
+    rows = FS.rows(offer(set()), set(), [])
+    assert len(rows) > FS.CARD + 10   # an English film: every font fits
+    html = FS.page(rows, '#FFFFFF', '#1A1A1A')
+    card, others = html.index(FS.ON_CARD), html.index(FS.OTHERS)
+    assert FS.ON_CARD == 'On the card' and FS.OTHERS == 'Others you can name' and card < others
+    names = [f['name'] for f in offer(set())]
+    for n in names[:FS.CARD]:
+        assert card < html.index(f'>{n}<') < others, n   # the card's fonts are the offer's first, in its order
+    for n in names[FS.CARD:]:
+        assert html.index(f'>{n}<') > others, n
+    assert 'class="cols"' in html   # more than ten others: two columns
+    few = FS.page(rows[:FS.CARD + 3], '#FFFFFF', '#1A1A1A')
+    assert FS.OTHERS in few and 'class="cols"' not in few
+    assert FS.OTHERS not in FS.page(rows[:FS.CARD], '#FFFFFF', '#1A1A1A')
+    out = FS.sample(offer(set()), set(), plan(DRAWN), None, render=lambda html: b'PNG')
+    assert out['on_card'] == names[:FS.CARD]
+    vw = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
+    assert "out.get('on_card')" in vw
+
+
 def test_the_route_gives_the_picture_as_base64_json_and_never_raises(monkeypatch):
     import base64
     from app import main as M
