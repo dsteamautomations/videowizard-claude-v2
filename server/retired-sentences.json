@@ -125,6 +125,9 @@
     "have a clean set made from it (paid)",
     "then the drawings and the materials, on the page",
     "they approve the drawings and the materials on the page",
-    "Use my own picture, on the thing's line"
+    "Use my own picture, on the thing's line",
+    "a fix is made only on request: `vw visuals fix --ref R`",
+    "approved on the Pictures step like any picture",
+    "made first as a style sheet (`vw visuals image --element _STYLE --kind style"
   ]
 }

@@ -953,7 +953,9 @@ def cmd_motion(a):
         proj = (ws / a.dir) if a.dir and (ws / a.dir).is_dir() else (Path(a.dir) if a.dir else folder / 'project')
         if not (proj / 'index.html').is_file():
             emit({'action': 'refused', 'message': f'No index.html in {proj}: the project is work/motion/{a.shot}/project/ with index.html at its root.'}, 2)
-        out = write(base + '/motion/upload', {'shot_id': a.shot, 'name': f'{a.shot}.zip', 'content_base64': _b64.b64encode(motion_zip(proj)).decode('ascii')})
+        rules = folder / 'rules.md'   # design/217 (C6): the server holds the shot's rules with the project; the fact check answers every one of them
+        out = write(base + '/motion/upload', {'shot_id': a.shot, 'name': f'{a.shot}.zip', 'content_base64': _b64.b64encode(motion_zip(proj)).decode('ascii'),
+                                              **({'rules': rules.read_text(encoding='utf-8')} if rules.is_file() else {})})
         if (load_json(last) or {}).get('sha256') != out['sha256']:   # design/134 5: a corrected project's checker sees only its own snapshots
             shutil.rmtree(folder / 'snapshots', ignore_errors=True)
         save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat()})
@@ -1107,8 +1109,8 @@ def cmd_next(a):
     if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
         nxt['review_page_url'] = signed_link(review_page_url(m['code']))
     if nxt.get('stage') == 'visuals':   # design/188 (SK, 12 Nov 2026): the later decisions in the chat, one thing at a time; design/204 to 210: the earlier ones on the Claude artifact page
-        nxt['visuals_in_chat'] = ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
-                                  'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')
+        nxt['visuals_in_chat'] = ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings, the two steps of the references and the pictures and drawn graphics are answered '
+                                  'on the page (`vw visuals page`); the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')   # design/217: step 6 on the page
     emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
          + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else '') + (f" {nxt['visuals_in_chat']}" if nxt.get('visuals_in_chat') else ''))
 
@@ -1760,11 +1762,11 @@ def _pic_codes(pictures):
 
 def _zoom_uploads(folder, sent):
     """The large pictures in the run folder that have no id in the page's file store yet, as lists for one upload each."""
-    paths = [str(f) for f in sorted((folder / 'zoom').glob('*.jpg')) if f.stem not in sent['zoom']]
+    paths = [str(f) for f in sorted(list((folder / 'zoom').glob('*.jpg')) + list((folder / 'zoom').glob('*.mp4'))) if f.stem not in sent['zoom']]   # design/217: a drawing's video page copy goes with the large pictures
     return [paths[i:i + ZOOM_UPLOAD] for i in range(0, len(paths), ZOOM_UPLOAD)]
 
 
-def page_pictures(m, folder, pictures):
+def page_pictures(m, folder, pictures, videos=None):
     """design/210: the pictures of a round, for the page. Each picture not yet in the run folder is fetched in its two sizes: the small one
     becomes a database document `pics/<code>.json` ({"code", "data"}, the JPEG as a data link), the large one a file `zoom/<code>.jpg`. Returns
     what the assistant sends, and only what was not handed over before: `picture_batches` for ArtifactData, `zoom_uploads` for the Artifact
@@ -1781,6 +1783,10 @@ def page_pictures(m, folder, pictures):
             small.unlink()
         if not (folder / 'zoom' / f'{code}.jpg').is_file():
             _download(m, p['zoom'], f'work/page/zoom/{code}.jpg')
+    for v in videos or []:   # design/217 (D6): a drawing's video, its page copy, uploaded like a large picture under its code
+        code = str(v.get('code') or '')
+        if re.fullmatch(r'v[0-9a-f]{12}', code) and v.get('key') and not (folder / 'zoom' / f'{code}.mp4').is_file():
+            _download(m, v['key'], f'work/page/zoom/{code}.mp4')
     if not codes:
         return {}
     sent = _pictures_sent(folder)
@@ -1797,7 +1803,7 @@ def page_uploaded(folder, text):
     never by its place; its id must be 32 hex characters. A name that is not one of this run's pictures, a code with two different ids and a
     line that cannot be read are refused by name and nothing is written for them. Each match becomes `zoomdocs/<code>.json`
     ({"code", "url"}) and is kept in the record; the batch that writes them to the page is returned."""
-    known = {f.stem for f in (folder / 'zoom').glob('*.jpg')}
+    known = {f.stem for f in list((folder / 'zoom').glob('*.jpg')) + list((folder / 'zoom').glob('*.mp4'))}   # design/217: a video page copy too
     got, refused = {}, []
     for raw in text.splitlines():
         line = raw.strip()
@@ -1805,7 +1811,7 @@ def page_uploaded(folder, text):
             continue
         path, blob = re.search(r'"([^"]+)"', line), re.search(r'/_blob/([^"\s)]+)', line)
         name = re.split(r'[\\/]+', path.group(1))[-1] if path else line[:80]
-        code = name[:-4] if name.lower().endswith('.jpg') else name
+        code = name[:-4] if name.lower().endswith(('.jpg', '.mp4')) else name
         why = ('this line of the answer could not be read' if not path else 'the line gives no link for it: it was not uploaded' if not blob else
                'it is not a picture of this run' if code not in known else 'its id is not 32 hex characters' if not re.fullmatch(r'[0-9a-f]{32}', blob.group(1)) else
                'it appears twice, with two different ids' if got.get(code, blob.group(1)) != blob.group(1) else '')
@@ -2000,7 +2006,7 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page', 'cap', 'likeness', 'digest', 'trial', 'look']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page', 'cap', 'likeness', 'digest', 'trial', 'look', 'pictures']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -2020,7 +2026,7 @@ VISUALS_FLAGS = {
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
     'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote', 'made'}, 'generations': {'shot'},
     'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'element', 'quote', 'notes'},
-    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'},
+    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'}, 'pictures': {'looks'},   # design/217
     'likeness': {'element', 'quote', 'stand_in'}}   # design/207 (D1)
 _VISUALS_ALL = set().union(*VISUALS_FLAGS.values()) | {'inr'}
 
@@ -2421,7 +2427,7 @@ def cmd_visuals(a):
             waiting = len([l for l in page['lines'] if l['state'] == 'open'])
             link = url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else ''
             old = bool(link) and (made_by.read_text(encoding='utf-8').strip() if made_by.is_file() else '') != plugin_version()   # published from an older page file: it cannot draw today's lines
-            more = {**(more or {}), **({'republish': True} if old else {}), **page_pictures(m, folder, page.get('pictures')),   # design/210: the round's pictures, fetched and ready to send
+            more = {**(more or {}), **({'republish': True} if old else {}), **page_pictures(m, folder, page.get('pictures'), page.get('videos')),   # design/210: the round's pictures, fetched and ready to send
                     **({'pictures_failed': page['pictures_failed']} if page.get('pictures_failed') else {})}
             return {'url': link, 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
                     'title': page['title'], 'capabilities': page['capabilities'], 'round': rnd, 'round_file': str(folder / f'{rnd}.json'),
@@ -2552,6 +2558,23 @@ def cmd_visuals(a):
     if a.what == 'not-this':   # design/111 F12: built by the server from the round, one model call and the rejections
         out = write(base + '/not-this', {'element_id': a.element})
         emit(out, 0, (out.get('next') or '') + ' ' + '; '.join(out.get('lines') or []))
+    if a.what == 'pictures':   # design/217 (C2): Claude's check of the step-6 pictures: alone, list them with their pictures; with a file, record the looks
+        if getattr(a, 'looks', None) is True:
+            out = call('GET', base + '/pictures/looks')
+            for p in out.get('pictures') or []:
+                folder = 'work/visuals/pictures/' + re.sub(r'[^A-Za-z0-9._-]', '-', str(p.get('ref')))
+                for n, pic in enumerate([p] + list(p.get('inputs') or [])):
+                    if pic.get('key'):
+                        pic['file'] = f"{folder}/{'picture' if n == 0 else 'input-%d-%s' % (n, re.sub(r'[^a-z]+', '-', str(pic.get('role') or 'input')))}{'.png' if pic['key'].endswith('.png') else '.jpg'}"
+                        _download(m, pic['key'], pic['file'])
+            (ws / 'work' / 'visuals' / 'pictures').mkdir(parents=True, exist_ok=True)
+            (ws / 'work' / 'visuals' / 'pictures' / 'listed.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+            emit({'file': 'work/visuals/pictures/listed.json', 'pictures': [p.get('ref') for p in out.get('pictures') or []], 'then': out.get('then')}, 0, out.get('then'))
+        if getattr(a, 'looks', None):
+            sent = _json_file(m, a.looks)
+            out = write(base + '/pictures/looks', {'by': (sent.get('by') if isinstance(sent, dict) else None) or 'assistant', 'pictures': sent.get('pictures') if isinstance(sent, dict) else sent})
+            emit(out, 0 if not out.get('refused') else 2, out.get('then') + (' Refused: ' + ' '.join(out['refused'].values()) if out.get('refused') else ''))
+        emit({'action': 'refused', 'message': 'List the pictures waiting for your check: `vw visuals pictures --looks`; send the looks: `vw visuals pictures --looks work/visuals/pictures/looks.json`.'}, 2)
     if a.what == 'round':   # design/79: every element at once; the operator answers on the page in two passes
         if getattr(a, 'looks', None) is True:   # design/211 part B: the made sets Claude looks at before the operator does, with their pictures; the server's `then` is the only sentence
             out = call('GET', base + '/round/looks')
@@ -2910,9 +2933,9 @@ def cmd_visuals(a):
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
         emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote or '', **_reuse_fields(a), **({'move': a.move} if a.move else {})}), 0,
              f'Still set for {a.shot} from reference {a.ref}.')   # design/94 R1.7: --move, the operator's words for a picture made for another shot
-    if a.what == 'fix':   # design/96 X1: a fix round only on request; tell the operator the line and the cost
-        out = write(f"{base}/references/{a.ref}/fix", {})
-        emit(out, 0, f"Fix {out.get('reference_id')} of {out.get('of')} requested for '{out.get('for')}' (₹{out.get('cost_inr', 0):,.0f}); `vw visuals status --wait 300`, then show it with its original.")
+    if a.what == 'fix':   # design/96 X1: a fix round only on request; design/217 (D3): retired, refused by name
+        emit({'action': 'refused', 'message': 'vw visuals fix is retired (design/217): a picture is changed only by "Correct it", the operator\'s words with Claude\'s failed lines in the box. '
+                                              'Reject it with their words (`vw visuals reject --ref R --notes "…"`) and write the new request from them.'}, 2)
     if a.what == 'unplace':   # design/94 R1.8: a shot's picture taken out with the operator's words; it stays approved
         out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote or ''})
         emit(out, 0, out.get('next') or f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")

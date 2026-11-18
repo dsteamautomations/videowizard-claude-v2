@@ -146,6 +146,8 @@ if __name__ == '__main__':
         prompt = d216(prompt, parts)
         from d216b_wording_v3 import apply as d216b   # design/216b: Claude names the things shown in each place (`things` with the proposal, `vw visuals round --things`)
         prompt = d216b(prompt, parts)
+        from d217_wording_v3 import apply as d217   # design/217: step 6 on the page; Claude checks its pictures (`vw visuals pictures --looks`); the fix round retired; a component approved by the check; the style sheet only with a graphic in steps; a fact check answers every rule
+        prompt = d217(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

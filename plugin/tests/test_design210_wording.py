@@ -83,8 +83,8 @@ def test_vw_next_at_the_visuals_stage_says_what_is_on_the_page_and_what_is_in_th
     with pytest.raises(SystemExit):
         vw.cmd_next(argparse.Namespace(take_over=False))
     out, err = capsys.readouterr()
-    said = ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
-            'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')
+    said = ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings, the two steps of the references and the pictures and drawn graphics are answered '
+            'on the page (`vw visuals page`); the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')   # design/217
     assert json.loads(out)['visuals_in_chat'] == said and said in err and "decisions of this stage are taken in the chat" not in err
 
 
@@ -100,8 +100,8 @@ def test_a_frame_grabbed_alone_is_a_candidate_for_the_round_not_approved_by_its_
 # ---------- the instruction texts ----------
 
 def test_the_command_file_says_where_each_decision_is_taken():
-    assert ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
-            'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time:') in CMD
+    assert ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings, the two steps of the references and the pictures and drawn graphics are answered '
+            'on the page (`vw visuals page`); the AI video and the recording are asked in the chat, one at a time:') in CMD   # design/217
     assert 'every other decision of this stage is asked in the chat' not in CMD
     assert "the card's buttons" not in CMD and '`vw visuals next` hands' in CMD                       # C2: a question is handed out by `vw visuals next`
     assert '`select` a choice where offered' not in CMD and 'with the operator\'s answer' in CMD     # F3: the choice is the operator's

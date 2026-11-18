@@ -793,12 +793,12 @@ def test_approve_file_names_each_placement(harness, monkeypatch, capsys):
     code, out, err = run(args(what='approve', file='out/approvals.json'), capsys)
     assert code == 0 and 'K2 placed in DG1 (replaces K1)' in err and 'S1 placed' not in err
 
-def test_fix_is_asked_for_and_says_its_line_and_cost(harness, monkeypatch, capsys):
-    """design/96 X1: a fix only on request."""
+def test_fix_is_retired_and_refused_by_name(harness, monkeypatch, capsys):
+    """design/96 X1: a fix only on request; design/217 (D3): retired for "Correct it", refused before anything reaches the server."""
     posted = []
-    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'reference_id': 'F1', 'of': 'K1', 'for': 'label: Rat-trap bond', 'cost_inr': 4.0})
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {})
     code, out, err = run(args(what='fix', ref='K1'), capsys)
-    assert code == 0 and posted[-1][0].endswith('/references/K1/fix') and "label: Rat-trap bond" in err and '₹4' in err and 'F1' in err
+    assert code == 2 and not posted and 'vw visuals fix is retired' in out['message']
 
 
 def test_budget_counts_fixes_apart(harness, monkeypatch, capsys):
@@ -811,8 +811,8 @@ def test_budget_counts_fixes_apart(harness, monkeypatch, capsys):
 def test_the_procedure_says_fixes_are_asked_for_and_names_the_graphic_kind():
     """design/96."""
     vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    for text in (vsteps, doc):
-        assert 'vw visuals fix --ref' in text and 'Image 1 to Image N' in text
+    assert 'vw visuals fix --ref' in vsteps and 'Image 1 to Image N' in vsteps   # instruction version 2, kept as it was
+    assert 'vw visuals fix --ref' not in doc and 'the fix round is retired' in doc and 'Image 1 to Image N' in doc   # design/217 (D3)
     assert '`graphic_kind`' in vp and '`graphic_kind`' in vsteps
 
 def test_status_lists_each_waiting_item_with_its_label_and_link(harness, monkeypatch, capsys):
