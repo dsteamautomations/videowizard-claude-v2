@@ -255,7 +255,7 @@ def test_the_instructions_say_a_footage_picture_needs_no_ai_set():
     v3 = json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
     parts = {p['name']: p['text'] for p in next(s for s in v3['stages'] if s['name'] == 'visuals')['parts']}
     # design/211: was 'a thing with an approved footage picture and no approved drawings gets no AI set': the operator now answers each footage picture (use it, free; or a clean set made from it, paid)
-    assert 'use its footage picture as the reference (free; no AI set' in parts['picture-search'] and 'have a clean set made from it (paid)' in parts['picture-search']
+    assert 'use its footage picture as the reference (no AI set' in parts['picture-search'] and 'have a clean set made from it,' in parts['picture-search']   # design/215 (W4): no "free" or "(paid)" at the references
     assert "a thing's approved footage picture, else the ticked picture of its set" in parts['later']
     md = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert 'its footage picture as the reference (free), a clean set made from it' in md   # design/211: was 'gets no AI set'
+    assert 'its footage picture as the reference, a clean set made from it' in md   # design/211: was 'gets no AI set'

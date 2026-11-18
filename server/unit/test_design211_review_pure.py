@@ -184,7 +184,7 @@ def test_C4_the_proposals_say_how_many_sets_are_made_first_and_that_the_rest_are
     assert lines['refs:proposals']['buttons'][0]['label'] == 'Accept all 2'                         # the routine things; the person not in the footage is not among them
     film.record(ans(lines['ref:TROWEL'], 'set'), ans(lines['ref:BRICK'], 'set'))                  # two more sets asked for on other lines
     line = film.lines()['refs:proposals']
-    assert 'The first 3 sets are made to check the method' in line['text'] and 'at most 3 times' in line['text']
+    assert 'Up to 3 sets are made first, to check the method' in line['text'] and 'at most 3 times' in line['text']
     assert '₹' not in line['text'] and 'paid' not in line['text'] and line['buttons'][0]['label'] == 'Accept all 2'
     item = film.next()['item']
     assert item['id'] == 'round1:all' and item['text'] == line['text'] and item['buttons'][0]['label'] == line['buttons'][0]['label']   # the same words in the chat

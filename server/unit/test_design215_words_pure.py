@@ -123,8 +123,8 @@ def test_the_server_says_it_when_step_4_is_recorded_and_again_at_make_them():
 
 
 def test_the_page_and_the_accept_all_line_say_it_too():
-    assert 'The first 3 sets are made to check the method' in W['help'] and 'at most 3 times' in W['help']
-    assert 'first 3 sets are made to check the method' in W['goes'].format(m=3, x=3)
+    assert 'Up to 3 sets are made first, to check the method' in W['help'] and 'at most 3 times' in W['help'] and 'The first 3' not in W['help']
+    assert 'Up to 3 sets are made first, to check the method' in W['goes'].format(m=3, x=3)
 
 
 def test_no_sentence_of_the_references_steps_names_an_amount():

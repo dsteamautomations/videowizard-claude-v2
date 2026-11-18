@@ -547,7 +547,7 @@ WORDS = {
     'go_set': 'Make a set with these words',       # the button of the words box
     'go_fix': 'Make it again with these words',
     'set_hint': 'Picture not good? Make a set instead.',   # beside "Make a set", only where a footage picture exists and may be used as it is
-    'goes': ' The first {m} sets are made to check the method; after you judge them, the others are made in one go. A set you ask to change is made again, at most {x} times.',
+    'goes': ' Up to {m} sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most {x} times.',
     # design/212: the buttons of step 1, short and plain; which of them a thing gets follows its case
     'approve': 'Approve',
     'fix': 'Minor corrections',
@@ -567,7 +567,7 @@ WORDS = {
     'aside': 'not ticked by the operator: not used',
     'help': 'Choose a thing in the list. Tick the pictures to keep, then choose an answer under them; you can undo it. Nothing is made until you say done in the chat. '
             'A set is three pictures of one thing, which become its reference; for a person, their three views; a place gets one picture. '
-            'The first 3 sets are made to check the method; after you judge them, the others are made in one go. A set you ask to change is made again, at most 3 times.',
+            'Up to 3 sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most 3 times.',
     'not_this': 'Not this picture',
     'that_is_it': 'That is it',
     'ask_footage': 'Use the footage picture as the reference?',

@@ -3470,6 +3470,10 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
         if v2:   # design/211: nothing is ordered here: Claude rewrites the request from these words first (ref_sets.round_rewrite); the earlier request is kept
             r.setdefault('operator_words', []).extend([words] if words else [])
             if words and v.get('all'):   # design/215 (change 5): kept for the thing, in the same save as the answer: every later request of it carries them
+                try:   # checked once, here: later requests carry these words without reading them again
+                    library.check_prompt(words, placed=False)
+                except ValueError as exc:
+                    need(False, f'{eid}: these words cannot be kept for every picture: {exc}')
                 ref_sets.correction_kept(session, user, eid, words, r.get('set'))
             r['rewrite_due'] = {'words': words, 'set': r.get('set'), 'at': stamp['at']}
         elif words:

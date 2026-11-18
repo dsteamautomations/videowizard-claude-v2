@@ -30,6 +30,14 @@ def corrected(words, tick, store=None, conn=None, eid='T_LAY'):
     return store, conn
 
 
+def test_ticked_words_that_break_a_wording_rule_are_refused_when_given_and_nothing_is_kept():
+    store, conn = at_two()
+    with pytest.raises(Exception) as exc:
+        VS.guarded(lambda: judge(store, conn, {'T_LAY': {'verdict': 'correct', 'words': 'Show the brand logo on the bag.', 'all': True}}))
+    assert 'cannot be kept for every picture' in str(getattr(exc.value, 'message', exc.value))
+    assert not saved(store).get('thing_corrections')
+
+
 def test_a_correction_about_one_view_stays_on_its_set():
     store, conn = corrected(DARK, tick=False)
     s = saved(store)

@@ -152,7 +152,7 @@ def test_accept_the_proposals_names_what_it_does_and_no_price(monkeypatch):
     assert l['title'] == "Claude's proposals" and l['item'] == 'round1:all' and l['ask'] == 'Accept the proposals for the routine things?'
     # design/211 review (C4): the truth about the sets: three are made first, the others are asked after. design/212: no cost is named
     assert l['text'] == ('7 things have a proposal from Claude. Accepting the 4 routine ones asks for 4 sets, takes the footage pictures of 0 things as they are, and makes no reference for 0. '
-                         'The first 3 sets are made to check the method; after you judge them, the others are made in one go. A set you ask to change is made again, at most 3 times. '
+                         'Up to 3 sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most 3 times. '
                          'A thing you answer yourself keeps your answer.')
     assert l['buttons'] == [{'label': 'Accept all 4', 'choice': 'accept_all', 'needs_words': False}] and 'own' not in l and 'pics' not in l
 
