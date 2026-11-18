@@ -34,6 +34,7 @@ New, named plainly:
 | `layout` | object | below |
 | `pic_docs`, `zoom_docs` | map | as today, when a picture was sent again |
 | `picture_batches`, `zoom_uploads`, `pictures_failed` | as today | added by `page()`; `zoom_uploads` also carries each drawn line's video page copy |
+| `videos` | [{code, key}] | added by `page()` (S, build): each drawn line's video page copy (`v` + 12 hex, 960 px H.264), which the tool fetches as `zoom/<code>.mp4` and uploads with the large pictures; never in the round document. A copy that cannot be made leaves `video.code` "" and `video.none` set |
 
 `layout`:
 
