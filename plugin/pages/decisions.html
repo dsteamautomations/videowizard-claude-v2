@@ -271,7 +271,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .shead{flex:none;display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--surface)}
 .shead h1{font:600 15px/1.2 var(--display)}
 .sgrow{flex:1}
-.sapp{flex:1;display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.sapp{flex:1;display:grid;grid-template-columns:clamp(230px,16.5vw,290px) minmax(0,1fr);min-height:0}
 .srail{border-right:1px solid var(--line);overflow:auto;padding:14px 10px;background:var(--surface)}
 .srail h2{font:600 12px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 10px 8px}
 .srail ul{list-style:none;margin:0 0 14px;padding:0}
@@ -284,35 +284,37 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 #sets .sfold{display:flex;width:100%;justify-content:space-between;border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:8px 10px;color:var(--muted);font-weight:400}
 .sfold::before{content:"▸ "} .sfold[aria-expanded="true"]::before{content:"▾ "} .sfold span{flex:1;text-align:left}
 #sets .squiet .srow{color:var(--muted);padding:6px 10px}
-.smain{overflow:auto;padding:22px 28px 30px;min-width:0;outline:0}
-.swrap{max-width:1560px}
+.smain{overflow:auto;padding:12px 24px;min-width:0;outline:0;display:flex;flex-direction:column}
+.swrap{max-width:1560px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .sname{font:600 20px/1.2 var(--display);margin:0;overflow-wrap:anywhere}
-.skind{color:var(--muted);font-size:13px;margin:2px 0 12px}
-.sverdict{display:flex;gap:12px;align-items:flex-start;border-radius:10px;padding:12px 14px;margin-bottom:16px;background:var(--ok-soft);border-left:4px solid var(--ok)}
+.skind{color:var(--muted);font-size:13px;margin:2px 0 8px}
+.sverdict{display:flex;gap:12px;align-items:flex-start;border-radius:10px;padding:10px 14px;margin-bottom:12px;background:var(--ok-soft);border-left:4px solid var(--ok)}
 .sverdict.bad{background:var(--chg-soft);border-left-color:var(--chg)} .sverdict.doubt{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted)}
 .sverdict b{display:block} .sverdict p{margin:0}
 #sets .slink{border:0;background:none;color:var(--accent);text-decoration:underline;padding:0;font-weight:500;border-radius:4px}
-.sstage{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:22px;align-items:start}
-.sbigrow{display:grid;gap:10px} .sbigrow.two{grid-template-columns:1fr 1fr}
-.sbigf{margin:0;min-width:0} .sbigf figcaption{font-size:13px;color:var(--muted);margin-top:4px}
-#sets .sbigb{display:block;width:100%;border:0;padding:0;border-radius:10px;overflow:hidden;background:var(--line);cursor:zoom-in}
+.sstage{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);grid-template-rows:minmax(0,1fr);gap:22px}
+.sviewer{display:flex;flex-direction:column;min-height:0} .sside{min-height:0;overflow:auto;padding-right:4px}
+.sbigrow{flex:1 1 auto;min-height:150px;display:grid;grid-template-rows:minmax(0,1fr);gap:10px} .sbigrow.two{grid-template-columns:1fr 1fr}
+.sbigf{margin:0;min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto} .sbigf figcaption{font-size:12px;color:var(--muted);margin-top:4px}
+#sets .sbigb{display:block;position:relative;width:100%;height:100%;min-height:0;border:0;padding:0;border-radius:10px;overflow:hidden;background:var(--line);cursor:zoom-in}
 .sbigb:disabled{opacity:1;cursor:default}
-.sbigb .ph{display:grid;place-items:center;min-height:200px;color:var(--muted)}
-.sbigb img{width:100%;max-height:calc(100vh - 470px);min-height:200px;object-fit:contain;display:block}
-.snolarge{font-size:13px;color:var(--muted);margin-top:4px}
-.sbigcap{margin:8px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sbigb .ph{display:grid;place-items:center;height:100%;color:var(--muted)}
+.sbigb img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.snolarge{font-size:12px;color:var(--muted);margin-top:2px}
+.sbigcap{margin:6px 0 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .spill{font-size:12px;border-radius:20px;padding:1px 8px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
-.sthis{margin:0 0 12px;max-width:80ch} .sthis ul{margin:4px 0 6px;padding-left:18px} .sthis li{margin:3px 0}
-.sstrip{display:flex;gap:26px;flex-wrap:wrap}
+.sthis{margin:0 0 8px;max-width:80ch;font-size:13px;line-height:1.4} .sthis ul{margin:2px 0 0;padding-left:18px} .sthis li{margin:1px 0}
+.sstrip{display:flex;gap:26px;flex-wrap:wrap;flex:none}
 .sgrp h4{font:600 12px/1 var(--body);color:var(--muted);margin:0 0 6px} .sths{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
-#sets .sth{position:relative;width:118px;border:2px solid transparent;border-radius:8px;padding:0;background:none;overflow:hidden;text-align:left;font-weight:400}
+#sets .sth{position:relative;width:104px;border:2px solid transparent;border-radius:8px;padding:0;background:none;overflow:hidden;text-align:left;font-weight:400}
 .sth.on{border-color:var(--accent)}
 .sth .ph{display:grid;place-items:center;aspect-ratio:16/9;background:var(--line);border-radius:5px;font-size:11px;color:var(--muted)}
 .sth img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border-radius:5px}
-.sthl{display:block;font-size:12px;line-height:1.3;color:var(--muted);padding:3px 4px} .sth.on .sthl{color:var(--accent);font-weight:600}
-.sfdot{position:absolute;top:5px;right:5px;width:10px;height:10px;border-radius:50%;background:var(--chg);border:2px solid var(--surface)}
+.sthl{display:block;font-size:12px;line-height:1.3;color:var(--muted);padding:3px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sth.on .sthl{color:var(--accent);font-weight:600}
+#sets .sth em{display:block;font-style:normal;font-size:12px;line-height:1.3;color:var(--chg);padding:0 4px 2px}
+.swaitline{font-size:13px;color:var(--muted);margin:2px 0 6px}
 .sansh{font:600 15px/1.3 var(--body);margin:4px 0 2px;color:var(--fg);text-transform:none;letter-spacing:0}
-.soneset{color:var(--muted);margin:0 0 12px}
+.soneset{color:var(--muted);margin:0 0 8px}
 .sbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 6px}
 #sets .sbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 16px;font-weight:600}
 #sets .sbtn:hover:not(:disabled){border-color:var(--accent)}
@@ -342,7 +344,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .stablewrap{overflow-x:auto}
 .sfoot{flex:none;border-top:1px solid var(--line);background:var(--surface);padding:8px 20px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px}
 .sfoot b{color:var(--fg)}
-@media (max-width:1000px){ .sstage{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:1000px){ .sstage{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;flex:none} .sside{overflow:visible} .sbigrow{flex:none} .sbigb img{position:static;height:auto;max-height:60vh} .sbigf{display:block} }
 @media (max-width:860px){ #sets{overflow:auto;display:block} .sapp{grid-template-columns:minmax(0,1fr)} .srail{border-right:0;border-bottom:1px solid var(--line)} .smain{padding:16px;overflow:visible} .sbigrow.two{grid-template-columns:minmax(0,1fr)} }
 </style>
 
@@ -988,7 +990,7 @@ function sAnswer(l,choice,notes,more){   // as every line's answer is written; a
   S.timer=setTimeout(()=>{ if(S.cur!==l.line) return; const n=sItems().find(x=>x.line!==l.line&&!sDone(x)); sGo(n?n.line:null); },1100); }
 function sUndo(l){ clearTimeout(S.timer); if(!db||!round) return; ref(l).delete().catch(fail);
   const r=sRest(), b=r&&r!==l&&l.case==='judge'&&answers[r.line]; if(b&&b.choice==='rest') ref(r).delete().catch(fail); }   // "Make the other N" stands only while every judged set has its answer
-function sOpen(p){ S.panel=p; S.msg=''; clearTimeout(S.timer); sMainDraw(); const f=document.querySelector('#spanel textarea, #spanel input, #spanel button'); if(f) f.focus(); }
+function sOpen(p){ S.panel=p; S.msg=''; clearTimeout(S.timer); sMainDraw(); const box=$('spanel'); if(box) box.scrollIntoView({block:'nearest'}); const f=$('sback')||document.querySelector('#spanel textarea, #spanel input, #spanel button'); if(f) f.focus(); }
 function sAct(l,b,i){
   if(b.act==='approve'){ if(l.sure) return sOpen(S.panel==='sure'?null:'sure'); const p=l.pick&&sMain(l); return sAnswer(l,p?p.choice:b.choice,''); }   // A6: against "make again", asked once
   if(b.needs_words||b.act==='again'||b.act==='leave') return sOpen(S.panel==='b'+i?null:'b'+i);
@@ -1024,7 +1026,7 @@ function sPanel(l){   // what opens under the buttons: the against-advice questi
   return [mk('label',{},b.ask||''),mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sagain',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},w.again_go),cancel)];
 }
 function sThing(l){
-  const w=SW(), a=sAns(l), kids=[mk('h2',{class:'sname'},l.name||l.title),mk('p',{class:'skind'},[l.kind,l.shots].filter(Boolean).join(' · '))], side=[], gate=[], m=sMade(l), foot=sFoot(l);
+  const w=SW(), a=sAns(l), kids=[mk('h2',{class:'sname'},l.name||l.title),mk('p',{class:'skind'},[l.kind,String(l.shots||'').split(' · ')[0].replace(/^./,c=>c.toLowerCase())].filter(Boolean).join(' · '))], side=[], gate=[], m=sMade(l), foot=sFoot(l);
   const seen=(l.pics||[]), gmsg=mk('p',{class:'sgate',id:'sgate',hidden:true}), sideBox=mk('div',{class:'sside'});
   const check=()=>{ if(!gate.length) return; const bad=seen.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=seen.filter(p=>picSeen[p.code]!=='ok').length;   // as on every line with pictures (design/210)
     gate.forEach(b=>{ b.disabled=!!(bad.length||wait); }); gmsg.textContent=bad.length?String(w.gate_bad||'').replace('{pics}',bad.join(', ')):wait?w.gate_wait:''; gmsg.hidden=!gmsg.textContent; };
@@ -1036,7 +1038,7 @@ function sThing(l){
       return mk('button',{class:'sth'+(on?' on':''),type:'button','aria-pressed':String(on),'aria-label':p.ref_only?(p.cmp_cap||p.label):p.label,'data-code':p.code,on:{click:()=>{
           if(!p.ref_only){ S.view[l.line]=p.code; delete S.cmp[l.line]; } else if(cmp&&p===mate) S.cmpOn[l.line]=false; else { S.cmp[l.line]=p.code; S.cmpOn[l.line]=true; } sMainDraw(); }}},
         mk('span',{class:'ph'},p.missing?w.missing:w.loading),mk('span',{class:'sthl'},p.ref_only?(p.view||p.label):[p.letter&&mk('b',{},p.letter),' '+(p.view||p.label)]),
-        !p.ref_only&&(p.faults||[]).length?mk('i',{class:'sfdot','aria-hidden':'true'}):null); };
+        !p.ref_only&&p.faults_n?mk('em',{},p.faults_n):null); };
     const viewer=mk('div',{class:'sviewer'},
       mk('div',{class:'sbigrow'+(cmp?' two':''),id:'sbig'},big(sel,cmp&&sel.set_cap),cmp&&big(mate,mate.cmp_cap)),
       mk('p',{class:'sbigcap'},mk('b',{},sel.name||''),sel.view&&' · '+sel.view,m.length>1&&sel===mp&&mk('span',{class:'spill'},w.main),mk('span',{class:'sgrow'}),
@@ -1048,12 +1050,10 @@ function sThing(l){
     Array.prototype.forEach.call(viewer.querySelectorAll('.sth'),btn=>{ const p=all.find(x=>x.code===btn.getAttribute('data-code')); if(p&&!p.missing) loadThumb(p,btn,check,0); });
     if(l.rec) side.push(mk('div',{class:'sverdict'+(l.rec.do==='remake'?' bad':l.rec.do==='use'?'':' doubt'),id:'srec'},mk('div',{},mk('b',{},l.rec.head||l.rec.label),
       mk('p',{},l.rec.first||l.rec.reason,' ',l.rec.more&&!S.open.why&&mk('button',{class:'slink',id:'smore',type:'button',on:{click:()=>{ S.open.why=true; sMainDraw(); }}},w.more),S.open.why&&l.rec.more))));   // A5
-    if(l.things_wait) side.push(mk('p',{class:'sverdict bad',id:'swaits'},l.things_wait));
     side.push(mk('h3',{class:'sansh',id:'sansh'},l.answer_head||''),mk('p',{class:'soneset'},l.answer_note||''));
     kids.push(mk('div',{class:'sstage'},viewer,sideBox));
   } else if(l.state==='open'){   // could not be made, or back with the operator: the server's sentence, its reason
     kids.push(mk('div',{class:'sverdict bad',id:'shead'},mk('div',{},mk('b',{},l.head||''),l.why&&mk('p',{},l.why))));
-    if(l.things_wait) kids.push(mk('p',{class:'sverdict bad',id:'swaits'},l.things_wait));
   } else {   // waiting, being made, or settled: nothing to answer
     kids.push(mk('p',{class:'sempty'},l.head||l.note||''));
     if(seen.length) kids.push(mk('div',{class:'sfrow'},seen.map(p=>mk('figure',{class:'sbigf'},sImg(p,'sth',seen),mk('figcaption',{},p.label)))));
@@ -1064,11 +1064,13 @@ function sThing(l){
       return mk('button',{class:'sbtn'+(first?' primary':'')+(b.act==='leave'?' danger':''),type:'button','data-act':b.act,'aria-expanded':pan?String(S.panel===(b.act==='approve'?'sure':'b'+i)):null,on:{click:()=>sAct(l,b,i)}},
         b.label,b.sug&&[' ',mk('span',{class:'ssug'},w.suggested||'')]); });
     if(seen.length) bar.forEach(b=>gate.push(b));
-    into.push(mk('div',{class:'sbar',role:'group','aria-label':l.answer_head||l.ask||''},bar),gmsg);
+    into.push(mk('div',{class:'sbar',role:'group','aria-label':l.answer_head||l.ask||''},bar));
+    if(l.things_wait) into.push(mk('p',{class:'swaitline',id:'swaits'},l.things_wait));
+    if(S.panel) into.push(mk('div',{class:'spanel',id:'spanel'},sPanel(l)));
+    into.push(gmsg);
     if(l.own&&assets) into.push(mk('p',{class:'sownp'},mk('button',{class:'slink',type:'button','data-act':'own','aria-expanded':String(S.panel==='own'),on:{click:()=>sOpen(S.panel==='own'?null:'own')}},l.own.label)));   // A8
     if(l.refused) into.push(mk('p',{class:'smsg',id:'srefused'},l.refused));   // the server's refusal of the last "done", kept on its set
     into.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
-    if(S.panel) into.push(mk('div',{class:'spanel',id:'spanel'},sPanel(l)));
     if(sDone(l)){ const t=sSays(l), ag=sAgainst(l);
       into.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'',src:a.own.url}),mk('p',{},mk('b',{},t[0]),t[1],ag&&' '+w.against_say),
         a&&mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo))); }

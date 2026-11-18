@@ -336,3 +336,64 @@ def test_an_answer_that_cannot_be_saved_says_so(browser):
     pg.locator('#smain [data-act="make"]').click()
     pg.wait_for_function("(document.querySelector('#smsg') || {}).textContent.includes('Could not save (denied)')")
     pg.close()
+
+
+# ---------- the fit (SK, 18 Nov 2026, after the deploy): the tester's page area, 1536 x 510, and 1900 x 830 ----------
+
+SIZES.setdefault('fit-small', {'width': 1536, 'height': 510})
+SIZES.setdefault('fit-large', {'width': 1900, 'height': 830})
+
+
+def inside(pg, sel):
+    box = pg.locator(sel).first.bounding_box()
+    vp = pg.viewport_size
+    assert box and box['x'] >= 0 and box['y'] >= 0 and box['x'] + box['width'] <= vp['width'] + 0.5 and box['y'] + box['height'] <= vp['height'] + 0.5, (sel, box, vp)
+    return box
+
+
+@pytest.mark.parametrize('size', ['fit-small', 'fit-large'])
+def test_a_set_of_three_with_footage_fits_with_no_scrolling(browser, size):
+    pg = page(browser, size=size)
+    go(pg, DECK)
+    for sel in ('#smain .sname', '#sbig .sbigb', '#sset', '#sfootage', '#srec', '#sansh'):
+        inside(pg, sel)
+    for i in range(pg.locator('#smain .sbar button').count()):
+        inside(pg, f'#smain .sbar button >> nth={i}')
+    assert pg.evaluate("(() => { const m = document.querySelector('#smain'); return m.scrollHeight <= m.clientHeight; })()")   # the main area does not scroll
+    big = pg.locator('#sbig').bounding_box()
+    assert big['height'] >= 140, big                                                                                       # the picture gave way first, not away (here with the line that the large copy is missing)
+    same_line = pg.evaluate("(() => { const a = document.querySelector('#sset').getBoundingClientRect(), b = document.querySelector('#sfootage').getBoundingClientRect(); return Math.abs(a.top - b.top) < 2; })()")
+    assert same_line                                                                                                       # the two rows of small pictures side by side
+    if size == 'fit-small':
+        assert 230 <= pg.locator('#srail').bounding_box()['width'] <= 270                                                   # the list at about 250 px
+    shot(pg, f'd216-fit-{size}')
+    clean(pg)
+    pg.close()
+
+
+def test_the_small_pictures_say_their_faults_in_words_no_rings(browser):
+    pg = page(browser)
+    go(pg, DECK)
+    assert pg.locator('#sset .sth em').all_text_contents() == [p['faults_n'] for p in made(DECK) if p.get('faults_n')] == ['1 fault', '2 faults', '1 fault']
+    assert pg.locator('#sets .sfdot, #sets .tflag').count() == 0
+    pg.close()
+
+
+def test_the_waiting_sentence_is_a_quiet_line_under_the_buttons(browser):
+    pg = page(browser, size='fit-small')
+    go(pg, DECK)
+    line, bar_ = pg.locator('#swaits'), pg.locator('#smain .sbar').bounding_box()
+    assert 'sverdict' not in line.get_attribute('class') and line.bounding_box()['y'] >= bar_['y'] + bar_['height'] - 1
+    assert pg.locator('#sansh').bounding_box()['y'] < bar_['y']                                                             # the answer is not pushed down
+    pg.close()
+
+
+def test_the_against_advice_question_opens_in_view_under_the_buttons(browser):
+    pg = page(browser, size='fit-small')
+    go(pg, DECK)
+    pg.locator('#smain [data-act="approve"]').click()
+    bar_ = pg.locator('#smain .sbar').bounding_box()
+    box = inside(pg, '#spanel')
+    assert box['y'] >= bar_['y'] + bar_['height'] - 1 and box['y'] - (bar_['y'] + bar_['height']) < 60                       # directly under the buttons
+    assert pg.evaluate('document.activeElement.id') == 'sback'
+    pg.close()

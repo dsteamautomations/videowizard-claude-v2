@@ -1260,6 +1260,7 @@ def _round_v2(ctx, every, step):
                              **({'weak': True} if (p.get('look') or {}).get('verdict') == 'weak' else {}), **({'flag': True} if p['ref'] in flagged else {}),
                              # design/216 (A4): what belongs to this picture, under it: its own faults, or that it has none, or that Claude could not check it (never "no fault" then)
                              'name': named(p), 'set_cap': WORDS['set_cap'].format(pic=low(named(p))), 'faults': [plain(p, x) for x in (p.get('check') or {}).get('failed') or []],
+                             **({'faults_n': _n(len((p.get('check') or {}).get('failed')), 'fault')} if (p.get('check') or {}).get('failed') else {}),   # design/216, the fit: "1 fault" under the small picture
                              'check_head': WORDS['check_of'].format(pic=low(named(p))) if st != 'none' else '', 'check_none': WORDS['no_fault'] if st != 'none' else WORDS['not_checked_pic'],
                              **({} if person or one else {'choice': 'use:' + p['ref'], 'choice_label': WORDS['approve_pic'].format(letter=letter[p['ref']]),
                                                           'say': WORDS['say_all'].format(n=n_pics, letter=letter[p['ref']]), 'main_label': WORDS['main_link'].format(letter=letter[p['ref']])})})

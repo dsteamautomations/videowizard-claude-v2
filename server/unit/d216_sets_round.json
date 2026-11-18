@@ -237,6 +237,7 @@
      ],
      "check_head": "Claude's check of picture A:",
      "check_none": "no fault found.",
+     "faults_n": "1 fault",
      "main_label": "Make A the main picture"
     },
     {
@@ -257,6 +258,7 @@
      ],
      "check_head": "Claude's check of picture B:",
      "check_none": "no fault found.",
+     "faults_n": "2 faults",
      "main_label": "Make B the main picture"
     },
     {
@@ -277,6 +279,7 @@
      ],
      "check_head": "Claude's check of picture C:",
      "check_none": "no fault found.",
+     "faults_n": "1 fault",
      "main_label": "Make C the main picture"
     }
    ],

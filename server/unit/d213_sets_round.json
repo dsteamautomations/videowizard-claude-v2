@@ -301,6 +301,7 @@
      "faults": [
       "Not the view asked."
      ],
+     "faults_n": "1 fault",
      "check_head": "Claude's check of picture B:",
      "check_none": "no fault found."
     },
@@ -483,6 +484,7 @@
      "faults": [
       "Not the view asked."
      ],
+     "faults_n": "1 fault",
      "check_head": "Claude's check of picture B:",
      "check_none": "no fault found.",
      "choice": "use:s-site_deck-1-2",
