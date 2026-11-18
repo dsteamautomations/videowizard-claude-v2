@@ -1,0 +1,278 @@
+{
+ "step": "Pictures and drawn graphics",
+ "round": "r20261118-120000-000000",
+ "capabilities": {"db": {"rules": [{"path": "rounds", "read": "view", "write": "owner"}, {"path": "pics", "read": "view", "write": "owner"}, {"path": "zoom", "read": "view", "write": "owner"}]}, "assets": {}, "user": {}},
+ "title": "VideoWizard decisions VW-99",
+ "open": true,
+ "summary": "8 to answer, 4 still being made or checked.",
+ "note": "Answer what is ready, then say done in the chat.",
+ "say": "8 things need your answer:\n- The kiln picture shows the action too early\n- The look of the graphics\n- The finished three-storey building\n- The kiln worker with the clay pan\n- Fewer bricks, fewer resources\n- What the cavities do\n- The wall builds itself\n- The housing site\n4 more are being made or checked: they come to the page later. Then say done here.",
+ "preparing": "Getting 21 pictures ready for the page: about 2 minutes.",
+ "layout": {
+  "kind": "pictures",
+  "made": "Nothing is recorded or made until you say done in the chat.",
+  "help": [
+   "Each line on the left needs one answer. Answer them in any order, then say done in the chat.",
+   "A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.",
+   "Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.",
+   "New pictures arrive while the film is being made. Claude checks each one first; it joins the list when it is checked."
+  ],
+  "coming": [
+   {"name": "Two walls under the same load", "kind_words": "A drawn graphic", "state": "making", "note": "Being made. It joins the list when it is ready."},
+   {"name": "Less soil, less fuel", "kind_words": "A drawn graphic", "state": "making", "note": "Being made. It joins the list when it is ready."},
+   {"name": "The brick kiln at dusk", "kind_words": "A still", "state": "checking", "note": "Claude is checking it. It joins the list when it is checked."},
+   {"name": "Bricks on edge, step 2", "kind_words": "A graphic in steps", "state": "checking", "note": "Claude is checking it. It joins the list when it is checked."}
+  ],
+  "words": {
+   "pictures": {
+    "todo": "Needs your answer",
+    "coming": "Still being made, nothing to do",
+    "nothing": "Nothing waits for you now.",
+    "against": "Against the check",
+    "done": {"answer": "Answered", "approve": "Approved", "again": "Made again", "fix": "Made again, your words", "select": "Selected", "reject": "Rebuilt, your words", "plain": "Made again, no effect"},
+    "undo": "Undo", "cancel": "Cancel", "details": "Details", "more": "See all {n}", "fewer": "Show fewer",
+    "compare": "Compare with the earlier try", "stop": "Stop comparing",
+    "frames": "Show its frames", "video": "Show the video", "video_bad": "The video could not be shown here; these are its frames.",
+    "loading": "Loading…", "missing": "Not available", "no_large": "The large picture is not available.",
+    "gate_wait": "The buttons work when every picture has shown.",
+    "gate_bad": "A picture is missing: {pics}. This line cannot be answered here: tell the assistant in the chat.",
+    "words_need": "Write what should change first.",
+    "left_one": "1 answer still needed", "left_many": "{n} answers still needed", "left_note": "Choose one from the list on the left.",
+    "end_head": "All answered", "end_note": "Go back to the chat and say done. This is what will happen then:", "end_foot": "Nothing is recorded or made before you say done.",
+    "foot": "{n} of {m} answered.", "foot_wait": "When all are answered, say done in the chat. Nothing is made before that.", "foot_done": "Go back to the chat and say done.",
+    "help": "How this works", "keys": "Keys: the left and right arrows move between the things that need an answer. Escape closes what is open.", "close": "Close"
+   }
+  }
+ },
+ "lines": [
+  {
+   "line": "l01", "key": "pic:question:q-kiln", "item": "question:q-kiln", "kind": "question", "state": "open",
+   "name": "The kiln picture shows the action too early", "kind_words": "A question about a picture already made",
+   "ask": "This picture already shows what happens later in the shot: the worker is already walking away with the pan. The shot should start before that. Make a new picture, or use this one anyway?",
+   "from": "The server asks this about a picture already made. Nothing is made until you answer.",
+   "pics": [{"code": "p13e339d10000", "label": "The first try of the kiln shot", "role": "main"}],
+   "buttons": [
+    {"label": "Make a new picture", "choice": "c1", "act": "answer", "needs_words": false, "say": "Claude asks for a new picture that starts before the action."},
+    {"label": "Use this one anyway", "choice": "c2", "act": "answer", "needs_words": false, "say": "This picture is approved as it is."}
+   ],
+   "details": []
+  },
+  {
+   "line": "l02", "key": "pic:picture:f96f42e7-0000:f96f42e700", "item": "picture:f96f42e7-0000:f96f42e700", "kind": "style", "state": "open",
+   "name": "The look of the graphics", "kind_words": "The style sheet",
+   "sub": "One picture that sets the colours, lines and lettering of every graphic in the film.",
+   "ask": "Is this the right look for the graphics?",
+   "pics": [{"code": "pf96f42e70000", "label": "The style sheet", "role": "main", "faults": []}],
+   "check": {
+    "state": "pass", "head": "Claude's check found nothing wrong", "by": "Claude looked at the picture against its list of 6 lines.", "show": "first",
+    "faults": [],
+    "passed_head": "The lines it passed",
+    "passed": ["reads: Rat-trap bond wall: the text reads exactly 'Rat-trap bond wall'.", "the palette: cream, terracotta, grey, pale blue, amber, green and charcoal, nothing else.", "the line: clean flat outlines, no hatching, gradients or shadows.", "sample labels readable: the title is readable at film size.", "no scene: a sample of the drawing language, not a scene.", "nothing extra: only what the request names."],
+    "advice_head": "Measured by the program, for you to judge",
+    "advice": ["Size: 2752x1536, the film's shape."]
+   },
+   "buttons": [
+    {"label": "Yes, use this look", "choice": "yes", "act": "approve", "needs_words": false, "say": "Approved. The first picture of every graphic is made from it."},
+    {"label": "No, make another", "choice": "no", "act": "again", "needs_words": false, "say": "Rejected. Claude asks for a new style sheet."},
+    {"label": "Correct it", "choice": "correct", "act": "fix", "needs_words": true, "hint": "What should change?", "go": "Send these words", "prefill": "", "say": "Rejected. Claude asks for a new one with your words: \"{words}\""}
+   ],
+   "details": [["How it was asked for", ["Asset: style sheet for every drawn graphic of a 16:9 documentary film, one flat illustration, no photograph, no panels, no borders."]], ["How it was made", ["Picture AI: a new picture", "Made from: nothing", "Size: 2752x1536"]]]
+  },
+  {
+   "line": "l03", "key": "pic:picture:798dfe0e-0000:798dfe0e00", "item": "picture:798dfe0e-0000:798dfe0e00", "kind": "still", "state": "open",
+   "name": "The finished three-storey building", "kind_words": "A still",
+   "ask": "Is this picture right for this shot?",
+   "where": "In the film at 1:35.1 to 1:40.6 (5.6 s) · Gap 5, Strong enough for three storeys",
+   "words_head": "The words under it:",
+   "words": "When constructed properly, buildings up to three storeys can be safely built using this technology.",
+   "try": "",
+   "foot_head": "Your footage: click one to see it beside the new picture",
+   "pics": [
+    {"code": "pe0cad4cb3a79", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
+    {"code": "p798dfe0e0000", "label": "The new picture", "role": "main", "faults": []},
+    {"code": "pf7b6e6385e7a", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
+   ],
+   "check": {
+    "state": "pass", "head": "Claude's check found nothing wrong", "by": "Claude looked at the picture against its list of 24 lines.", "show": "first",
+    "faults": [],
+    "passed_head": "The lines it passed",
+    "passed": ["word: three-storey: the building has three full storeys.", "fact: F_bond: the brick face shows headers and stretchers with mortar joints.", "exactly three floors: three floor levels topped by a parapet and a water tank.", "no background figure repeated: no person or animal is the same individual as in another picture of this scene.", "readable text: none.", "a real face: none."],
+    "advice_head": "Measured by the program, for you to judge",
+    "advice": ["Light and colour: close to the footage beside it (6 frames).", "Fine detail: 1.38 of the fine detail of the footage beside it (6 frames).", "Size: 2752x1536, the film's shape."]
+   },
+   "buttons": [
+    {"label": "Yes, put it in the film", "choice": "yes", "act": "approve", "needs_words": false, "say": "Approved and placed in the film at 1:35.1."},
+    {"label": "No, make another", "choice": "no", "act": "again", "needs_words": false, "say": "Rejected. Claude asks for a new picture for this shot."},
+    {"label": "Correct it", "choice": "correct", "act": "fix", "needs_words": true, "hint": "What should change in this picture?", "go": "Send these words", "prefill": "", "say": "Rejected. Claude asks for a new picture with your words: \"{words}\""}
+   ],
+   "details": [["How it was asked for", ["Asset: the still picture of a 16:9 documentary shot, a single real photograph, one view."]], ["The approved looks it was made from", ["The building", "The wall"]], ["How it was made", ["Picture AI: an edit of earlier pictures", "Size: 2752x1536"]]]
+  },
+  {
+   "line": "l04", "key": "pic:picture:0b24f420-0000:0b24f42000", "item": "picture:0b24f420-0000:0b24f42000", "kind": "still", "state": "open",
+   "name": "The kiln worker with the clay pan", "kind_words": "A still",
+   "ask": "Is this picture right for this shot?",
+   "where": "In the film at 1:40.6 to 1:44.8 (4.2 s) · Gap 6, Where bricks come from",
+   "words_head": "The words under it:",
+   "words": "Every brick manufactured consumes soil, fuel, and energy.",
+   "try": "Try 2",
+   "foot_head": "Your footage and the earlier try: click one to see it beside the new picture",
+   "pics": [
+    {"code": "pe0cad4cb3a79", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
+    {"code": "p0b24f4200000", "label": "The new picture (try 2)", "role": "main",
+     "faults": ["the start state: the pan is on the ground, held, not on the worker's head.", "the people: three distant workers are visible, not two.", "a real face: the worker has the recognisable face of a person in your footage.", "group alike: one distant worker wears a blue shirt, not pale cream or white."],
+     "check_head": "Claude's check of this picture:"},
+    {"code": "pf7b6e6385e7a", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"},
+    {"code": "p13e339d10000", "label": "Try 1, not used", "role": "earlier", "cmp_cap": "Try 1, not used", "why": "You said: make a new picture. It already showed the worker walking away with the pan."}
+   ],
+   "check": {
+    "state": "fail", "head": "Claude's check found 4 problems: the start state: the pan is on the ground, held, not on the worker's head.", "by": "Claude looked at the picture against its list of 22 lines.", "show": "first",
+    "faults": ["the start state: the pan is on the ground, held, not on the worker's head.", "the people: three distant workers are visible, not two.", "a real face: the worker has the recognisable face of a person in your footage.", "group alike: one distant worker wears a blue shirt, not pale cream or white."],
+    "passed_head": "The lines it passed",
+    "passed": ["person kept: Kiln worker: faded dark-blue shirt, checked lungi, brown headwrap.", "inventory: exactly one iron pan of wet clay.", "readable text: none."],
+    "advice_head": "Measured by the program, for you to judge",
+    "advice": ["Light and colour: brighter by 0.26, less saturated by 0.16 than the footage beside it (6 frames).", "Fine detail: 1.24 of the fine detail of the footage beside it (6 frames)."]
+   },
+   "buttons": [
+    {"label": "Yes, put it in the film", "choice": "yes", "act": "approve", "needs_words": false, "say": "Approved and placed in the film at 1:40.6.",
+     "sure": {"ask": "Claude's check found 4 problems in this picture. Use it all the same?", "go": "Use it all the same", "back": "Go back"}},
+    {"label": "No, make another", "choice": "no", "act": "again", "needs_words": false, "say": "Rejected. Claude asks for a third picture."},
+    {"label": "Correct it", "choice": "correct", "act": "fix", "needs_words": true, "hint": "What should change in this picture?", "go": "Send these words",
+     "prefill": "The pan should be on the worker's head, not on the ground. Two distant workers, not three. A face that is no one from the footage. Every distant worker in pale cream or white.",
+     "say": "Rejected. Claude asks for a new picture with your words: \"{words}\""}
+   ],
+   "details": [["How it was asked for", ["Mode: edit. Image 1 is the picture to fix; images 2 onward are its references."]], ["The approved looks it was made from", ["The kiln", "The clay pan", "The brick"]], ["How it was made", ["Picture AI: an edit of earlier pictures", "Size: 2752x1536"]]]
+  },
+  {
+   "line": "l05", "key": "pic:graphics:BEAT_06-B1_sh3:3", "item": "graphics:BEAT_06-B1_sh3:3", "kind": "steps", "state": "open",
+   "name": "Fewer bricks, fewer resources", "kind_words": "A graphic in steps",
+   "ask": "Are these 3 steps of the graphic right?",
+   "where": "In the film at 1:44.8 to 1:52.6 (7.8 s) · Gap 6, Where bricks come from",
+   "words_head": "The words under it:",
+   "words": "By reducing brick usage, Rat-Trap Bond Masonry conserves natural resources and lowers the environmental footprint of construction.",
+   "try": "",
+   "strip_head": "The steps, in order: click one to see it large",
+   "foot_head": "Your footage and the earlier try: click one to see it beside the steps",
+   "pics": [
+    {"code": "pe0cad4cb3a79", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
+    {"code": "pfd32e4820000", "label": "Step 1", "role": "step", "n": 1, "caption": "Step 1: on 'By reducing brick usage': the small wall 'Fewer bricks' with the icons Soil, Fuel and Energy.", "faults": []},
+    {"code": "pe4b07d230000", "label": "Step 2", "role": "step", "n": 2, "caption": "Step 2: on 'conserves natural resources': the icons shrink and turn green.", "faults": []},
+    {"code": "p3e3e3e3e0000", "label": "Step 3", "role": "step", "n": 3, "caption": "Step 3: on 'lowers the environmental footprint': the label 'Lower environmental footprint' appears below the icons.",
+     "faults": ["exact text: the label reads 'Lower enviromental footprint', one letter missing."], "check_head": "Claude's check of step 3:"},
+    {"code": "pf7b6e6385e7a", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"},
+    {"code": "p1cdaa3960000", "label": "Step 1, first try, not used", "role": "earlier", "cmp_cap": "Step 1, first try, not used", "why": "You said: two lightning-bolt icons instead of one; bricks drawn laid flat, not on edge; wall too large; the label too low."}
+   ],
+   "check": {
+    "state": "fail", "head": "Claude's check found 1 problem: step 3: exact text: the label reads 'Lower enviromental footprint', one letter missing.", "by": "Claude looked at each step against its list: 9, 10 and 11 lines.", "show": "first",
+    "faults": ["Step 3: exact text: the label reads 'Lower enviromental footprint', one letter missing."],
+    "passed_head": "The lines it passed",
+    "passed": ["Step 1: reads: 'Fewer bricks', 'Soil', 'Fuel', 'Energy', letter for letter.", "Step 2: adds what the plan's step 2 names, the rest as step 1.", "Step 3: adds what the plan's step 3 names, the rest as step 2."],
+    "advice_head": "Measured by the program, for you to judge",
+    "advice": ["Steps 2 and 3 look almost the same: the change between them is small."]
+   },
+   "buttons": [
+    {"label": "Yes, use all 3 steps", "choice": "yes", "act": "approve", "needs_words": false, "say": "All 3 steps approved and placed in the film at 1:44.8, played as a build.",
+     "sure": {"ask": "Claude's check found 1 problem in step 3, and steps 2 and 3 look almost the same. Use all 3 steps all the same?", "go": "Use all 3 steps all the same", "back": "Go back"}},
+    {"label": "Correct step 1", "choice": "correct:1", "act": "fix", "needs_words": true, "hint": "What should change in step 1?", "go": "Send these words", "prefill": "",
+     "say": "Step 1 is made again with your words: \"{words}\". Steps 2 and 3 are made again from it."},
+    {"label": "Correct step 2", "choice": "correct:2", "act": "fix", "needs_words": true, "hint": "What should change in step 2?", "go": "Send these words", "prefill": "",
+     "say": "Step 2 is made again with your words: \"{words}\". Step 3 is made again from it."},
+    {"label": "Correct step 3", "choice": "correct:3", "act": "fix", "needs_words": true, "hint": "What should change in step 3?", "go": "Send these words", "prefill": "The label should read 'Lower environmental footprint', letter for letter.",
+     "say": "Step 3 is made again from step 2 with your words: \"{words}\"."}
+   ],
+   "details": [["How step 1 was asked for", ["Image 1 is the film's approved style picture: take its palette, line weight, label style and flat cream background, nothing else."]], ["How it was made", ["Picture AI. Step 1 is made from the style sheet; each later step from the step before it."]]]
+  },
+  {
+   "line": "l06", "key": "pic:take:b8025a17-0000", "item": "take:b8025a17-0000", "kind": "drawn", "state": "open",
+   "name": "What the cavities do", "kind_words": "A drawn graphic",
+   "ask": "Is this drawing right for the film?",
+   "where": "In the film at 0:38.2 to 0:45.0 (6.9 s) · Gap 4, What the cavities do, and the buildings",
+   "words_head": "The words under it:",
+   "words": "They serve an important purpose, reducing the use of bricks and mortar while improving the thermal performance of the building.",
+   "try": "",
+   "foot_head": "Your footage: click one to see it beside the drawing",
+   "video": {"code": "vb8025a170000", "label": "The drawing, playing", "none": ""},
+   "finish": "Added by the server: soft grain and darker corners.",
+   "held": "",
+   "pics": [
+    {"code": "p85d3848516a4", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
+    {"code": "pb8025a170000", "label": "Its frames, in order", "role": "sheet", "faults": []},
+    {"code": "pa0d773a77ff5", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
+   ],
+   "check": {
+    "state": "pass", "head": "Fact check: passed. All 53 rules held, after 2 redo rounds.", "by": "A Claude checker that never saw the build judged 53 rules on snapshots of the video.", "show": "all",
+    "faults": [],
+    "passed_head": "All 53 rules of the fact check (round 3)",
+    "passed": ["Passed: The only text on screen is \"Fewer bricks\" and \"Less mortar\".", "Passed: Things are added in this order and no other: the cavity tint, then \"Fewer bricks\", then \"Less mortar\", then the heat arrow."],
+    "advice_head": "What the checker saw",
+    "advice": ["0.1 s: a single red-brick wall section alone in the middle of a warm off-white page.", "6.86 s: the finished picture: five pale-blue slots, both labels with their leaders, and the orange arrow."]
+   },
+   "buttons": [
+    {"label": "Select: use it in the film", "choice": "select", "act": "select", "needs_words": false, "say": "Selected. It goes in the film at 0:38.2."},
+    {"label": "Reject", "choice": "reject", "act": "reject", "needs_words": true, "hint": "What is wrong with it?", "go": "Send these words", "prefill": "", "say": "Rejected. Claude's helpers rebuild it with your words: \"{words}\""},
+    {"label": "Take the effect away", "choice": "plain", "act": "plain", "needs_words": false, "say": "It is made again without the soft grain and darker corners. You see it again here."}
+   ],
+   "details": [["How it was made", ["Built as a web animation by Claude helpers on the laptop, rendered to video by the server. No picture AI.", "Length: 6.88 s at 25 frames a second."]]]
+  },
+  {
+   "line": "l07", "key": "pic:take:59161cc8-0000", "item": "take:59161cc8-0000", "kind": "drawn", "state": "open",
+   "name": "The wall builds itself", "kind_words": "A drawn graphic",
+   "ask": "Is this drawing right for the film?",
+   "where": "In the film at 0:53.0 to 0:57.0 (4.0 s) · Gap 5, The wall assembles itself",
+   "words_head": "The words under it:",
+   "words": "The greatest advantage of Rat-Trap Bond Masonry lies in its efficiency.",
+   "try": "",
+   "foot_head": "Your footage: click one to see it beside the drawing",
+   "video": {"code": "", "label": "", "none": "The video is not available here: these are its frames."},
+   "finish": "",
+   "held": "Its fact check did not pass: to select it all the same, say why.",
+   "pics": [
+    {"code": "p85d3848516a4", "label": "Your footage before this shot", "role": "before", "cmp_cap": "Your footage before this shot"},
+    {"code": "p59161cc80000", "label": "Its frames, in order", "role": "sheet", "faults": []},
+    {"code": "pa0d773a77ff5", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
+   ],
+   "check": {
+    "state": "fail", "head": "Fact check: not passed. 2 of 53 rules are still open after 2 redo rounds:", "by": "A Claude checker that never saw the build judged 53 rules on snapshots of the video.", "show": "all",
+    "faults": ["The final frames show the finished section holding still: four complete courses, thirty brick shapes and ten cavities.", "Every full brick has the proportions of about 3 : 1.5 : 1 in length : width : height (230 x 110 x 75 mm); all full bricks are the same size."],
+    "passed_head": "All 53 rules of the fact check (round 3)",
+    "passed": ["Passed: No text appears in any frame.", "Passed: The courses appear one at a time from the bottom up, course 1 to course 4."],
+    "advice_head": "What the checker saw",
+    "advice": ["0 s: a plain warm off-white background with one flat sand-coloured slab.", "4 s: a finished block of four rows of red bricks with grey joints on the sand slab."]
+   },
+   "buttons": [
+    {"label": "Select: use it in the film", "choice": "select", "act": "select", "needs_words": true, "hint": "Why is it right for the film all the same?", "go": "Select it with this reason", "prefill": "",
+     "need": "Write your reason first. It is kept with the film.",
+     "say": "Selected. It goes in the film at 0:53.0. Your reason: \"{words}\""},
+    {"label": "Reject", "choice": "reject", "act": "reject", "needs_words": true, "hint": "What is wrong with it?", "go": "Send these words",
+     "prefill": "The finished section should hold still at the end with four complete courses. Every full brick the same size, about 3 : 1.5 : 1.",
+     "say": "Rejected. Claude's helpers rebuild it with your words: \"{words}\""}
+   ],
+   "details": [["How it was made", ["Built as a web animation by Claude helpers on the laptop, rendered to video by the server. No picture AI.", "Length: 4.04 s at 25 frames a second."]]]
+  },
+  {
+   "line": "l08", "key": "pic:picture:c0ffee01-0000:c0ffee0100", "item": "picture:c0ffee01-0000:c0ffee0100", "kind": "still", "state": "open",
+   "name": "The housing site", "kind_words": "A still",
+   "ask": "Is this picture right for this shot?",
+   "where": "In the film at 2:10.4 to 2:15.0 (4.6 s) · Gap 8, Homes that last",
+   "words_head": "The words under it:",
+   "words": "Across the state, housing schemes now use the bond for low-cost homes.",
+   "try": "",
+   "foot_head": "Your footage: click one to see it beside the new picture",
+   "pics": [
+    {"code": "pc0ffee010000", "label": "The new picture", "role": "main", "faults": []},
+    {"code": "pd00d00d00d00", "label": "Your footage after this shot", "role": "after", "cmp_cap": "Your footage after this shot"}
+   ],
+   "check": {
+    "state": "not_checked", "head": "Not checked: Claude's check did not come within 30 minutes. Judge it by eye.", "by": "", "show": "first",
+    "faults": [], "passed_head": "", "passed": [],
+    "advice_head": "Measured by the program, for you to judge",
+    "advice": ["Light and colour: close to the footage beside it (6 frames).", "Size: 2752x1536, the film's shape."]
+   },
+   "buttons": [
+    {"label": "Yes, put it in the film", "choice": "yes", "act": "approve", "needs_words": false, "say": "Approved and placed in the film at 2:10.4."},
+    {"label": "No, make another", "choice": "no", "act": "again", "needs_words": false, "say": "Rejected. Claude asks for a new picture for this shot."},
+    {"label": "Correct it", "choice": "correct", "act": "fix", "needs_words": true, "hint": "What should change in this picture?", "go": "Send these words", "prefill": "", "say": "Rejected. Claude asks for a new picture with your words: \"{words}\""}
+   ],
+   "details": [["How it was made", ["Picture AI: a new picture", "Size: 2752x1536"]]]
+  }
+ ]
+}
