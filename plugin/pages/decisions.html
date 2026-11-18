@@ -262,6 +262,88 @@ table.loss{margin-top:12px;max-width:1100px;background:var(--surface);border:1px
 table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3){white-space:normal;color:var(--muted)}
 .tcard{max-width:560px;margin:10vh auto 0;text-align:center;padding:32px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .tcard h2{font-size:24px} .tcard .tbar{justify-content:center;margin-top:18px} .tcard .tnote{margin-top:10px} .talldone .tnote{font-size:13px}
+/* design/216 (SK, 18 Nov 2026): step 5 of the references, "the sets", as on the trial SK corrected over five rounds: the list of what needs an answer,
+   one large picture of the set with its small pictures below, the answer for the whole set beside it, one count in the bottom bar. Desktop; in a
+   narrow window the answer column drops under the picture and the list above it, and nothing overlaps. */
+#sets{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);font:14px/1.5 var(--body)}
+#sets button{font:inherit;color:inherit;cursor:pointer}
+#sets h1,#sets h2,#sets h3,#sets h4{text-wrap:balance}
+.shead{flex:none;display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--surface)}
+.shead h1{font:600 15px/1.2 var(--display)}
+.sgrow{flex:1}
+.sapp{flex:1;display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0}
+.srail{border-right:1px solid var(--line);overflow:auto;padding:14px 10px;background:var(--surface)}
+.srail h2{font:600 12px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 10px 8px}
+.srail ul{list-style:none;margin:0 0 14px;padding:0}
+#sets .srow{display:flex;width:100%;text-align:left;gap:10px;align-items:flex-start;border:0;background:none;padding:9px 10px;border-radius:8px;font-weight:400}
+#sets .srow:hover{background:var(--bg)} #sets .srow[aria-current]{background:var(--accent-soft)}
+.snm{flex:1;min-width:0;line-height:1.3;overflow-wrap:anywhere}
+.sdot{width:22px;height:22px;border-radius:50%;background:var(--bg);color:var(--muted);flex:none;display:grid;place-items:center;font-size:12px;font-style:normal;font-weight:600;line-height:1}
+.srow.done .sdot{background:var(--ok);color:var(--surface)} .srow.against .sdot{background:var(--chg);color:var(--surface)}
+.sst{font-size:12px;color:var(--muted);white-space:nowrap} .srow.against .sst{color:var(--chg)}
+#sets .sfold{display:flex;width:100%;justify-content:space-between;border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:8px 10px;color:var(--muted);font-weight:400}
+.sfold::before{content:"▸ "} .sfold[aria-expanded="true"]::before{content:"▾ "} .sfold span{flex:1;text-align:left}
+#sets .squiet .srow{color:var(--muted);padding:6px 10px}
+.smain{overflow:auto;padding:22px 28px 30px;min-width:0;outline:0}
+.swrap{max-width:1560px}
+.sname{font:600 20px/1.2 var(--display);margin:0;overflow-wrap:anywhere}
+.skind{color:var(--muted);font-size:13px;margin:2px 0 12px}
+.sverdict{display:flex;gap:12px;align-items:flex-start;border-radius:10px;padding:12px 14px;margin-bottom:16px;background:var(--ok-soft);border-left:4px solid var(--ok)}
+.sverdict.bad{background:var(--chg-soft);border-left-color:var(--chg)} .sverdict.doubt{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted)}
+.sverdict b{display:block} .sverdict p{margin:0}
+#sets .slink{border:0;background:none;color:var(--accent);text-decoration:underline;padding:0;font-weight:500;border-radius:4px}
+.sstage{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:22px;align-items:start}
+.sbigrow{display:grid;gap:10px} .sbigrow.two{grid-template-columns:1fr 1fr}
+.sbigf{margin:0;min-width:0} .sbigf figcaption{font-size:13px;color:var(--muted);margin-top:4px}
+#sets .sbigb{display:block;width:100%;border:0;padding:0;border-radius:10px;overflow:hidden;background:var(--line);cursor:zoom-in}
+.sbigb:disabled{opacity:1;cursor:default}
+.sbigb .ph{display:grid;place-items:center;min-height:200px;color:var(--muted)}
+.sbigb img{width:100%;max-height:calc(100vh - 470px);min-height:200px;object-fit:contain;display:block}
+.snolarge{font-size:13px;color:var(--muted);margin-top:4px}
+.sbigcap{margin:8px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.spill{font-size:12px;border-radius:20px;padding:1px 8px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.sthis{margin:0 0 12px;max-width:80ch} .sthis ul{margin:4px 0 6px;padding-left:18px} .sthis li{margin:3px 0}
+.sstrip{display:flex;gap:26px;flex-wrap:wrap}
+.sgrp h4{font:600 12px/1 var(--body);color:var(--muted);margin:0 0 6px} .sths{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+#sets .sth{position:relative;width:118px;border:2px solid transparent;border-radius:8px;padding:0;background:none;overflow:hidden;text-align:left;font-weight:400}
+.sth.on{border-color:var(--accent)}
+.sth .ph{display:grid;place-items:center;aspect-ratio:16/9;background:var(--line);border-radius:5px;font-size:11px;color:var(--muted)}
+.sth img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border-radius:5px}
+.sthl{display:block;font-size:12px;line-height:1.3;color:var(--muted);padding:3px 4px} .sth.on .sthl{color:var(--accent);font-weight:600}
+.sfdot{position:absolute;top:5px;right:5px;width:10px;height:10px;border-radius:50%;background:var(--chg);border:2px solid var(--surface)}
+.sansh{font:600 15px/1.3 var(--body);margin:4px 0 2px;color:var(--fg);text-transform:none;letter-spacing:0}
+.soneset{color:var(--muted);margin:0 0 12px}
+.sbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 6px}
+#sets .sbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 16px;font-weight:600}
+#sets .sbtn:hover:not(:disabled){border-color:var(--accent)}
+#sets .sbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+#sets .sbtn.danger{border-color:var(--stop);color:var(--stop)}
+.ssug{font-size:11px;font-weight:600;margin-left:8px;padding:1px 6px;border-radius:4px;background:var(--surface);color:var(--accent)}
+.spanel,.sanswer{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:14px;margin:10px 0;max-width:760px}
+.sanswer{display:flex;gap:12px;align-items:center;border-color:var(--ok);background:var(--ok-soft)} .sanswer.against{border-color:var(--chg);background:var(--chg-soft)}
+.sanswer p{margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.spanel textarea{width:100%;min-height:70px} .spanel label{display:block;font-weight:600;margin-bottom:6px} .spanel .stick{font-weight:400;margin:8px 0;display:flex;gap:8px;align-items:center}
+.spanel .group{border:0;padding:0}
+.sacts{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.smsg{color:var(--stop);margin:6px 0}
+.sgate{color:var(--muted);font-size:13px;margin:4px 0}
+.sownp{margin:2px 0 8px}
+.smore{margin-top:22px;border-top:1px solid var(--line);max-width:900px}
+.smore h3{font:600 12px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+.sacc{border-bottom:1px solid var(--line)}
+#sets .sacc>button{display:flex;width:100%;border:0;border-radius:0;background:none;padding:11px 2px;text-align:left;gap:10px;font-weight:400}
+.sacc>button::before{content:"▸";color:var(--muted)} .sacc>button[aria-expanded="true"]::before{content:"▾"}
+.sacc>button .n{color:var(--muted);margin-left:auto}
+.sacc .sbody{padding:0 2px 14px 22px;max-width:70ch;overflow-wrap:anywhere} .sacc .sbody ul{margin:0;padding-left:18px} .sacc .sbody li{margin:4px 0}
+.sfrow{display:flex;gap:12px;flex-wrap:wrap}
+.scard{max-width:640px;margin:8vh auto 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px;text-align:center}
+.scard h2{font:600 22px/1.2 var(--display);margin:0 0 8px} .scard ul{text-align:left;margin:14px auto;max-width:440px}
+.sempty{color:var(--muted)}
+.stablewrap{overflow-x:auto}
+.sfoot{flex:none;border-top:1px solid var(--line);background:var(--surface);padding:8px 20px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px}
+.sfoot b{color:var(--fg)}
+@media (max-width:1000px){ .sstage{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:860px){ #sets{overflow:auto;display:block} .sapp{grid-template-columns:minmax(0,1fr)} .srail{border-right:0;border-bottom:1px solid var(--line)} .smain{padding:16px;overflow:visible} .sbigrow.two{grid-template-columns:minmax(0,1fr)} }
 </style>
 
 <div class="wrap" id="wrap">
@@ -280,16 +362,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
     <div class="tprog"><span id="tprogt"></span><i><b id="tprogb"></b></i></div>
     <div class="tpopw"><button type="button" class="tlink" data-pop="thow" aria-expanded="false">How this works</button><div class="tpop" id="thow" hidden></div></div>
     <div class="tpopw"><button type="button" class="tlink" data-pop="tkeys" aria-expanded="false">Keys</button>
-      <div class="tpop" id="tkeys" hidden><dl id="tkeys2" hidden>
-        <dt><kbd>←</kbd> <kbd>→</kbd> or <kbd>J</kbd> <kbd>K</kbd></dt><dd>Previous or next set</dd>
-        <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Choose picture A, B or C as the reference</dd>
-        <dt><kbd>A</kbd></dt><dd>Approve</dd>
-        <dt><kbd>C</kbd></dt><dd>Minor corrections</dd>
-        <dt><kbd>M</kbd></dt><dd>Make again, or make it</dd>
-        <dt><kbd>U</kbd></dt><dd>Upload my own</dd>
-        <dt><kbd>L</kbd></dt><dd id="tk2leave"></dd>
-        <dt><kbd>Esc</kbd></dt><dd>Close what is open</dd>
-      </dl><dl id="tkeys1">
+      <div class="tpop" id="tkeys" hidden><dl id="tkeys1">
         <dt><kbd>←</kbd> <kbd>→</kbd> or <kbd>J</kbd> <kbd>K</kbd></dt><dd>Previous or next thing</dd>
         <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Tick or untick a picture</dd>
         <dt><kbd>A</kbd></dt><dd>Approve</dd>
@@ -308,6 +381,15 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
     <nav class="trail" id="trail" aria-label="Things to answer"></nav>
     <main class="tmain" id="tmain" tabindex="-1"></main>
   </div>
+</div>
+
+<div id="sets" hidden>
+  <header class="shead"><h1 id="sstep"></h1><span class="sgrow"></span><button type="button" class="slink" id="shelp" aria-expanded="false"></button></header>
+  <div class="sapp">
+    <nav class="srail" id="srail" aria-label="The sets"></nav>
+    <main class="smain" id="smain" tabindex="-1"></main>
+  </div>
+  <div class="sfoot" id="sfoot"></div>
 </div>
 
 <script>
@@ -615,9 +697,10 @@ function heading(name,g,shut){   // design/211: the heading of a group of lines;
 function draw(force){
   const list=$('list');
   if(!ready){return;}
-  const things=!!(round&&round.layout&&(round.layout.kind==='things'||round.layout.kind==='sets'));   // design/212: step 1 of the references has its own layout; design/213: step 2 (the sets) is drawn in it too
-  $('things').hidden=!things; $('wrap').hidden=things;
+  const kind=round&&round.layout&&round.layout.kind, things=kind==='things', sets=kind==='sets';   // design/212: step 1 of the references has its own layout; design/216: step 2, the sets, the trial SK corrected
+  $('things').hidden=!things; $('sets').hidden=!sets; $('wrap').hidden=things||sets;
   if(things){ tDraw(); return; }
+  if(sets){ sDraw(); return; }
   if(!round){ list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); list.appendChild(el('div','state','Nothing to decide yet. The assistant writes the lines here when a step is ready.')); $('dots').textContent=''; $('msg').textContent='Nothing to decide yet'; return; }
   $('step').textContent='VideoWizard · '+(round.run||'')+' · '+(round.step||''); $('title').textContent=(round.step||'Your')+': your decisions'; $('summary').textContent=round.summary||'';
   const lines=round.lines||[], seen={};
@@ -649,7 +732,7 @@ function draw(force){
   rows.forEach((r,i)=>{ const n=nodes[r.head?'g:'+r.head:r.line.line]; if(n&&list.children[i]!==n.node) list.insertBefore(n.node,list.children[i]||null); });   // the film's order; a block already in place is not moved
   $('msg').textContent = !lines.length ? (round.note||'Nothing to decide') : open ? open+' still to answer. '+(round.note||'') : answered ? 'All answered. Go back to the chat and say done.' : (round.note||'Nothing waits for you here.');
 }
-function fail(e){ const m='Could not save ('+((e&&e.code)||'error')+'). Check that you are signed in to Claude, then try again.'; $('msg').textContent=m; if(!$('things').hidden) tRefuse(m); }
+function fail(e){ const m='Could not save ('+((e&&e.code)||'error')+'). Check that you are signed in to Claude, then try again.'; $('msg').textContent=m; if(!$('things').hidden) tRefuse(m); if(!$('sets').hidden) sRefuse(m); }
 function ref(line){ return db.doc('rounds/'+round.round+'/answers/'+line.line); }
 function marksOf(line){ const a=answers[line.line], m=a&&a.pics; return m&&Object.keys(m).length?m:null; }   // design/211: the pictures of this line answered on their own
 function write(line,choice,notes,more){ if(!db||!round) return; const m=marksOf(line); ref(line).set(Object.assign({key:line.key,item:line.item||'',choice:choice,notes:String(notes||'').slice(0,MAX),at:new Date().toISOString()},m?{pics:m}:{},more||{})).catch(fail); draw(true); }   // `more`: the operator's own picture and their words of permission (design/210 part 2)
@@ -670,14 +753,12 @@ try{ T.auto=localStorage.getItem('vw-refs-auto')!=='0'; }catch(e){}
 const mk=(tag,a,...kids)=>{ const e=document.createElement(tag);
   for(const k in a||{}){ const v=a[k]; if(k==='on') for(const ev in v) e.addEventListener(ev,v[ev]); else if(k==='hidden'||k==='disabled'||k==='checked') e[k]=v; else if(v!=null&&v!==false) e.setAttribute(k,v); }
   e.append(...kids.flat(Infinity).filter(x=>x!=null&&x!==false)); return e; };
-const tSets=()=>!!round&&(round.layout||{}).kind==='sets';   // design/213: step 2, the sets, in this layout
-const tThings=()=>(round.lines||[]).filter(l=>l.key!=='refs:proposals'&&l.key!=='sets:rest');
-const tProp=()=>(round.lines||[]).find(l=>l.key==='refs:proposals'||l.key==='sets:rest');   // the line that answers many at once: the routine things, or the waiting sets
+const tThings=()=>(round.lines||[]).filter(l=>l.key!=='refs:proposals');
+const tProp=()=>(round.lines||[]).find(l=>l.key==='refs:proposals');   // the line that answers many at once: the routine things
 const tOwn=l=>{ const a=answers[l.line]; return a&&a.choice!=='pics'?a:null; };   // the operator's own answer to this thing, on this page
-const tByProp=l=>{ const p=tProp(); return !tSets()&&!!p&&!!answers[p.line]&&(p.covers||[]).indexOf(l.key)>=0&&!tOwn(l); };   // answered by "Accept all": a thing answered alone keeps its answer
+const tByProp=l=>{ const p=tProp(); return !!p&&!!answers[p.line]&&(p.covers||[]).indexOf(l.key)>=0&&!tOwn(l); };   // answered by "Accept all": a thing answered alone keeps its answer
 const tDone=l=>!!(tOwn(l)||tByProp(l)||l.kept);
-const tCounts=l=>!tSets()||l.state==='open';   // the sets: only an open line is judged; a waiting or a settled set has nothing to press
-const tWaits=l=>tCounts(l)&&!tDone(l);
+const tWaits=l=>!tDone(l);
 const tMark=p=>({id:String(p.choice||'').slice(4),use:String(p.choice||'').indexOf('use:')===0});   // a footage picture, or the closest one found (ticked: "that is it")
 // design/212 review: a picture starts ticked when the server says so (`on`: the pictures Claude's proposal uses). Only a picture the operator unticked themselves is
 // "not this picture"; one that started unticked and stays so is simply not used; one they ticked themselves is used.
@@ -688,18 +769,17 @@ function tMarks(l){ const m={}; (l.pics||[]).forEach(p=>{ const k=tMark(p), on=t
 function tRefuse(text){ T.msg=text||''; const m=$('tmsg'); if(m){ m.textContent=T.msg; m.hidden=!T.msg; } }
 function tAnswer(l,choice,notes,more){   // an answer is written as every line's answer is; the ticks travel with it as the pictures' own answers
   T.panel=null; T.msg=''; clearTimeout(T.timer);
-  write(l,choice,notes||'',Object.assign(tSets()?{}:{pics:choice==='ignore'||choice==='own'?{}:tMarks(l)},more||{}));
+  write(l,choice,notes||'',Object.assign({pics:choice==='ignore'||choice==='own'?{}:tMarks(l)},more||{}));
   if(T.auto) T.timer=setTimeout(()=>{ if((tThings()[T.cur]||{}).line===l.line) tNextOpen(true); },1200);
 }
-function tUndo(l){ clearTimeout(T.timer); if(!db||!round) return; ref(l).delete().catch(fail);
-  const r=tSets()&&tProp(), b=r&&r!==l&&l.case==='judge'&&sRestAns(); if(b&&!b.loss) ref(r).delete().catch(fail); }   // the sets: "Make them" stands only while every judged set has its answer
+function tUndo(l){ clearTimeout(T.timer); if(!db||!round) return; ref(l).delete().catch(fail); }
 function tAct(l,b){   // one of the thing's buttons: refused here, in the server's own words, when it needs a picture ticked and none is
   const need=(l.tick||{})[b.choice];
   if(need&&!tKept(l).length) return tRefuse(need);
   if(b.needs_words||b.choice==='ignore') return tOpen(T.panel===b.choice?null:b.choice);
   tAnswer(l,b.choice,'');
 }
-function tOpen(p){ T.panel=p; T.msg=''; clearTimeout(T.timer); tDraw(); const f=(tSets()&&$('tleave')&&$('tcancel'))||document.querySelector('#tpanel textarea, #tpanel input, #tpanel button'); if(f) f.focus(); }   // the sets: leaving out is never one key away
+function tOpen(p){ T.panel=p; T.msg=''; clearTimeout(T.timer); tDraw(); const f=document.querySelector('#tpanel textarea, #tpanel input, #tpanel button'); if(f) f.focus(); }   // the sets: leaving out is never one key away
 function tGo(i){ clearTimeout(T.timer); T.show=false; T.cur=i; T.panel=null; T.msg=''; tDraw(); }
 function tStep(d){ const n=tThings().length; if(n) tGo(T.cur<0?(d>0?0:n-1):(T.cur+d+n)%n); }
 function tNextOpen(auto){ const list=tThings(), n=list.length;
@@ -712,11 +792,9 @@ function tTick(l,p,on,fig){   // a tick changed: an answer already given follows
   else write(l,a.choice,a.notes,{pics:tMarks(l)});
 }
 const W=()=>(round&&(round.layout||{}).words)||{};   // design/215: the words of these screens are the server's (`layout.words`); the page holds none of them
-function tTag(l){ const a=tOwn(l), T_DONE=W().done||{}; if(tSets()) return a?(sBtn(l,a).label||a.choice):l.kept||sWaitTag(l)||l.tag||''; return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||((l.buttons||[]).find(x=>x.choice===a.choice)||{}).label||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
+function tTag(l){ const a=tOwn(l), T_DONE=W().done||{}; return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||((l.buttons||[]).find(x=>x.choice===a.choice)||{}).label||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
 function tSays(l){   // the answer as it stands, said back
   const a=tOwn(l), q=s=>'“'+s+'”', has=(l.pics||[]).length>0;
-  if(tSets()){ if(!a) return ['Kept from before: ',l.kept+'.'+(l.kept_note?' '+l.kept_note:'')];   // the sentence is the server's: the chosen picture's, else the button's
-    const p=(l.pics||[]).find(x=>x.choice&&x.choice===a.choice), b=sBtn(l,a); return ['Your answer: ',String((p&&p.say)||b.say||b.label||a.choice).replace('{words}',a.notes||'')]; }
   const sb=a&&(l.buttons||[]).find(x=>x.choice===a.choice&&x.say); if(sb){ const k=tKept(l).length; return ['Your answer: ',String(sb.say).replace('{words}',a.notes||'').replace('{pictures}',k+' ticked picture'+(k===1?'':'s'))]; }   // design/213: the server's own sentence, where the button has one
   if(!a) return tByProp(l)?['Your answer: ',((l.rec||{}).label||'Accepted')+". (Claude's proposal, accepted.)"]:l.case==='auto'?['Decided: ',l.kept+'. No answer is needed.']:['Kept from before: ',l.kept+(l.kept_how?' '+l.kept_how:'')+'. Choose another answer to change it.'];
   // what will happen, said plainly: which pictures the answer uses, or that the set is made from the description
@@ -732,22 +810,17 @@ function tLarge(p,btn){   // on a wide screen the row's pictures are wider than 
   zoomUrl[p.code].then(u=>{ const img=btn.querySelector('img'); if(!img||!/^\/_blob\/[0-9a-f]{32}$/.test(u)) return; const small=img.src; img.onload=null; img.onerror=()=>{ img.onerror=null; img.src=small; }; img.src=u; });
 }
 function tTop(list){
-  const n=list.filter(tCounts).length, a=list.filter(l=>tCounts(l)&&tDone(l)).length, lay=round.layout||{}, s=tSets();
-  $('tstep').textContent=s?(round.step||''):(round.step||'References')+', step 1'; $('tprogt').textContent=a+' of '+n+(s?' judged':' answered'); $('tprogb').style.width=(n?100*a/n:0)+'%';
-  if(s) $('thow').replaceChildren(...[].concat(lay.help||[]).map(x=>mk('p',{},x))); else
+  const n=list.length, a=list.filter(tDone).length, lay=round.layout||{};
+  $('tstep').textContent=(round.step||'References')+', step 1'; $('tprogt').textContent=a+' of '+n+' answered'; $('tprogb').style.width=(n?100*a/n:0)+'%';
   $('thow').replaceChildren(mk('p',{},lay.help||round.note||''),round.summary&&mk('p',{},round.summary)); $('tauto').checked=!!T.auto;
-  $('tnextopen').textContent=s?'Next to judge':'Next to answer'; $('tkeys1').hidden=s; $('tkeys2').hidden=!s;
-  $('tk1leave').textContent=W().leave||''; $('tk2leave').textContent=W().leave_set||''; $('tk1fix').textContent=(W().fix?W().fix+', or words':'Words')+' for the picture';
+  $('tnextopen').textContent='Next to answer';
+  $('tk1leave').textContent=W().leave||''; $('tk1fix').textContent=(W().fix?W().fix+', or words':'Words')+' for the picture';
   $('tstop').hidden=!lay.stopped; $('tstop').textContent=lay.stopped?'Not recorded: '+lay.stopped:'';
 }
 function tAccept(prop){ const b=(prop.buttons||[])[0]; if(b) write(prop,b.choice,''); }
 function tRail(list){
   const rail=$('trail'), top=rail.scrollTop, kids=[], prop=tProp();
-  if(prop&&tSets()){   // design/213: the waiting sets, made or left out together once the first sets are judged
-    const ans=sRestAns();
-    kids.push(mk('div',{class:'tprop'},mk('p',{},ans?(ans.say||ans.label||''):prop.head),mk('div',{class:'trow2'},sRest(prop,list,false)),
-      !ans&&!sJudged(list)&&mk('p',{class:'tmore',id:'trestwhy'},prop.why)));
-  } else if(prop){   // "Accept Claude's proposals for the N routine things", with a button that shows them first
+  if(prop){   // "Accept Claude's proposals for the N routine things", with a button that shows them first
     const rt=list.filter(l=>(prop.covers||[]).indexOf(l.key)>=0), left=rt.filter(l=>!tDone(l)).length, b=(prop.buttons||[])[0]||{};
     kids.push(mk('div',{class:'tprop'},mk('p',{},left?prop.head:'The '+rt.length+' routine things are answered.'),
       mk('div',{class:'trow2'},
@@ -757,35 +830,26 @@ function tRail(list){
         mk('button',{class:'tlink',id:'twhat',type:'button','aria-expanded':String(!!T.fold['?']),'aria-controls':'tpmore',on:{click:()=>{ T.fold['?']=!T.fold['?']; tRail(list); }}},'what this does')),
       mk('p',{class:'tmore',id:'tpmore',hidden:!T.fold['?']},prop.text)));
   }
-  kids.push(mk('div',{class:'tfil',role:'group','aria-label':'Show'},[['all','All'],['open',tSets()?'To judge':'To answer'],['done',tSets()?'Judged':'Answered']].map(f=>
+  kids.push(mk('div',{class:'tfil',role:'group','aria-label':'Show'},[['all','All'],['open','To answer'],['done','Answered']].map(f=>
     mk('button',{class:'tchip',type:'button','aria-pressed':String(T.filter===f[0]),'data-filter':f[0],on:{click:()=>{ T.filter=f[0]; tRail(list); }}},f[1]))));
   const groups=[]; list.forEach((l,i)=>{ const g=l.group||''; let o=groups.find(x=>x.g===g); if(!o) groups.push(o={g:g,rows:[]}); o.rows.push([l,i]); });   // the groups, in the order the server sent the things
   let shown=0;
   groups.forEach((o,gi)=>{
-    const rows=o.rows.filter(r=>T.filter==='all'||(tCounts(r[0])&&(T.filter==='done')===tDone(r[0]))); if(!rows.length) return;
+    const rows=o.rows.filter(r=>T.filter==='all'||(T.filter==='done')===tDone(r[0])); if(!rows.length) return;
     shown+=rows.length; const open=!T.fold[o.g];
     kids.push(mk('button',{class:'tgh',type:'button','aria-expanded':String(open),'aria-controls':'tgrp'+gi,on:{click:()=>{ T.fold[o.g]=open; tRail(list); }}},mk('span',{},o.g),String(rows.length)));
     kids.push(mk('ul',{id:'tgrp'+gi,hidden:!open},rows.map(r=>{ const l=r[0], i=r[1], n=(l.pics||[]).length, d=tDone(l);
-      return mk('li',{},mk('button',{class:'trow'+(d?' done':'')+(tCounts(l)?'':' calm'),type:'button','aria-current':i===T.cur&&!T.show?'true':null,'data-i':i,on:{click:()=>tGo(i)}},
-        mk('i',{class:'tdot',title:tSets()?tTag(l):d?'Answered':'To answer'}),mk('span',{class:'tnm',title:l.name},l.name),
-        mk('span',{class:'tmeta'},l.kind,!tSets()&&mk('span',{class:'tcount'},n?n+(n>1?' pictures':' picture'):'no picture'),mk('span',{class:'ttag'},tSets()||d?tTag(l):((l.rec||{}).label||'')))));
+      return mk('li',{},mk('button',{class:'trow'+(d?' done':''),type:'button','aria-current':i===T.cur&&!T.show?'true':null,'data-i':i,on:{click:()=>tGo(i)}},
+        mk('i',{class:'tdot',title:d?'Answered':'To answer'}),mk('span',{class:'tnm',title:l.name},l.name),
+        mk('span',{class:'tmeta'},l.kind,mk('span',{class:'tcount'},n?n+(n>1?' pictures':' picture'):'no picture'),mk('span',{class:'ttag'},d?tTag(l):((l.rec||{}).label||'')))));
     })));
   });
-  if(!shown) kids.push(mk('p',{class:'tempty'},tSets()?(T.filter==='open'?'Nothing left to judge.':'Nothing judged yet.'):T.filter==='open'?'Nothing left to answer.':'Nothing answered yet.'));
+  if(!shown) kids.push(mk('p',{class:'tempty'},T.filter==='open'?'Nothing left to answer.':'Nothing answered yet.'));
   rail.replaceChildren(...kids); rail.scrollTop=top;
   const c=rail.querySelector('.trow[aria-current]'); if(c) c.scrollIntoView({block:'nearest'});
 }
 function tPanel(l){   // what opens under the buttons: the words box, the operator's own picture (the page's own upload), or what leaving out costs
   const cancel=mk('button',{class:'tbtn quiet',id:'tcancel',type:'button',on:{click:()=>tOpen(null)}},'Cancel');
-  if(tSets()&&T.panel!=='own'){   // design/213: the words box, the small confirm of "make again", or what leaving out loses; every sentence is the server's
-    const b=(l.buttons||[])[+String(T.panel).slice(1)]||{}, loss=l.loss||{}, go=(id,cls,label,words)=>mk('button',{class:'tbtn '+cls,id:id,type:'button',on:{click:()=>{
-      const w=words?words.value.trim().slice(0,MAX):''; if(words&&!w){ tRefuse('Write what should change first.'); words.focus(); return; }
-      const all=b.all&&$('tall'); tAnswer(l,all&&all.checked?b.all.choice:b.choice,w); }}},label);   // design/215: "applies to every picture of this thing", off unless ticked
-    if(b.needs_words){ const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)}); return [mk('label',{for:'tfix'},b.hint||'What should change?'),ta,
-      b.all?mk('label',{class:'tnote',for:'tall'},mk('input',{type:'checkbox',id:'tall'}),' '+b.all.label):null,mk('div',{class:'tacts'},go('tfixsend','go',b.go||b.label,ta),cancel)]; }
-    if(b.act==='leave') return [mk('p',{},loss.text||''),(loss.shots||[]).length?mk('ul',{},loss.shots.map(x=>mk('li',{},x))):null,mk('div',{class:'tacts'},go('tleave','stop',b.label),cancel)];
-    return [mk('p',{},b.ask||''),mk('div',{class:'tacts'},go('tagain','go',b.label),cancel)];
-  }
   const wb=(l.buttons||[]).find(x=>x.choice===T.panel&&x.needs_words&&x.choice!=='fix');
   if(wb){   // design/213: an answer of the server's that needs the operator's own words (the permission of a person the footage shows)
     const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)});
@@ -807,7 +871,6 @@ function tPanel(l){   // what opens under the buttons: the words box, the operat
 }
 function tMain(list){
   const main=$('tmain'), l=list[T.cur], prop=tProp(), fold=tFold;
-  if(tSets()&&(T.show||!l)){ main.replaceChildren(...sOther(list,prop).flat(4).filter(Boolean)); main.scrollTop=0; return; }
   const small=(p,cls)=>{ const s=mk('span',{class:cls},mk('span',{class:'ph'},p.missing?'Not available':'…')); if(!p.missing) loadThumb(p,s,()=>{},0); return s; };
   if(T.show&&prop){   // the routine things, to be seen before they are accepted together
     const rt=list.filter(x=>(prop.covers||[]).indexOf(x.key)>=0), left=rt.filter(x=>!tDone(x)).length, b=(prop.buttons||[])[0]||{};
@@ -841,11 +904,10 @@ function tMain(list){
       mk('div',{class:'tnav'},mk('button',{class:'tbtn',id:'tprev',type:'button','aria-label':'Previous thing',on:{click:()=>tStep(-1)}},'‹ Previous'),
         mk('span',{},(T.cur+1)+' of '+list.length),mk('button',{class:'tbtn',id:'tnext',type:'button','aria-label':'Next thing',on:{click:()=>tStep(1)}},'Next ›'))),
     mk('p',{class:'tsub',title:l.desc},l.desc),usedFull);
-  if(!tSets()&&l.likeness) kids.push(mk('p',{class:'tstrip',id:'tlikeness'},mk('b',{},l.likeness.ask)));   // design/213: the one question for a person the footage shows
-  if(!tSets()&&l.differs) kids.push(mk('p',{class:'changed tsaid',id:'tdiffers'},l.differs));   // design/213: where the plan and the footage differ, said openly
+  if(l.likeness) kids.push(mk('p',{class:'tstrip',id:'tlikeness'},mk('b',{},l.likeness.ask)));   // design/213: the one question for a person the footage shows
+  if(l.differs) kids.push(mk('p',{class:'changed tsaid',id:'tdiffers'},l.differs));   // design/213: where the plan and the footage differ, said openly
   if(l.refused) kids.push(mk('p',{class:'tmsg',id:'trefused'},'Not recorded: '+l.refused));   // the server's refusal of the last "done", kept on its thing
-  let bar=[];
-  if(tSets()) bar=sBody(l,kids,gate,check); else {
+  const bar=[];
   if(l.note) kids.push(mk('p',{class:'changed',id:'tcame'},l.note,' ',l.again&&l.again.choice&&mk('button',{class:'tbtn',id:'tconfirm',type:'button',on:{click:()=>tAnswer(l,l.again.choice,l.again.notes||'')}},'Confirm my answer')));   // design/212 review: a new picture came; the answer given waits for a look at it
   if(l.rec){
     const why=mk('p',{class:'tstrip',id:'twhy',hidden:true},l.rec.reason), wb=mk('button',{class:'tlink',id:'twhyb',type:'button','aria-expanded':'false','aria-controls':'twhy'},'Why?'); fold(wb,why);
@@ -873,11 +935,10 @@ function tMain(list){
     const first=i===0&&!!sug&&b.choice===sug, pan=b.needs_words||b.choice==='ignore';
     bar.push(mk('button',{class:'tbtn'+(first?' go':b.choice==='ignore'?' quiet':''),type:'button','data-act':b.choice,'aria-expanded':pan?String(T.panel===b.choice):null,on:{click:()=>tAct(l,b)}},b.label,first&&[' ',mk('span',{class:'tsug'},'Suggested')]));
     if(b.note) bar.push(mk('span',{class:'tnote','data-note':b.choice},b.note)); });   // design/215: a hint beside a button, the server's
-  }
-  if(l.own&&assets&&(bar.length||!tSets())){ const at=bar.findIndex((x,i)=>i>0&&/^(ignore|leave)$/.test(x.getAttribute('data-act')));
+  if(l.own&&assets){ const at=bar.findIndex((x,i)=>i>0&&/^(ignore|leave)$/.test(x.getAttribute('data-act')));
     bar.splice(at<0?bar.length:at,0,mk('button',{class:'tbtn',type:'button','data-act':'own','aria-expanded':String(T.panel==='own'),on:{click:()=>tOpen(T.panel==='own'?null:'own')}},l.own.label)); }
   if(pics.length) bar.forEach(b=>gate.push(b));
-  if(bar.length||!tSets()) kids.push(mk('div',{class:'tbar',role:'group','aria-label':'Your answer'},bar),
+  kids.push(mk('div',{class:'tbar',role:'group','aria-label':'Your answer'},bar),
     (l.buttons||[]).filter(b=>b.small).map(b=>mk('p',{class:'tnote'},mk('button',{class:'tlink',type:'button','data-act':'words',on:{click:()=>tAct(l,b)}},b.label+' (optional)'))),
     mk('p',{class:'tnote',id:'tmade'},(round.layout||{}).made||''),gmsg,
     mk('p',{class:'tmsg',id:'tmsg',role:'status',hidden:!T.msg},T.msg));
@@ -885,7 +946,7 @@ function tMain(list){
   if(tDone(l)){ const a=tOwn(l), s=tSays(l);
     kids.push(mk('div',{class:'tanswer',id:'tanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'Your own picture',src:a.own.url}),mk('p',{},mk('b',{},s[0]),s[1]),
       a&&mk('button',{class:'tbtn',id:'tundo',type:'button',on:{click:()=>tUndo(l)}},'Undo'))); }
-  const det=mk('div',{class:'tdetails',id:'tdetails',hidden:true},mk('dl',{},tSets()?(l.details||[]).map(r=>[mk('dt',{},r[0]),[].concat(r[1]).map(x=>mk('dd',{},x))]):[
+  const det=mk('div',{class:'tdetails',id:'tdetails',hidden:true},mk('dl',{},[
     mk('dt',{},'Description'),mk('dd',{},l.desc),
     l.used&&[mk('dt',{},'Shots'),mk('dd',{},l.used)],
     l.search&&[mk('dt',{},'What the search found'),mk('dd',{},l.search.text+(l.search.why?' '+l.search.why:''))],
@@ -897,88 +958,177 @@ function tMain(list){
   kids.push(detBtn,det);
   main.replaceChildren(...kids.flat(3).filter(Boolean)); main.scrollTop=0; check();
 }
-// ---------- design/213: step 2 of the references, "the sets", in the layout above (`round.layout.kind==='sets'`) ----------
-// The server sends every group, the order, each set's case, its buttons (each with its slot `act` and the sentence `say` its answer reads back),
-// and the waiting sets as one line (`sets:rest`). Nothing is parsed here: this draws them and writes the answers as every line's answer is written.
 const tFold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!target.hidden; btn.setAttribute('aria-expanded',String(!target.hidden)); });
-function sBtn(l,a){ return a.choice==='own'?(l.own||{}):(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{}; }   // the button an answer came from
-const sRestAns=()=>{ const r=tProp(), a=r&&answers[r.line]; return a?((r.buttons||[]).find(b=>b.choice===a.choice)||{choice:a.choice}):null; };   // how the waiting sets were answered
-const sJudged=list=>list.every(l=>l.case!=='judge'||tDone(l));
-const sWaitTag=l=>{ const r=tProp(), b=sRestAns(); return b&&(r.covers||[]).indexOf(l.key)>=0?(b.loss&&l.out?W().wait_out||'':W().wait_made||''):''; };
-function sPicked(l){   // the picture chosen as the reference: the only one that can be, the one clicked here, or the one of the answer given
-  const c=(l.pics||[]).filter(p=>p.choice), t=T.tick[l.line], a=tOwn(l);
-  return c.length===1?c[0]:c.find(p=>t!==undefined?p.code===t:!!a&&p.choice===a.choice)||null; }
-function sPick(l,p){   // a click on the chosen picture takes the choice back; an approval already given follows the choice, or is taken back with it
-  const on=sPicked(l)===p?null:p, a=tOwn(l), was=a&&(l.pics||[]).some(x=>x.choice===a.choice);
-  clearTimeout(T.timer); T.tick[l.line]=on?on.code:''; T.msg='';
-  if(was&&on) write(l,on.choice,''); else { if(was) tUndo(l); tDraw(); } }
+// ---------- design/216 (SK, 18 Nov 2026): step 5 of the references, "the sets" (`round.layout.kind==='sets'`), as on the trial SK corrected ----------
+// The list holds only what needs an answer, numbered, then "The other N sets"; one set at a time: its large picture, its small pictures below, and
+// beside it one answer for the whole set. Every word is the server's: the line's own (its heading, its buttons, what each answer will do) and the
+// screen's (`layout.words.sets`). Answers are written as every line's answer is written (`write`, `ref`); nothing is recorded before "done".
+const S={round:'',cur:null,panel:null,msg:'',timer:0,help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{}};
+const SW=()=>W().sets||{};
+const sLines=()=>(round.lines||[]).filter(l=>l.key!=='sets:rest');
+const sRest=()=>(round.lines||[]).find(l=>l.key==='sets:rest'&&l.state==='open')||null;
+const sMade=l=>(l.pics||[]).filter(p=>!p.ref_only);
+const sFoot=l=>(l.pics||[]).filter(p=>p.ref_only);
+const sAns=l=>{ const a=answers[l.line]; return a&&a.choice!=='pics'?a:null; };
+const sDone=l=>!!(sAns(l)||l.kept);
+const sWaiting=()=>{ const r=sRest(); return r?sLines().filter(l=>(r.covers||[]).indexOf(l.key)>=0):[]; };
+const sItems=()=>sLines().filter(l=>l.state==='open').concat(sRest()&&sWaiting().length?[sRest()]:[]);   // what needs an answer, then the other sets (A10)
+const sJudged=()=>sLines().every(l=>l.case!=='judge'||sDone(l));
+const sBtn=(l,a)=>a.choice==='own'?{act:'own',label:(l.own||{}).label,say:(l.own||{}).say}:(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{};
+const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
+function sMain(l){ const m=sMade(l), a=sAns(l), c=S.pick[l.line]; return m.find(p=>c?p.code===c:!!a&&!!p.choice&&p.choice===a.choice)||m[0]; }   // A7: A, unless another is made the main picture
+function sSays(l){   // the answer as it stands, in the server's words: the main picture's sentence, else the button's
+  const a=sAns(l), w=SW(); if(!a) return l.kept?[w.kept,l.kept]:['',''];
+  const p=(l.pics||[]).find(x=>x.choice&&x.choice===a.choice), b=sBtn(l,a), all=!!b.all&&b.all.choice===a.choice;
+  return [w.answer,String((p&&p.say)||(all?b.all.say:b.say)||b.label||a.choice).replace('{words}',a.notes||'')]; }
+function sRefuse(m){ S.msg=m||''; const e=$('smsg'); if(e){ e.textContent=S.msg; e.hidden=!S.msg; } }
+function sGo(id){ clearTimeout(S.timer); S.cur=id; S.panel=null; S.msg=''; S.help=false; S.open={}; sDraw(); $('smain').scrollTop=0; }
+function sAnswer(l,choice,notes,more){   // as every line's answer is written; after a moment the next thing that needs an answer opens
+  S.panel=null; S.msg=''; write(l,choice,notes||'',more||{}); clearTimeout(S.timer);
+  S.timer=setTimeout(()=>{ if(S.cur!==l.line) return; const n=sItems().find(x=>x.line!==l.line&&!sDone(x)); sGo(n?n.line:null); },1100); }
+function sUndo(l){ clearTimeout(S.timer); if(!db||!round) return; ref(l).delete().catch(fail);
+  const r=sRest(), b=r&&r!==l&&l.case==='judge'&&answers[r.line]; if(b&&b.choice==='rest') ref(r).delete().catch(fail); }   // "Make the other N" stands only while every judged set has its answer
+function sOpen(p){ S.panel=p; S.msg=''; clearTimeout(S.timer); sMainDraw(); const f=document.querySelector('#spanel textarea, #spanel input, #spanel button'); if(f) f.focus(); }
 function sAct(l,b,i){
-  if(b.act==='approve'){ const p=sPicked(l); if(l.pick&&!p) return tRefuse((round.layout||{}).pick||''); return tAnswer(l,l.pick?p.choice:b.choice,''); }
-  if(b.needs_words||b.act==='again'||b.act==='leave') return tOpen(T.panel==='b'+i?null:'b'+i);
-  tAnswer(l,b.choice,'');
+  if(b.act==='approve'){ if(l.sure) return sOpen(S.panel==='sure'?null:'sure'); const p=l.pick&&sMain(l); return sAnswer(l,p?p.choice:b.choice,''); }   // A6: against "make again", asked once
+  if(b.needs_words||b.act==='again'||b.act==='leave') return sOpen(S.panel==='b'+i?null:'b'+i);
+  sAnswer(l,b.choice,'');
 }
-function sShow(m){ clearTimeout(T.timer); T.show=m; T.panel=null; T.msg=''; tDraw(); const c=m==='leave'&&$('tclose'); if(c) c.focus(); }
-function sRestSet(rest,b){ T.show=false; if(!tThings().some(tWaits)) T.cur=-1; write(rest,b.choice,''); }
-function sRest(rest,list,big){   // the buttons of the waiting sets: small in the list's banner, large on the card
-  const bs=rest.buttons||[], show=mk('button',{class:'tbtn',type:'button','data-rest':'show',on:{click:()=>sShow('list')}},rest.show||'');
-  if(sRestAns()) return [show,mk('button',{class:'tbtn',type:'button','data-rest':'undo',on:{click:()=>tUndo(rest)}},'Undo')];
-  return [bs[0]&&mk('button',{class:'tbtn go',type:'button','data-rest':bs[0].choice,disabled:!sJudged(list),'aria-describedby':sJudged(list)?null:'trestwhy',on:{click:()=>sRestSet(rest,bs[0])}},(big&&bs[0].big)||bs[0].label),show,
-    bs.filter(b=>b.loss).map(b=>mk('button',{class:big?'tbtn quiet':'tlink',type:'button','data-rest':b.choice,on:{click:()=>sShow('leave')}},b.label))];
+function sPick(l,p){ S.pick[l.line]=p.code; const a=sAns(l); if(a&&(l.pics||[]).some(x=>x.choice===a.choice)) write(l,p.choice,''); else sMainDraw(); }   // an approval given follows the main picture
+function sAcc(id,title,n,body){ const o=!!S.open[id];
+  return mk('div',{class:'sacc'},mk('button',{type:'button','aria-expanded':String(o),'data-acc':id,on:{click:()=>{ S.open[id]=!o; sMainDraw(); }}},mk('span',{},title),n!=null&&mk('span',{class:'n'},String(n))),o&&mk('div',{class:'sbody'},body)); }
+function sDetails(l){   // A9: the server's rows, each folded
+  const rows=(l.details||[]).map((d,i)=>{ const v=[].concat(d[1]).filter(Boolean); return v.length?sAcc('d'+i,d[0],v.length>1?v.length:null,v.length>1?mk('ul',{},v.map(x=>mk('li',{},String(x)))):mk('p',{},String(v[0]))):null; }).filter(Boolean);
+  return rows.length?mk('section',{class:'smore'},mk('h3',{},SW().details),rows):null; }
+function sImg(p,cls,list,onShown){   // a small picture of the page's database in a button; a click opens the large one (`openZoom`)
+  const b=mk('button',{class:cls,type:'button','aria-label':p.label,on:{click:e=>openZoom(list,list.indexOf(p),e.currentTarget)}},mk('span',{class:'ph'},p.missing?SW().missing:SW().loading));
+  if(!p.missing) loadThumb(p,b,onShown||(()=>{}),0); return b; }
+function sBig(p,list,check){   // the large picture: the small one first, then the large copy of the file store; without it the small one enlarged, said so
+  const note=mk('p',{class:'snolarge',hidden:true},SW().no_large), b=mk('button',{class:'sbigb',type:'button',disabled:true,'aria-label':p.label,on:{click:e=>openZoom(list,list.indexOf(p),e.currentTarget)}},mk('span',{class:'ph'},p.missing?SW().missing:SW().loading));
+  if(!p.missing) loadThumb(p,b,()=>{ check(); const img=b.querySelector('img'); if(!img) return; if(!zoomUrl[p.code]) zoomUrl[p.code]=picDoc('zoom',p.code,'url');
+    zoomUrl[p.code].then(u=>{ if(!/^\/_blob\/[0-9a-f]{32}$/.test(u)){ delete zoomUrl[p.code]; note.hidden=false; return; } const small=img.src; img.onload=null; img.onerror=()=>{ img.onerror=null; img.src=small; note.hidden=false; }; img.src=u; }); },0);
+  return [b,note]; }
+function sPanel(l){   // what opens under the buttons: the against-advice question, the words box, the confirm of "make again", what going on without loses, the operator's own picture
+  const w=SW(), cancel=mk('button',{class:'sbtn',id:'scancel',type:'button',on:{click:()=>sOpen(null)}},w.cancel);
+  if(S.panel==='sure'){ const p=l.pick&&sMain(l), b=(l.buttons||[]).find(x=>x.act==='approve')||{};
+    return [mk('label',{},l.sure.ask),mk('p',{},l.sure.text),mk('div',{class:'sacts'},mk('button',{class:'sbtn',id:'ssure',type:'button',on:{click:()=>sAnswer(l,p?p.choice:b.choice,'')}},l.sure.go),
+      mk('button',{class:'sbtn primary',id:'sback',type:'button',on:{click:()=>sOpen(null)}},l.sure.back))]; }
+  if(S.panel==='own') return [ownBox(l),mk('div',{class:'sacts'},cancel)];
+  const b=(l.buttons||[])[+String(S.panel).slice(1)]||{};
+  if(b.needs_words){ const ta=mk('textarea',{id:'sfix',maxlength:String(MAX)}), tick=b.all&&mk('input',{type:'checkbox',id:'sall'}); ta.value=S.words[l.line]||''; ta.addEventListener('input',()=>{ S.words[l.line]=ta.value; });
+    return [mk('label',{for:'sfix'},b.hint||w.fix_ask),ta,tick&&mk('label',{class:'stick',for:'sall'},tick,b.all.label),
+      mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sfixsend',type:'button',on:{click:()=>{ const t=ta.value.trim().slice(0,MAX); if(!t){ sRefuse(b.hint||w.fix_need); ta.focus(); return; }
+        sAnswer(l,tick&&tick.checked?b.all.choice:b.choice,t); }}},b.go||b.label),cancel)]; }
+  if(b.act==='leave'){ const loss=l.loss||{}; return [mk('label',{},loss.text||''),(loss.shots||[]).length?mk('p',{},loss.shots.join(', ')):null,
+    mk('div',{class:'sacts'},mk('button',{class:'sbtn danger',id:'sleave',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},b.label),cancel)]; }
+  return [mk('label',{},b.ask||''),mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sagain',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},w.again_go),cancel)];
 }
-function sOther(list,rest){   // the main panel when no set is open: the waiting sets listed, what leaving some out loses, the card of the waiting sets, or "all answered"
-  const lay=round.layout||{}, ans=sRestAns(), close=label=>mk('button',{class:'tbtn'+(label==='Cancel'?' quiet':''),id:'tclose',type:'button',on:{click:()=>sShow(false)}},label);
-  const b=rest&&(rest.buttons||[]).find(x=>x.loss);
-  if(T.show==='leave'&&b){ const loss=b.loss; return [
-    mk('div',{class:'thead'},mk('h2',{},loss.head)),mk('p',{class:'tnote'},loss.intro),grid(loss.cols,loss.rows,'loss'),
-    loss.people&&mk('p',{class:'tstrip',id:'tpeople'},loss.people),
-    mk('div',{class:'tbar'},mk('button',{class:'tbtn stop',id:'trestout',type:'button',disabled:!sJudged(list),'aria-describedby':sJudged(list)?null:'trestoutwhy',on:{click:()=>sRestSet(rest,b)}},loss.button||b.label),close('Cancel')),
-    !sJudged(list)&&mk('p',{class:'tmore',id:'trestoutwhy'},rest.why),   // design/213 review: as "Make them": not before the first sets are judged
-    mk('p',{class:'tnote'},lay.made||'')]; }
-  if(T.show&&rest) return [
-    mk('div',{class:'thead'},mk('h2',{},rest.list_head||rest.head),mk('div',{class:'tnav'},close('Close'))),
-    mk('p',{class:'tnote'},ans?(ans.say||''):rest.list_note),
-    mk('div',{class:'tplist'},list.filter(x=>(rest.covers||[]).indexOf(x.key)>=0).map(x=>mk('div',{class:'tprow'},
-      mk('div',{class:'tptx'},mk('p',{},mk('b',{},x.name),' ',x.kind&&mk('span',{class:'tkind'},x.kind),ans&&mk('span',{class:'tsug'},sWaitTag(x))),mk('p',{class:'tnote'},x.wait_note||'')),
-      mk('button',{class:'tbtn',type:'button','data-open':x.key,on:{click:()=>tGo(list.indexOf(x))}},'Open'))))];
-  if(list.length&&!list.some(tWaits)) return rest&&!ans
-    ?[mk('div',{class:'tcard',id:'trestcard'},mk('h2',{},rest.head),mk('div',{class:'tbar'},sRest(rest,list,true)),mk('p',{class:'tnote'},lay.made||''))]
-    :[mk('div',{class:'talldone'},mk('h2',{},'All answered.'),mk('p',{},'Go back to the chat and say done.'),ans&&ans.say&&mk('p',{class:'tnote'},ans.say))];
-  return [mk('p',{class:'tempty'},'Choose a thing from the list.')];
+function sThing(l){
+  const w=SW(), a=sAns(l), kids=[mk('h2',{class:'sname'},l.name||l.title),mk('p',{class:'skind'},[l.kind,l.shots].filter(Boolean).join(' · '))], side=[], gate=[], m=sMade(l), foot=sFoot(l);
+  const seen=(l.pics||[]), gmsg=mk('p',{class:'sgate',id:'sgate',hidden:true}), sideBox=mk('div',{class:'sside'});
+  const check=()=>{ if(!gate.length) return; const bad=seen.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=seen.filter(p=>picSeen[p.code]!=='ok').length;   // as on every line with pictures (design/210)
+    gate.forEach(b=>{ b.disabled=!!(bad.length||wait); }); gmsg.textContent=bad.length?String(w.gate_bad||'').replace('{pics}',bad.join(', ')):wait?w.gate_wait:''; gmsg.hidden=!gmsg.textContent; };
+  if(l.case==='judge'&&m.length){
+    const mp=sMain(l), sel=m.find(p=>p.code===S.view[l.line])||mp, all=m.concat(foot);
+    const cmp=!!S.cmpOn[l.line]&&foot.length>0, mate=foot.find(x=>x.code===S.cmp[l.line])||foot[Math.min(Math.max(m.indexOf(sel),0),foot.length-1)];   // A2: the footage beside the set's picture, never in its place
+    const big=(p,cap)=>mk('figure',{class:'sbigf'},sBig(p,all,check),cap&&mk('figcaption',{},cap));
+    const thumb=p=>{ const on=p===sel||(cmp&&p===mate);
+      return mk('button',{class:'sth'+(on?' on':''),type:'button','aria-pressed':String(on),'aria-label':p.ref_only?(p.cmp_cap||p.label):p.label,'data-code':p.code,on:{click:()=>{
+          if(!p.ref_only){ S.view[l.line]=p.code; delete S.cmp[l.line]; } else if(cmp&&p===mate) S.cmpOn[l.line]=false; else { S.cmp[l.line]=p.code; S.cmpOn[l.line]=true; } sMainDraw(); }}},
+        mk('span',{class:'ph'},p.missing?w.missing:w.loading),mk('span',{class:'sthl'},p.ref_only?(p.view||p.label):[p.letter&&mk('b',{},p.letter),' '+(p.view||p.label)]),
+        !p.ref_only&&(p.faults||[]).length?mk('i',{class:'sfdot','aria-hidden':'true'}):null); };
+    const viewer=mk('div',{class:'sviewer'},
+      mk('div',{class:'sbigrow'+(cmp?' two':''),id:'sbig'},big(sel,cmp&&sel.set_cap),cmp&&big(mate,mate.cmp_cap)),
+      mk('p',{class:'sbigcap'},mk('b',{},sel.name||''),sel.view&&' · '+sel.view,m.length>1&&sel===mp&&mk('span',{class:'spill'},w.main),mk('span',{class:'sgrow'}),
+        foot.length?mk('button',{class:'slink',id:'scompare',type:'button','aria-pressed':String(cmp),on:{click:()=>{ S.cmpOn[l.line]=!cmp; sMainDraw(); }}},cmp?w.stop:w.compare):null),
+      mk('div',{class:'sthis',id:'sthis'},(sel.faults||[]).length?[mk('b',{},sel.check_head),mk('ul',{},sel.faults.map(x=>mk('li',{},x)))]:sel.check_none?[sel.check_head&&mk('b',{},sel.check_head+' '),sel.check_none]:null,   // A4: what belongs to this picture
+        l.pick&&m.length>1&&sel!==mp&&sel.main_label?[' ',mk('button',{class:'slink',id:'smainpick',type:'button',on:{click:()=>sPick(l,sel)}},sel.main_label)]:null),
+      mk('div',{class:'sstrip'},mk('div',{class:'sgrp'},mk('h4',{},l.strip_head||''),mk('div',{class:'sths',id:'sset'},m.map(thumb))),
+        foot.length?mk('div',{class:'sgrp'},mk('h4',{},w.footage_head),mk('div',{class:'sths',id:'sfootage'},foot.map(thumb))):null));
+    Array.prototype.forEach.call(viewer.querySelectorAll('.sth'),btn=>{ const p=all.find(x=>x.code===btn.getAttribute('data-code')); if(p&&!p.missing) loadThumb(p,btn,check,0); });
+    if(l.rec) side.push(mk('div',{class:'sverdict'+(l.rec.do==='remake'?' bad':l.rec.do==='use'?'':' doubt'),id:'srec'},mk('div',{},mk('b',{},l.rec.head||l.rec.label),
+      mk('p',{},l.rec.first||l.rec.reason,' ',l.rec.more&&!S.open.why&&mk('button',{class:'slink',id:'smore',type:'button',on:{click:()=>{ S.open.why=true; sMainDraw(); }}},w.more),S.open.why&&l.rec.more))));   // A5
+    if(l.things_wait) side.push(mk('p',{class:'sverdict bad',id:'swaits'},l.things_wait));
+    side.push(mk('h3',{class:'sansh',id:'sansh'},l.answer_head||''),mk('p',{class:'soneset'},l.answer_note||''));
+    kids.push(mk('div',{class:'sstage'},viewer,sideBox));
+  } else if(l.state==='open'){   // could not be made, or back with the operator: the server's sentence, its reason
+    kids.push(mk('div',{class:'sverdict bad',id:'shead'},mk('div',{},mk('b',{},l.head||''),l.why&&mk('p',{},l.why))));
+    if(l.things_wait) kids.push(mk('p',{class:'sverdict bad',id:'swaits'},l.things_wait));
+  } else {   // waiting, being made, or settled: nothing to answer
+    kids.push(mk('p',{class:'sempty'},l.head||l.note||''));
+    if(seen.length) kids.push(mk('div',{class:'sfrow'},seen.map(p=>mk('figure',{class:'sbigf'},sImg(p,'sth',seen),mk('figcaption',{},p.label)))));
+  }
+  if(l.state==='open'){
+    const into=l.case==='judge'&&m.length?side:kids, sug=(l.buttons||[]).find(b=>b.sug);
+    const bar=(l.buttons||[]).map((b,i)=>{ const pan=b.needs_words||b.act==='again'||b.act==='leave'||(b.act==='approve'&&!!l.sure), first=sug?b===sug:l.case==='notmade'&&i===0;
+      return mk('button',{class:'sbtn'+(first?' primary':'')+(b.act==='leave'?' danger':''),type:'button','data-act':b.act,'aria-expanded':pan?String(S.panel===(b.act==='approve'?'sure':'b'+i)):null,on:{click:()=>sAct(l,b,i)}},
+        b.label,b.sug&&[' ',mk('span',{class:'ssug'},w.suggested||'')]); });
+    if(seen.length) bar.forEach(b=>gate.push(b));
+    into.push(mk('div',{class:'sbar',role:'group','aria-label':l.answer_head||l.ask||''},bar),gmsg);
+    if(l.own&&assets) into.push(mk('p',{class:'sownp'},mk('button',{class:'slink',type:'button','data-act':'own','aria-expanded':String(S.panel==='own'),on:{click:()=>sOpen(S.panel==='own'?null:'own')}},l.own.label)));   // A8
+    if(l.refused) into.push(mk('p',{class:'smsg',id:'srefused'},l.refused));   // the server's refusal of the last "done", kept on its set
+    into.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
+    if(S.panel) into.push(mk('div',{class:'spanel',id:'spanel'},sPanel(l)));
+    if(sDone(l)){ const t=sSays(l), ag=sAgainst(l);
+      into.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'',src:a.own.url}),mk('p',{},mk('b',{},t[0]),t[1],ag&&' '+w.against_say),
+        a&&mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo))); }
+  }
+  (l.case==='judge'&&m.length?side:kids).push(sDetails(l));
+  sideBox.append(...side.flat(6).filter(Boolean));
+  setTimeout(check,0);
+  return kids;
 }
-function sBody(l,kids,gate,check){   // one set: what is said openly, the suggestion with the check, the footage to compare with, the made pictures; returns its buttons
-  const pics=l.pics||[], ref=pics.filter(p=>p.ref_only), made=pics.filter(p=>!p.ref_only), zoom=made.concat(ref), open=l.state==='open', many=open&&made.filter(p=>p.choice).length>1, cur=sPicked(l), row=[], under=[];
-  const img=(p,cls,all)=>{ const b=mk('button',{class:cls,type:'button',disabled:true,'aria-label':'Open large: '+p.label,on:{click:e=>openZoom(all,all.indexOf(p),e.currentTarget)}},mk('span',{class:'ph'},p.missing?'Not available':'Loading…'));
-    if(!p.missing) loadThumb(p,b,()=>{ check(); if(cls==='timg') tLarge(p,b); },0); return b; };
-  const behind=(id,cls,label,...body)=>{ const box=mk('div',{class:'tstrip',id:id,hidden:true},body), b=mk('button',{class:cls,id:id+'b',type:'button','aria-expanded':'false','aria-controls':id},label); tFold(b,box); under.push(box); return b; };
-  const before=(l.earlier||[]).length?behind('tearlier','tlink','The set before',mk('div',{class:'tfrow'},l.earlier.map(p=>mk('div',{class:'tfcell'},img(p,'tfth',l.earlier),mk('span',{},p.label))))):null;
-  [['differs'],['asked',before],['changed'],['partial'],['most']].forEach(x=>{ if(l[x[0]]) kids.push(mk('p',{class:'changed tsaid',id:'t'+x[0]},l[x[0]],x[1]&&[' ',x[1]])); });
-  if(before&&!l.asked) row.push(before);
-  kids.push(under.splice(0));
-  if(l.rec) row.push(mk('span',{},'Claude suggests: ',mk('b',{},l.rec.label)),l.rec.reason&&behind('twhy','tlink','Why?',l.rec.reason));
-  if(l.check) row.push(behind('tcheck','tchip '+(l.check.state==='pass'?'calm':'warn'),l.check.chip,mk('b',{},l.check.by),(l.check.lines||[]).length?mk('ul',{},l.check.lines.map(x=>mk('li',{},x))):null));
-  if(l.look) row.push(behind('tlook','tlink','What the image model did',l.look.chose&&mk('p',{},'It chose: '+l.look.chose),l.look.aside&&mk('p',{},'It set aside: '+l.look.aside)));
-  if(l.rule) row.push(mk('span',{class:'trule'},l.rule));
-  if(row.length) kids.push(mk('div',{class:'tsuggest wide'},row),under);
-  if(ref.length) kids.push(mk('h3',{class:'tlab'},'Compare with your footage'),mk('div',{class:'tfrow',id:'tfoot'},ref.map(p=>mk('div',{class:'tfcell'},img(p,'tfth',zoom),mk('span',{},p.view||p.label)))));
-  if(made.length) kids.push(ref.length&&open&&mk('h3',{class:'tlab'},'The set that was made'),mk('div',{class:'tpics',role:many?'radiogroup':null,'aria-label':many?'Which picture is the reference?':null},made.map((p,i)=>{
-    const on=many&&cur===p, view=p.view||p.label, saw=p.note&&mk('p',{class:'tsaw',id:'tsaw'+i,hidden:true},mk('b',{},'What Claude saw: '),p.note);
-    const info=saw&&mk('button',{class:'tinfo',id:'tinfo'+i,type:'button','aria-expanded':'false','aria-controls':'tsaw'+i,'aria-label':'What Claude saw in this picture',title:'What Claude saw'},'i'); if(info) tFold(info,saw);
-    const pk=many&&p.choice&&mk('button',{class:'tpick',id:'tpick'+(i+1),type:'button',role:'radio','aria-checked':String(on),'aria-label':(on?'The reference: ':'Use as the reference: ')+p.label,on:{click:()=>sPick(l,p)}},on?'The reference':'Use as the reference',mk('kbd',{'aria-hidden':'true'},String(i+1)));
-    if(pk) gate.push(pk);
-    return mk('figure',{class:'ttile'+(on?'':' plain')},img(p,'timg',zoom),
-      p.flag&&mk('i',{class:'tflag',role:'img','aria-label':'The check names this picture',title:'The check names this picture'}),p.weak&&mk('span',{class:'tweak'},'Weak'),
-      mk('figcaption',{class:'tcap'},made.length>1&&p.letter&&mk('b',{class:'tletter'},p.letter),mk('span',{title:view},view),info),pk,saw); })));
-  if(l.head&&open){   // not made: the bold sentence, its reason behind a small "why"
-    const why=l.why&&mk('span',{id:'twhynot',hidden:true},' '+l.why), wb=why&&mk('button',{class:'tlink',id:'twhynotb',type:'button','aria-expanded':'false','aria-controls':'twhynot'},'why'); if(wb) tFold(wb,why);
-    kids.push(mk('p',{class:'tnopics'},mk('b',{},l.head),' ',wb,why));
-  } else if(l.head) kids.push(mk('p',{class:'tnopics'},l.head,sWaitTag(l)&&[' ',mk('span',{class:'tsug'},sWaitTag(l))]));
-  return open?(l.buttons||[]).map((b,i)=>{ const pan=b.needs_words||b.act==='again'||b.act==='leave';
-    return mk('button',{class:'tbtn'+(b.sug?' go':b.act==='leave'?' quiet':''),type:'button','data-act':b.act,'aria-expanded':pan?String(T.panel==='b'+i):null,on:{click:()=>sAct(l,b,i)}},b.label,b.sug&&[' ',mk('span',{class:'tsug'},'Suggested')]); }):[];
-}
+function sRestView(r){   // "The other N sets": made together, or only some of them (A12), once the first sets are answered
+  const w=SW(), a=sAns(r), make=(r.buttons||[])[0]||{}, out=(r.buttons||[]).find(b=>b.loss), ready=sJudged(), L=out&&out.loss, waiting=sWaiting();
+  const kids=[mk('h2',{class:'sname'},r.name||r.title),mk('p',{class:'skind'},w.rest_kind),
+    !ready&&mk('div',{class:'sverdict bad',id:'sbefore'},mk('div',{},mk('b',{},w.rest_before),mk('p',{},w.rest_before_why))),
+    mk('div',{class:'sbar'},mk('button',{class:'sbtn primary',type:'button','data-rest':make.choice,disabled:!ready,on:{click:()=>sAnswer(r,make.choice,'')}},make.big||make.label),
+      out&&mk('button',{class:'sbtn',type:'button','data-rest':'some',disabled:!ready,'aria-expanded':String(S.panel==='out'),on:{click:()=>sOpen(S.panel==='out'?null:'out')}},out.label))];
+  if(S.panel==='out'&&L) kids.push(mk('div',{class:'spanel',id:'spanel',style:'max-width:none'},mk('label',{},L.head),mk('p',{},L.intro),mk('div',{class:'stablewrap'},grid(L.cols,L.rows,'loss')),L.people&&mk('p',{},L.people),
+    mk('div',{class:'sacts'},mk('button',{class:'sbtn danger',id:'srestout',type:'button',on:{click:()=>sAnswer(r,out.choice,'')}},L.button||out.label),mk('button',{class:'sbtn',id:'scancel',type:'button',on:{click:()=>sOpen(null)}},w.cancel))));
+  kids.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
+  if(a) kids.push(mk('div',{class:'sanswer',id:'sanswer'},mk('p',{},mk('b',{},w.answer),sSays(r)[1]),mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(r)}},w.undo)));
+  kids.push(mk('section',{class:'smore'},mk('h3',{},w.rest_more),sAcc('names',w.rest_names,waiting.length,mk('ul',{},waiting.map(t=>mk('li',{},t.title||t.name))))));
+  return kids; }
+function sEnd(){   // A13: what will happen, thing by thing, before the operator says done
+  const w=SW(), it=sItems(), left=it.filter(l=>!sDone(l));
+  if(left.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},left.length===1?w.left_one:String(w.left_many||'').replace('{n}',left.length)),mk('p',{},w.left_note))];
+  return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>mk('li',{},mk('b',{},(l.name||l.title)+': '),sSays(l)[1]))),mk('p',{class:'sempty'},w.end_foot))]; }
+function sRail(){
+  const w=SW(), it=sItems(), kids=[mk('h2',{},w.todo)];
+  kids.push(mk('ul',{},it.map((l,i)=>{ const d=sDone(l), ag=l.key!=='sets:rest'&&sAgainst(l), a=sAns(l), b=a&&sBtn(l,a);
+    return mk('li',{},mk('button',{class:'srow'+(d?(ag?' against':' done'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},
+      mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
+  const covered=(sRest()||{}).covers||[];
+  [['settled',w.settled,sLines().filter(l=>l.case==='settled')],['busy',w.busy,sLines().filter(l=>l.state!=='open'&&l.case!=='settled'&&covered.indexOf(l.key)<0)]].forEach(([g,title,rows])=>{
+    if(!rows.length) return; const o=!!S.fold[g];
+    kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':g,on:{click:()=>{ S.fold[g]=!o; sRail(); }}},mk('span',{},title),String(rows.length)));
+    if(o) kids.push(mk('ul',{class:'squiet'},rows.map(l=>mk('li',{},mk('button',{class:'srow',type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},mk('span',{class:'snm'},l.name||l.title)))))); });
+  $('srail').replaceChildren(...kids); }
+function sCount(){ const w=SW(), it=sItems(), n=it.filter(sDone).length;   // A11: the one count
+  $('sfoot').replaceChildren(mk('b',{},String(w.foot||'').replace('{n}',n).replace('{m}',it.length)),mk('span',{},n===it.length?w.foot_done:w.foot_wait)); }
+function sMainDraw(){
+  const l=(round.lines||[]).find(x=>x.line===S.cur), w=SW(), main=$('smain'), top=main.scrollTop;
+  const body=S.help?[mk('h2',{class:'sname'},w.help),[].concat((round.layout||{}).help||[]).map(x=>mk('p',{style:'max-width:65ch;margin-top:8px'},x)),mk('p',{style:'max-width:65ch;margin:8px 0 12px'},w.keys),
+      mk('button',{class:'sbtn',id:'shelpclose',type:'button',on:{click:()=>{ S.help=false; sDraw(); }}},w.close)]
+    :l&&l.key==='sets:rest'?sRestView(l):l?sThing(l):sEnd();
+  main.replaceChildren(mk('div',{class:'swrap'},...[].concat(body).flat(6).filter(Boolean))); main.scrollTop=top; }
+function sDraw(){
+  if(S.round!==round.round){ const f=sItems().find(l=>!sDone(l));   // a new round: the first thing that needs an answer
+    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{}}); }
+  $('sstep').textContent=round.step||''; $('shelp').textContent=SW().help||''; $('shelp').setAttribute('aria-expanded',String(S.help));
+  sRail(); sMainDraw(); sCount(); }
+$('shelp').addEventListener('click',()=>{ S.help=!S.help; sDraw(); });
+document.addEventListener('keydown',e=>{   // A15: the arrow keys and Escape stay; the large picture has its own keys
+  if($('sets').hidden||zoomed||e.ctrlKey||e.metaKey||e.altKey||!round) return;
+  if(e.key==='Escape'){ if(S.panel) return sOpen(null); if(S.help){ S.help=false; return sDraw(); } return; }
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ const it=sItems(); if(!it.length) return; e.preventDefault();
+    const i=it.findIndex(x=>x.line===S.cur), n=it[(Math.max(i,0)+(e.key==='ArrowRight'?(i<0?0:1):it.length-1))%it.length]; sGo(n.line); }
+});
 function tDraw(){
   const list=tThings();
-  if(T.round!==round.round){ T.round=round.round; T.tick={}; T.panel=null; T.msg=''; T.show=false; const f=list.findIndex(tWaits); T.cur=list.length&&f<0?-1:Math.max(f,0);   // a new round: the first thing still to answer
-    if(tSets()){ T.fold={}; list.forEach(l=>{ if(T.fold[l.group]===undefined) T.fold[l.group]=true; if(l.state!=='recorded') T.fold[l.group]=false; }); } }   // the sets: a group with nothing but settled sets starts folded
+  if(T.round!==round.round){ T.round=round.round; T.tick={}; T.panel=null; T.msg=''; T.show=false; const f=list.findIndex(tWaits); T.cur=list.length&&f<0?-1:Math.max(f,0); }   // a new round: the first thing still to answer
   if(T.cur>=list.length) T.cur=list.length-1;
   const f=document.activeElement&&document.activeElement.id;
   tTop(list); tRail(list); tMain(list);
@@ -999,15 +1149,13 @@ document.addEventListener('keydown',e=>{   // the keys of this layout; the large
   if(k==='Escape'){
     if(document.querySelector('.tpop:not([hidden])')) return tPops();
     if(T.panel) return tOpen(null);
-    if(tSets()&&T.show) return sShow(false);
     Array.prototype.forEach.call(document.querySelectorAll('#tmain [aria-expanded="true"]'),b=>b.click());
     return tRefuse('');
   }
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='checkbox') return;
   if(k==='ArrowLeft'||k==='j'){ e.preventDefault(); tStep(-1); }
   else if(k==='ArrowRight'||k==='k'){ e.preventDefault(); tStep(1); }
-  else if(/^[123]$/.test(k)){ const c=$(tSets()?'tpick'+k:'tck'+(k-1)); if(c) c.click(); }
-  else if(tSets()){ if('acmul'.indexOf(k)>=0&&k.length===1){ e.preventDefault(); if(k==='m') act('again')||act('make'); else act({a:'approve',c:'fix',u:'own',l:'leave'}[k]); } }
+  else if(/^[123]$/.test(k)){ const c=$('tck'+(k-1)); if(c) c.click(); }
   else if('ascul'.indexOf(k)>=0&&k.length===1){ e.preventDefault(); if(k==='c') act('fix')||act('words'); else act({a:'use',s:'set',u:'own',l:'ignore'}[k]); }
 });
 function watchAnswers(){

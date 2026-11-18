@@ -1,0 +1,1492 @@
+{
+ "step": "References: the sets",
+ "round": "r20261118-064458-121615",
+ "capabilities": {
+  "db": {
+   "rules": [
+    {
+     "path": "rounds",
+     "read": "view",
+     "write": "owner"
+    },
+    {
+     "path": "pics",
+     "read": "view",
+     "write": "owner"
+    },
+    {
+     "path": "zoom",
+     "read": "view",
+     "write": "owner"
+    }
+   ]
+  },
+  "assets": {},
+  "user": {}
+ },
+ "title": "VideoWizard decisions VW-24",
+ "open": true,
+ "lines": [
+  {
+   "line": "l01",
+   "key": "sets:rest",
+   "title": "The other sets",
+   "state": "open",
+   "item": "rest:2026-11-17T10:17:35.740964+00:00",
+   "ask": "Make the other sets now?",
+   "buttons": [
+    {
+     "label": "Make the other 17",
+     "choice": "rest",
+     "needs_words": false,
+     "act": "rest",
+     "say": "The other 17 sets will be made.",
+     "big": "Make the other 17"
+    },
+    {
+     "label": "Make only some of them",
+     "choice": "rest_out",
+     "needs_words": false,
+     "act": "rest_out",
+     "say": "6 sets will be made. 11 are not made.",
+     "loss": {
+      "head": "Without these 11 sets",
+      "intro": "These shots are then made with no reference of the thing named. Nothing changes until you choose it below.",
+      "cols": [
+       "Not made",
+       "Shots",
+       "Which shots lose it"
+      ],
+      "rows": [
+       [
+        "Mangalore clay roof tile",
+        14,
+        "shot 4 of gap 1, shot 5 of gap 1, shot 1 of gap 3, shot 4 of gap 5, shot 6 of gap 5, shot 1 of gap 6, shot 1 of gap 10, shot 2 of gap 11, shot 1 of gap 13, shot 2 of gap 13, shot 3 of gap 13, shot 3 of gap 14, shot 5 of gap 14, shot 3 of gap 16"
+       ],
+       [
+        "Simple ceiling finish: oiled tiles and white-painted ribs",
+        1,
+        "shot 3 of gap 13"
+       ],
+       [
+        "Shuttering oil",
+        1,
+        "shot 2 of gap 8"
+       ],
+       [
+        "Wide flat brush",
+        1,
+        "shot 2 of gap 8"
+       ],
+       [
+        "Open tin of shuttering oil",
+        1,
+        "shot 2 of gap 8"
+       ],
+       [
+        "Shuttering support",
+        2,
+        "shot 1 of gap 8, shot 1 of gap 13"
+       ],
+       [
+        "Cement bag",
+        3,
+        "shot 3 of gap 1, shot 2 of gap 5, shot 1 of gap 7"
+       ],
+       [
+        "Wooden window shutter",
+        4,
+        "shot 4 of gap 1, shot 4 of gap 5, shot 2 of gap 13, shot 3 of gap 13"
+       ],
+       [
+        "The room under the roof being built",
+        2,
+        "shot 1 of gap 8, shot 1 of gap 13"
+       ],
+       [
+        "Lane of filler slab homes",
+        1,
+        "shot 4 of gap 16"
+       ],
+       [
+        "Bedding a brick in mortar",
+        1,
+        "shot 2 of gap 1"
+       ]
+      ],
+      "people": "The 6 people always get a set: The young site worker, The tile-maker, The woman of the house, The home owner, The daughter, The neighbour. Not making the others also has their 6 sets made, on the same word, when you say done in the chat.",
+      "button": "Do not make these 11 sets; make the other 6"
+     }
+    }
+   ],
+   "cost": "Without these 11 sets, these shots are made with no reference: Mangalore clay roof tile: shot 4 of gap 1, shot 5 of gap 1, shot 1 of gap 3, shot 4 of gap 5, shot 6 of gap 5, shot 1 of gap 6, shot 1 of gap 10, shot 2 of gap 11, shot 1 of gap 13, shot 2 of gap 13, shot 3 of gap 13, shot 3 of gap 14, shot 5 of gap 14, shot 3 of gap 16; Simple ceiling finish: oiled tiles and white-painted ribs: shot 3 of gap 13; Shuttering oil: shot 2 of gap 8; Wide flat brush: shot 2 of gap 8; Open tin of shuttering oil: shot 2 of gap 8; Shuttering support: shot 1 of gap 8, shot 1 of gap 13; Cement bag: shot 3 of gap 1, shot 2 of gap 5, shot 1 of gap 7; Wooden window shutter: shot 4 of gap 1, shot 4 of gap 5, shot 2 of gap 13, shot 3 of gap 13; The room under the roof being built: shot 1 of gap 8, shot 1 of gap 13; Lane of filler slab homes: shot 4 of gap 16; Bedding a brick in mortar: shot 2 of gap 1.",
+   "head": "17 more sets wait for your word",
+   "why": "Judge the first sets first: a fault here would repeat in all of them.",
+   "show": "Show the 17",
+   "list_head": "The 17 sets waiting to be made",
+   "list_note": "None of these is made yet. They are made together, in one go, when you choose to make them.",
+   "covers": [
+    "set:HELPER",
+    "set:TILEMAKER",
+    "set:MOTHER",
+    "set:FATHER",
+    "set:CHILD",
+    "set:NEIGHBOUR",
+    "set:TILE",
+    "set:CEILING_FINISH",
+    "set:SHUTTER_OIL",
+    "set:OIL_BRUSH",
+    "set:OIL_TIN",
+    "set:PROP_POST",
+    "set:CEMENT_BAG",
+    "set:SHUTTER_WINDOW",
+    "set:SITE_BELOW",
+    "set:LANE",
+    "set:T_BRICKLAY"
+   ],
+   "name": "The other 17 sets"
+  },
+  {
+   "line": "l02",
+   "key": "set:SITE_DECK",
+   "title": "The representative filler slab roof, from above (a place)",
+   "state": "open",
+   "item": "set:SITE_DECK:038991305f58b243d6a8748ae17fc53a",
+   "ask": "Which picture is the reference?",
+   "buttons": [
+    {
+     "label": "Make all 3 again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found.",
+     "sug": true
+    },
+    {
+     "label": "Approve all 3",
+     "choice": "use",
+     "needs_words": false,
+     "act": "approve",
+     "say": ""
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
+     }
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Make again",
+   "desc": "The top of a small house's roof under construction, open to the sky: a flat deck of tan shuttering boards with side boards at the edges, on which the steel grid, tiles and concrete are placed in turn; trees and a neighbouring roof beyond.",
+   "used": "Used in 6 shots; the closest is a close-up (shot 1 of gap 9).",
+   "shots": "Used in 6 shots · closest: a close-up",
+   "rec": {
+    "do": "remake",
+    "label": "Make it again",
+    "reason": "All three pictures fill the steel grid with round clay pans, one per bay. The plan's roof uses Mangalore roof tiles laid in pairs in each bay, so every deck shot would copy the wrong filler. Picture 2 is also not a true view from the other side of picture 1.",
+    "head": "Claude recommends: make it again",
+    "first": "All three pictures fill the steel grid with round clay pans, one per bay.",
+    "more": "The plan's roof uses Mangalore roof tiles laid in pairs in each bay, so every deck shot would copy the wrong filler. Picture 2 is also not a true view from the other side of picture 1."
+   },
+   "pics": [
+    {
+     "code": "pb3bfa44747c1",
+     "label": "From your footage: the whole place",
+     "ref_only": true,
+     "view": "the whole place",
+     "cmp_cap": "Your footage, to compare: the whole place"
+    },
+    {
+     "code": "p6cd80294d6b9",
+     "label": "From your footage: from the other side",
+     "ref_only": true,
+     "view": "from the other side",
+     "cmp_cap": "Your footage, to compare: from the other side"
+    },
+    {
+     "code": "p7f6f03d7dcc1",
+     "label": "From your footage: its fixed things",
+     "ref_only": true,
+     "view": "its fixed things",
+     "cmp_cap": "Your footage, to compare: its fixed things"
+    },
+    {
+     "code": "pfc6007c40f4f",
+     "label": "A · the whole place",
+     "letter": "A",
+     "view": "the whole place",
+     "note": "A wide view from above of a board deck with side boards, a tied steel grid on grey blocks, trees and a neighbouring tiled roof beyond, a trowel and an upturned pan at the edge. The bays hold round clay pans, not Mangalore tiles; a few bars end loose on the deck.",
+     "flag": true,
+     "choice": "use:038991305f58b243d6a8748ae17fc53a",
+     "choice_label": "Approve A",
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [
+      "The bays of the grid hold round clay pans, one in each; the plan's roof has Mangalore roof tiles laid in pairs in each bay."
+     ],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found.",
+     "main_label": "Make A the main picture"
+    },
+    {
+     "code": "pc0a5773edfd6",
+     "label": "B · from the other side",
+     "letter": "B",
+     "view": "from the other side",
+     "note": "The deck seen along its length with the bare grid in front and the round clay pans beyond, trees all round. The stacks, the tools and the proportions of the deck do not sit where a reverse view of picture 1 would put them, and no neighbouring roof is seen.",
+     "flag": true,
+     "choice": "use:038991305f58b243d6a8748ae17fc53a-2",
+     "choice_label": "Approve B",
+     "say": "All 3 pictures approved as one set. Later pictures start from picture B.",
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [
+      "The deck is longer and narrower than in picture 1, and the stacks of pans and the upturned pan stand in a corner where the reverse of picture 1 would not have them.",
+      "The bays hold round clay pans, not Mangalore roof tiles in pairs, and no neighbouring roof is in the picture."
+     ],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found.",
+     "main_label": "Make B the main picture"
+    },
+    {
+     "code": "p57e5ca56fc5b",
+     "label": "C · its fixed things",
+     "letter": "C",
+     "view": "its fixed things",
+     "note": "A near view of the tied ribbed bars on grey cover blocks over dusty tan boards with footprints, the upright side board behind, a neighbouring tiled roof and palms soft beyond; the bars and blocks match the footage well. Round clay pans sit in the bays, not tiles.",
+     "weak": true,
+     "flag": true,
+     "choice": "use:038991305f58b243d6a8748ae17fc53a-3",
+     "choice_label": "Approve C",
+     "say": "All 3 pictures approved as one set. Later pictures start from picture C.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [
+      "The bays beside the bars hold round clay pans; the plan's roof has Mangalore roof tiles laid in pairs."
+     ],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found.",
+     "main_label": "Make C the main picture"
+    }
+   ],
+   "check": {
+    "state": "fail",
+    "by": "Claude's check found:",
+    "chip": "Claude's check found 4 faults",
+    "lines": [
+     "Picture A: The bays of the grid hold round clay pans, one in each; the plan's roof has Mangalore roof tiles laid in pairs in each bay.",
+     "Picture B: The deck is longer and narrower than in picture 1, and the stacks of pans and the upturned pan stand in a corner where the reverse of picture 1 would not have them.",
+     "Picture B: The bays hold round clay pans, not Mangalore roof tiles in pairs, and no neighbouring roof is in the picture.",
+     "Picture C: The bays beside the bars hold round clay pans; the plan's roof has Mangalore roof tiles laid in pairs."
+    ]
+   },
+   "look": {
+    "chose": "It raised the grid from the yard of the footage onto a board deck at roof height and filled the bays with the round clay pans seen in the footage, adding scaffolding and timber props from web photographs.",
+    "aside": "It left out the Mangalore roof tiles, which the footage shows stacked beside the grid and the plan names as the filler; it also left out the bare ground the footage grid lies on."
+   },
+   "searched": {
+    "state": "not known",
+    "text": "Searched: not known.",
+    "pages": []
+   },
+   "pick": true,
+   "name": "The representative filler slab roof, from above",
+   "kind": "a place",
+   "details": [
+    [
+     "What Claude's check found",
+     [
+      "Picture A: The bays of the grid hold round clay pans, one in each; the plan's roof has Mangalore roof tiles laid in pairs in each bay.",
+      "Picture B: The deck is longer and narrower than in picture 1, and the stacks of pans and the upturned pan stand in a corner where the reverse of picture 1 would not have them.",
+      "Picture B: The bays hold round clay pans, not Mangalore roof tiles in pairs, and no neighbouring roof is in the picture.",
+      "Picture C: The bays beside the bars hold round clay pans; the plan's roof has Mangalore roof tiles laid in pairs."
+     ]
+    ],
+    [
+     "Description",
+     "The top of a small house's roof under construction, open to the sky: a flat deck of tan shuttering boards with side boards at the edges, on which the steel grid, tiles and concrete are placed in turn; trees and a neighbouring roof beyond."
+    ],
+    [
+     "Shots",
+     "Used in 6 shots; the closest is a close-up (shot 1 of gap 9)."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · the whole place: A wide view from above of a board deck with side boards, a tied steel grid on grey blocks, trees and a neighbouring tiled roof beyond, a trowel and an upturned pan at the edge. The bays hold round clay pans, not Mangalore tiles; a few bars end loose on the deck.",
+      "B · from the other side: The deck seen along its length with the bare grid in front and the round clay pans beyond, trees all round. The stacks, the tools and the proportions of the deck do not sit where a reverse view of picture 1 would put them, and no neighbouring roof is seen.",
+      "C · its fixed things: A near view of the tied ribbed bars on grey cover blocks over dusty tan boards with footprints, the upright side board behind, a neighbouring tiled roof and palms soft beyond; the bars and blocks match the footage well. Round clay pans sit in the bays, not tiles."
+     ]
+    ],
+    [
+     "What the image model did",
+     [
+      "The image model chose: It raised the grid from the yard of the footage onto a board deck at roof height and filled the bays with the round clay pans seen in the footage, adding scaffolding and timber props from web photographs.",
+      "It set aside: It left out the Mangalore roof tiles, which the footage shows stacked beside the grid and the plan names as the filler; it also left out the bare ground the footage grid lies on."
+     ]
+    ],
+    [
+     "What the picture model searched",
+     [
+      "Searched: not known."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Use my own picture instead",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together",
+   "sure": {
+    "ask": "Claude's check found 4 faults in this set. Approve it all the same?",
+    "text": "All three pictures fill the steel grid with round clay pans, one per bay. Every later picture of it would copy this.",
+    "go": "Approve the set all the same",
+    "back": "Go back"
+   },
+   "things_wait": "This place shows the Mangalore clay roof tile, whose set is not approved yet: answer that first, or it is made from words."
+  },
+  {
+   "line": "l03",
+   "key": "set:MASON",
+   "title": "The mason (a person)",
+   "state": "open",
+   "item": "set:MASON:af88767646272004d3fc8c43252c44c4",
+   "ask": "Is this set right for this person?",
+   "buttons": [
+    {
+     "label": "Approve all 3",
+     "choice": "yes",
+     "needs_words": false,
+     "act": "approve",
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A.",
+     "sug": true
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
+     }
+    },
+    {
+     "label": "Make all 3 again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Use it",
+   "desc": "A man of about 48, lean and wiry, medium-dark brown skin, short greying black hair receding at the temples, a thick grey-black moustache, deep lines beside the eyes, strong veined forearms and work-roughened hands.",
+   "used": "Used in 9 shots; the closest is a close-up (shot 2 of gap 1).",
+   "shots": "Used in 9 shots · closest: a close-up",
+   "rec": {
+    "do": "use",
+    "label": "Use this set",
+    "reason": "One and the same man in all three pictures and he fits the plan: about 48, lean, greying hair receding at the temples, grey-black moustache, veined forearms, rough hands. Small point: the sleeve edge is frayed in the hand picture and neat in the full-length one.",
+    "head": "Claude recommends: use this set",
+    "first": "One and the same man in all three pictures and he fits the plan: about 48, lean, greying hair receding at the temples, grey-black moustache, veined forearms, rough hands.",
+    "more": "Small point: the sleeve edge is frayed in the hand picture and neat in the full-length one."
+   },
+   "pics": [
+    {
+     "code": "p63dc5a78e755",
+     "label": "A · full length, front",
+     "letter": "A",
+     "view": "full length, front",
+     "note": "A lean man of about 48 standing at ease, facing the camera, head to bare feet, blue checked shirt, white veshti folded to the knee, greying hair, grey-black moustache, alone on plain blurred sandy ground.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found."
+    },
+    {
+     "code": "pe1616ad4b02d",
+     "label": "B · right hand and forearm",
+     "letter": "B",
+     "view": "right hand and forearm",
+     "note": "His right forearm and hand hanging at his side, strongly veined, five fingers, rough cracked fingertips; same shirt and veshti. The sleeve edge is frayed here and neat in picture 1; the checks of the shirt read a little stronger.",
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found."
+    },
+    {
+     "code": "pf863fde661b1",
+     "label": "C · the face",
+     "letter": "C",
+     "view": "the face",
+     "note": "A close view of the same face: short greying hair receding at the temples, thick grey-black moustache, deep lines beside the eyes, light grey stubble, the blue checked collar, plain blurred ground behind.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found."
+    }
+   ],
+   "check": {
+    "state": "pass",
+    "by": "Claude's check passed: no fault found.",
+    "chip": "Claude's check passed",
+    "lines": []
+   },
+   "look": {
+    "chose": "A lean barefoot man in a faded blue checked shirt and a white veshti folded to the knee, standing alone on plain blurred sandy ground.",
+    "aside": "Nothing: the model's notes name no change and nothing left out."
+   },
+   "searched": {
+    "state": "not asked",
+    "text": "No search was asked: a person's set is made from the description and the film's own pictures.",
+    "pages": []
+   },
+   "rule": "For a person, picture A is the reference and the face goes with it",
+   "name": "The mason",
+   "kind": "a person",
+   "details": [
+    [
+     "Description",
+     "A man of about 48, lean and wiry, medium-dark brown skin, short greying black hair receding at the temples, a thick grey-black moustache, deep lines beside the eyes, strong veined forearms and work-roughened hands."
+    ],
+    [
+     "Shots",
+     "Used in 9 shots; the closest is a close-up (shot 2 of gap 1)."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · full length, front: A lean man of about 48 standing at ease, facing the camera, head to bare feet, blue checked shirt, white veshti folded to the knee, greying hair, grey-black moustache, alone on plain blurred sandy ground.",
+      "B · right hand and forearm: His right forearm and hand hanging at his side, strongly veined, five fingers, rough cracked fingertips; same shirt and veshti. The sleeve edge is frayed here and neat in picture 1; the checks of the shirt read a little stronger.",
+      "C · the face: A close view of the same face: short greying hair receding at the temples, thick grey-black moustache, deep lines beside the eyes, light grey stubble, the blue checked collar, plain blurred ground behind."
+     ]
+    ],
+    [
+     "What the image model did",
+     [
+      "The image model chose: A lean barefoot man in a faded blue checked shirt and a white veshti folded to the knee, standing alone on plain blurred sandy ground.",
+      "It set aside: Nothing: the model's notes name no change and nothing left out."
+     ]
+    ],
+    [
+     "What the picture model searched",
+     [
+      "No search was asked: a person's set is made from the description and the film's own pictures."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Use my own picture instead",
+    "person": true,
+    "permitted": false,
+    "text": "Add this person's own photo, a PNG, JPEG or WebP file up to 15 MB: their set is made from it. A real person's photo is used only with their permission: write first, in your own words, that you have it.",
+    "say": "My own photo: the set is made from it."
+   },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together"
+  },
+  {
+   "line": "l04",
+   "key": "set:ROOM",
+   "title": "The family room under the filler slab ceiling (a place)",
+   "state": "open",
+   "item": "setmake:ROOM",
+   "ask": "Make it now?",
+   "buttons": [
+    {
+     "label": "Make it",
+     "choice": "make",
+     "needs_words": false,
+     "act": "make",
+     "say": "Make it. The set comes back to you to judge."
+    },
+    {
+     "label": "Go on without a reference",
+     "choice": "aside",
+     "needs_words": false,
+     "act": "leave",
+     "say": "Go on without a reference. 8 shots will be made with no reference of it."
+    }
+   ],
+   "group": "Could not be made",
+   "case": "notmade",
+   "tag": "Not made",
+   "desc": "The main room of the family home: lime-washed cream walls, a smooth grey cement floor, an exposed filler slab ceiling of terracotta tile undersides in straight rows framed by grey concrete ribs, a window with pale blue wooden shutters, a wooden table and two chairs, a woven floor mat.",
+   "used": "Used in 8 shots; the closest is a close-up (shot 5 of gap 1).",
+   "shots": "Used in 8 shots · closest: a close-up",
+   "loss": {
+    "text": "These 8 shots are then made with no reference of it:",
+    "shots": [
+     "shot 4 of gap 1",
+     "shot 5 of gap 1",
+     "shot 4 of gap 5",
+     "shot 2 of gap 13",
+     "shot 3 of gap 13",
+     "shot 3 of gap 14",
+     "shot 5 of gap 14",
+     "shot 3 of gap 16"
+    ]
+   },
+   "head": "The rule that held this set back no longer applies to a set: it can be made now.",
+   "name": "The family room under the filler slab ceiling",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "The main room of the family home: lime-washed cream walls, a smooth grey cement floor, an exposed filler slab ceiling of terracotta tile undersides in straight rows framed by grey concrete ribs, a window with pale blue wooden shutters, a wooden table and two chairs, a woven floor mat."
+    ],
+    [
+     "Shots",
+     "Used in 8 shots; the closest is a close-up (shot 5 of gap 1)."
+    ]
+   ],
+   "own": {
+    "label": "Use my own picture instead",
+    "person": false,
+    "permitted": true,
+    "text": "Add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference of this thing, and no set is made.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   }
+  },
+  {
+   "line": "l05",
+   "key": "set:HELPER",
+   "title": "The young site worker (a person)",
+   "name": "The young site worker",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l06",
+   "key": "set:TILEMAKER",
+   "title": "The tile-maker (a person)",
+   "name": "The tile-maker",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l07",
+   "key": "set:MOTHER",
+   "title": "The woman of the house (a person)",
+   "name": "The woman of the house",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l08",
+   "key": "set:FATHER",
+   "title": "The home owner (a person)",
+   "name": "The home owner",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l09",
+   "key": "set:CHILD",
+   "title": "The daughter (a person)",
+   "name": "The daughter",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l10",
+   "key": "set:NEIGHBOUR",
+   "title": "The neighbour (a person)",
+   "name": "The neighbour",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l11",
+   "key": "set:TILE",
+   "title": "Mangalore clay roof tile (a material)",
+   "name": "Mangalore clay roof tile",
+   "kind": "a material",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 14 shots would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l12",
+   "key": "set:CEILING_FINISH",
+   "title": "Simple ceiling finish: oiled tiles and white-painted ribs (a material)",
+   "name": "Simple ceiling finish: oiled tiles and white-painted ribs",
+   "kind": "a material",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l13",
+   "key": "set:SHUTTER_OIL",
+   "title": "Shuttering oil (a material)",
+   "name": "Shuttering oil",
+   "kind": "a material",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l14",
+   "key": "set:OIL_BRUSH",
+   "title": "Wide flat brush (an object)",
+   "name": "Wide flat brush",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l15",
+   "key": "set:OIL_TIN",
+   "title": "Open tin of shuttering oil (an object)",
+   "name": "Open tin of shuttering oil",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l16",
+   "key": "set:PROP_POST",
+   "title": "Shuttering support (an object)",
+   "name": "Shuttering support",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 2 shots would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l17",
+   "key": "set:CEMENT_BAG",
+   "title": "Cement bag (an object)",
+   "name": "Cement bag",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 3 shots would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l18",
+   "key": "set:SHUTTER_WINDOW",
+   "title": "Wooden window shutter (an object)",
+   "name": "Wooden window shutter",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 4 shots would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l19",
+   "key": "set:SITE_BELOW",
+   "title": "The room under the roof being built (a place)",
+   "name": "The room under the roof being built",
+   "kind": "a place",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 2 shots would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l20",
+   "key": "set:LANE",
+   "title": "Lane of filler slab homes (a place)",
+   "name": "Lane of filler slab homes",
+   "kind": "a place",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l21",
+   "key": "set:T_BRICKLAY",
+   "title": "Bedding a brick in mortar (a way of working)",
+   "name": "Bedding a brick in mortar",
+   "kind": "a way of working",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
+   "tag": "Waiting",
+   "wait_note": "If not made, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l22",
+   "key": "set:REBAR_GRID",
+   "title": "Tied steel reinforcement grid on cover blocks (an object)",
+   "name": "Tied steel reinforcement grid on cover blocks",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p57df8a981b21",
+     "label": "From your footage: oblique from above (the starting picture)"
+    },
+    {
+     "code": "pf0b1890c6ae5",
+     "label": "From your footage: close on a tied crossing"
+    },
+    {
+     "code": "pe2de60820414",
+     "label": "From your footage: as the film uses it"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: oblique from above (the starting picture)",
+      "From your footage: close on a tied crossing",
+      "From your footage: as the film uses it"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l23",
+   "key": "set:CONCRETE",
+   "title": "Wet concrete (a material)",
+   "name": "Wet concrete",
+   "kind": "a material",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p772533733385",
+     "label": "From your footage: in the pan (the starting picture)"
+    },
+    {
+     "code": "p58ce31290e03",
+     "label": "From your footage: spread on the slab"
+    },
+    {
+     "code": "p24ad9e128c08",
+     "label": "From your footage: a surface of it, filling the frame"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: in the pan (the starting picture)",
+      "From your footage: spread on the slab",
+      "From your footage: a surface of it, filling the frame"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l24",
+   "key": "set:PAN",
+   "title": "Round metal mortar pan (an object)",
+   "name": "Round metal mortar pan",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p7fa2d228bb0f",
+     "label": "From your footage: side (the starting picture)"
+    },
+    {
+     "code": "p4bf0e1c5dc11",
+     "label": "From your footage: tipped, pouring"
+    },
+    {
+     "code": "p380399a0ea66",
+     "label": "From your footage: the detail that shows how it is made"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: side (the starting picture)",
+      "From your footage: tipped, pouring",
+      "From your footage: the detail that shows how it is made"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l25",
+   "key": "set:BRICK",
+   "title": "Red clay brick (an object)",
+   "name": "Red clay brick",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pbd53c83379fc",
+     "label": "From your footage: whole and at rest (the starting picture)"
+    },
+    {
+     "code": "p270212d28dfe",
+     "label": "From your footage: as the film uses it"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole and at rest (the starting picture)",
+      "From your footage: as the film uses it"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l26",
+   "key": "set:TROWEL",
+   "title": "Mason's trowel (an object)",
+   "name": "Mason's trowel",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p91cee5373562",
+     "label": "From your footage: whole and at rest (the starting picture)"
+    },
+    {
+     "code": "p9758a05863a5",
+     "label": "From your footage: as the film uses it"
+    },
+    {
+     "code": "pf55a9c97e22e",
+     "label": "From your footage: the detail that shows how it is made"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole and at rest (the starting picture)",
+      "From your footage: as the film uses it",
+      "From your footage: the detail that shows how it is made"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l27",
+   "key": "set:STRAIGHTEDGE",
+   "title": "Wooden straightedge (an object)",
+   "name": "Wooden straightedge",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p401d31e01f03",
+     "label": "From your footage: in use on wet concrete (the starting picture)"
+    },
+    {
+     "code": "pe2d2ad6f32b8",
+     "label": "From your footage: whole and at rest"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: in use on wet concrete (the starting picture)",
+      "From your footage: whole and at rest"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l28",
+   "key": "set:SHUTTER_BOARD",
+   "title": "Shuttering board (an object)",
+   "name": "Shuttering board",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p0647609cb1b4",
+     "label": "From your footage: the board surface under the grid (the starting picture)"
+    },
+    {
+     "code": "p7aa3d025120a",
+     "label": "From your footage: whole and at rest"
+    },
+    {
+     "code": "p0a2bf45b4db0",
+     "label": "From your footage: as the film uses it"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: the board surface under the grid (the starting picture)",
+      "From your footage: whole and at rest",
+      "From your footage: as the film uses it"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l29",
+   "key": "set:WIRE_COIL",
+   "title": "Coil of binding wire (an object)",
+   "name": "Coil of binding wire",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p176541fa17cd",
+     "label": "From your footage: whole and at rest (the starting picture)"
+    },
+    {
+     "code": "p8c5b82df59db",
+     "label": "From your footage: as the film uses it"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole and at rest (the starting picture)",
+      "From your footage: as the film uses it"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l30",
+   "key": "set:STONE_HEAP",
+   "title": "Heap of crushed stone (a material)",
+   "name": "Heap of crushed stone",
+   "kind": "a material",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p151d6d5428b4",
+     "label": "From your footage: a surface of it, filling the frame (the starting picture)"
+    },
+    {
+     "code": "pb40bfaa317d4",
+     "label": "From your footage: as the film uses it"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: a surface of it, filling the frame (the starting picture)",
+      "From your footage: as the film uses it"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l31",
+   "key": "set:SITE_YARD",
+   "title": "Materials on the site floor (a place)",
+   "name": "Materials on the site floor",
+   "kind": "a place",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p0a4f469b2ec2",
+     "label": "From your footage: the whole place (the starting picture)"
+    },
+    {
+     "code": "pa691e0f579a3",
+     "label": "From your footage: from the other side"
+    },
+    {
+     "code": "p6b310991322c",
+     "label": "From your footage: its fixed things"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: the whole place (the starting picture)",
+      "From your footage: from the other side",
+      "From your footage: its fixed things"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l32",
+   "key": "set:T_POUR",
+   "title": "Pouring concrete from a pan (a way of working)",
+   "name": "Pouring concrete from a pan",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pb1f58fb9ae82",
+     "label": "From your footage: the action at its key moment (the starting picture)"
+    },
+    {
+     "code": "p8c7ff80d7d42",
+     "label": "From your footage: the result just after"
+    },
+    {
+     "code": "p23f49fbc571b",
+     "label": "From your footage: close on where it happens"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: the action at its key moment (the starting picture)",
+      "From your footage: the result just after",
+      "From your footage: close on where it happens"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l33",
+   "key": "set:T_LEVEL",
+   "title": "Checking level with a spirit level (a way of working)",
+   "name": "Checking level with a spirit level",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pb282e7a5b88a",
+     "label": "From your footage: close on where it happens (the starting picture)"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: close on where it happens (the starting picture)"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l34",
+   "key": "set:T_SCREED",
+   "title": "Levelling concrete with a straightedge (a way of working)",
+   "name": "Levelling concrete with a straightedge",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p1d73d70457e8",
+     "label": "From your footage: the action at its key moment (the starting picture)"
+    },
+    {
+     "code": "p05a5adc6cc43",
+     "label": "From your footage: the result just after"
+    },
+    {
+     "code": "pa2bed814ba70",
+     "label": "From your footage: close on where it happens"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: the action at its key moment (the starting picture)",
+      "From your footage: the result just after",
+      "From your footage: close on where it happens"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l35",
+   "key": "set:T_STRIKE",
+   "title": "Removing shuttering (a way of working)",
+   "name": "Removing shuttering",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p884fd83bb93c",
+     "label": "From your footage: the action at its key moment (the starting picture)"
+    },
+    {
+     "code": "p2b92aeafb84c",
+     "label": "From your footage: the result just after"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: the action at its key moment (the starting picture)",
+      "From your footage: the result just after"
+     ]
+    ]
+   ]
+  }
+ ],
+ "summary": "34 things: 3 to answer, 0 kept, 17 not ready yet, 14 recorded.",
+ "note": "Look at each set, answer each line, then say done in the chat.",
+ "layout": {
+  "kind": "sets",
+  "made": "Nothing is made until you say done in the chat.",
+  "help": [
+   "Look at each set, answer each line, then say done in the chat.",
+   "A set is the pictures made of one person or thing: up to three. The one you approve becomes its reference: pictures of this thing start from it.",
+   "Judge the first sets, then say whether the others are made. The settled ones need no answer. Only what you do here counts: nothing is chosen for you."
+  ],
+  "groups": [
+   "To judge",
+   "Could not be made",
+   "Waiting to be made",
+   "Settled"
+  ],
+  "pick": "Choose the picture that is the reference first.",
+  "words": {
+   "leave": "No reference needed",
+   "leave_set": "Go on without a reference",
+   "set": "Make a set",
+   "fix": "Make a set with words",
+   "loss_head": "With no reference of it",
+   "done": {
+    "use": "Approved",
+    "set": "Make a set",
+    "fix": "Set with your words",
+    "own": "Own picture",
+    "ignore": "No reference"
+   },
+   "wait_out": "Not made",
+   "wait_made": "Will be made",
+   "corrections_head": "The operator's corrections",
+   "searched_head": "What the picture model searched",
+   "sets": {
+    "todo": "Needs your answer",
+    "settled": "Settled earlier, nothing to do",
+    "busy": "Being made or looked at, nothing to answer yet",
+    "suggested": "Suggested",
+    "against": "Against advice",
+    "against_say": "This goes against Claude's advice.",
+    "done": {
+     "approve": "Approved",
+     "fix": "Made again, your words",
+     "again": "Made again",
+     "remake": "Made again",
+     "own": "Your picture",
+     "make": "Will be made",
+     "set": "Will be made",
+     "leave": "No reference",
+     "rest": "Will be made",
+     "rest_out": "Some not made",
+     "photo": "Another photo",
+     "standin": "A stand-in"
+    },
+    "more": "more",
+    "main": "Main picture",
+    "compare": "Compare with your footage",
+    "stop": "Stop comparing",
+    "footage_head": "Your footage: click one to see it beside the set",
+    "answer": "Your answer: ",
+    "kept": "Kept from before: ",
+    "undo": "Undo",
+    "cancel": "Cancel",
+    "details": "Details",
+    "fix_ask": "What should change?",
+    "fix_need": "Write what should change first.",
+    "again_go": "Make the set again",
+    "no_large": "The large picture is not available.",
+    "loading": "Loading…",
+    "missing": "Not available",
+    "gate_wait": "The buttons work when every picture has shown.",
+    "gate_bad": "A picture is missing: {pics}. This set cannot be answered here: tell the assistant in the chat.",
+    "left_one": "1 answer still needed",
+    "left_many": "{n} answers still needed",
+    "left_note": "Choose one from the list on the left.",
+    "end_head": "All answered",
+    "end_note": "Go back to the chat and say done. This is what will happen then:",
+    "end_foot": "Nothing is recorded or made before you say done.",
+    "foot": "{n} of {m} answered.",
+    "foot_wait": "When all are answered, say done in the chat. Nothing is made before that.",
+    "foot_done": "Go back to the chat and say done.",
+    "help": "How this works",
+    "keys": "Keys: the left and right arrows move between the things that need an answer. Escape closes what is open.",
+    "close": "Close",
+    "rest_kind": "Not made yet. They are made together, in one go, after you say done in the chat.",
+    "rest_before": "Answer the first sets before this.",
+    "rest_before_why": "A fault in the first sets would repeat in all of these.",
+    "rest_more": "More, if you want it",
+    "rest_names": "Which sets these are"
+   }
+  }
+ },
+ "say": "3 things need your answer: the representative filler slab roof, from above, the mason and the family room under the filler slab ceiling. Then choose whether the other 17 sets are made. Then say done here."
+}
