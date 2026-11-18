@@ -317,8 +317,8 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     page = film.page()
     lines = {l['key']: l for l in page['lines']}
     assert [l['key'] for l in page['lines']] == ['sets:rest', 'set:T_LAY', 'set:MASON', 'set:STREET', 'set:TROWEL', 'set:BRICK', 'set:FAN']
-    assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make them' and lines['sets:rest']['buttons'][0]['big'] == 'Make the other 2'
-    assert [b['label'] for b in chat(film, 'sets:rest')['buttons']] == ['Make the other 2 sets', 'Do not make these 2 sets']
+    assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make the other 2' and lines['sets:rest']['buttons'][0]['big'] == 'Make the other 2'
+    assert [b['label'] for b in chat(film, 'sets:rest')['buttons']] == ['Make the other 2', 'Do not make these 2 sets']
     lay = lines['set:T_LAY']
     assert lay['group'] == CF.STEP2_GROUPS[0] and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'pass', 'by': "Claude's check passed: no fault found.", 'chip': "Claude's check passed", 'lines': []}   # design/214: the look passed every line; the model's stored fault ("Not the view asked.") is no longer shown
     assert 'notes' not in lay and lay['look'] == {'chose': 'The most common variant.', 'aside': 'Nothing of the request.'} and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
@@ -497,8 +497,8 @@ def older_view(state):
     return json.loads(WHEN.sub('T', json.dumps(view, sort_keys=True, default=str)))
 
 
-OLDER = {'step1': 'ad40300f115390166ae596bd425c9e242642c2ab3475522018ffcd10a4270577', 'making': 'f3ae90372d4fff132776ac21c001e5c3a2d74bb4e4a89ac126052cb7a634cdd3',
-         'step2': '379099b3917b77ee604baebde94d75f3dba11edfb8302a465b938719bfecae69', 'complete': 'a35701aa32d83bc88bd3bd99c2f0c62dd49dbed01690390ba5554bbcdf4842cc'}   # taken on main at d255486, before the three parts; design/215: 'complete' again, only the step's new name and its sentence differ ("Sizes, materials and graphic specs")
+OLDER = {'step1': '84a30c468b418155a91e69c28a311dd67462c1f5c3087ef9fdf4587c415abbaf', 'making': '429a73c51c3efb9970c259ac805ef6318d63f25058d0084eb98d26b0f641e690',
+         'step2': '7161a38b49acab8d64c4f349f7866cbecc2104a8fe30fe2accdc4312e17e79bd', 'complete': '405814646f1e6961a8df8e40717da122ef5c4ec726b2540b0d04637b44f8f837'}   # design/216 re-took all four: the page's `how` asks the assistant to post `say` (B1), and 'Leave it out' reads 'No reference needed' / 'Go on without a reference' (B6); nothing else   # taken on main at d255486, before the three parts; design/215: 'complete' again, only the step's new name and its sentence differ ("Sizes, materials and graphic specs")
 
 
 @pytest.mark.parametrize('state', sorted(OLDER))
@@ -508,4 +508,4 @@ def test_an_older_round_gives_the_page_and_the_chat_it_gave_before_design_211(st
     view = older_view(state)
     assert 'refused' not in view['page'] and (state == 'complete' or view['page']['step'] in (P.REFS_STEP, P.SETS_STEP))
     assert hashlib.sha256(json.dumps(view, sort_keys=True).encode()).hexdigest() == OLDER[state], json.dumps(view, sort_keys=True, ensure_ascii=False)[:3000]
-    assert '"then"' not in json.dumps(view['next']) and not any('rec' in l or 'group' in l for l in view['page']['lines'])
+    assert 'Leave it out' not in json.dumps(view) and '"then"' not in json.dumps(view['next']) and not any('rec' in l or 'group' in l for l in view['page']['lines'])

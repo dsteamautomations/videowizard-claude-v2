@@ -30,7 +30,7 @@ def labels(item):
 
 
 def test_the_three_labels_and_none_of_the_older_words():
-    assert (W['leave'], W['leave_wait_one'], W['leave_wait'], W['leave_failed']) == ('No reference needed', 'Do not make this set', 'Do not make these sets', 'Go on without a reference')
+    assert (W['leave'], W['leave_failed'], W['rest_some']) == ('No reference needed', 'Go on without a reference', 'Make only some of them')   # design/216 (A12): the waiting sets' label is 'Make only some of them'; 'Do not make this set / these sets' retired
     assert W['fix1'] == 'Make a set with words' and W['go_set'] == 'Make a set with these words' and W['fix'] == 'Minor corrections'
     said = ' '.join(str(v) for v in W.values()) + ' '.join(CF.STEP1_GROUPS) + RS.MAKES_LIMIT + RS.CLEAN_NO_FRAME
     assert not re.search(r'leave (it|them|these \d+|some|\{them\}) out|\bleft out\b|leaving out|Leave out', said, re.I)
@@ -55,7 +55,7 @@ def test_a_person_shown_in_a_made_shot_is_never_offered_to_go_without_a_referenc
     store, conn = at_two()
     for i in items(store, conn):
         if i.get('_person'):
-            assert not any(l in labels(i) for l in (W['leave'], W['leave_failed'], W['leave_wait_one']))
+            assert not any(l in labels(i) for l in (W['leave'], W['leave_failed'], W['rest_some']))
 
 
 def test_step_5_a_set_that_could_not_be_made_offers_go_on_without_a_reference():
@@ -74,7 +74,7 @@ def test_step_5_a_set_that_could_not_be_made_offers_go_on_without_a_reference():
 def test_step_5_the_waiting_sets_are_not_made_under_their_own_label():
     store, conn = at_two()
     rest = next(i for i in items(store, conn) if i['id'].startswith('rest:'))
-    assert labels(rest)[1] == 'Do not make these 2 sets' and rest['_line']['buttons'][1]['label'] == 'Do not make these sets'
+    assert labels(rest)[1] == 'Do not make these 2 sets' and rest['_line']['buttons'][1]['label'] == 'Make only some of them'
     assert rest['_line']['buttons'][1]['loss']['button'] == 'Do not make these 2 sets' and rest['_line']['buttons'][1]['loss']['cols'][0] == 'Not made'
 
 
@@ -86,7 +86,7 @@ def test_what_the_chat_says_under_each_button():
             assert b['description'] and not MONEY.search(b['description']), b
             if b['label'] == 'Approve':
                 assert b['description'] == 'Use this as the reference'
-            if b['label'].startswith('Approve '):
+            if b['label'].startswith('Approve ') and not b['label'].startswith('Approve all '):
                 assert b['description'] == 'Use this picture as the reference'
     store, conn = film()
     post(store, conn)
@@ -148,4 +148,4 @@ def test_the_server_sends_the_words_the_page_renders():
     words = PF.page_words()
     assert words == {'leave': 'No reference needed', 'leave_set': 'Go on without a reference', 'set': 'Make a set', 'fix': 'Make a set with words', 'loss_head': 'With no reference of it',
                      'done': {'use': 'Approved', 'set': 'Make a set', 'fix': 'Set with your words', 'own': 'Own picture', 'ignore': 'No reference'},
-                     'wait_out': 'Not made', 'wait_made': 'Will be made', 'corrections_head': "The operator's corrections", 'searched_head': 'What the picture model searched'}
+                     'wait_out': 'Not made', 'wait_made': 'Will be made', 'corrections_head': "The operator's corrections", 'searched_head': 'What the picture model searched', 'sets': CF.SETS_PAGE}   # design/216

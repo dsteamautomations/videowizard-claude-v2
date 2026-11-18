@@ -34,7 +34,64 @@
    "wait_out": "Not made",
    "wait_made": "Will be made",
    "corrections_head": "The operator's corrections",
-   "searched_head": "What the picture model searched"
+   "searched_head": "What the picture model searched",
+   "sets": {
+    "todo": "Needs your answer",
+    "settled": "Settled earlier, nothing to do",
+    "busy": "Being made or looked at, nothing to answer yet",
+    "suggested": "Suggested",
+    "against": "Against advice",
+    "against_say": "This goes against Claude's advice.",
+    "done": {
+     "approve": "Approved",
+     "fix": "Made again, your words",
+     "again": "Made again",
+     "remake": "Made again",
+     "own": "Your picture",
+     "make": "Will be made",
+     "set": "Will be made",
+     "leave": "No reference",
+     "rest": "Will be made",
+     "rest_out": "Some not made",
+     "photo": "Another photo",
+     "standin": "A stand-in"
+    },
+    "more": "more",
+    "main": "Main picture",
+    "compare": "Compare with your footage",
+    "stop": "Stop comparing",
+    "footage_head": "Your footage: click one to see it beside the set",
+    "answer": "Your answer: ",
+    "kept": "Kept from before: ",
+    "undo": "Undo",
+    "cancel": "Cancel",
+    "details": "Details",
+    "fix_ask": "What should change?",
+    "fix_need": "Write what should change first.",
+    "again_go": "Make the set again",
+    "no_large": "The large picture is not available.",
+    "loading": "Loading…",
+    "missing": "Not available",
+    "gate_wait": "The buttons work when every picture has shown.",
+    "gate_bad": "A picture is missing: {pics}. This set cannot be answered here: tell the assistant in the chat.",
+    "left_one": "1 answer still needed",
+    "left_many": "{n} answers still needed",
+    "left_note": "Choose one from the list on the left.",
+    "end_head": "All answered",
+    "end_note": "Go back to the chat and say done. This is what will happen then:",
+    "end_foot": "Nothing is recorded or made before you say done.",
+    "foot": "{n} of {m} answered.",
+    "foot_wait": "When all are answered, say done in the chat. Nothing is made before that.",
+    "foot_done": "Go back to the chat and say done.",
+    "help": "How this works",
+    "keys": "Keys: the left and right arrows move between the things that need an answer. Escape closes what is open.",
+    "close": "Close",
+    "rest_kind": "Not made yet. They are made together, in one go, after you say done in the chat.",
+    "rest_before": "Answer the first sets before this.",
+    "rest_before_why": "A fault in the first sets would repeat in all of these.",
+    "rest_more": "More, if you want it",
+    "rest_names": "Which sets these are"
+   }
   }
  },
  "lines": [
@@ -47,7 +104,7 @@
    "ask": "Make the other sets now?",
    "buttons": [
     {
-     "label": "Make them",
+     "label": "Make the other 17",
      "choice": "rest",
      "needs_words": false,
      "act": "rest",
@@ -55,7 +112,7 @@
      "big": "Make the other 17"
     },
     {
-     "label": "Do not make these sets",
+     "label": "Make only some of them",
      "choice": "rest_out",
      "needs_words": false,
      "act": "rest_out",
@@ -134,8 +191,9 @@
    "head": "17 more sets wait for your word",
    "why": "Judge the first sets first: a fault here would repeat in all of them.",
    "show": "Show the 17",
+   "name": "The other 17 sets",
    "list_head": "The 17 sets waiting to be made",
-   "list_note": "None of these is made yet. They are made together when you choose \"Make them\".",
+   "list_note": "None of these is made yet. They are made together, in one go, when you choose to make them.",
    "covers": [
     "set:HELPER",
     "set:TILEMAKER",
@@ -165,7 +223,7 @@
    "ask": "Is this set right for this person?",
    "buttons": [
     {
-     "label": "Make again",
+     "label": "Make all 3 again",
      "choice": "no",
      "needs_words": false,
      "act": "again",
@@ -174,11 +232,11 @@
      "sug": true
     },
     {
-     "label": "Approve",
+     "label": "Approve all 3",
      "choice": "yes",
      "needs_words": false,
      "act": "approve",
-     "say": "Approve: this set is right. Picture A is the reference and the face goes with it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A."
     },
     {
      "label": "Minor corrections",
@@ -189,7 +247,8 @@
      "go": "Make it again with these words",
      "all": {
       "label": "This applies to every picture of this thing",
-      "choice": "correct_all"
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
      }
     }
    ],
@@ -202,7 +261,19 @@
    "rec": {
     "do": "remake",
     "label": "Make it again",
-    "reason": "Why."
+    "reason": "Why.",
+    "head": "Claude recommends: make it again",
+    "first": "Why.",
+    "more": ""
+   },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together",
+   "sure": {
+    "ask": "Claude's check found 1 fault in this set. Approve it all the same?",
+    "text": "Why. Every later picture of it would copy this.",
+    "go": "Approve the set all the same",
+    "back": "Go back"
    },
    "pics": [
     {
@@ -210,7 +281,12 @@
      "label": "A · full length, front",
      "letter": "A",
      "view": "full length, front",
-     "note": "full length, front: as asked."
+     "note": "full length, front: as asked.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found."
     },
     {
      "code": "p0ec80a762b87",
@@ -219,14 +295,26 @@
      "view": "right hand and forearm",
      "note": "right hand and forearm: as asked.",
      "weak": true,
-     "flag": true
+     "flag": true,
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [
+      "Not the view asked."
+     ],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found."
     },
     {
      "code": "pe49a4db02af9",
      "label": "C · the face",
      "letter": "C",
      "view": "the face",
-     "note": "the face: as asked."
+     "note": "the face: as asked.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found."
     }
    ],
    "check": {
@@ -246,6 +334,12 @@
    "kind": "a person",
    "details": [
     [
+     "What Claude's check found",
+     [
+      "Picture B: Not the view asked."
+     ]
+    ],
+    [
      "Description",
      "What it looks like."
     ],
@@ -254,21 +348,11 @@
      "Used in 1 shot; the closest is a medium shot (shot 1 of gap 1)."
     ],
     [
-     "Why Claude suggests this",
-     "Why."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "A · full length, front: full length, front: as asked.",
       "B · right hand and forearm: right hand and forearm: as asked.",
       "C · the face: the face: as asked."
-     ]
-    ],
-    [
-     "What Claude's check found",
-     [
-      "Picture B: Not the view asked."
      ]
     ],
     [
@@ -280,7 +364,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": true,
     "permitted": false,
     "text": "Add this person's own photo, a PNG, JPEG or WebP file up to 15 MB: their set is made from it. A real person's photo is used only with their permission: write first, in your own words, that you have it.",
@@ -296,7 +380,7 @@
    "ask": "Which picture is the reference?",
    "buttons": [
     {
-     "label": "Make again",
+     "label": "Make all 3 again",
      "choice": "no",
      "needs_words": false,
      "act": "again",
@@ -305,7 +389,7 @@
      "sug": true
     },
     {
-     "label": "Approve",
+     "label": "Approve all 3",
      "choice": "use",
      "needs_words": false,
      "act": "approve",
@@ -320,7 +404,8 @@
      "go": "Make it again with these words",
      "all": {
       "label": "This applies to every picture of this thing",
-      "choice": "correct_all"
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
      }
     }
    ],
@@ -333,26 +418,41 @@
    "rec": {
     "do": "remake",
     "label": "Make it again",
-    "reason": "Why."
+    "reason": "Why.",
+    "head": "Claude recommends: make it again",
+    "first": "Why.",
+    "more": ""
+   },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together",
+   "sure": {
+    "ask": "Claude's check found 1 fault in this set. Approve it all the same?",
+    "text": "Why. Every later picture of it would copy this.",
+    "go": "Approve the set all the same",
+    "back": "Go back"
    },
    "pics": [
     {
      "code": "pe18a877e5bc7",
      "label": "From your footage: whole",
      "ref_only": true,
-     "view": "whole"
+     "view": "whole",
+     "cmp_cap": "Your footage, to compare: whole"
     },
     {
      "code": "p5534628a7c96",
      "label": "From your footage: whole",
      "ref_only": true,
-     "view": "whole"
+     "view": "whole",
+     "cmp_cap": "Your footage, to compare: whole"
     },
     {
      "code": "p7e2d39a82da1",
      "label": "From your footage: whole",
      "ref_only": true,
-     "view": "whole"
+     "view": "whole",
+     "cmp_cap": "Your footage, to compare: whole"
     },
     {
      "code": "pcc2918d5e30c",
@@ -360,9 +460,15 @@
      "letter": "A",
      "view": "the whole place",
      "note": "the whole place: as asked.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found.",
      "choice": "use:s-site_deck-1",
      "choice_label": "Approve A",
-     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A.",
+     "main_label": "Make A the main picture"
     },
     {
      "code": "p9e4fe51f6c4d",
@@ -372,9 +478,17 @@
      "note": "from the other side: as asked.",
      "weak": true,
      "flag": true,
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [
+      "Not the view asked."
+     ],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found.",
      "choice": "use:s-site_deck-1-2",
      "choice_label": "Approve B",
-     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture B.",
+     "main_label": "Make B the main picture"
     },
     {
      "code": "p029df773bfed",
@@ -382,9 +496,15 @@
      "letter": "C",
      "view": "its fixed things",
      "note": "its fixed things: as asked.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found.",
      "choice": "use:s-site_deck-1-3",
      "choice_label": "Approve C",
-     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture C.",
+     "main_label": "Make C the main picture"
     }
    ],
    "check": {
@@ -405,6 +525,12 @@
    "kind": "a place",
    "details": [
     [
+     "What Claude's check found",
+     [
+      "Picture B: Not the view asked."
+     ]
+    ],
+    [
      "Description",
      "What it looks like."
     ],
@@ -413,21 +539,11 @@
      "Used in 1 shot; the closest is a medium shot (shot 2 of gap 1)."
     ],
     [
-     "Why Claude suggests this",
-     "Why."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "A · the whole place: the whole place: as asked.",
       "B · from the other side: from the other side: as asked.",
       "C · its fixed things: its fixed things: as asked."
-     ]
-    ],
-    [
-     "What Claude's check found",
-     [
-      "Picture B: Not the view asked."
      ]
     ],
     [
@@ -439,7 +555,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
@@ -471,7 +587,8 @@
      "go": "Make it again with these words",
      "all": {
       "label": "This applies to every picture of this thing",
-      "choice": "correct_all"
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
      }
     },
     {
@@ -492,15 +609,26 @@
    "rec": {
     "do": "use",
     "label": "Use this picture",
-    "reason": "All three agree with the plan."
+    "reason": "All three agree with the plan.",
+    "head": "Claude recommends: use this picture",
+    "first": "All three agree with the plan.",
+    "more": ""
    },
+   "answer_head": "Your answer",
+   "answer_note": "This one picture is the reference.",
+   "strip_head": "The picture that was made",
    "pics": [
     {
      "code": "p92ad37aa52c9",
      "label": "the whole place",
      "letter": "",
      "view": "the whole place",
-     "note": "the whole place: as asked."
+     "note": "the whole place: as asked.",
+     "name": "The picture",
+     "set_cap": "The set: the picture",
+     "faults": [],
+     "check_head": "Claude's check of the picture:",
+     "check_none": "no fault found."
     }
    ],
    "check": {
@@ -521,10 +649,6 @@
      "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
     ],
     [
-     "Why Claude suggests this",
-     "All three agree with the plan."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "the whole place: the whole place: as asked."
@@ -532,7 +656,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
@@ -548,7 +672,7 @@
    "ask": "Which picture is the reference?",
    "buttons": [
     {
-     "label": "Approve",
+     "label": "Approve all 3",
      "choice": "use",
      "needs_words": false,
      "act": "approve",
@@ -564,11 +688,12 @@
      "go": "Make it again with these words",
      "all": {
       "label": "This applies to every picture of this thing",
-      "choice": "correct_all"
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
      }
     },
     {
-     "label": "Make again",
+     "label": "Make all 3 again",
      "choice": "no",
      "needs_words": false,
      "act": "again",
@@ -585,8 +710,14 @@
    "rec": {
     "do": "use",
     "label": "Use this set",
-    "reason": "The hand is at work in all three."
+    "reason": "The hand is at work in all three.",
+    "head": "Claude recommends: use this set",
+    "first": "The hand is at work in all three.",
+    "more": ""
    },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together",
    "pics": [
     {
      "code": "p2ff74921262f",
@@ -594,9 +725,15 @@
      "letter": "A",
      "view": "the action at its key moment",
      "note": "the action at its key moment: as asked.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found.",
      "choice": "use:s-t_lay-2",
      "choice_label": "Approve A",
-     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A.",
+     "main_label": "Make A the main picture"
     },
     {
      "code": "pafc68c813cc2",
@@ -604,9 +741,15 @@
      "letter": "B",
      "view": "the result just after",
      "note": "the result just after: as asked.",
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found.",
      "choice": "use:s-t_lay-2-2",
      "choice_label": "Approve B",
-     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture B.",
+     "main_label": "Make B the main picture"
     },
     {
      "code": "p4248e2df77b2",
@@ -614,9 +757,15 @@
      "letter": "C",
      "view": "close on where it happens",
      "note": "close on where it happens: as asked.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found.",
      "choice": "use:s-t_lay-2-3",
      "choice_label": "Approve C",
-     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture C.",
+     "main_label": "Make C the main picture"
     }
    ],
    "check": {
@@ -654,10 +803,6 @@
      "Used in 1 shot; the closest is a medium shot (shot 1 of gap 2)."
     ],
     [
-     "Why Claude suggests this",
-     "The hand is at work in all three."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "A · the action at its key moment: the action at its key moment: as asked.",
@@ -667,7 +812,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
@@ -683,7 +828,7 @@
    "ask": "Which picture is the reference?",
    "buttons": [
     {
-     "label": "Approve",
+     "label": "Approve all 3",
      "choice": "use",
      "needs_words": false,
      "act": "approve",
@@ -707,8 +852,14 @@
    "rec": {
     "do": "use",
     "label": "Use this set",
-    "reason": "All three agree with the plan."
+    "reason": "All three agree with the plan.",
+    "head": "Claude recommends: use this set",
+    "first": "All three agree with the plan.",
+    "more": ""
    },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together",
    "pics": [
     {
      "code": "p92ad37aa52c9",
@@ -716,9 +867,15 @@
      "letter": "A",
      "view": "the whole place",
      "note": "the whole place: as asked.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1",
      "choice_label": "Approve A",
-     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A.",
+     "main_label": "Make A the main picture"
     },
     {
      "code": "p64a748859ef1",
@@ -726,9 +883,15 @@
      "letter": "B",
      "view": "from the other side",
      "note": "from the other side: as asked.",
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1-2",
      "choice_label": "Approve B",
-     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture B.",
+     "main_label": "Make B the main picture"
     },
     {
      "code": "ped031b26c982",
@@ -736,9 +899,15 @@
      "letter": "C",
      "view": "its fixed things",
      "note": "its fixed things: as asked.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1-3",
      "choice_label": "Approve C",
-     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture C.",
+     "main_label": "Make C the main picture"
     }
    ],
    "check": {
@@ -768,10 +937,6 @@
      "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
     ],
     [
-     "Why Claude suggests this",
-     "All three agree with the plan."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "A · the whole place: the whole place: as asked.",
@@ -781,7 +946,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
@@ -797,7 +962,7 @@
    "ask": "Which picture is the reference?",
    "buttons": [
     {
-     "label": "Approve",
+     "label": "Approve all 2",
      "choice": "use",
      "needs_words": false,
      "act": "approve",
@@ -813,11 +978,12 @@
      "go": "Make it again with these words",
      "all": {
       "label": "This applies to every picture of this thing",
-      "choice": "correct_all"
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
      }
     },
     {
-     "label": "Make again",
+     "label": "Make all 2 again",
      "choice": "no",
      "needs_words": false,
      "act": "again",
@@ -841,8 +1007,14 @@
    "rec": {
     "do": "use",
     "label": "Use this set",
-    "reason": "All three agree with the plan."
+    "reason": "All three agree with the plan.",
+    "head": "Claude recommends: use this set",
+    "first": "All three agree with the plan.",
+    "more": ""
    },
+   "answer_head": "Your answer for the whole set (pictures A and B)",
+   "answer_note": "One answer covers all 2 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 2 pictures, answered together",
    "pics": [
     {
      "code": "p92ad37aa52c9",
@@ -850,9 +1022,15 @@
      "letter": "A",
      "view": "the whole place",
      "note": "the whole place: as asked.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1",
      "choice_label": "Approve A",
-     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+     "say": "All 2 pictures approved as one set. Later pictures start from picture A.",
+     "main_label": "Make A the main picture"
     },
     {
      "code": "p64a748859ef1",
@@ -860,9 +1038,15 @@
      "letter": "B",
      "view": "from the other side",
      "note": "from the other side: as asked.",
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1-2",
      "choice_label": "Approve B",
-     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+     "say": "All 2 pictures approved as one set. Later pictures start from picture B.",
+     "main_label": "Make B the main picture"
     }
    ],
    "check": {
@@ -886,10 +1070,6 @@
      "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
     ],
     [
-     "Why Claude suggests this",
-     "All three agree with the plan."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "A · the whole place: the whole place: as asked.",
@@ -898,7 +1078,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
@@ -915,7 +1095,7 @@
    "ask": "Which picture is the reference?",
    "buttons": [
     {
-     "label": "Approve",
+     "label": "Approve all 3",
      "choice": "use",
      "needs_words": false,
      "act": "approve",
@@ -931,11 +1111,12 @@
      "go": "Make it again with these words",
      "all": {
       "label": "This applies to every picture of this thing",
-      "choice": "correct_all"
+      "choice": "correct_all",
+      "say": "Make it again with your words: \"{words}\". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you."
      }
     },
     {
-     "label": "Make again",
+     "label": "Make all 3 again",
      "choice": "no",
      "needs_words": false,
      "act": "again",
@@ -952,8 +1133,14 @@
    "rec": {
     "do": "use",
     "label": "Use this set",
-    "reason": "All three agree with the plan."
+    "reason": "All three agree with the plan.",
+    "head": "Claude recommends: use this set",
+    "first": "All three agree with the plan.",
+    "more": ""
    },
+   "answer_head": "Your answer for the whole set (pictures A, B and C)",
+   "answer_note": "One answer covers all 3 pictures. You do not answer them one by one.",
+   "strip_head": "The set: 3 pictures, answered together",
    "pics": [
     {
      "code": "p92ad37aa52c9",
@@ -961,9 +1148,15 @@
      "letter": "A",
      "view": "the whole place",
      "note": "the whole place: as asked.",
+     "name": "Picture A",
+     "set_cap": "The set: picture A",
+     "faults": [],
+     "check_head": "Claude's check of picture A:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1",
      "choice_label": "Approve A",
-     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture A.",
+     "main_label": "Make A the main picture"
     },
     {
      "code": "p64a748859ef1",
@@ -971,9 +1164,15 @@
      "letter": "B",
      "view": "from the other side",
      "note": "from the other side: as asked.",
+     "name": "Picture B",
+     "set_cap": "The set: picture B",
+     "faults": [],
+     "check_head": "Claude's check of picture B:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1-2",
      "choice_label": "Approve B",
-     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture B.",
+     "main_label": "Make B the main picture"
     },
     {
      "code": "ped031b26c982",
@@ -981,9 +1180,15 @@
      "letter": "C",
      "view": "its fixed things",
      "note": "its fixed things: as asked.",
+     "name": "Picture C",
+     "set_cap": "The set: picture C",
+     "faults": [],
+     "check_head": "Claude's check of picture C:",
+     "check_none": "no fault found.",
      "choice": "use:s-street-1-3",
      "choice_label": "Approve C",
-     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+     "say": "All 3 pictures approved as one set. Later pictures start from picture C.",
+     "main_label": "Make C the main picture"
     }
    ],
    "check": {
@@ -1005,10 +1210,6 @@
      "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
     ],
     [
-     "Why Claude suggests this",
-     "All three agree with the plan."
-    ],
-    [
      "What Claude saw in each picture",
      [
       "A · the whole place: the whole place: as asked.",
@@ -1018,7 +1219,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
@@ -1140,7 +1341,7 @@
     ]
    ],
    "own": {
-    "label": "Upload my own",
+    "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
     "text": "Add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference of this thing, and no set is made.",
@@ -1201,7 +1402,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "A person: always gets a set.",
    "details": [
@@ -1221,7 +1422,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "A person: always gets a set.",
    "details": [
@@ -1241,7 +1442,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "A person: always gets a set.",
    "details": [
@@ -1261,7 +1462,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "A person: always gets a set.",
    "details": [
@@ -1281,7 +1482,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "A person: always gets a set.",
    "details": [
@@ -1301,7 +1502,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "A person: always gets a set.",
    "details": [
@@ -1321,7 +1522,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1342,7 +1543,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1363,7 +1564,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1384,7 +1585,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1405,7 +1606,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1426,7 +1627,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1447,7 +1648,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1468,7 +1669,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1489,7 +1690,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1510,7 +1711,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,
@@ -1531,7 +1732,7 @@
    "group": "Waiting to be made",
    "case": "wait",
    "note": "Not ordered yet: it is offered when the first sets are judged.",
-   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "head": "Not made yet. It is made with the other sets when you choose to make them.",
    "tag": "Waiting",
    "wait_note": "If not made, 1 shot would have no reference of it.",
    "out": true,

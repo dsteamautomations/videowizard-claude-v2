@@ -80,7 +80,7 @@ def test_a_persons_prompt_carries_the_description_the_role_the_outfit_the_place_
 def test_two_people_alike_on_every_trait_are_refused_before_any_payment():
     twin = {**HELPER, 'id': 'P3', 'name': 'Second helper', 'requirements': 'another helper'}
     doc = doc_with(MASON, HELPER, twin)
-    with pytest.raises(ValueError, match='P2 and P3 .* alike'):
+    with pytest.raises(ValueError, match='These two people read alike, Helper and Second helper: add what tells them apart'):   # design/216 (B5): plain words, by name (before: 'P2 and P3 are alike on every compared trait')
         VS.distinct_people(doc)
     doc = doc_with(MASON, HELPER, {**twin, 'description': 'a young man of about twenty, lean, dark skin, cropped hair, a beard, long trousers'})
     VS.distinct_people(doc)   # different traits pass

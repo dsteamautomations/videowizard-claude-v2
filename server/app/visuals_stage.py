@@ -2009,11 +2009,15 @@ def alike_people(plan):
     return [(a['id'], b['id']) for i, a in enumerate(people) for b in people[i + 1:] if traits(a.get('description')) == traits(b.get('description'))]
 
 
+PEOPLE_ALIKE = 'These two people read alike, {a} and {b}: add what tells them apart.'
+
+
 def distinct_people(plan):
     """design/151 part 2: every pair of people differs on at least one compared trait, whoever they are in the film; an alike pair is refused by name
     before any payment. design/207: the plan check names every such pair together first (carried_warnings, `people_alike`)."""
-    for a, b in alike_people(plan)[:1]:
-        need(False, f"{a} and {b} are alike on every compared trait (age, build, hair, face): change one description so they can be told apart; this holds for every person of the film.")
+    names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
+    for a, b in alike_people(plan)[:1]:   # design/216 (B5): plain words, as the page shows them (was: "alike on every compared trait (age, build, hair, face) ...")
+        need(False, PEOPLE_ALIKE.format(a=names[a], b=names[b]))
 
 
 def _place_look(plan):
@@ -3594,8 +3598,12 @@ def _set_budget(run, session, spend):
 RULE_RETIRED = 'The rule that held this set back no longer applies to a set: it can be made now.'   # design/215: a refusal stored by "measure it first" or "the plan cites the footage"
 
 
+RETIRED_FOR_SETS = ('size still unknown', 'cites the footage',   # design/215 (R3, R4)
+                    'with no landmark and measured distance', 'says nothing a picture can show')   # defect 54: a set's request is the plan's own words; design/216 (B3): its stored refusal no longer holds the set
+
+
 def rule_retired(session, error):
-    return round_v2(session) and ('size still unknown' in str(error or '') or 'cites the footage' in str(error or ''))
+    return round_v2(session) and any(x in str(error or '') for x in RETIRED_FOR_SETS)
 
 
 def with_corrections(session, plan, prompt, element_ids):

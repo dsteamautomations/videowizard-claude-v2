@@ -131,7 +131,7 @@ def test_both_front_ends_offer_the_tick_and_show_the_corrections_on_the_things_l
     ctx = lambda: CF._ctx(conn, store, USER, RUN, [])
     item = next(i for i in CF._round_items(ctx(), every=True) if i['id'].startswith('set:T_LAY'))
     fix = next(b for b in item['_line']['buttons'] if b['act'] == 'fix')
-    assert fix['all'] == {'label': 'This applies to every picture of this thing', 'choice': 'correct_all'} and fix['choice'] == 'correct'
+    assert fix['all'] == {'label': 'This applies to every picture of this thing', 'choice': 'correct_all', 'say': CF.WORDS['say_fix_all']} and fix['choice'] == 'correct'
     chat = {b['choice']: b for b in item['buttons'] + list(item.get('other_choices') or [])}
     assert chat['correct_all']['label'] == 'Correct every picture of it' and chat['correct_all']['needs_words'] is True
     assert 'corrections' not in item['_line']

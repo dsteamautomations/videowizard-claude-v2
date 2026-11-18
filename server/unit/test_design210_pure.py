@@ -112,7 +112,7 @@ def test_the_same_picture_on_two_lines_has_one_code_and_is_listed_once_and_a_bro
 def test_the_page_may_use_its_file_store_and_is_told_the_order():
     assert P.CAPABILITIES['assets'] == {} and P.CAPABILITIES['user'] == {} and {'pics', 'zoom', 'rounds'} <= {r['path'] for r in P.CAPABILITIES['db']['rules']}
     how = P.HOW
-    assert how.index('picture_batches') < how.index('zoom_uploads') < how.index('--uploaded') < how.index('collection "rounds"') < how.index('Open this page')
+    assert how.index('picture_batches') < how.index('zoom_uploads') < how.index('--uploaded') < how.index('collection "rounds"') < how.index('Say to the operator `say`')
     assert '`capabilities` again, exactly as given' in how and 'large pictures are not available' in how and 'vw visuals next' in how
 
 

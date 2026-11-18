@@ -1959,6 +1959,7 @@ def retired(what):
     emit({'action': 'refused', 'message': RETIRED[what]}, 2)
 
 
+PREPARE_MIN = 10   # design/216 (B2): from this many pictures to fetch (about 40 seconds), the operator is told first
 OWN_PICTURE_MAX = 15 * 1024 * 1024   # design/177: the server's limit for the operator's own picture, said before the file is sent
 ROUND_ONE = ('answer', 'make', 'aside', 'back')   # design/177: the page's step-2 actions on one element
 
@@ -1978,7 +1979,9 @@ def _round_one(a, base):
             emit({'action': 'refused', 'message': f'Give the answer for {eid}: --verdict yes|no|correct (with --golden <picture id> for the Yes of a thing, --words "…" for Correct it); nothing was sent.'}, 2)
         if golden is True:
             emit({'action': 'refused', 'message': 'Name the starting picture: --golden <picture id>; nothing was sent.'}, 2)
-        out = write(base + '/round/answer', {'element_id': eid, 'verdict': verdict, 'golden': golden or None, 'words': words})
+        if getattr(a, 'every_picture', False) and verdict != 'correct':
+            emit({'action': 'refused', 'message': '--every-picture goes with --verdict correct and the words; nothing was sent.'}, 2)
+        out = write(base + '/round/answer', {'element_id': eid, 'verdict': verdict, 'golden': golden or None, 'words': words, **({'all': True} if getattr(a, 'every_picture', False) else {})})   # design/216 (B6)
         if not out.get('stored'):
             emit(out, 0, out.get('next') or f'{eid}: the answer was not stored.')
         ans = out.get('answer') or {}
@@ -2398,8 +2401,15 @@ def cmd_visuals(a):
             made_by.write_text(plugin_version() + '\n', encoding='utf-8')
             emit({'url': a.url.strip()}, 0, 'The page link is kept for this run. Now send the pictures, when the round has any (step 2 of `how`), and write the round to the page (step 3).')
 
-        def hand(page, more=None):
-            """This round as one file for the page, and what the assistant needs to put it there. Nothing of its content is typed."""
+        def hand(page, more=None, said=''):
+            """This round as one file for the page, and what the assistant needs to put it there. Nothing of its content is typed.
+            design/216 (B2): with many pictures still to fetch, the server's sentence `preparing` is said first and nothing is fetched or written
+            until `--fetch`."""
+            todo = [c for c in _pic_codes(page.get('pictures')) if not (folder / 'pics' / f'{c}.json').is_file() or not (folder / 'zoom' / f'{c}.jpg').is_file()]
+            if len(todo) >= PREPARE_MIN and page.get('preparing') and not getattr(a, 'fetch', False):
+                emit({'preparing': page['preparing'], 'pictures_to_fetch': len(todo), **{k: v for k, v in (more or {}).items() if k != 'then'}}, 0,
+                     said + f'Say this to the operator first, as it is: "{page["preparing"]}" Then run `vw visuals page --fetch`: it fetches the pictures and gives the round. '
+                            'Nothing was written to the page yet.')
             rnd = page['round']
             suffix = _doc_suffix(_pictures_sent(folder))
             names = {c: c + suffix for c in _pic_codes(page.get('pictures'))} if suffix else {}   # design/210 review: pictures offered again are in other documents; the round says which
@@ -2415,7 +2425,8 @@ def cmd_visuals(a):
                     **({'pictures_failed': page['pictures_failed']} if page.get('pictures_failed') else {})}
             return {'url': link, 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
                     'title': page['title'], 'capabilities': page['capabilities'], 'round': rnd, 'round_file': str(folder / f'{rnd}.json'),
-                    'answers_collection': f'rounds/{rnd}/answers', 'answers_dir': str(folder / 'answers'), 'waiting': waiting, 'note': doc['note'], 'how': page['how'], **(more or {})}
+                    'answers_collection': f'rounds/{rnd}/answers', 'answers_dir': str(folder / 'answers'), 'waiting': waiting, 'note': doc['note'], 'how': page['how'],
+                    **({'say': page['say']} if page.get('say') else {}), **(more or {})}   # design/216 (B1): the message posted with the link, unchanged
 
         def pictures_line(info):
             """design/210: what the assistant sends before the round, in words."""
@@ -2468,7 +2479,7 @@ def cmd_visuals(a):
                      done + f"{len(own_fetch)} picture(s) the operator added on the page are still to fetch. For each id, the Artifact tool: action \"read\", `url` {link or 'the page link'}, "
                             f"`path` the id, `out_dir` {folder / 'own'}. The ids: " + ', '.join(f'`path` {i}' for i in own_fetch) + '. Then run `vw visuals page --record` again: their lines '
                             'are recorded then. Nothing is recorded for those lines yet.')
-            info = hand(out['page'], {k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out})
+            info = hand(out['page'], {k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out}, said=done + (out.get('then') or '') + ' ')
             emit(info, 0, done + f"{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
         out = write(base + '/page', {'one': False}, wait=PAGE_WAIT)
         info = hand(out, {'then': out['then']} if out.get('then') else None)   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
@@ -3789,6 +3800,8 @@ def build_parser():
     s.add_argument('--looks', nargs='?', const=True, default=None, help='round: alone, list the sets to look at and fetch their pictures; with a file, record the looks (design/211)')
     s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
+    s.add_argument('--fetch', action='store_true', help='page: fetch the pictures now, after saying the sentence `preparing` (design/216)')
+    s.add_argument('--every-picture', dest='every_picture', action='store_true', help='round --answer with --verdict correct: the words apply to every picture of this thing (design/216; the page\'s tick)')
     s.add_argument('--pictures-again', dest='pictures_again', action='store_true', help='page: offer every picture of the round again, under new document names: for a batch that failed or a picture that stays grey on the page (design/210)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the base and the gap files (design/149 B7)')

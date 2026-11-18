@@ -111,12 +111,12 @@ def test_vw24s_stored_round_shows_in_the_new_layout_as_it_is(monkeypatch):
     mason, deck, room = by['MASON'], by['SITE_DECK'], by['ROOM']
     assert len([x for x in mason['pics'] if not x.get('ref_only')]) == 3 and 'pick' not in mason and mason['rule'] == W['rule_person']      # its made set keeps its three pictures
     assert [x.get('ref_only', False) for x in deck['pics']] == [True] * 3 + [False] * 3 and deck['pick'] is True
-    assert [x['letter'] for x in deck['pics'][3:]] == ['A', 'B', 'C'] and all(x['choice'].startswith('use:') and x['say'] == W['say_use'].format(letter=x['letter']) for x in deck['pics'][3:])
+    assert [x['letter'] for x in deck['pics'][3:]] == ['A', 'B', 'C'] and all(x['choice'].startswith('use:') and x['say'] == W['say_all'].format(n=3, letter=x['letter']) for x in deck['pics'][3:])
     assert acts(mason) == ['again', 'approve', 'fix'] and btn(mason, 'again')['sug'] is True and [b['choice'] for b in mason['buttons']] == ['no', 'yes', 'correct']
     assert acts(deck) == ['again', 'approve', 'fix'] and btn(deck, 'approve')['choice'] == 'use' and deck['rec']['label'] == 'Make it again'
     assert deck['check']['state'] == 'fail' and deck['check']['chip'] == "Claude's check found 1 fault" and deck['pics'][4].get('flag') is True
     assert room['case'] == 'notmade' and room['head'] == 'This set could not be made.' and room['why'].startswith('The request places') and acts(room) == ['make', 'leave']
-    assert rest['head'] == '17 more sets wait for your word' and rest['show'] == 'Show the 17' and len(rest['covers']) == 17 and labels(rest) == ['Make them', 'Do not make these sets']
+    assert rest['head'] == '17 more sets wait for your word' and rest['show'] == 'Show the 17' and len(rest['covers']) == 17 and labels(rest) == ['Make the other 17', 'Make only some of them']
     assert rest['buttons'][0]['big'] == 'Make the other 17' and rest['buttons'][0]['say'] == 'The other 17 sets will be made.'
     loss = rest['buttons'][1]['loss']
     assert len(loss['rows']) == 11 and loss['head'] == 'Without these 11 sets' and loss['button'] == 'Do not make these 11 sets; make the other 6' == chat(film, 'sets:rest')['buttons'][1]['label'] and loss['people'].startswith('The 6 people always get a set: ') \
@@ -134,11 +134,11 @@ def test_vw24s_stored_round_shows_in_the_new_layout_as_it_is(monkeypatch):
 def test_a_persons_set_approve_corrections_and_make_again(monkeypatch):
     film = Film(monkeypatch, '2')
     m = film.lines()['set:MASON']
-    assert [(b['label'], b['choice'], b['act'], b['needs_words']) for b in m['buttons']] == [('Approve', 'yes', 'approve', False), ('Minor corrections', 'correct', 'fix', True), ('Make again', 'no', 'again', False)]
-    assert btn(m, 'approve')['sug'] is True and btn(m, 'approve')['say'] == W['say_yes'] and btn(m, 'again')['ask'] == W['again_ask'] and '{words}' in btn(m, 'fix')['say']
-    assert m['own']['label'] == 'Upload my own' and m['own']['say'] == W['say_own_person'] and m['rec'] == {'do': 'use', 'label': 'Use this set', 'reason': 'All three agree with the plan.'}
+    assert [(b['label'], b['choice'], b['act'], b['needs_words']) for b in m['buttons']] == [('Approve all 3', 'yes', 'approve', False), ('Minor corrections', 'correct', 'fix', True), ('Make all 3 again', 'no', 'again', False)]
+    assert btn(m, 'approve')['sug'] is True and btn(m, 'approve')['say'] == W['say_all'].format(n=3, letter='A') and btn(m, 'again')['ask'] == W['again_ask'] and '{words}' in btn(m, 'fix')['say']
+    assert m['own']['label'] == 'Use my own picture instead' and m['own']['say'] == W['say_own_person'] and m['rec'] == CF.rec_of('Use this set', 'use', 'All three agree with the plan.')
     item = chat(film, 'set:MASON')
-    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Approve', 'yes'), ('Minor corrections', 'correct'), ('Make again', 'no'), ('Correct every picture of it', 'correct_all')] and item['question'].endswith('is this set right for this person?')
+    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Approve all 3', 'yes'), ('Minor corrections', 'correct'), ('Make all 3 again', 'no'), ('Correct every picture of it', 'correct_all')] and item['question'].endswith('is this set right for this person?')
     out = film.record(ans(m, 'correct', 'His shirt is blue.'))
     assert out['refused'] == [] and {k: film.session()['round']['elements']['MASON']['answer'][k] for k in ('verdict', 'golden', 'words')} == {'verdict': 'correct', 'golden': None, 'words': 'His shirt is blue.'}
     assert film.record(ans(m, 'correct'))['refused'][0]['key'] == 'set:MASON'                                      # corrections need the operator's words
@@ -149,7 +149,7 @@ def test_a_things_set_approve_takes_the_picture_chosen(monkeypatch):
     s = film.lines()['set:STREET']
     made = [x for x in s['pics'] if not x.get('ref_only')]
     assert s['pick'] is True and btn(s, 'approve')['choice'] == 'use' and [x['choice'] for x in made] == ['use:s-street-1', 'use:s-street-1-2', 'use:s-street-1-3']
-    assert made[1]['say'] == 'Approve: picture B is the reference; pictures of this thing start from it.' and 'every shot' not in read(s)
+    assert made[1]['say'] == 'All 3 pictures approved as one set. Later pictures start from picture B.' and 'every shot' not in read(s)
     assert [(b['label'], b['choice']) for b in chat(film, 'set:STREET')['buttons']] == [('Approve A', 'use:s-street-1'), ('Approve B', 'use:s-street-1-2'), ('Approve C', 'use:s-street-1-3'), ('Minor corrections', 'correct')]
     assert film.record(ans(s, 'use:s-street-1-2'))['refused'] == [] and film.session()['round']['elements']['STREET']['answer']['golden'] == 's-street-1-2'
     assert film.record(ans(s, 'use'))['refused'][0]['key'] == 'set:STREET'                                         # "Approve" alone is no answer: the page sends the picture chosen
@@ -226,7 +226,7 @@ def test_a_set_not_made_a_refused_photo_and_a_thing_back(monkeypatch):
     film.change(lambda s: [r.update(status='failed') for r in s['references'].values() if r.get('set') == 's-street-1'])
     s = film.lines()['set:STREET']
     assert (s['group'], s['case'], s['head'], s['why']) == (G[1], 'notmade', 'This set could not be made.', 'Google refused the request.')
-    assert [(b['label'], b['choice'], b['act']) for b in s['buttons']] == [('Make it', 'make', 'make'), ('Go on without a reference', 'aside', 'leave')] and s['own']['label'] == 'Upload my own'
+    assert [(b['label'], b['choice'], b['act']) for b in s['buttons']] == [('Make it', 'make', 'make'), ('Go on without a reference', 'aside', 'leave')] and s['own']['label'] == 'Use my own picture instead'
     assert ['Why it could not be made', 'Google refused the request.'] in s['details']
     film.record(ans(s, 'make'))
     assert film.called('set_make') == [('STREET', 'Make it')]
@@ -249,10 +249,10 @@ def test_the_waiting_sets_make_them_and_leave_some_out(monkeypatch):
     aside = []
     monkeypatch.setattr(VS, 'set_aside', lambda store, user, run, outputs, eid, words='', back=False: aside.append(eid) or {'element_id': eid})
     rest = film.lines()['sets:rest']
-    assert [(b['label'], b['choice']) for b in rest['buttons']] == [('Make them', 'rest'), ('Do not make these sets', 'rest_out')] and rest['why'] == W['rest_why']
+    assert [(b['label'], b['choice']) for b in rest['buttons']] == [('Make the other 2', 'rest'), ('Make only some of them', 'rest_out')] and rest['why'] == W['rest_why']
     assert rest['buttons'][1]['say'] == '2 are not made. No other set waits.' and len(rest['buttons'][1]['loss']['rows']) == 2
     item = chat(film, 'sets:rest')
-    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Make the other 2 sets', 'rest'), ('Do not make these 2 sets', 'rest_out')]
+    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Make the other 2', 'rest'), ('Do not make these 2 sets', 'rest_out')]
     assert rest['buttons'][1]['loss']['button'] == 'Do not make these 2 sets'                                              # no person waits: the same words on the page and in the chat
     film.record(ans(rest, 'rest'))
     assert len(film.called('round_rest')) == 1 and not aside

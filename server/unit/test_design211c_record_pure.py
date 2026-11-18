@@ -149,8 +149,8 @@ def test_make_the_rest_goes_to_part_b_with_the_buttons_label_as_the_operators_wo
     film.change(lambda s: s['round']['elements']['T_LAY'].update(ignored=True))   # the first sets are judged: only the others wait
     rest = film.lines()['sets:rest']
     out = film.record(ans(rest, 'rest'))
-    assert film.called('round_rest') == [('Make the other 2 sets',)] and out['recorded'] == ['sets:rest'] and out['then'] == ref_sets.ALL_MAKING.format(k=2, x='70')
-    assert any('sets:rest' in x and 'Make the other 2 sets' in x for x in logged(film))
+    assert film.called('round_rest') == [('Make the other 2',)] and out['recorded'] == ['sets:rest'] and out['then'] == ref_sets.ALL_MAKING.format(k=2, x='70')
+    assert any('sets:rest' in x and 'Make the other 2' in x for x in logged(film))
 
 
 def test_leave_the_rest_out_sets_each_thing_aside_and_pays_nothing(monkeypatch):

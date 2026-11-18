@@ -130,12 +130,12 @@ def test_every_thing_is_on_the_page_at_once_with_its_footage_pictures_and_the_ch
     assert [x['item'] for x in p['lines']] == ['round1:E1', 'round1:E2', 'round1:P1'] and all(x['state'] == 'open' and x['comment'] is True for x in p['lines'])
     assert len(l['ref:E1']['pics']) == 4 and [x['label'] for x in l['ref:E1']['pics']] == ['Footage picture 1', 'Footage picture 2', 'Footage picture 3', 'Footage picture 4']   # up to four, as the chat shows
     assert l['ref:E1']['pics'][0]['code'] == P.pic_code(CF._ref_key(NEW, 'F1'), saved(store)['references']['F1']['sha256']) and len(p['pictures']) == 4
-    assert l['ref:E1']['buttons'] == [{'label': 'Yes, use it', 'choice': 'approve', 'needs_words': False}, {'label': 'Leave it out', 'choice': 'ignore', 'needs_words': False}]
+    assert l['ref:E1']['buttons'] == [{'label': 'Yes, use it', 'choice': 'approve', 'needs_words': False}, {'label': 'No reference needed', 'choice': 'ignore', 'needs_words': False}]   # design/216 (B6): was 'Leave it out'
     assert 'nothing is paid' in l['ref:E1']['text'] and l['ref:E1']['ask'] == 'Use this picture from your footage as the reference?'
     assert 'pics' not in l['ref:E2'] and l['ref:E2']['buttons'][0] == {'label': f'Yes, make one ({paid(store, conn)})', 'choice': 'approve', 'needs_words': False}
-    assert l['ref:E2']['buttons'][1]['label'] == 'Leave it out' and 'no picture of it' in l['ref:E2']['text']
+    assert l['ref:E2']['buttons'][1]['label'] == 'No reference needed' and 'no picture of it' in l['ref:E2']['text']
     chat = CF._round_items(CF._ctx(conn, store, USER, NEW, []))
-    assert [i['id'] for i in chat] == ['round1:E1'] and [b['label'] for b in chat[0]['buttons']] == ['Yes, use it', 'Leave it out']   # the chat still asks one at a time
+    assert [i['id'] for i in chat] == ['round1:E1'] and [b['label'] for b in chat[0]['buttons']] == ['Yes, use it', 'No reference needed']   # the chat still asks one at a time
     assert len(json.dumps(p['lines'], ensure_ascii=False).encode('utf-8')) < P.ROUND_BYTES and '_' not in ''.join(k[0] for x in p['lines'] for k in x)
 
 
@@ -198,7 +198,7 @@ def test_done_with_some_unanswered_keeps_the_answers_and_records_and_queues_noth
     assert s['round']['elements']['E2']['verdict'] is None and s['references']['F1']['status'] == 'candidate'
     now = by(r['page'])
     assert r['page']['step'] == A and now['ref:E1']['state'] == 'open' and 'kept' not in now['ref:E1']
-    assert now['ref:E2']['kept'] == f'Yes, make one ({paid(store, conn)})' and now['ref:P1']['kept'] == 'Leave it out' and now['ref:E2']['kept_note'] == P.REFS_KEPT
+    assert now['ref:E2']['kept'] == f'Yes, make one ({paid(store, conn)})' and now['ref:P1']['kept'] == 'No reference needed' and now['ref:E2']['kept_note'] == P.REFS_KEPT
     assert 'the sets are made when every thing is answered' in P.REFS_KEPT and now['ref:E2']['state'] == 'open' and now['ref:E2']['buttons']   # it can still be changed
     assert '1 to answer, 2 kept' in r['page']['summary'] and '1 thing(s) still wait' in r['then'] and 'nothing is made' in r['then']
 
@@ -382,7 +382,7 @@ def test_a_set_that_was_not_made_is_made_now_or_left_out():
     store, conn = not_made()
     l = by(page(store, conn))['set:E2']
     assert l['item'] == 'setmake:E2' and l['state'] == 'open' and 'pics' not in l and 'was not made' in l['text']
-    assert [b['label'] for b in l['buttons']] == [f'Make it ({paid(store, conn)})', 'Leave it out']
+    assert [b['label'] for b in l['buttons']] == [f'Make it ({paid(store, conn)})', 'Go on without a reference']
     n = len(conn.inserted)
     r = record(store, conn, [ans(l, 'make')])
     assert r['recorded'] == ['set:E2'] and len(conn.inserted) == n + 1 and by(r['page'])['set:E2']['state'] == 'making'

@@ -203,8 +203,8 @@ def test_C5_leave_these_out_never_covers_a_person_and_names_the_shots_that_lose_
     assert film.session()['round']['rest'] == ['MASON', 'TILE']
     line = film.lines()['sets:rest']
     said = chat(film, 'sets:rest')   # design/213: the page line has its parts and short labels; the chat says the same as one text
-    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make them', 'Do not make this set'] and line['buttons'][1]['loss']['button'] == 'Do not make this set; make the other 1'   # design/213 review: the words pressed say all the click does
-    assert [b['label'] for b in said['buttons']] == ['Make the other 2 sets', 'Do not make this set; make the other 1']
+    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make the other 2', 'Make only some of them'] and line['buttons'][1]['loss']['button'] == 'Do not make this set; make the other 1'   # design/213 review: the words pressed say all the click does
+    assert [b['label'] for b in said['buttons']] == ['Make the other 2', 'Do not make this set; make the other 1']   # design/216 (B6, A3, A12): one label everywhere
     assert 'The mason: a person shown in a made picture always gets a set' in said['text'] and line['buttons'][1]['loss']['people'] == 'This person always gets a set: The mason. Not making the others also has their set made, on the same word, when you say done in the chat.'
     assert line['cost'] == 'Without this set, these shots are made with no reference: Roof tile: shot 2 of gap 3.'
     assert film.record(ans(line, 'rest_out'))['refused'][0]['message'] == CF.WORDS['rest_first'] and not film.row('TILE').get('ignored')   # design/213 review: not while a first set is unjudged

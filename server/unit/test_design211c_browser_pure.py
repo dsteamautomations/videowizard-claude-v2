@@ -98,7 +98,7 @@ def test_a_line_of_an_older_round_draws_as_before(monkeypatch, browser, view):
     pg = show(browser, doc(Film(monkeypatch, session=older_step1()).page()), view)
     assert pg.locator('button.ghead').count() == 0 and pg.locator('p.prop').count() == 0 and pg.locator('.pnote').count() == 0 and pg.locator('.pcell').count() == 0   # 1: none of the new parts
     trowel = block(pg, "Mason's trowel")
-    assert trowel.locator('.acts > button').all_text_contents() == ['Yes, use it', 'Leave it out'] and trowel.locator('button.pic').all_text_contents() == ['Footage picture 1', 'Footage picture 2']   # 2
+    assert trowel.locator('.acts > button').all_text_contents() == ['Yes, use it', 'No reference needed'] and trowel.locator('button.pic').all_text_contents() == ['Footage picture 1', 'Footage picture 2']   # 2
     assert trowel.locator('.acts textarea').get_attribute('placeholder').startswith('Add a comment (optional). It is kept with your answer')   # 3
     assert pg.locator('section.item').count() == 7 and no_side_scroll(pg)   # 4
     pg.close()

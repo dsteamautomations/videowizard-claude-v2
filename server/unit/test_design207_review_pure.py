@@ -260,7 +260,7 @@ def test_the_check_names_every_pair_of_people_who_read_alike_in_one_warning():
                               "Write each person's age, build, hair and face in their `description`, so that every pair differs in at least one."}]
     assert 'people_alike' in VC.WARNING_TECHNICAL and 'people_alike' not in VC.WARNING_PLAIN
     assert not [w for w in VS.carried_warnings(session(), OLD, alike_doc(), []) if w['kind'] == 'people_alike']   # an older film's round does not compare people
-    with pytest.raises(ValueError, match='P3 and P4 are alike on every compared trait'):   # the refusal at the round is as it was, one pair
+    with pytest.raises(ValueError, match='These two people read alike, '):   # the refusal at the round, one pair; design/216 (B5): in plain words (before: 'P3 and P4 are alike on every compared trait')
         VS.distinct_people(alike_doc())
 
 

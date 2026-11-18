@@ -33,7 +33,7 @@ HOW = ('The operator answers this step on a page, not on a card. '
        '`vw visuals page --uploaded "<that file>"`: it gives one more batch in `picture_batches`, sent the same way. If an upload fails, go on, and tell the operator that the large pictures '
        'are not available on the page. '
        '3. Write this round to the page with the ArtifactData tool: action "set", `url` the page\'s link, collection "rounds", doc_id `round`, file_path `round_file`. Type none of its content. '
-       '4. Say to the operator, as your own one line: "Open this page, answer each line, then tell me you are done:" and the link. Then wait. Do not post the lines in the chat as well. '
+       '4. Say to the operator `say`, exactly as it is, then the link: add nothing to it, no count and no summary of your own (design/216). Then wait. Do not post the lines in the chat as well. '
        '5. When the operator says done: ArtifactData, action "list", collection `answers_collection`, out_dir `answers_dir`; then run `vw visuals page --record`. '
        'If it lists pictures the operator added on the page (`own_fetch`), fetch each one: the Artifact tool, action "read", `url` the page\'s link, `path` the picture\'s id, '
        '`out_dir` `own_dir`; then run `vw visuals page --record` again: their lines are recorded then (design/210). '
@@ -50,6 +50,7 @@ CAPABILITIES = {'db': {'rules': [{'path': path, 'read': 'view', 'write': 'owner'
 PIC_SIZES = {'thumb': ('.page-thumb.jpg', 360, 60), 'zoom': ('.page-zoom.jpg', 1600, 78)}   # per size: where it is stored beside the picture, its long side at most, its JPEG quality
 _MADE = set()   # ponytail: the sizes this process knows are stored, so a page with many pictures asks the storage once each; a shared record if servers multiply
 PIC_WORKERS = 8   # pictures whose sizes are made at one time: the storage reads and writes at once, as `analysis_jobs.REUSE_READS`
+PREPARE_SECONDS = 4   # ponytail: the laptop fetches a picture's two copies one by one, about two seconds each (VW-24, finding 16); fetching several at once would change this
 
 
 def pic_code(key, mark=''):
@@ -120,6 +121,8 @@ def _with_pictures(store, page):
                     failed.append(f"{line.get('title') or line.get('key')}: {p['label']}")
     if found:
         page['pictures'] = [v for v in found.values() if v]
+        n = len(page['pictures'])   # design/216 (B2): said before the laptop fetches them, about two copies a picture at two seconds each
+        page['preparing'] = CF.WORDS['preparing'].format(pictures=CF._n(n, 'picture'), minutes=CF._n(max(1, -(-n * PREPARE_SECONDS // 60)), 'minute'))
     if failed:
         page['pictures_failed'] = failed
     return page
@@ -468,7 +471,7 @@ def _own_line(ctx, item, paid):
             CF.WORDS['own_set'].format(file=OWN_FILE) if item['id'].startswith('set:') and item.get('_v2') else   # design/213: true for every kind of thing: pictures of it start from the reference
             f'When none of these is right, add your own picture, {OWN_FILE}: every shot of this thing then starts from it.' if item['id'].startswith('set:') else
             f'Add your own picture, {OWN_FILE}: it becomes the reference of this thing, and no set is made.')
-    label = CF.WORDS['upload'] if item.get('_v2') else 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else '')   # design/212: no cost at the references of a v2 round
+    label = (CF.WORDS['upload'] if step1 else CF.WORDS['own_instead']) if item.get('_v2') else 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else '')   # design/212: no cost at the references of a v2 round; design/216 (A8): a link under the set's buttons
     return {'label': label, 'person': person, 'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text,
             **({'say': CF.WORDS['say_own_person' if person else 'say_own']} if item.get('_v2') and not step1 else {})}
 
@@ -499,11 +502,12 @@ def _named(plan, eid):
 def _details(line):
     """design/213: the folded "Details" of a line of step 2: [[label, text or texts]], only what the line has."""
     look, made, searched = line.get('look') or {}, [p for p in line.get('pics') or [] if not p.get('ref_only')], line.get('searched')
-    rows = [[page_words()['corrections_head'], line.get('corrections')], ['Description', line.get('desc')], ['Shots', line.get('used')], ['Why Claude suggests this', (line.get('rec') or {}).get('reason')],
-            ['What Claude saw in each picture', [f"{p['label']}: {p['note']}" for p in made if p.get('note')]], ["What Claude's check found", (line.get('check') or {}).get('lines')],
+    # design/216 (A9): in the order of the trial; Claude's reason is on the coloured line with "more", so it is not a row here
+    rows = [["What Claude's check found", (line.get('check') or {}).get('lines')], ['Description', line.get('desc')], ['Shots', line.get('used')],
+            ['What Claude saw in each picture', [f"{p['label']}: {p['note']}" for p in made if p.get('note')]],
             ['What the image model did', [CF.WORDS['model_' + k].format(words=look[k]) for k in ('chose', 'aside') if look.get(k)]],
             [page_words()['searched_head'], [searched['text']] + [f"{p['title']}: {p['url']}" if p.get('title') else str(p.get('url')) for p in searched.get('pages') or []] if searched else None],   # design/215
-            ['Why it could not be made', line.get('why')], ['Where it stands', line.get('note')]]
+            [page_words()['corrections_head'], line.get('corrections')], ['Why it could not be made', line.get('why')], ['Where it stands', line.get('note')]]
     return [r for r in rows if r[1]]
 
 
@@ -683,7 +687,8 @@ def _round_page(ctx, base, step):
     if held:   # design/211: "Accept the proposals" covers only what the operator can see: it is offered when every line is on the page
         lines = [l for l in lines if l['key'] != 'refs:proposals']
     refused = session.get('page_refused') or {}
-    lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if line['key'] in refused and line['state'] == 'open' else {})} for n, line in enumerate(lines, 1)]
+    shown = lambda key: key in refused and not (v2 and V.rule_retired(session, refused[key]))   # design/216 (B3): a refusal by a rule that no longer applies is not said again
+    lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if shown(line['key']) and line['state'] == 'open' else {})} for n, line in enumerate(lines, 1)]
     left = len([l for l in lines if waits(l)])
     more = f', {held} more after these' if held else ''
     many = lambda n, word: f"{n} {word}{'' if n == 1 else 's'}"
@@ -705,7 +710,7 @@ def _round_page(ctx, base, step):
         note = (f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
                 'Look at each set, answer each line, then say done in the chat.' if left else
                 'Nothing to answer here yet: the sets appear here when they are ready.' if making else 'Nothing more to answer here now.')
-        return {**base, 'step': SETS_STEP, 'open': bool(left), 'lines': lines,
+        return {**base, 'step': SETS_STEP, 'open': bool(left), 'lines': lines, 'say': sets_say(lines),
                 'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}.",   # design/212: no cost is named
                 'note': note, **({'then': then} if then else {}),
                 # design/213 (17 Nov 2026): the sets in the new layout: one set at a time beside the list, in the server's four groups
@@ -728,11 +733,26 @@ def _round_page(ctx, base, step):
 
 
 def page_words():
-    """design/215: the words of the references screens that the page used to hold itself: sent with the layout, so the page and the chat say the same."""
+    """design/215: the words of the references screens that the page used to hold itself: sent with the layout, so the page and the chat say the same.
+    design/216: `sets`, the words of the sets screen (`chat_flow.SETS_PAGE`)."""
     w = CF.WORDS
     return {'leave': w['leave'], 'leave_set': w['leave_failed'], 'set': w['set'], 'fix': w['fix1'], 'loss_head': 'With no reference of it',
             'done': {'use': 'Approved', 'set': w['set'], 'fix': 'Set with your words', 'own': 'Own picture', 'ignore': 'No reference'},
-            'wait_out': 'Not made', 'wait_made': 'Will be made', 'corrections_head': "The operator's corrections", 'searched_head': 'What the picture model searched'}
+            'wait_out': 'Not made', 'wait_made': 'Will be made', 'corrections_head': "The operator's corrections", 'searched_head': 'What the picture model searched', 'sets': CF.SETS_PAGE}
+
+
+def sets_say(lines):
+    """design/216 (B1): the one message the assistant posts with the link of the sets screen: what needs an answer, by name; then the other
+    sets; then "say done here". No count of pictures, no "lines". With nothing to answer, it says so."""
+    w, waits = CF.WORDS, lambda l: l['state'] == 'open' and not l.get('kept')
+    todo = [l for l in lines if waits(l) and l['key'] != 'sets:rest']
+    rest = next((l for l in lines if waits(l) and l['key'] == 'sets:rest'), None)
+    if not todo and not rest:
+        return w['say_nothing']
+    sets = CF._n(len(rest.get('covers') or []), 'set') if rest else ''
+    said = [w['say_need'].format(things=CF._n(len(todo), 'thing') + (' needs' if len(todo) == 1 else ' need'), names=CF._and(CF.the(l.get('name') or l['title']) for l in todo))] if todo else []
+    said += [w['say_rest' if todo else 'say_rest_only'].format(sets=sets)] if rest else []
+    return ' '.join(said + [w['say_done']])
 
 
 def _sets_asked(ctx, items):
@@ -906,7 +926,7 @@ def _page(conn, store, user, run, outputs):
     ctx = CF._ctx(conn, store, user, run, outputs)
     session, draft = ctx['session'], ctx['session'].get('treatment_draft')
     stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
-    base = {'step': 'Treatment', 'round': 'r' + stamp, 'how': HOW, 'capabilities': CAPABILITIES, 'title': f"VideoWizard decisions {run.get('code') or ''}".strip()}
+    base = {'step': 'Treatment', 'round': 'r' + stamp, 'how': HOW, 'say': CF.WORDS['say_page'], 'capabilities': CAPABILITIES, 'title': f"VideoWizard decisions {run.get('code') or ''}".strip()}
     if _at_plan(ctx):
         step, lines = _plan_step(ctx)   # design/209: after the plan, the drawings and the materials; design/210: then the reference drawings, then the reference round
         if step in ('refs', 'sets'):
