@@ -526,6 +526,7 @@ def things_asked(store, run, outputs):
     rd = session.get('round') or {}
     plan = V.guarded(lambda: V.current_plan(store, session))
     places = [e for e in plan['elements'] if e.get('kind') == 'place' and e['id'] in (rd.get('elements') or {})]
+    places = [e for e in places if not rd['elements'][e['id']].get('ignored')]   # a place the operator set aside is never asked for
     due = [e for e in places if rd['elements'][e['id']].get('things_due')] or places
     line = lambda text: ' '.join(str(text or '').split())[:200]
     shots = lambda pid: [line(sh.get('message') or sh.get('action') or sh.get('description')) for gap in plan.get('gaps') or [] for sc in all_scenes(gap)
@@ -549,7 +550,7 @@ def round_things(conn, store, user, run, outputs, rows):
     for r in rows:
         row = rd['elements'][r['element_id']]
         row['things'] = {'ids': list(dict.fromkeys(r['things'])), 'reason': _one(r['reason']), 'by': user['id'], 'at': _now()}
-        if row.pop('things_due', None):
+        if row.pop('things_due', None) and not row.get('ignored'):   # a place the operator set aside is never ordered
             due.append(r['element_id'])
     V.save_session(store, run, session)
     session, queued, errors = _order(conn, store, user, run, outputs, due) if due else (session, [], {})

@@ -3361,6 +3361,8 @@ def _queue_sets(conn, store, user, run, outputs, eids):
                 row['things_due'] = True
                 save_session(store, run, session)
                 continue
+            if row.pop('things_due', None):   # it has its list: it is never asked for again, so it cannot be ordered a second time
+                save_session(store, run, session)
             waits = ref_sets.pending_things(plan, session, eid)
             if waits:   # design/216 (the critic's points 1 and 2): a place is held until its things' sets are approved; ref_sets.release orders it then
                 row['held'] = [t['id'] for t in waits]

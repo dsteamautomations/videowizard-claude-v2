@@ -393,6 +393,31 @@ def test_216b_no_reference_needed_a_removed_thing_two_places_and_a_new_list():
     assert 'Roof tile' not in req['prompt'].split('from their descriptions: ')[-1]
 
 
+def test_216b_a_place_set_aside_while_it_waits_for_its_list_is_never_made():
+    from test_design211b_older_pure import saved
+    from test_design211b_round_pure import jobs, put
+    store, conn = no_list_film()
+    s = saved(store)
+    s['round']['elements']['STREET']['ignored'] = True           # the operator: do not make this set
+    put(store, s)
+    assert RS.things_asked(store, RUN, [])['places'] == []
+    out = VS.guarded(lambda: RS.round_things(conn, store, {'id': 'u1'}, RUN, [], [{'element_id': 'STREET', 'things': [], 'reason': 'Nothing stays.'}]))
+    assert out['queued'] == [] and 'STREET' not in jobs(conn)
+
+
+def test_216b_a_place_that_has_its_list_is_ordered_once_though_it_was_still_marked_as_waiting():
+    from test_design211b_older_pure import saved
+    from test_design211b_round_pure import put, req
+    store, conn = no_list_film()
+    s = saved(store)
+    s['round']['elements']['STREET']['things'] = {'ids': [], 'reason': 'Nothing stays.'}   # the list came with the round file, the mark stayed
+    put(store, s)
+    VS._queue_sets(conn, store, {'id': 'u1'}, RUN, [], ['STREET'])                         # the operator: make it
+    assert not saved(store)['round']['elements']['STREET'].get('things_due')
+    out = VS.guarded(lambda: RS.round_things(conn, store, {'id': 'u1'}, RUN, [], [{'element_id': 'STREET', 'things': [], 'reason': 'Nothing stays.'}]))
+    assert out['queued'] == [] and [req(p)['reference']['element_id'] for p in conn.inserted].count('STREET') == 1
+
+
 def test_216b_a_hold_of_0113_waits_for_claudes_list_and_a_made_place_is_untouched():
     from test_design211b_older_pure import saved
     from test_design211b_round_pure import jobs, put
