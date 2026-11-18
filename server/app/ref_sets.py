@@ -569,7 +569,8 @@ def set_facts(session, plan, eid, row):
         if failed:
             fail = fail_of(failed[-1])
         elif row.get('error'):   # refused by the server before any call: its own sentence, no provider to name
-            fail = {'cause': 'limit', 'model': None, 'text': LIMIT_PLAIN} if is_limit(row['error']) else {'cause': 'other', 'model': None, 'text': V._plain(row['error'])}
+            fail = {'cause': 'limit', 'model': None, 'text': LIMIT_PLAIN} if is_limit(row['error']) else \
+                {'cause': 'other', 'model': None, 'text': V.RULE_RETIRED if V.rule_retired(session, row['error']) else V._plain(row['error'])}   # design/215: a refusal of a retired rule is not shown as it was written
     history = list(row.get('history') or [])
     return {'pictures': [{'ref': p['id'], 'n': int(p.get('set_n') or 1), 'view': p.get('view') or (names[int(p.get('set_n') or 1) - 1] if int(p.get('set_n') or 1) <= len(names) else ''),
                           'check': check_summary(session, p), 'look': p.get('look'), 'notes': (p.get('notes') or '') if own else ''} for p in pics],

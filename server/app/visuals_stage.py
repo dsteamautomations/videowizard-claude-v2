@@ -3583,6 +3583,13 @@ def _set_budget(run, session, spend):
     return spend['spent_inr'], cap_of(session), image_price_inr(run, provider='gemini') * SET_MAX
 
 
+RULE_RETIRED = 'The rule that held this set back no longer applies to a set: it can be made now.'   # design/215: a refusal stored by "measure it first" or "the plan cites the footage"
+
+
+def rule_retired(session, error):
+    return round_v2(session) and ('size still unknown' in str(error or '') or 'cites the footage' in str(error or ''))
+
+
 def set_cause(session, plan, element_id, budget=None):
     """R12, R18: why the set of one element would not be made now, in the operator's words: its material spec is not approved (or its correction
     waits), a size is not measured, the spend cap. None when nothing stands in its way. The same three gates generate_image holds."""
@@ -3595,7 +3602,8 @@ def set_cause(session, plan, element_id, budget=None):
         if not material_approved(session, m):
             return {'kind': 'spec', 'element_id': m['id'], 'text': f"the material spec of {m.get('name') or m['id']} is not approved"}
     unknown = [d for d in element.get('size') or [] if d.get('value') is None]
-    if unknown and element.get('kind') not in ('person', 'graphic', 'style') and any(
+    if unknown and not round_v2(session) and element.get('kind') not in ('person', 'graphic', 'style') and any(   # design/215 (R4): not for a set of a v2 round
+           
             r.get('kind') == 'frame' and r.get('element_id') == element_id and r.get('status') == 'approved' for r in session['references'].values()):   # design/119 rule 8, design/151 Q6
         return {'kind': 'size', 'element_id': element_id, 'text': f"a size of {element.get('name') or element_id} is not measured yet ({unknown[0].get('part')} {unknown[0].get('measure')}): the assistant measures it from the approved footage picture"}
     if budget and budget[0] + budget[2] > budget[1] + 1e-9:
@@ -3875,6 +3883,8 @@ def _set_state(session, plan, step, eid, row, budget):
         return {**out, 'cause': None, 'settled': None, 'problem': problem, **mark}
     from . import ref_sets
     was = 'spec' if 'material spec of' in error else 'cap' if ref_sets.is_limit(error) else 'size' if 'size still unknown' in error else 'other' if error else None
+    if rule_retired(session, error) and not cause:
+        return {**out, 'cause': None, 'settled': RULE_RETIRED, 'problem': None, **mark}
     return {**out, 'cause': cause, 'settled': None if cause else {'spec': 'spec approved', 'size': 'size measured', 'cap': 'spend cap raised'}.get(was),
             'problem': _plain(error) if was == 'other' and not cause else None, **mark}
 
@@ -3933,7 +3943,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
             drawn = (drawings.words(store, session, element['id'], first=len(parents_) + 1), drawings.must_be_true(session, element['id'])) if sheets else None
             body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_), drawn=drawn), 'parents': parents_ + sheets, 'set': True, 'search': True,
                     'views': set_views(element), **({'drawn_facts': drawn[1]} if drawn else {})}
-    if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE:
+    if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE and v2row is None:   # design/215 (R3, R4): not for a set of a v2 round: the operator decided at step 1, and an unknown size is left out of its request
         from .visual_contract import footage_cited
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
         cited = footage_cited(element, plan.get('visual_facts'))
@@ -3987,7 +3997,9 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
                             "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start.")
         need(all(p and (p['status'] == 'approved' or (p['status'] == 'candidate' and p['id'] == body.get('fix_of')))   # W4: a fix starts from its candidate, whatever its kind
                  for p in parents), 'Parents must be approved references of this run.')
-    library.check_prompt(body['prompt'], fix=bool(body.get('fix_of')), placed=not (body.get('set') and round_v2(session)))   # defect 54: a v2 set's request is the plan's own words, placed by the server; design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
+    # design/215 (R1): of a v2 set's request the wording rules read only the words Claude or the operator added, never the plan's own words
+    library.check_prompt(' '.join(x for x in (v2req['parts']['added'], v2req['parts']['operator']) if x) if v2row is not None else body['prompt'],
+                         fix=bool(body.get('fix_of')), placed=not (body.get('set') and round_v2(session)))   # defect 54: a v2 set's request is the plan's own words, placed by the server; design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
         starts = [p for p in parents if p['kind'] == 'keyframe']
         need(not starts or re.search(r'\bimage 1\b', body['prompt'], re.I),
@@ -4050,7 +4062,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
             library.check_quoted(writer_prompt, library.exact_entries(answer))
         except ValueError as exc:
             need(False, str(exc))
-    elif not body.get('fix_of'):
+    elif not body.get('fix_of') and v2row is None:   # design/215 (R2): not on a v2 set: an inch mark or a printed name in the plan's words is no lettering to place
         try:
             library.check_quoted(writer_prompt, [])   # design/111 F13: quoted words with no exact-text field at all
         except ValueError as exc:
@@ -4128,7 +4140,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
         body = {**body, 'prompt': with_composed(body['prompt'], exact_text_block(answer))}
     for eid in [body['element_id']] + [x for x in (named or {}).get('element_ids') or [] if x != body['element_id']]:   # design/111 F12: 'none of these', in every prompt that shows the element
         nl = not_this_line(session, plan, eid, named, found[2] if found else None)
-        if nl:
+        if nl and v2row is None:   # design/215 (R5): never on a v2 set: its request carries the operator's words in their own place
             body = {**body, 'prompt': with_composed(body['prompt'], nl)}
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
         need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: the operator approves it first, on the page (`vw visuals page`), before a picture shows it.")
