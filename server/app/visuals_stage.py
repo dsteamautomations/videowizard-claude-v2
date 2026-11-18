@@ -6015,6 +6015,40 @@ def add_colour(store, user, run, outputs, body):
                                    'the operator sees it under Details on the drawing, nothing is asked.'}
 
 
+VIEW_UNSTATED = 'not stated (the spec does not state the view: state it in the drawing note when another drawing shows the same part from another direction)'
+
+
+def view_words(spec):
+    """design/218b: the spec's direction of view as the brief says it; a spec without one says so plainly (no new required field)."""
+    return spec.get('view') or VIEW_UNSTATED
+
+
+def drawing_note(session, plan, user, shots, text):
+    """design/218b: one plain line Claude records for the drawings it names (a part seen from another direction is the same part), kept beside
+    the plan, carried in their briefs and shown under Details on their lines. The same line for the same drawings is kept once. Never refuses
+    an upload or a verdict: it is only a record."""
+    from .font_sample import drawn_shots
+    text = ' '.join(str(text or '').split())
+    need(text, 'Give the note as one plain line (--text).')
+    need(len(text) <= 300, 'The note is one plain line of at most 300 characters.')
+    drawn = {s['id'] for s in drawn_shots(plan)}
+    need(shots and all(s in drawn for s in shots), f"Name the drawn shots the note is for (--shot): {', '.join(s for s in shots if s not in drawn) or 'none given'} "
+                                                   f"is not a drawn shot of the plan ({', '.join(sorted(drawn)) or 'none'}).")
+    rows = session.setdefault('drawing_notes', [])
+    same = next((r for r in rows if r['text'] == text and set(r['shots']) == set(shots)), None)
+    if same:
+        return same
+    rows.append({'text': text, 'shots': list(dict.fromkeys(shots)), 'by': 'claude', 'user': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    return rows[-1]
+
+
+def add_note(store, user, run, outputs, body):
+    session = session_of(store, run, outputs)
+    row = drawing_note(session, current_plan(store, session), user, body['shots'], body['text'])
+    save_session(store, run, session)
+    return {'note': row, 'next': f"Recorded for {', '.join(row['shots'])}: the next briefs of those drawings carry it (`vw motion brief`); the operator sees it under Details, nothing is asked."}
+
+
 def palette_line(plan, session):
     """design/218: the brief's palette: the plan's, then the colours added since (design/218 A), so every drawing agrees."""
     base = ((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or 'the approved style picture'
@@ -6120,7 +6154,7 @@ def motion_brief(store, run, outputs, shot_id):
              palette_line(plan, session),   # design/218: the plan's palette and the colours added since, the same for every drawing
              f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."]
     if spec:
-        lines += [f"Drawing spec, view {spec.get('view') or '-'}: parts {', '.join(spec.get('parts') or []) or '-'}; sizes {dims or '-'}; relationships {'; '.join(spec.get('relationships') or []) or '-'}; "
+        lines += [f"Drawing spec, view {view_words(spec)}: parts {', '.join(spec.get('parts') or []) or '-'}; sizes {dims or '-'}; relationships {'; '.join(spec.get('relationships') or []) or '-'}; "
                   f"proportions {'; '.join(spec.get('proportions') or []) or '-'}; label \"{spec.get('label') or ''}\"" + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.')]
     lines += [f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in sm.get('labels') or []) or 'name them in the plan (scene_motion.labels) and use them exactly'}.",
               'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.',
@@ -6129,6 +6163,7 @@ def motion_brief(store, run, outputs, shot_id):
                  '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else ''),
               f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; text at least 2.6 % of the frame height, inside the inner 90 %; "
               'every label sentence case as written above.',
+              *(f'Recorded for this drawing (keep it): {n["text"]}' for n in session.get('drawing_notes') or [] if shot['id'] in n['shots']),   # design/218b
               '', film.style_part(run)]   # design/179 S4: the film's motion style; the fixed 'flat, clean, technical' is gone
     for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16)
         lines += ['', f'Subject rules ({stem}): every one holds in this drawing.', *(f'- {r}' for r in _subject_rules(store, stem))]

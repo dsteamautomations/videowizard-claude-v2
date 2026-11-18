@@ -38,11 +38,24 @@ def test_motion_colour_posts_the_thing_the_colour_and_the_reason(harness, monkey
     posted = {}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'next': 'Added.'}))
     a = argparse.Namespace(what='colour', shot='D1,D2', thing='walls', colour='#5A524C', words='dark warm grey', reason='the palette named none', quote=None,
-                           dir=None, sha=None, at=None, zoom=None, job=None, file=None, subject=None, add=None, crop=None, off=False, on=False)
+                           dir=None, sha=None, at=None, zoom=None, job=None, file=None, subject=None, add=None, crop=None, off=False, on=False, text=None)
     with pytest.raises(SystemExit) as exc:
         vw.cmd_motion(a)
     assert exc.value.code == 0 and posted['path'].endswith('/motion/colour')
     assert posted['shots'] == ['D1', 'D2'] and posted['thing'] == 'walls' and posted['colour'] == '#5A524C' and posted['quote'] == ''
     with pytest.raises(SystemExit) as exc:
         vw.cmd_motion(argparse.Namespace(**{**vars(a), 'reason': None}))
+    assert exc.value.code == 2
+
+
+def test_motion_note_posts_the_shots_and_the_line(harness, monkeypatch, capsys):
+    posted = {}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'next': 'Recorded.'}))
+    a = argparse.Namespace(what='note', shot='D1, D2', text='The steel is shown from the side in D1 and cut across here.', quote=None, thing=None, colour=None, words=None, reason=None,
+                           dir=None, sha=None, at=None, zoom=None, job=None, file=None, subject=None, add=None, crop=None, off=False, on=False)
+    with pytest.raises(SystemExit) as exc:
+        vw.cmd_motion(a)
+    assert exc.value.code == 0 and posted['path'].endswith('/motion/note') and posted['shots'] == ['D1', 'D2'] and posted['text'].startswith('The steel')
+    with pytest.raises(SystemExit) as exc:
+        vw.cmd_motion(argparse.Namespace(**{**vars(a), 'text': ' '}))
     assert exc.value.code == 2

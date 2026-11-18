@@ -19,6 +19,7 @@ The server places these at check and render; refer to them, never create them:
 ## The brief is the contract
 
 - The root's `data-duration`, `data-fps`, `data-width`, `data-height` are exactly the brief's. The length is to the frame.
+- A part another drawing shows from another direction or at another scale is the same part: draw it as this drawing's spec and view say, and make the change of view readable (the view visibly turns or cuts; a label such as "section" only where the brief lists it); never a part that morphs into another shape.
 - Every text on screen is one of the brief's labels, word for word, and nothing else. Put each label in an element with a stable `id`.
 - What appears when follows the narration: an element named by a word appears at that word's second (the brief lists each word's start). The plan's cues (`#id` at a word) are checked by the server against the render.
 - The claims and the drawing spec are facts: draw the parts, sizes, relationships and proportions as the spec says, and only those. A real object is drawn as it is built (a wall shows its bond; an opening has a lintel); when unsure, draw less, never something false.

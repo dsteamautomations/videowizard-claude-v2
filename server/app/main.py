@@ -1494,6 +1494,16 @@ def visuals_motion_colour(run_id: UUID, body: MotionColour, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_colour(storage(), user, run, outputs, body_dict(body)))
 
 
+class MotionNote(Write):   # design/218b: one plain line for the drawings it names
+    shots: list[str] = Field(min_length=1, max_length=60)
+    text: str = Field(min_length=1, max_length=300)
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/note')
+def visuals_motion_note(run_id: UUID, body: MotionNote, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_note(storage(), user, run, outputs, body_dict(body)))
+
+
 @app.post('/api/runs/{run_id}/visuals/motion/upload')
 def visuals_motion_upload(run_id: UUID, body: MotionUpload, user=User, conn=DB):   # design/130 §4: the shot's HyperFrames project as one zip
     import base64 as b64

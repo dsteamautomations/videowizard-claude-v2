@@ -938,6 +938,11 @@ def cmd_motion(a):
             emit({'action': 'refused', 'message': 'Give the subject, the rule and the operator\'s words: `vw motion rule --subject rat-trap-bond --add "…" --quote "<their yes>"`.'}, 2)
         out = write(base + '/motion/rule', {'subject': a.subject, 'rule': a.add, 'quote': a.quote})
         emit(out, 0, out.get('next'))
+    if a.what == 'note':   # design/218b: one plain line for the drawings it names (a part seen from another direction is the same part); never asked
+        if not (a.shot and (a.text or '').strip()):
+            emit({'action': 'refused', 'message': 'Give the drawn shots and one plain line: `vw motion note --shot D1,D2 --text "The steel is shown from the side in D1 and cut across here."`.'}, 2)
+        out = write(base + '/motion/note', {'shots': [s.strip() for s in a.shot.split(',') if s.strip()], 'text': a.text})
+        emit(out, 0, out.get('next'))
     if a.what == 'colour':   # design/218 A: a neutral colour the palette names none for, chosen by Claude and recorded once for every drawing
         if not (a.shot and a.thing and a.colour and a.words and a.reason):
             emit({'action': 'refused', 'message': 'Give the drawn shots, the thing, the colour, its words and one reason: `vw motion colour --shot D1,D2 --thing walls --colour "#5A524C" '
@@ -3863,8 +3868,8 @@ def build_parser():
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
-    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish', 'colour'])   # design/130; design/186: finish
-    for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote', '--thing', '--colour', '--words', '--reason'):   # design/218: the last four for colour
+    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish', 'colour', 'note'])   # design/130; design/186: finish
+    for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote', '--thing', '--colour', '--words', '--reason', '--text'):   # design/218: four for colour; design/218b: --text for note
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.add_argument('--off', action='store_true', help="finish: take the drawing's finish away (design/186)"); s.add_argument('--on', action='store_true', help='finish: put it back')

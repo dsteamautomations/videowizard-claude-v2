@@ -702,6 +702,11 @@ def colour_notes(session, shot_id):
             for r in (session.get('added_colours') or {}).values() if shot_id in r['shots']]
 
 
+def drawing_notes(session, shot_id):
+    """design/218b: the plain lines Claude recorded for this drawing (a part seen from another direction), said without asking."""
+    return [n['text'] for n in session.get('drawing_notes') or [] if shot_id in n['shots']]
+
+
 def drawn_line(store, session, plan, job, check, fin, motion_take):
     """Kind `drawn` (contract 3.7): the video (its page copy) with the frame sheet one click away, the fact check with every open rule in full,
     select (with the operator's reason when it is held, F3), reject, and "Take the effect away" when it has a finish (no confirmation, D8)."""
@@ -727,7 +732,8 @@ def drawn_line(store, session, plan, job, check, fin, motion_take):
             'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['video'], 'none': W['video_none']},
             'finish': W['finish'].format(finish=listed) if listed else '', 'held': held, 'pics': pics, 'check': view, 'buttons': buttons,
             'details': [['How it was made', ['Built as a web animation by Claude helpers on the laptop, rendered to video by the server. No picture AI.' if motion_take else 'Drawn by the server from the scene file.']
-                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]] + ([['Colours', colour_notes(session, shot_id)]] if colour_notes(session, shot_id) else [])}   # design/218 A
+                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]] + ([['Colours', colour_notes(session, shot_id)]] if colour_notes(session, shot_id) else [])
+                + ([['Notes', drawing_notes(session, shot_id)]] if drawing_notes(session, shot_id) else [])}   # design/218 A, 218b
 
 
 def question_line(session, plan, item, q, ref):

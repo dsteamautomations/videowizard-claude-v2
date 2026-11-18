@@ -16,6 +16,7 @@
 | A3 | Shown without asking, under Details on the drawn graphic's line: "Added by Claude: dark warm grey for the walls, because the palette named none." | `pictures.colour_notes`, `drawn_line` |
 | A4 | The rule writer lists such a colour under "Colours to add", not as a question; the motion skill picks a neutral and names it under "Colours added" in REVIEW.md; section 11 says the assistant records it | `scripts/d218_wording_v3.py` |
 | B | The check and the proposal warn (`palette_missing`, the assistant's list) when a part that the drawing specs of two or more drawn shots show has no word in the palette and no recorded colour; only while no gap was ever accepted (editing an approved palette sends the accepted gaps back), so the colour goes into the palette before the operator approves the plan. Built on the specs: before them the plan does not say what a drawn shot shows | `visual_contract.palette_warnings`, `visuals_stage.palette_due` |
+| V (218b) | A part another drawing shows from another direction or scale is the same part: each drawing follows its own spec and view, the change of view is made readable, and Claude records one plain line, `vw motion note --shot D1,D2 --text "…"` (`POST /visuals/motion/note`, `session['drawing_notes']`), carried in those drawings' briefs ("Recorded for this drawing (keep it): …") and shown under Details ("Notes"). A spec with no view reads "not stated (the spec does not state the view …)" in the brief. Only two approved specs that truly contradict are asked. No new refusal on an upload or a verdict | `visuals_stage.drawing_note`, `add_note`, `view_words`; `pictures.drawing_notes`; `scripts/d218b_wording_v3.py` |
 
 The picture heads the card's fonts (the offer's first four, `font_sample.CARD`: the question card holds four and adds Other) under "On the card", then "Others you can name" (two columns above ten).
 
@@ -23,11 +24,11 @@ Edge cases: a long label is shortened at a word with "…"; a font whose file is
 
 ## Old ways
 
-Rows 169, 170 and 171 of `design/35-decision-log.md`.
+Rows 169 to 172 of `design/35-decision-log.md`.
 
 ## Tests
 
-`server/unit/test_design218_colours_pure.py` (A, B); `plugin/tests/test_design218_font_sample.py` (the two commands); `server/unit/test_design218_font_sample_pure.py`: the rows, the HTML, the colours, the wording, the versions, and one real render with the repository's fonts (skipped where Chromium is not installed).
+`server/unit/test_design218_colours_pure.py` (A, B); `server/unit/test_design218b_views_pure.py` (V); `plugin/tests/test_design218_font_sample.py` (the two commands); `server/unit/test_design218_font_sample_pure.py`: the rows, the HTML, the colours, the wording, the versions, and one real render with the repository's fonts (skipped where Chromium is not installed).
 
 ## Not covered
 

@@ -150,6 +150,8 @@ if __name__ == '__main__':
         prompt = d217(prompt, parts)
         from d218_wording_v3 import apply as d218   # design/218: the font question shows `vw font --sample` first; step 6 on the page, a chat card only for a question the server asks there
         prompt = d218(prompt, parts)
+        from d218b_wording_v3 import apply as d218b   # design/218b: a part seen from another direction is the same part; never asked; `vw motion note`
+        prompt = d218b(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))
