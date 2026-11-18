@@ -186,7 +186,11 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
-     "go": "Make it again with these words"
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all"
+     }
     }
    ],
    "group": "To judge",
@@ -313,7 +317,11 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
-     "go": "Make it again with these words"
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all"
+     }
     }
    ],
    "group": "To judge",
@@ -460,7 +468,11 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
-     "go": "Make it again with these words"
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all"
+     }
     },
     {
      "label": "Make again",
@@ -549,7 +561,11 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
-     "go": "Make it again with these words"
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all"
+     }
     },
     {
      "label": "Make again",
@@ -794,7 +810,11 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
-     "go": "Make it again with these words"
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all"
+     }
     },
     {
      "label": "Make again",
@@ -908,7 +928,11 @@
      "needs_words": true,
      "act": "fix",
      "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you.",
-     "go": "Make it again with these words"
+     "go": "Make it again with these words",
+     "all": {
+      "label": "This applies to every picture of this thing",
+      "choice": "correct_all"
+     }
     },
     {
      "label": "Make again",

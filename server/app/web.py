@@ -441,7 +441,7 @@ def _visuals_act(code, vw2_session, body):
             'nothing-fits': lambda: V.nothing_fits(store, user, run, outputs, body['search_id'], str(body.get('reason') or '')),
             'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, conn=conn),   # design/79; design/121 change 6: no search at Done; design/151
             'round-sets': lambda: V.round_sets(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, conn=conn, partial=True),   # design/151; R15: the page records the answered sets, the others stay on step 2
-            'set_answer': lambda: V.set_answer(store, user, run, outputs, body['element_id'], body.get('verdict'), body.get('golden'), body.get('words')),   # R13: one answer of step 2, stored as it is made
+            'set_answer': lambda: V.set_answer(store, user, run, outputs, body['element_id'], body.get('verdict'), body.get('golden'), body.get('words'), all=bool(body.get('all'))),   # R13: one answer of step 2, stored as it is made
             'set_aside': lambda: V.set_aside(store, user, run, outputs, body['element_id'], str(body.get('words') or ''), bool(body.get('back'))),   # follow-up: a set never made, set aside at step 2, or brought back
             'set_make': lambda: V.set_make(conn, store, user, run, outputs, body['element_id']),   # R17: a set that was not made, made now
             'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote, list(body.get('ignore') or [])),   # design/121 change 1

@@ -133,7 +133,7 @@ def test_the_request_places_the_plans_description_and_requirements_word_for_word
     assert r['parts']['description'] == e['description'] and r['parts']['requirements'] == e['requirements'] and r['parts']['kind'] == e['kind'] and r['parts']['subject'] == e['name']
     assert [v['name'] for v in r['views']] == RS.view_names(e) == r['parts']['views'] and len(r['views']) == 3
     assert set(r) == {'prompt', 'views', 'inputs', 'search', 'lines', 'parts'}
-    assert set(r['parts']) == {'kind', 'subject', 'description', 'requirements', 'sizes', 'material', 'signs', 'place', 'look', 'category', 'added', 'operator', 'views', 'inputs', 'source'}
+    assert set(r['parts']) == {'kind', 'subject', 'description', 'requirements', 'sizes', 'material', 'signs', 'place', 'look', 'category', 'added', 'operator', 'corrections', 'views', 'inputs', 'source'}
     assert r['parts']['look'] == 'handheld, natural colours, as the footage' and r['parts']['look'] in r['prompt']
     library.check_prompt(r['prompt'])       # the server's own lints pass on the server's own text
     library.check_quoted(r['prompt'], [])

@@ -3451,7 +3451,8 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             held[eid] = ref_sets.MAKES_LIMIT.format(eid=eid, max=ref_sets.MAKES_MAX)
             continue
         if v['verdict'] != 'yes' and room is not None and len(again) >= room:   # the cap: nothing is rejected and nothing queued; the answer waits, stored
-            r['answer'] = {'verdict': v['verdict'], 'golden': None, 'words': ' '.join(str(v.get('words') or '').split()), 'set': r.get('set'), 'by': user['id'], 'at': stamp['at']}
+            r['answer'] = {'verdict': v['verdict'], 'golden': None, 'words': ' '.join(str(v.get('words') or '').split()), 'set': r.get('set'), 'by': user['id'], 'at': stamp['at'],
+                           **({'all': True} if v.get('all') else {})}
             held[eid] = ref_sets.LIMIT_PLAIN if v2 else f'the spend cap of ₹{budget[1]:,.0f} is reached (₹{budget[0]:,.0f} spent): the set is not made again; its answer is kept and waits'   # design/213: no amount in a v2 round
             continue
         r['verdict'] = v['verdict']
@@ -3468,6 +3469,8 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             _feedback_image(session, run, user, x, 'reject', quote, words)
         if v2:   # design/211: nothing is ordered here: Claude rewrites the request from these words first (ref_sets.round_rewrite); the earlier request is kept
             r.setdefault('operator_words', []).extend([words] if words else [])
+            if words and v.get('all'):   # design/215 (change 5): kept for the thing, in the same save as the answer: every later request of it carries them
+                ref_sets.correction_kept(session, user, eid, words, r.get('set'))
             r['rewrite_due'] = {'words': words, 'set': r.get('set'), 'at': stamp['at']}
         elif words:
             r.setdefault('corrections', []).append(words)
@@ -3501,7 +3504,7 @@ def _answer_of(row):
         return None, False
     if a.get('set') != row.get('set'):
         return None, True
-    return {k: a.get(k) for k in ('verdict', 'golden', 'words')}, False
+    return {**{k: a.get(k) for k in ('verdict', 'golden', 'words')}, **({'all': True} if a.get('all') else {})}, False
 
 
 def _answered(session, kinds, eid, row):
@@ -3524,7 +3527,7 @@ def _round_row(session, element_id, where, answering=False):
     return row
 
 
-def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None, words=''):
+def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None, words='', all=False):
     """R13: one answer of step 2, stored as it is made and not recorded until Done: the starting picture, Yes / No / Correct it, the words. It is sent whole
     at every change, so the later writer wins. An answer whose starting picture belongs to a set made again since is discarded, not stored."""
     session = session_of(store, run, outputs)
@@ -3546,7 +3549,8 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
         row.pop('answer', None)
         save_session(store, run, session)
         return {'element_id': element_id, 'stored': False, 'discarded': True, 'next': f'{element_id}: made again since; judge the new set.'}
-    row['answer'] = {'verdict': verdict, 'golden': golden, 'words': str(words or '').strip(), 'set': row.get('set'), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    row['answer'] = {'verdict': verdict, 'golden': golden, 'words': str(words or '').strip(), 'set': row.get('set'), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
+                     **({'all': True} if all and v2 and verdict == 'correct' else {})}   # design/215: the correction applies to every picture of the thing
     save_session(store, run, session)
     return {'element_id': element_id, 'stored': True, 'answer': _answer_of(row)[0]}
 
@@ -3588,6 +3592,16 @@ RULE_RETIRED = 'The rule that held this set back no longer applies to a set: it 
 
 def rule_retired(session, error):
     return round_v2(session) and ('size still unknown' in str(error or '') or 'cites the footage' in str(error or ''))
+
+
+def with_corrections(session, plan, prompt, element_ids):
+    """design/215 (change 5): a picture's prompt with the operator's corrections of the things it shows, each said once."""
+    from . import ref_sets
+    for eid in dict.fromkeys(element_ids):
+        line = ref_sets.corrections_line(session, plan, eid)
+        if line:
+            prompt = with_composed(prompt, line)
+    return prompt
 
 
 def set_cause(session, plan, element_id, budget=None):
@@ -4143,6 +4157,8 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
         nl = not_this_line(session, plan, eid, named, found[2] if found else None)
         if nl and v2row is None:   # design/215 (R5): never on a v2 set: its request carries the operator's words in their own place
             body = {**body, 'prompt': with_composed(body['prompt'], nl)}
+    if v2row is None and not body.get('fix_of') and body['element_id'] != STYLE:   # design/215 (change 5): a still or a start picture carries the operator's corrections of its things (a set's request places them itself)
+        body = {**body, 'prompt': with_corrections(session, plan, body['prompt'], [body['element_id']] + list((named or {}).get('element_ids') or []))}
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
         need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: the operator approves it first, on the page (`vw visuals page`), before a picture shows it.")
         try:

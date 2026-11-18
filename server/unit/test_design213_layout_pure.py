@@ -138,7 +138,7 @@ def test_a_persons_set_approve_corrections_and_make_again(monkeypatch):
     assert btn(m, 'approve')['sug'] is True and btn(m, 'approve')['say'] == W['say_yes'] and btn(m, 'again')['ask'] == W['again_ask'] and '{words}' in btn(m, 'fix')['say']
     assert m['own']['label'] == 'Upload my own' and m['own']['say'] == W['say_own_person'] and m['rec'] == {'do': 'use', 'label': 'Use this set', 'reason': 'All three agree with the plan.'}
     item = chat(film, 'set:MASON')
-    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Approve', 'yes'), ('Minor corrections', 'correct'), ('Make again', 'no')] and item['question'].endswith('is this set right for this person?')
+    assert [(b['label'], b['choice']) for b in item['buttons']] == [('Approve', 'yes'), ('Minor corrections', 'correct'), ('Make again', 'no'), ('Correct every picture of it', 'correct_all')] and item['question'].endswith('is this set right for this person?')
     out = film.record(ans(m, 'correct', 'His shirt is blue.'))
     assert out['refused'] == [] and {k: film.session()['round']['elements']['MASON']['answer'][k] for k in ('verdict', 'golden', 'words')} == {'verdict': 'correct', 'golden': None, 'words': 'His shirt is blue.'}
     assert film.record(ans(m, 'correct'))['refused'][0]['key'] == 'set:MASON'                                      # corrections need the operator's words

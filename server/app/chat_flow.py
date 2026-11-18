@@ -532,6 +532,10 @@ WORDS = {
     'leave_wait_one': 'Do not make this set',      # step 2: the sets that wait for the second go
     'leave_wait': 'Do not make these sets',
     'leave_failed': 'Go on without a reference',   # step 2: a set that could not be made, or was made the most times
+    'fix_all': 'Correct every picture of it',      # design/215 (change 5): the chat's own button for the page's tick
+    'all_tick': 'This applies to every picture of this thing',
+    'say_fix_all': 'Make it again with your words: "{words}". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you.',
+    'corrections': "The operator's corrections: {words}",
     'fix1': 'Make a set with words',            # step 1 (W1): it makes a new set with the operator's words; it corrects no picture
     'go_set': 'Make a set with these words',       # the button of the words box
     'go_fix': 'Make it again with these words',
@@ -801,6 +805,7 @@ def _told(line):
     parts += [WORDS['model_' + k].format(words=v) for k, v in (line.get('look') or {}).items() if v]   # design/213: the image model's notes as Claude's two plain lines; the raw notes stay in the record
     parts += [line['asked']] if isinstance(line.get('asked'), str) else []
     parts += [WORDS['earlier'].format(labels=', '.join(p['label'] for p in line['earlier']))] if line.get('earlier') else []   # design/211 review, S14: the chat shows the set before too
+    parts += [WORDS['corrections'].format(words='; '.join(line['corrections']))] if line.get('corrections') else []   # design/215
     parts += [WORDS['proposes'].format(**line['rec'])] if line.get('rec') else []
     return '\n'.join(p for p in [line.get('note') or ''] + parts + [line.get('cost') or ''] if p)   # design/212 review: first, that a new picture came for the thing
 
@@ -955,6 +960,7 @@ def _round_v2(ctx, every, step):
                     **({'warnings': warnings} if warnings else {}), **({'pics': pics} if pics else {}), **({'tick': tick} if tick else {}),
                     **({'likeness': {'ask': WORDS['likeness_ask_child' if shown.get('child') else 'likeness_ask']}} if permit else {}),
                     **({'differs': WORDS['added'].format(words=row['prompt'])} if frames and row.get('prompt') else {}),   # design/213: where the plan and the footage differ, said openly
+                    **({'corrections': ref_sets.corrections_shown(session, plan, eid)} if ref_sets.corrections_shown(session, plan, eid) else {}),   # design/215
                     **({'cost': _cost(f, where)} if can_leave else {}),
                     **({'note': WORDS['came'], 'again': {'choice': waits.get('choice'), 'notes': str(waits.get('words') or '')}} if waits else {})}
 
@@ -1080,7 +1086,9 @@ def _round_v2(ctx, every, step):
 
     def head(eid, f, group, case, tag):
         """What every line of a thing says of it: the group, the case, and where the film uses it."""
-        return {'group': group, 'case': case, 'tag': tag, 'desc': str(f.get('description') or by_id[eid].get('description') or ''), 'used': _used(f, where), 'shots': _used(f, where, short=True)}
+        kept = ref_sets.corrections_shown(session, plan, eid)   # design/215: the operator's corrections of the thing, on its line
+        return {'group': group, 'case': case, 'tag': tag, 'desc': str(f.get('description') or by_id[eid].get('description') or ''), 'used': _used(f, where), 'shots': _used(f, where, short=True),
+                **({'corrections': kept} if kept else {})}
 
     def leaving(f, label):
         """What a thing with no reference loses: (the sentence of the answer, under the label pressed; the page's list)."""
@@ -1135,7 +1143,7 @@ def _round_v2(ctx, every, step):
                 chat += [_button(WORDS['approve_pic'].format(letter=letter[p['ref']]), 'use:' + p['ref']) for p in shown]
                 page.append({'label': WORDS['approve'], 'choice': 'use', 'needs_words': False, 'act': 'approve', 'say': ''})
             if again:   # made the most times: no remake is offered (ref_sets.MAKES_LIMIT would hold it)
-                add(WORDS['fix'], 'correct', 'fix', WORDS['say_fix'], words=True, tell=WORDS['fix_tell'], go=WORDS['go_fix'])
+                add(WORDS['fix'], 'correct', 'fix', WORDS['say_fix'], words=True, tell=WORDS['fix_tell'], go=WORDS['go_fix'], all={'label': WORDS['all_tick'], 'choice': 'correct_all'})
                 add(WORDS['again_set'], 'no', 'again', WORDS['say_again'], ask=WORDS['again_ask'])
             if sf.get('changed'):
                 add(WORDS['remake'], 'remake', 'remake', WORDS['say_remake'])
@@ -1145,6 +1153,8 @@ def _round_v2(ctx, every, step):
             gold = proposed.get('golden') if not person and not one else None
             want = {'use': 'use:' + str(gold) if gold else chat[0]['choice'], 'remake': 'no'}.get(do)
             chat.sort(key=lambda b: b['choice'] != want)
+            if again:   # design/215 (change 5): the page's tick "applies to every picture of this thing" as the chat's own answer, after the others
+                chat.append(_button(WORDS['fix_all'], 'correct_all', words=True, tell=WORDS['fix_tell']))
             page.sort(key=lambda b: b['act'] != {'use': 'approve', 'remake': 'again'}.get(do))
             if do in ('use', 'remake') and page[0]['act'] == {'use': 'approve', 'remake': 'again'}[do]:
                 page[0]['sug'] = True
@@ -1190,7 +1200,9 @@ def _round_v2(ctx, every, step):
                 if choice == 'aside':
                     return V.set_aside(store, user, run, outputs, eid, words or quote)
                 golden = choice[4:] if choice.startswith('use:') else None
-                V.set_answer(store, user, run, outputs, eid, 'yes' if golden else choice, golden, words if choice == 'correct' else '')
+                every_pic = choice == 'correct_all'
+                choice = 'correct' if every_pic else choice
+                V.set_answer(store, user, run, outputs, eid, 'yes' if golden else choice, golden, words if choice == 'correct' else '', all=every_pic)
                 out = flush_sets(conn, store, user, run, outputs, quote)
                 return out if out is not None else {'tell': 'Your answer is kept. It is recorded as soon as the sets still being made are back.'}
             sets.append(_v2_item(f"set:{eid}:{row.get('set')}", 'reference set', '', names[eid], WORDS['ask_person_set' if person else 'ask_one_set' if one else 'ask_thing_set'], run_, chat[:4], line, more=chat[4:],
@@ -1691,7 +1703,8 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
         'None of these': 'None is right; the set is made again', 'Select': 'Use it in the film', 'Reject': 'I will ask you what is wrong with it', 'Approve': 'It is right; go on',
         'Shoot': 'Make the take now (paid)', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
         'Leave it out': 'This thing gets no reference', 'No reference needed': 'No reference of it; its shots are made without one',
-        'Go on without a reference': 'No set of it; its shots are made without a reference', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
+        'Go on without a reference': 'No set of it; its shots are made without a reference',
+        'Correct every picture of it': 'The set is made again with your words, and they go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
         'Make it': 'Make the set now (paid)', 'Yes, use it': 'Use the footage picture', 'Yes, make one': 'Have a set made (paid)',
         'Take the effect away': 'Make the drawing again without the added effect',
         'Use it as the reference': 'Take the footage picture; nothing is made', 'Make a clean set from it': 'A set is made from the footage picture', 'Have a set made': 'A set of three pictures is made',

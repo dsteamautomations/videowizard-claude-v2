@@ -170,6 +170,11 @@ FRAME_DRAWN_LINE = "Image {k} is the film's own picture of {name} ({view}): take
 SHEET_LINE = 'Image {k} is an approved drawing of {name} ({view}).'
 ADDED_LINE = "Added by the film's writer: {words}"
 OPERATOR_LINE = "The operator's words: {words}"
+# design/215 (change 5): the operator's corrections of a thing, kept per thing in the session (`thing_corrections`), never in the plan: carried into every later
+# request of the thing with the operator's rank; the later one wins where two disagree
+CORRECTIONS_ONE = "The operator's corrections of {name}: {words}"
+CORRECTIONS_MANY = "The operator's corrections of {name}, in the order given; where two disagree the later one wins: {words}."
+CORRECTION_LATER = '{words} (the later one: in force where the two disagree)'
 # design/213: a person the footage shows, with the recorded permission: the film's own pictures of them (visuals_stage.LIKENESS_PHOTO_LINE, said of footage pictures)
 LIKENESS_FOOTAGE_LINE = ('{images} of this person, used with their permission: take the face, the build, the skin and the hair from {them}, nothing else; '
                          'the garments, the poses and the plain ground are as written here.')
@@ -293,6 +298,36 @@ def views_for(element, plan, rd=None):
 def view_names(element, rd=None):
     """The view names of a thing, as `views_for` names them: for the helpers' brief and the labels of footage frames."""
     return [v['name'] for v in views_for(element, None, rd)]
+
+
+# ---------- the operator's corrections of a thing (design/215) ----------
+
+def corrections_of(session, plan, eid):
+    """The operator's corrections of a thing, in the order given: only for a thing the plan still names (one removed from the plan takes its
+    corrections with it); they stay with the thing by its id through every revision of the plan."""
+    if not _element(plan, eid):
+        return []
+    return [w for w in (_one(c.get('words')) for c in ((session or {}).get('thing_corrections') or {}).get(eid) or []) if w]
+
+
+def corrections_line(session, plan, eid, skip=''):
+    """The sentence a request of the thing carries: '' with none. `skip`: words the request already says in their own place."""
+    words = [w for w in corrections_of(session, plan, eid) if w != skip]
+    name = (_element(plan, eid) or {}).get('name') or eid
+    if len(words) < 2:
+        return CORRECTIONS_ONE.format(name=name, words=words[0]) if words else ''
+    return CORRECTIONS_MANY.format(name=name, words='; '.join(f"({n}) {w.rstrip('.')}" for n, w in enumerate(words, 1)))
+
+
+def corrections_shown(session, plan, eid):
+    """The corrections as the thing's line shows them: in order, the later one marked as the one in force."""
+    words = corrections_of(session, plan, eid)
+    return words[:-1] + [CORRECTION_LATER.format(words=words[-1])] if len(words) > 1 else words
+
+
+def correction_kept(session, user, eid, words, set_id):
+    """One correction kept for the thing: the operator ticked that it applies to every picture of it."""
+    session.setdefault('thing_corrections', {}).setdefault(eid, []).append({'words': _one(words), 'at': _now(), 'by': user['id'], 'set': set_id})
 
 
 # ---------- the request and the checks ----------
@@ -433,6 +468,8 @@ def set_request(plan, run, session, element, row):
     sheets = [i for i in inputs if i['role'] == 'drawing']
     added = ' '.join(str(row.get('prompt') or '').split())
     operator = ' '.join(str((row.get('operator_words') or [''])[-1] or '').split())
+    carried = corrections_line(session, plan, eid, skip=operator)   # design/215: the thing's corrections, above everything else
+    kept = [w for w in corrections_of(session, plan, eid) if w != operator]
     place = _place(element, facts)
     look = _look(plan)
     try:
@@ -444,9 +481,9 @@ def set_request(plan, run, session, element, row):
     signs = [] if kind != 'place' or str(element.get('staged_clean') or '').strip() else [s for s in facts['signs'] if s][:2]
     drawn = _drawn_facts(session, eid) if sheets else []
     words = lambda label, text: [f'{label}: {_plain_words(element, text)}'] if str(text).strip() else []
-    order = _authority(operator, added, footage, sheets, kind != 'person')
+    order = _authority(operator or kept, added, footage, sheets, kind != 'person')
     told = (words('Sizes', '; '.join(sizes) + '.') if sizes else []) + ([material] if material else []) + (words('Signs of use', '; '.join(signs) + '.') if signs else []) \
-        + ([ADDED_LINE.format(words=added)] if added else []) + ([OPERATOR_LINE.format(words=operator)] if operator else []) \
+        + ([ADDED_LINE.format(words=added)] if added else []) + ([carried] if carried else []) + ([OPERATOR_LINE.format(words=operator)] if operator else []) \
         + ([AUTHORITY.format(order='; '.join(f'({n}) {x}' for n, x in enumerate(order, 1)))] if order else [])
     if kind == 'person':
         others = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] != eid]
@@ -472,11 +509,11 @@ def set_request(plan, run, session, element, row):
                 MAY_SHOW.get(kind, MAY_SHOW['object']) + '\n' + setting + ' ' + LOOK_LINE.format(look=look) + '\n' + FINISH, NOTES_FOOTAGE if footage else NOTES]
         prompt, source = '\n\n'.join(text), 'footage' if footage else 'web'
     prompt = re.sub(r'(?<!\.)\.\.(?!\.)', '.', prompt).replace('.;', ';')   # a sentence of the plan that ends in a full stop gets no second one
-    lines = _lines(element, facts, inputs, added, operator, len(views))
+    lines = _lines(element, facts, inputs, added, '; '.join(w.rstrip('.') for w in kept + [operator] if w), len(views))
     if drawn or sheets:   # the facts of the drawing set are checked on the picture, and it must be a photograph
         lines += [{'check': 'drawn fact: ' + f, 'weight': 'must', 'pass_when': f'the picture shows it as the approved drawings do: {f}'} for f in drawn] + [V.DRAWN_LOOK_LINE]
     parts = {'kind': kind, 'subject': name, 'description': facts['description'], 'requirements': facts['requirements'], 'sizes': sizes, 'material': material, 'signs': signs,
-             'place': place, 'look': look, 'category': category, 'added': added, 'operator': operator, 'views': [v['name'] for v in views], 'inputs': inputs, 'source': source}
+             'place': place, 'look': look, 'category': category, 'added': added, 'operator': operator, 'corrections': kept, 'views': [v['name'] for v in views], 'inputs': inputs, 'source': source}
     return {'prompt': prompt, 'views': views, 'inputs': inputs, 'search': kind != 'person', 'lines': lines, 'parts': parts}
 
 

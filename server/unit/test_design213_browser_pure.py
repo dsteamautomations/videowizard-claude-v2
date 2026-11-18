@@ -195,7 +195,7 @@ def test_what_each_button_of_a_set_writes(browser):
     fix, again = btn(PERSON, 'fix'), btn(PERSON, 'again')
     # minor corrections: the words are required, and travel with the choice
     pg.locator('#tmain [data-act="fix"]').click()
-    assert pg.locator('#tpanel label').text_content() == 'What should change?' and pg.locator('#tpanel button').all_text_contents() == ['Make it again with these words', 'Cancel']
+    assert pg.locator('#tpanel label').first.text_content() == 'What should change?' and pg.locator('#tpanel button').all_text_contents() == ['Make it again with these words', 'Cancel']
     pg.locator('#tfixsend').click()
     assert pg.locator('#tmsg').text_content() == 'Write what should change first.' and PERSON['line'] not in answers(pg)
     pg.locator('#tfix').fill('Picture B: only the hand.')

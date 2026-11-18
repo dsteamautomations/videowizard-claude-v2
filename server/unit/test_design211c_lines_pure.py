@@ -227,7 +227,7 @@ def test_a_set_shows_its_pictures_with_their_views_both_checks_the_notes_and_the
     assert t['rec'] == {'do': 'remake', 'label': 'Make it again', 'reason': 'Picture B shows no hand at work.'} and t['tag'] == 'Make again'
     assert labels(t) == ['Make again', 'Approve', 'Minor corrections'] and [b['choice'] for b in t['buttons']] == ['no', 'use', 'correct'] and t['buttons'][0]['sug'] is True   # the proposed answer first
     assert t['buttons'][2]['needs_words'] is True and t['pick'] is True                # "Approve" takes the picture chosen under the pictures
-    assert [b['label'] for b in said['buttons'] + said['other_choices']] == ['Make again', 'Approve A', 'Approve B', 'Approve C', 'Minor corrections']   # the chat: one "Approve" per picture
+    assert [b['label'] for b in said['buttons'] + said['other_choices']] == ['Make again', 'Approve A', 'Approve B', 'Approve C', 'Minor corrections', 'Correct every picture of it']   # the chat: one "Approve" per picture; design/215: the page's tick as the chat's own answer
     assert 'comment' not in t and t['own']['label'] == 'Upload my own' and 'partial' not in t and 'earlier' not in t
     m, s = l['set:MASON'], l['set:STREET']
     assert m['check'] == {'state': 'pass', 'by': "Claude's check passed: no fault found.", 'chip': "Claude's check passed", 'lines': []} and m['ask'] == 'Is this set right for this person?'
@@ -374,8 +374,8 @@ def test_the_chat_item_of_each_line_has_the_same_question_text_and_buttons_as_th
         both = i['buttons'] + i.get('other_choices', [])
         own, page = [b['label'] for b in both if not (state == '1' and b['choice'].startswith(('not:', 'use:')))], labels(l)
         if state == '2':   # design/213: the same answers, by their choices: the page has one "Approve" for the picture chosen where the chat has one per picture, and short labels of its own on "make the rest"
-            assert list(dict.fromkeys(b['choice'].split(':')[0] for b in both)) == [b['choice'].split(':')[0] for b in l['buttons']], l['key']
-            own, page = [b['label'] for b in both if not b['choice'].startswith(('use:', 'rest'))], [b['label'] for b in l['buttons'] if b['choice'] not in ('use', 'rest', 'rest_out')]
+            assert list(dict.fromkeys(b['choice'].split(':')[0] for b in both)) == [c for b in l['buttons'] for c in [b['choice'].split(':')[0]]] + [b['all']['choice'] for b in l['buttons'] if b.get('all')], l['key']   # design/215: the page's tick is the chat's last answer
+            own, page = [b['label'] for b in both if not b['choice'].startswith(('use:', 'rest', 'correct_all'))], [b['label'] for b in l['buttons'] if b['choice'] not in ('use', 'rest', 'rest_out')]
         assert CF._split(i['question'])[1] == l['ask'] and i['text'].startswith(l.get('text') or l.get('desc') or l.get('used') or '') and own == page, l['key']   # design/212: a thing's line of step 1 carries its parts (design/213: of step 2 too)
         for said in ([W['proposes'].format(**l['rec'])] if l.get('rec') else []) + [W['read_first'].format(warning=w) for w in l.get('warnings', [])] + l.get('check', {}).get('lines', []) \
                 + [x['note'] for x in l.get('pics', []) if x.get('note')] + [l[k] for k in ('partial', 'cost', 'most', 'changed', 'asked') if l.get(k)]:

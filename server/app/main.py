@@ -418,6 +418,7 @@ class RoundAnswer(Write):   # design/177: one answer of step 2, stored (the page
     verdict: Literal['yes', 'no', 'correct'] | None = None
     golden: str | None = None
     words: str = ''
+    all: bool = False   # design/215: the correction applies to every picture of the thing
 
 
 class RoundAside(Write):   # design/177: a set never made, set aside at step 2, or brought back
@@ -1841,7 +1842,7 @@ def visuals_round_sets(run_id: UUID, body: RoundSets, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round/answer')
 def visuals_round_answer(run_id: UUID, body: RoundAnswer, user=User, conn=DB):   # design/177: `vw visuals round --answer`
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words, all=body.all))
 
 
 class RoundMake(Write):   # design/211: `vw visuals round --make E --quote "<their words>"`: in a v2 round making a set needs the operator's words
