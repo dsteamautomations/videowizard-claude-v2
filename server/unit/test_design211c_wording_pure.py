@@ -32,7 +32,10 @@ def visuals():
     spec = importlib.util.spec_from_file_location('d213_wording_v3', ROOT / 'scripts' / 'd213_wording_v3.py')   # design/213: a later script still, which changes the sentence on step 2 of this one
     d213 = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(d213)
-    return review.before(later.before(d213.before(next(s for s in d['stages'] if s['name'] == 'visuals'))))   # the text as it was before them
+    spec = importlib.util.spec_from_file_location('d214_wording_v3', ROOT / 'scripts' / 'd214_wording_v3.py')   # design/214: a later script still: the check of a set is the look's
+    d214 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(d214)
+    return review.before(later.before(d213.before(d214.before(next(s for s in d['stages'] if s['name'] == 'visuals')))))   # the text as it was before them
 
 
 def test_each_anchor_of_script_c_is_found_once_or_is_already_applied():
@@ -80,7 +83,7 @@ def test_the_page_file_draws_the_new_fields_with_the_same_words():
     assert CF.WORDS['proposes'].startswith('Claude suggests: {label}. ') and "'Claude suggests: '+line.rec.label+'. '" in PAGE   # design/212: "suggests", as the new layout of step 1 says it
     for state, tail in (('pass', ': passed.'), ('fail', ': it found faults.'), ('none', ': the check did not run.')):
         assert 'check_' + state not in CF.WORDS and f"'{tail}'" in PAGE   # design/213: the server sends these of step 2 as `check` {state, by, chip, lines}; the page keeps the words for an older round
-    assert CF.WORDS['check_by'] == "The program's check" and (CF.WORDS['chip_pass'], CF.WORDS['chip_none']) == ('Check passed', 'The check did not run')
+    assert CF.WORDS['check_by'] == "Claude's check" and (CF.WORDS['chip_pass'], CF.WORDS['chip_none']) == ("Claude's check passed", "Claude's check: not checked")   # design/214
     for word in ("'The set before'", "'Claude saw: '", "'Weak'", "'To compare with'", 'line.comment_hint||', 'line.partial', 'line.cost', 'line.notes', 'line.earlier', 'p.choice_label||', 'line.tag||',
                  "choice:'pics'", 'function heading(', 'function setMark('):
         assert word in PAGE, word

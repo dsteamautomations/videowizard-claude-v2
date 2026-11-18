@@ -114,7 +114,7 @@ def test_vw24s_stored_round_shows_in_the_new_layout_as_it_is(monkeypatch):
     assert [x['letter'] for x in deck['pics'][3:]] == ['A', 'B', 'C'] and all(x['choice'].startswith('use:') and x['say'] == W['say_use'].format(letter=x['letter']) for x in deck['pics'][3:])
     assert acts(mason) == ['again', 'approve', 'fix'] and btn(mason, 'again')['sug'] is True and [b['choice'] for b in mason['buttons']] == ['no', 'yes', 'correct']
     assert acts(deck) == ['again', 'approve', 'fix'] and btn(deck, 'approve')['choice'] == 'use' and deck['rec']['label'] == 'Make it again'
-    assert deck['check']['state'] == 'fail' and deck['check']['chip'] == 'The check found 1 fault' and deck['pics'][4].get('flag') is True
+    assert deck['check']['state'] == 'fail' and deck['check']['chip'] == "Claude's check found 1 fault" and deck['pics'][4].get('flag') is True
     assert room['case'] == 'notmade' and room['head'] == 'This set could not be made.' and room['why'].startswith('The request places') and acts(room) == ['make', 'leave']
     assert rest['head'] == '17 more sets wait for your word' and rest['show'] == 'Show the 17' and len(rest['covers']) == 17 and labels(rest) == ['Make them', 'Leave some out']
     assert rest['buttons'][0]['big'] == 'Make the other 17' and rest['buttons'][0]['say'] == 'The other 17 sets will be made.'

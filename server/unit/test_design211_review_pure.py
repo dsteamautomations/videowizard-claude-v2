@@ -255,8 +255,8 @@ def test_S15_the_check_is_told_in_plain_words_an_errored_check_is_not_checked_an
                                        'lines': [], 'must_failed': [{'check': 'size', 'weight': 'must', 'pass': False, 'seen': '1024x1024'}], 'model': 'm', 'error': 'TimeoutError: no answer'}
     put_session(film, s)
     line = film.lines()['set:STREET']
-    assert line['check']['state'] == 'fail' and line['check']['lines'] == ['Picture A is not the size asked for.', 'Picture A was made from a picture that is not approved.',
-                                                                           'Picture A was not checked: the check did not run.']
+    # design/214: the code checks stay; a model's error stored before is no longer read (Claude's look answered the picture's lines)
+    assert line['check']['state'] == 'fail' and line['check']['lines'] == ['Picture A is not the size asked for.', 'Picture A was made from a picture that is not approved.']
     assert '1024' not in json.dumps(line['check']) and 'abc12345' not in json.dumps(line) and 'TimeoutError' not in json.dumps(line)
     lay = film.lines()['set:T_LAY']
     assert lay['check']['state'] == 'pass' and lay['check']['lines'] == []
@@ -267,9 +267,9 @@ def test_S16_N2_the_looks_listing_carries_the_judging_points_and_the_shape_of_th
     step1_done(film)
     film.back()
     how = film.due()['how']
-    assert how == RS.LOOK_HOW and len(how['judge']) == 5 and any('approved drawing' in p and 'footage picture' in p for p in how['judge']) and any("the plan's description" in p for p in how['judge'])
+    assert how == RS.LOOK_HOW and len(how['judge']) == 6 and any('approved drawing' in p and 'footage picture' in p for p in how['judge']) and any("the plan's description" in p for p in how['judge'])
     row = how['file']['sets'][0]
-    assert set(row) == {'element_id', 'set', 'recommend', 'golden', 'reason', 'chose', 'aside', 'pictures'} and set(row['pictures'][0]) == {'ref', 'view', 'verdict', 'seen'} and '--looks' in how['send']
+    assert set(row) == {'element_id', 'set', 'recommend', 'golden', 'reason', 'chose', 'aside', 'pictures'} and set(row['pictures'][0]) == {'ref', 'view', 'verdict', 'seen', 'lines', 'not_checked'} and '--looks' in how['send']
     assert '`how`' in RS.SETS_LOOK and 'its group name' in RS.SETS_LOOK and 'its group name' in RF.FIND_START
     helper = (Path(__file__).resolve().parents[2] / 'plugin' / 'agents' / 'vw-set-look.md').read_text(encoding='utf-8')
     assert '`how`' in helper and 'approved drawing' in helper and 'Each picture shows the view its turn asked for' not in helper   # one source: the server's

@@ -221,7 +221,7 @@ def test_a_set_shows_its_pictures_with_their_views_both_checks_the_notes_and_the
         ('A · the action at its key moment', 'the action at its key moment: as asked.', False, 'use:s-t_lay-1', 'Approve A'),
         ('B · the result just after', 'the result just after: as asked.', True, 'use:s-t_lay-1-2', 'Approve B'),
         ('C · close on where it happens', 'close on where it happens: as asked.', False, 'use:s-t_lay-1-3', 'Approve C')]
-    assert t['check'] == {'state': 'fail', 'by': "The program's check found:", 'chip': 'The check found 1 fault', 'lines': ['Picture B: the action is shown: A tool lying still; no hand.']}
+    assert t['check'] == {'state': 'fail', 'by': "Claude's check found:", 'chip': "Claude's check found 1 fault", 'lines': ['Picture B: A tool lying still; no hand.']}   # design/214
     assert 'notes' not in t and t['look'] == {'chose': 'bamboo, as the photographs show', 'aside': 'the wooden scaffold the request named'}   # the raw notes are not shown
     assert 'The image model chose: bamboo, as the photographs show' in said['text'] and 'It set aside: the wooden scaffold the request named' in said['text']
     assert t['rec'] == {'do': 'remake', 'label': 'Make it again', 'reason': 'Picture B shows no hand at work.'} and t['tag'] == 'Make again'
@@ -230,7 +230,7 @@ def test_a_set_shows_its_pictures_with_their_views_both_checks_the_notes_and_the
     assert [b['label'] for b in said['buttons'] + said['other_choices']] == ['Make again', 'Approve A', 'Approve B', 'Approve C', 'Minor corrections']   # the chat: one "Approve" per picture
     assert 'comment' not in t and t['own']['label'] == 'Upload my own' and 'partial' not in t and 'earlier' not in t
     m, s = l['set:MASON'], l['set:STREET']
-    assert m['check'] == {'state': 'pass', 'by': "The program's check found no fault.", 'chip': 'Check passed', 'lines': []} and m['ask'] == 'Is this set right for this person?'
+    assert m['check'] == {'state': 'pass', 'by': "Claude's check passed: no fault found.", 'chip': "Claude's check passed", 'lines': []} and m['ask'] == 'Is this set right for this person?'
     assert labels(m) == ['Approve', 'Minor corrections', 'Make again'] and [b['choice'] for b in m['buttons']] == ['yes', 'correct', 'no'] and m['rec'] == {'do': 'use', 'label': 'Use this set', 'reason': 'All three agree with the plan.'}
     assert not any('choice' in x for x in m['pics']) and 'pick' not in m             # a person's starting picture is the server's choice
     assert labels(s)[0] == 'Approve' and s['buttons'][0]['sug'] is True and s['rec']['label'] == 'Use this set' and s['group'] == S[0]
@@ -248,11 +248,15 @@ def test_the_inputs_of_a_set_come_first_to_compare_with_and_have_no_button(monke
 
 def test_a_check_that_did_not_run_says_so_and_blocks_nothing(monkeypatch):
     film = Film(monkeypatch, '2')
-    film.change(lambda s: [r.pop('check') for r in s['references'].values() if r.get('set') == 's-mason-1'])
+    # design/214: "not checked" is a picture Claude could not open: its look says so, with why; the set is still shown and can be approved
+    off = lambda r, why: (r['look'].pop('lines'), r['look'].update(not_checked=why, verdict=None, seen=''))
+    film.change(lambda s: [off(r, 'The file would not open.') for r in s['references'].values() if r.get('set') == 's-mason-1'])
     m = film.lines()['set:MASON']
-    assert m['check'] == {'state': 'none', 'by': "The program's check did not run on these pictures.", 'chip': 'The check did not run', 'lines': []} and m['buttons'] and m['group'] == S[0]   # design/213: the check's own sentence and chip
-    film.change(lambda s: s['references']['s-t_lay-1-3'].pop('check'))
-    assert film.lines()['set:T_LAY']['check']['lines'] == ['Picture B: the action is shown: A tool lying still; no hand.', 'Picture C was not checked: the check did not run.']
+    assert m['check'] == {'state': 'none', 'by': "Claude's check: not checked.", 'chip': "Claude's check: not checked",
+                          'lines': [f'{p} was not checked: The file would not open.' for p in ('Picture A', 'Picture B', 'Picture C')]} and m['buttons'] and m['group'] == S[0]
+    film.change(lambda s: off(s['references']['s-t_lay-1-3'], 'It came back empty.'))
+    lay = film.lines()['set:T_LAY']['check']
+    assert lay['lines'] == ['Picture B: A tool lying still; no hand.', 'Picture C was not checked: It came back empty.'] and lay['chip'] == "Claude's check found 1 fault"
 
 
 def test_a_partial_set_is_shown_as_it_is_with_what_is_missing(monkeypatch):

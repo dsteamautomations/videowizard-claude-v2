@@ -348,6 +348,12 @@ def code_checks(ref, result, parents):
     return out
 
 
+def code_only(session, ref):
+    """design/214: the record of a picture no model checks (a picture of a v2 round's set: Claude's look answers its lines): the code checks alone."""
+    parents = [session['references'].get(p.get('id')) or {} for p in (ref.get('generation') or {}).get('parents') or []]
+    return {'code': code_checks(ref, {'width': ref.get('width'), 'height': ref.get('height')}, parents)}
+
+
 LIGHT_JUMP = {'brightness': 0.15, 'saturation': 0.15, 'warmth': 0.08}   # design/91 N9; ponytail: fixed jumps on 0..1 means, tune them against real films
 
 

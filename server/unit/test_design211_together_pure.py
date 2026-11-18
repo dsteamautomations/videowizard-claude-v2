@@ -161,7 +161,7 @@ class Film:
         for s in self.due()['sets']:
             rec = (recommend or {}).get(s['element_id'], 'use')
             rows.append({'element_id': s['element_id'], 'set': s['set'], 'recommend': rec, 'golden': s['pictures'][0]['ref'] if rec == 'use' else None, 'reason': 'Looked at against the plan.', 'chose': 'The most common variant.', 'aside': 'Nothing of the request.',
-                         'pictures': [{'ref': p['ref'], 'view': p['view'], 'verdict': 'pass', 'seen': f"{p['view']}: as asked."} for p in s['pictures']]})
+                         'pictures': [{'ref': p['ref'], 'view': p['view'], 'verdict': 'pass', 'seen': f"{p['view']}: as asked.", 'lines': [{'id': l['id'], 'pass': True, 'seen': 'As the drawing shows.' if l.get('say') else ''} for l in p['lines']]} for p in s['pictures']]})
         return self.do(lambda: RS.round_looks(self.store, USER, self.run, self.outputs, rows, 'helper'))
 
     def rewrite(self, rows):
@@ -320,7 +320,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make them' and lines['sets:rest']['buttons'][0]['big'] == 'Make the other 2'
     assert [b['label'] for b in chat(film, 'sets:rest')['buttons']] == ['Make the other 2 sets', 'Leave these 2 out']
     lay = lines['set:T_LAY']
-    assert lay['group'] == CF.STEP2_GROUPS[0] and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'fail', 'by': "The program's check found:", 'chip': 'The check found 1 fault', 'lines': ['Picture B: the view: Not the view asked.']}
+    assert lay['group'] == CF.STEP2_GROUPS[0] and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'pass', 'by': "Claude's check passed: no fault found.", 'chip': "Claude's check passed", 'lines': []}   # design/214: the look passed every line; the model's stored fault ("Not the view asked.") is no longer shown
     assert 'notes' not in lay and lay['look'] == {'chose': 'The most common variant.', 'aside': 'Nothing of the request.'} and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
     assert lines['set:MASON']['check']['state'] == 'pass' and lines['set:MASON']['rec']['label'] == 'Use this set' and [b['choice'] for b in lines['set:MASON']['buttons']] == ['yes', 'correct', 'no']
 

@@ -361,6 +361,7 @@ def finished(monkeypatch, request_more=None, extra=2, lines=True, older=False):
     first = s['references']['s-street-1']
     if older:
         first.pop('view')   # a set of an older round has no view on its pictures
+        s['round'].pop('v')   # design/214: and its round is an older one: its pictures are still checked by the model
     if lines:
         first['server_checklist'] = request('STREET')['lines']
     store = store_of(s)
@@ -378,7 +379,8 @@ def test_every_picture_of_a_set_waits_for_its_own_check_and_a_v2_set_carries_its
     views = RS.views_for(el('STREET'), F.plan())
     store, job, result, due = finished(monkeypatch, {'views': [v['ask'] for v in views], 'view_names': [v['name'] for v in views]})
     refs = saved(store)['references']
-    assert due is True and all(refs[r]['check_pending'] is True and 'check' not in refs[r] for r in ('s-street-1', 's-street-1-2', 's-street-1-3'))
+    # design/214: no model check for a set of a v2 round: nothing is due, nothing waits; each picture keeps the code checks (its size)
+    assert not due and all('check_pending' not in refs[r] and list(refs[r]['check']) == ['code'] and refs[r]['check']['code'][0]['pass'] is True for r in ('s-street-1', 's-street-1-2', 's-street-1-3'))
     assert [refs[r]['view'] for r in ('s-street-1', 's-street-1-2', 's-street-1-3')] == F.VIEWS['STREET'] and refs['s-street-1-2']['ask'] == views[1]['ask']
     assert refs['s-street-1-3']['server_checklist'] == refs['s-street-1']['server_checklist'] and refs['s-street-1-2']['set_n'] == 2
 
@@ -394,7 +396,7 @@ def test_an_older_set_gets_three_checks_too_and_no_view(monkeypatch):
 
 def test_the_check_runs_once_per_picture_and_each_keeps_its_own_record(monkeypatch):
     views = RS.views_for(el('STREET'), F.plan())
-    store, job, result, due = finished(monkeypatch, {'views': [v['ask'] for v in views], 'view_names': [v['name'] for v in views]})
+    store, job, result, due = finished(monkeypatch, {'views': [v['ask'] for v in views], 'view_names': [v['name'] for v in views]}, older=True)   # design/214: an older round's set
     seen = []
 
     def run_check(st, session, ref, res, transport):
@@ -410,7 +412,7 @@ def test_the_check_runs_once_per_picture_and_each_keeps_its_own_record(monkeypat
 
 
 def test_a_partial_set_checks_what_came(monkeypatch):
-    store, job, result, due = finished(monkeypatch, extra=1)
+    store, job, result, due = finished(monkeypatch, extra=1, older=True)   # design/214: an older round's set
     seen = []
     monkeypatch.setattr(IC, 'run_check', lambda st, session, ref, res, transport: seen.append(ref['id']) or {'code': [], 'lines': [], 'must_failed': [], 'model': 'm'})
     monkeypatch.setattr(VW, 'connect', lambda: Lock())
@@ -445,10 +447,16 @@ def test_check_summary_says_pass_fail_or_that_the_check_did_not_run():
     assert RS.check_summary(s, 's-t_lay-1-2') == {'state': 'fail', 'failed': [{'check': 'the action is shown', 'seen': 'A tool lying still; no hand.'}], 'error': None}
     assert RS.check_summary(s, s['references']['s-t_lay-1-2']) == RS.check_summary(s, 's-t_lay-1-2')   # the row itself is taken too
     assert RS.check_summary(F.session('making'), 's-street-1') == {'state': 'none', 'failed': [], 'error': None} == RS.check_summary(s, 'no-such-picture')
+    # design/214: a set of a v2 round is checked by Claude's look; a model's record stored before (its error, its lines) is not read. The code checks stay.
     s['references']['s-street-1']['check'] = {'code': [{'check': 'size', 'weight': 'must', 'pass': True, 'seen': '2752x1536'}], 'lines': [], 'must_failed': [], 'model': 'm', 'error': 'no Gemini key on the server'}
-    assert RS.check_summary(s, 's-street-1') == {'state': 'none', 'failed': [], 'error': 'no Gemini key on the server'}
-    s['references']['s-street-1']['check']['code'][0].update({'pass': False, 'seen': '1536x2752'})   # the model did not run and the shape is wrong: the shape is still said
-    assert RS.check_summary(s, 's-street-1') == {'state': 'fail', 'failed': [{'check': 'size', 'seen': '1536x2752'}], 'error': 'no Gemini key on the server'}
+    assert RS.check_summary(s, 's-street-1') == {'state': 'pass', 'failed': [], 'error': None}
+    s['references']['s-street-1']['check']['code'][0].update({'pass': False, 'seen': '1536x2752'})   # the shape is wrong: the shape is still said
+    assert RS.check_summary(s, 's-street-1') == {'state': 'fail', 'failed': [{'check': 'size', 'seen': '1536x2752'}], 'error': None}
+    old = F.older_session()   # a set of an older round: the model's record, read as before
+    old['references']['s-street-1']['check'] = {'code': [{'check': 'size', 'weight': 'must', 'pass': False, 'seen': '1536x2752'}], 'lines': [], 'must_failed': [], 'model': 'm', 'error': 'no Gemini key on the server'}
+    assert RS.check_summary(old, 's-street-1') == {'state': 'fail', 'failed': [{'check': 'size', 'seen': '1536x2752'}], 'error': 'no Gemini key on the server'}
+    old['references']['s-street-1']['check']['code'][0]['pass'] = True
+    assert RS.check_summary(old, 's-street-1') == {'state': 'none', 'failed': [], 'error': 'no Gemini key on the server'}
 
 
 # ---------- what the page reads of a set ----------

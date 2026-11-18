@@ -93,7 +93,7 @@ def looks(store, recommend='use', only=None, **change):
         if only is None or s['element_id'] in only:
             out.append({'element_id': s['element_id'], 'set': s['set'], 'recommend': recommend, 'golden': s['pictures'][0]['ref'] if recommend == 'use' else None, 'reason': 'All agree with the plan.',
                         'chose': 'The most common variant.', 'aside': 'Nothing of the request.',   # design/213: required where the pictures carry the image model's notes
-                        'pictures': [{'ref': p['ref'], 'view': p['view'], 'verdict': 'pass', 'seen': p['view'] + ': as asked.'} for p in s['pictures']], **change})
+                        'pictures': [{'ref': p['ref'], 'view': p['view'], 'verdict': 'pass', 'seen': p['view'] + ': as asked.', 'lines': [{'id': l['id'], 'pass': True, 'seen': 'As the drawing shows.' if l.get('say') else ''} for l in p['lines']]} for p in s['pictures']], **change})
     return out
 
 
@@ -461,7 +461,7 @@ def test_the_sets_to_look_at_come_with_their_facts_request_inputs_and_large_pict
     zoom = page_flow.PIC_SIZES['zoom'][0]
     assert t['inputs'][0] == {'ref': 'f-trowel-side', 'role': 'footage', 'view': 'side', 'key': s['references']['f-trowel-side']['key'] + '.' + s['references']['f-trowel-side']['sha256'][:10] + zoom} and store.exists(t['inputs'][0]['key'])
     assert [(p['ref'], p['n'], p['view']) for p in t['pictures']] == [(t['set'], 1, 'side'), (t['set'] + '-2', 2, 'in the hand, lifting mortar'), (t['set'] + '-3', 3, 'the detail that shows how it is made')]
-    assert t['pictures'][0]['key'].endswith(zoom) and t['pictures'][0]['check'] == {'state': 'none', 'failed': [], 'error': None}
+    assert t['pictures'][0]['key'].endswith(zoom) and set(t['pictures'][0]) == {'ref', 'n', 'view', 'key', 'lines'} and t['pictures'][0]['lines'] == RS.check_lines(s['references'][t['set']])   # design/214: the check list, no model's result
     assert t['pictures'][1]['key'] == s['references'][t['set'] + '-2']['key']        # a picture that cannot be shrunk is given at its full size
     assert RS.looks_due(store_of(F.older_session()), RUN, []) == {'sets': [], 'then': None}
 
@@ -479,7 +479,8 @@ def test_the_looks_are_recorded_on_each_picture_and_on_the_row():
     assert row['set_look'] == {'who': 'helper', 'at': row['set_look']['at'], 'set': row['set'], 'recommend': 'use', 'golden': row['set'], 'reason': 'All agree with the plan.',
                                 'chose': 'The most common variant.', 'aside': 'Nothing of the request.'}   # design/213
     pic = s['references'][row['set'] + '-2']
-    assert pic['look'] == {'who': 'helper', 'at': row['set_look']['at'], 'view': 'from the other side', 'verdict': 'pass', 'seen': 'from the other side: as asked.', 'trial': None, 'ref': pic['id']}
+    assert pic['look'] == {'who': 'helper', 'at': row['set_look']['at'], 'view': 'from the other side', 'verdict': 'pass', 'seen': 'from the other side: as asked.', 'trial': None, 'ref': pic['id'],
+                           'lines': [{'id': l['id'], 'check': l['check'], 'pass': True, 'seen': ''} for l in RS.check_lines(pic)]}   # design/214: every line of its check list, answered
     assert RS.looked(s, 'STREET', row) and not RS.looked(s, 'MASON', s['round']['elements']['MASON'])
     out = RS.round_looks(store, USER, RUN, [], looks(store, recommend='doubt'), 'someone')
     assert out['recorded'] == ['MASON', 'T_LAY'] and out['left'] == [] and out['then'] == RS.SETS_PAGE and saved(store)['round']['elements']['MASON']['set_look']['who'] == 'assistant'

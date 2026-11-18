@@ -16,13 +16,14 @@ import d211b_wording_v3 as W   # noqa: E402
 import d212_wording_v3 as LATER   # noqa: E402  (design/212: a later script still; it changes a sentence part C put beside this one's)
 import d211d_wording_v3 as REVIEW   # noqa: E402  (design/211, the review: a later script that changes sentences of this one; these tests read the text as it was before it)
 import d213_wording_v3 as D213   # noqa: E402  (design/213: a later script still; it changes sentences of this one; these tests read the text as it was before it)
+import d214_wording_v3 as D214   # noqa: E402  (design/214: a later script still: the check of a set is the look's)
 
 OTHERS = ('`vw visuals elements` shows where each is seen', 'A clip frame is free and exact', 'never a blurred one for identity', 'The operator answers both steps on the page',
           'In the chat, one at a time (`vw visuals next`, section E)', "except the plugin's helpers the steps name")   # the anchors of parts A and C: never inside one of part B's
 
 
 def stage():
-    return REVIEW.before(LATER.before(D213.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))))
+    return REVIEW.before(LATER.before(D213.before(D214.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))))
 
 
 def applied():
@@ -73,7 +74,7 @@ def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_rea
     now = prompt + ''.join(p['text'] for p in parts)
     before = st['prompt'] + ''.join(p['text'] for p in st['parts'])
     import d213_wording_v3 as D213   # design/213 review: the command file's sentence on step 2 was reworded by that script
-    cmd_before = REVIEW.before_commands(D213.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')))
+    cmd_before = REVIEW.before_commands(D213.before_commands(D214.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8'))))
     cmd = commands(cmd_before)
     agents = ''.join(p.read_text(encoding='utf-8') for p in (ROOT / 'plugin' / 'agents').glob('*.md'))
     listed = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']

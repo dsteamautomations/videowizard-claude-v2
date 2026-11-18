@@ -135,10 +135,7 @@ class Film:
         rows = sorted([r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == eid and r.get('set') == row.get('set') and r.get('key')], key=lambda r: r['set_n'])
         look = row.get('set_look') if (row.get('set_look') or {}).get('set') == row.get('set') else None
 
-        def check(r):
-            c = r.get('check')
-            bad = (c or {}).get('must_failed') or []
-            return {'state': 'none' if not c else 'fail' if bad else 'pass', 'failed': [{'check': b['check'], 'seen': b['seen']} for b in bad], 'error': None}
+        check = lambda r: ref_sets.check_summary(session, r)   # design/214: part B's own summary (Claude's check of a v2 set, from the look's line answers)
         history = [{k: h[k] for k in ('n', 'set', 'added', 'operator')} for h in row.get('history') or []]
         return {'pictures': [{'ref': r['id'], 'n': r['set_n'], 'view': r.get('view') or '', 'check': check(r), 'look': r.get('look')} for r in rows], 'inputs': self.inputs.get(eid, []), 'from': 'web',
                 'notes': rows[0].get('notes') if rows else '', 'sources': rows[0].get('sources') or [] if rows else [],

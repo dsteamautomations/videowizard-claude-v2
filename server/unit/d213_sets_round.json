@@ -208,10 +208,10 @@
    ],
    "check": {
     "state": "fail",
-    "by": "The program's check found:",
-    "chip": "The check found 1 fault",
+    "by": "Claude's check found:",
+    "chip": "Claude's check found 1 fault",
     "lines": [
-     "Picture B: the view: Not the view asked."
+     "Picture B: Not the view asked."
     ]
    },
    "look": {
@@ -243,9 +243,9 @@
      ]
     ],
     [
-     "What the check found",
+     "What Claude's check found",
      [
-      "Picture B: the view: Not the view asked."
+      "Picture B: Not the view asked."
      ]
     ],
     [
@@ -361,10 +361,10 @@
    ],
    "check": {
     "state": "fail",
-    "by": "The program's check found:",
-    "chip": "The check found 1 fault",
+    "by": "Claude's check found:",
+    "chip": "Claude's check found 1 fault",
     "lines": [
-     "Picture B: the view: Not the view asked."
+     "Picture B: Not the view asked."
     ]
    },
    "look": {
@@ -397,9 +397,9 @@
      ]
     ],
     [
-     "What the check found",
+     "What Claude's check found",
      [
-      "Picture B: the view: Not the view asked."
+      "Picture B: Not the view asked."
      ]
     ],
     [
@@ -472,8 +472,8 @@
    ],
    "check": {
     "state": "pass",
-    "by": "The program's check found no fault.",
-    "chip": "Check passed",
+    "by": "Claude's check passed: no fault found.",
+    "chip": "Claude's check passed",
     "lines": []
    },
    "name": "The street (one picture)",
@@ -583,8 +583,8 @@
    ],
    "check": {
     "state": "pass",
-    "by": "The program's check found no fault.",
-    "chip": "Check passed",
+    "by": "Claude's check passed: no fault found.",
+    "chip": "Claude's check passed",
     "lines": []
    },
    "pick": true,
@@ -705,8 +705,8 @@
    ],
    "check": {
     "state": "pass",
-    "by": "The program's check found no fault.",
-    "chip": "Check passed",
+    "by": "Claude's check passed: no fault found.",
+    "chip": "Claude's check passed",
     "lines": []
    },
    "pick": true,
@@ -824,8 +824,8 @@
    ],
    "check": {
     "state": "pass",
-    "by": "The program's check found no fault.",
-    "chip": "Check passed",
+    "by": "Claude's check passed: no fault found.",
+    "chip": "Claude's check passed",
     "lines": []
    },
    "pick": true,
@@ -940,8 +940,8 @@
    ],
    "check": {
     "state": "pass",
-    "by": "The program's check found no fault.",
-    "chip": "Check passed",
+    "by": "Claude's check passed: no fault found.",
+    "chip": "Claude's check passed",
     "lines": []
    },
    "pick": true,

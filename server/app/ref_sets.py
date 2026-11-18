@@ -7,6 +7,7 @@ and C read only the functions and constants named in design/211 section 4.
 
 A refusal is a named constant (a format string): raised with `visuals_stage.need(False, NAME.format(...))`; a test asserts the message.
 """
+import hashlib
 import re
 from datetime import datetime, timezone
 
@@ -30,7 +31,8 @@ ROUND_POSTED = ('The round is posted for {n} things, {d} of them doubtful. Run `
 GO1_MAKING = "Step 1 is recorded. The first {k} sets are being made (about ₹{x}); {r} more wait for the operator's word. Wait: `vw visuals status --wait 900`."
 ALL_MAKING = '{k} set(s) are being made (about ₹{x}). Wait: `vw visuals status --wait 900`.'
 SETS_LOOK = ('The sets are back. Look at them before the operator does: `vw visuals round --looks` lists them, fetches the pictures and says how to judge them and the '
-             'shape of the file to send (`how`, in work/visuals/sets/looks.json). With more than 5 sets start `vw-set-look` helpers, about 5 sets each, each given its group name, '
+             "shape of the file to send (`how`, in work/visuals/sets/looks.json); every line of every picture's check list gets its answer. "
+             'With more than 5 sets start `vw-set-look` helpers, about 5 sets each, each given its group name, '
              "its element ids, the run folder's path and the tool's command line; with 5 sets or fewer, look yourself. Each records its looks: `vw visuals round --looks <file>`. "
              'No set is shown to the operator before its look is recorded.')
 SETS_MAKING = 'The sets are being made. Wait for them (`vw visuals status --wait 900`); then look at them before the operator does (`vw visuals round --looks`).'
@@ -59,6 +61,10 @@ LOOK_HOW = {
               'compare shape, size and how the thing is built with the drawing. A set that looks right and is not the film\'s thing is wrong.',
               "It agrees with the plan's description, requirements and sizes, and with the operator's words in the request, which win over all of these. Say what differs.",
               'The pictures of the set agree with one another: the same thing in every detail they share.',
+              # design/214: the check of a set is Claude's, line by line
+              'The check list: each picture comes with its own (`lines`). Answer every line of every picture, pass or fail, from what you see in the picture, never from the '
+              'request or the notes; a fact of the drawing is checked against the drawing sheet among the inputs. Never pass a line you did not look at; a picture you could '
+              'not open is `not_checked`, with why.',
               'What the image model changed: read its notes for what it took from the web instead of the request, and what it left out. Say it for the operator in two plain lines: '
               '`chose`, what the model chose, and `aside`, what it set aside; no file name, no heading, nothing copied from the notes as written.'],
     'may_show': ('A person alone on plain ground. An object or a material with no person; a hand, and the material the thing works on, only in a picture that shows it in use. A place as '
@@ -67,10 +73,13 @@ LOOK_HOW = {
              'sets': [{'element_id': '<the element id>', 'set': '<the set id of this listing>', 'recommend': 'use | remake | doubt',
                        'golden': '<with use: the id of the picture every shot starts from; null for a person, and with remake or doubt>', 'reason': '<one line, at most 300 characters>',
                        'chose': '<one line, at most 300 characters: what the image model chose>', 'aside': '<one line, at most 300 characters: what it set aside>',
-                       'pictures': [{'ref': '<the picture id>', 'view': '<its view>', 'verdict': 'pass | weak | fail', 'seen': '<one line: what you saw, at most 300 characters>'}]}]},
+                       'pictures': [{'ref': '<the picture id>', 'view': '<its view>', 'verdict': 'pass | weak | fail', 'seen': '<one line: what you saw, at most 300 characters>',
+                                     'lines': [{'id': "<the id of a line of this picture's `lines`>", 'pass': 'true | false',
+                                                'seen': '<with a fail, and with a pass of a line marked `say`: one plain sentence of what you saw, at most 300 characters>'}],
+                                     'not_checked': '<only for a picture you could not open: why, in one line; it then needs no verdict, seen or lines>'}]}]},
     'send': ('`vw visuals round --looks <file>`. Every picture of a set gets its row. `use`: the set can serve as it is; `remake`: a fault would be copied into the film (say which '
              'picture and what is wrong, so the request can be rewritten); `doubt`: you cannot tell. `chose` and `aside` are required where the pictures of the set carry '
-             "the image model's notes. A refused set is named with its reason: fix that row and send it again.")}
+             "the image model's notes. Every line of a picture's `lines` gets its answer, by its `id`. A refused set is named with its reason: fix that row and send it again.")}
 
 # ---------- refusals ----------
 
@@ -88,6 +97,12 @@ LOOK_VERDICT = '{eid}: the verdict of a look is pass, weak or fail, and the reco
 LOOK_SEEN = '{eid}: a look says in one line what was seen, at most {max} characters, and the recommendation gives its reason.'
 LOOK_GOLDEN = '{eid}: the picture proposed as the starting picture is not a picture of this set.'
 LOOK_MODEL = ("{eid}: the pictures of this set carry the image model's notes: say what it chose (`chose`) and what it set aside (`aside`), one line each, at most {max} characters.")
+# design/214: the check of a set is answered line by line in the look
+LOOK_LINE_OPEN = ('{eid}: {pic}: the line "{check}" ({id}) has no answer: every line of every picture gets `pass`, true or false. Answer it in that picture\'s `lines` and '
+                  'send the file again (`vw visuals round --looks <file>`).')
+LOOK_LINE_UNKNOWN = ('{eid}: {pic}: {id} is not a line of this picture now: list the sets again (`vw visuals round --looks`), answer the lines it gives and send the file again.')
+LOOK_LINE_WORDS = ('{eid}: {pic}: the line "{check}" ({id}) needs one plain sentence of what was seen (`seen`, at most {max} characters): a fail always, and a pass of a '
+                   'fact of the drawing. Add it and send the file again (`vw visuals round --looks <file>`).')
 REST_NOT_NOW = 'The other sets are ordered once the first sets are back and have their look: not now.'
 REST_NONE = 'No set waits to be ordered.'
 REST_CAP = ('The other {n} sets need about ₹{x}, and ₹{spent} is spent of the ₹{cap} limit of this film: none was ordered. Leave some things out, or ask the '
@@ -462,6 +477,13 @@ def check_summary(session, ref):
     picture's reference id (or its row). 'none': the check did not run (no key, a model error, or not back yet)."""
     row = ref if isinstance(ref, dict) else (session.get('references') or {}).get(ref) or {}
     check = row.get('check')
+    if V.round_v2(session) and row.get('kind') == 'sheet' and row.get('set'):
+        # design/214: a set of a v2 round is checked by Claude's look, line by line; a model's result stored before stays in the record and is not read here.
+        # 'none': not checked (no look with line answers yet, or the picture could not be opened: `error` says why). The code checks stay.
+        look = row.get('look') or {}
+        failed = [{'check': l.get('check'), 'seen': l.get('seen') or ''} for l in look.get('lines') or [] if l.get('pass') is False]
+        failed += [{'check': c.get('check'), 'seen': c.get('seen') or ''} for c in (check or {}).get('code') or [] if c.get('pass') is False]
+        return {'state': 'fail' if failed else 'pass' if 'lines' in look else 'none', 'failed': failed, 'error': look.get('not_checked') or None}
     if not check:
         return {'state': 'none', 'failed': [], 'error': None}
     failed = list(check.get('must_failed') or [])
@@ -578,8 +600,12 @@ def unused_refs(session, plan, shot, parents):
 # ---------- the states of a v2 round (visuals_stage._round_pass) ----------
 
 def looked(session, eid, row):
-    """A set's look is complete: the row's `set_look` is of the set it holds now and each of its pictures has a look."""
-    return (row.get('set_look') or {}).get('set') == row.get('set') and all(p.get('look') for p in _pictures(session, eid, row, ('candidate',)))
+    """A set's look is complete: the row's `set_look` is of the set it holds now and each of its pictures has a look. design/214: a look
+    answers the picture's check list (`lines`), or says the picture was not checked; a look of before, with neither, stands only for a set
+    the operator has already judged (their stored answer is of this set)."""
+    judged = bool((row.get('answer') or {}).get('verdict')) and row['answer'].get('set') == row.get('set')
+    return (row.get('set_look') or {}).get('set') == row.get('set') and all(
+        p.get('look') and (judged or 'lines' in p['look'] or p['look'].get('not_checked')) for p in _pictures(session, eid, row, ('candidate',)))
 
 
 def _sets(rd):
@@ -779,15 +805,51 @@ def done_then(run, queued, rest, errors=None, complete=False):
 
 # ---------- the looks at a made set ----------
 
+def check_lines(ref):
+    """design/214: the check list of one picture of a set, for Claude's look: the lines the program builds for the picture's check
+    (image_check.lines_of: one source), each with an id made of its own words, so a list that changed has other ids. `say`: a fact of the
+    approved drawing, whose pass needs a few words too."""
+    out = {}
+    for l in image_check.lines_of(ref):
+        lid = hashlib.sha1(f"{l['check']}|{l['pass_when']}".encode('utf-8')).hexdigest()[:8]
+        out[lid] = {'id': lid, 'check': l['check'], 'pass_when': l['pass_when'], **({'say': True} if l['check'].startswith('drawn fact: ') else {})}
+    return list(out.values())
+
+
+def _one(text):
+    return ' '.join(str(text or '').split())
+
+
+def _line_fault(eid, pic, sent):
+    """design/214: the first fault of one picture's row of a look against its check list, as a refusal; None when every line is answered,
+    and for a picture that could not be opened (`not_checked`, with why)."""
+    name, want = str(pic.get('view') or pic['id']), check_lines(pic)
+    if _one(sent.get('not_checked')):
+        return None
+    got = {a.get('id'): a for a in sent.get('lines') or [] if isinstance(a, dict)}
+    unknown = [i for i in got if i not in {w['id'] for w in want}]
+    if unknown:
+        return LOOK_LINE_UNKNOWN.format(eid=eid, pic=name, id=unknown[0])
+    for w in want:
+        a = got.get(w['id'])
+        if not a or not isinstance(a.get('pass'), bool):
+            return LOOK_LINE_OPEN.format(eid=eid, pic=name, check=w['check'], id=w['id'])
+        words = _one(a.get('seen'))
+        if len(words) > ref_find.SEEN_CHARS or (not words and (a['pass'] is False or w.get('say'))):
+            return LOOK_LINE_WORDS.format(eid=eid, pic=name, check=w['check'], id=w['id'], max=ref_find.SEEN_CHARS)
+    return None
+
+
 def _due(session, rd):
     return [(eid, r) for eid, r in _sets(rd) if V._set_rows(session, eid, r['set']) and not looked(session, eid, r)]
 
 
 def looks_due(store, run, outputs):
     """`GET /api/runs/{run_id}/visuals/round/looks`: the made sets with no complete look: {'sets': [{'element_id', 'name', 'set', 'facts':
-    thing_facts, 'request', 'inputs': [{'ref', 'role', 'view', 'key'}], 'pictures': [{'ref', 'n', 'view', 'key', 'check'}], 'notes',
+    thing_facts, 'request', 'inputs': [{'ref', 'role', 'view', 'key'}], 'pictures': [{'ref', 'n', 'view', 'key', 'lines'}], 'notes',
     'footage': [{'ref', 'view', 'key'}]}], 'then'}. The picture keys are the 1600 px copies (page_flow.sized). design/213: `footage`, the
-    thing's footage pictures that were not inputs of the set, to compare it with (`footage_beside`)."""
+    thing's footage pictures that were not inputs of the set, to compare it with (`footage_beside`). design/214: `lines`, the picture's check
+    list for the look to answer: [{'id', 'check', 'pass_when', 'say'?}] (`check_lines`); no model's result is given."""
     session = V.session_of(store, run, outputs)
     rd = session.get('round')
     if not V.round_v2(session):
@@ -808,7 +870,7 @@ def looks_due(store, run, outputs):
         pics = _pictures(session, eid, row, ('candidate',))
         sets.append({'element_id': eid, 'name': element.get('name') or eid, 'set': row['set'], 'facts': thing_facts(plan, session, element),
                      'request': (pics[0].get('generation') or {}).get('prompt') or '', 'inputs': [{**i, 'key': big(i['ref'])} for i in facts['inputs']],
-                     'pictures': [{'ref': p['ref'], 'n': p['n'], 'view': p['view'], 'key': big(p['ref']), 'check': p['check']} for p in facts['pictures']],
+                     'pictures': [{'ref': p['ref'], 'n': p['n'], 'view': p['view'], 'key': big(p['ref']), 'lines': check_lines(session['references'][p['ref']])} for p in facts['pictures']],
                      'notes': facts['notes'], 'footage': [{**i, 'key': big(i['ref'])} for i in facts['footage']]})
     return {'sets': sets, 'then': SETS_LOOK if sets else then_of(session), 'how': LOOK_HOW}
 
@@ -816,21 +878,24 @@ def looks_due(store, run, outputs):
 def round_looks(store, user, run, outputs, sets, by):
     """`POST /api/runs/{run_id}/visuals/round/looks`: sets = [{'element_id', 'set', 'recommend', 'golden', 'reason', 'pictures': [{'ref',
     'view', 'verdict', 'seen'}], 'chose', 'aside'}]. Each picture gets its `look`; the row its `set_look`. Refuses LOOK_SET_UNKNOWN, LOOK_PICTURES,
-    LOOK_VERDICT, LOOK_SEEN, LOOK_GOLDEN, LOOK_MODEL. Returns {'recorded': [eid], 'refused': {eid: message}, 'left': [eid], 'then'}.
+    LOOK_VERDICT, LOOK_SEEN, LOOK_GOLDEN, LOOK_MODEL, and (design/214) LOOK_LINE_OPEN, LOOK_LINE_UNKNOWN, LOOK_LINE_WORDS: each picture's row
+    answers every line of its check list, `lines`: [{'id', 'pass', 'seen'}], or says `not_checked` with why (a picture that could not be
+    opened: it needs no verdict; the set can still be shown and approved). A refused set is not recorded in any part. Returns {'recorded': [eid], 'refused': {eid: message}, 'left': [eid], 'then'}.
     design/213: `chose` and `aside`, what the image model chose and what it set aside, one line each: required where a picture of the set
     carries the model's notes; kept in the row's `set_look`."""
     session = V.session_of(store, run, outputs)
     rd = session.get('round')
     V.need(V.round_v2(session) and rd.get('pass') != 1, 'No set of the reference round waits for a look.')
     who, recorded, refused = by if by in ref_find.WHO else 'assistant', [], {}
-    one = lambda text: ' '.join(str(text or '').split())
+    one = _one
     for s in sets or []:
         eid = (s or {}).get('element_id')
         row = rd['elements'].get(eid) or {}
         pics = _pictures(session, eid, row, ('candidate',)) if row.get('set') and row.get('set') == s.get('set') else []
         looks = {p.get('ref'): p for p in s.get('pictures') or [] if isinstance(p, dict)}
         missing = [str(p.get('view') or p['id']) for p in pics if p['id'] not in looks]
-        mine = [looks[p['id']] for p in pics if p['id'] in looks]
+        mine = [looks[p['id']] for p in pics if p['id'] in looks and not one(looks[p['id']].get('not_checked'))]   # design/214: a picture not checked has no verdict
+        off = [looks[p['id']] for p in pics if p['id'] in looks and one(looks[p['id']].get('not_checked'))]
         model = {k: one(s.get(k)) for k in ('chose', 'aside')} if isinstance(s, dict) else {}
         if not pics:
             refused[eid] = LOOK_SET_UNKNOWN.format(eid=eid, set=s.get('set'))
@@ -838,17 +903,24 @@ def round_looks(store, user, run, outputs, sets, by):
             refused[eid] = LOOK_PICTURES.format(eid=eid, missing=', '.join(missing))
         elif s.get('recommend') not in RECOMMENDS or any(l.get('verdict') not in ref_find.VERDICTS for l in mine):
             refused[eid] = LOOK_VERDICT.format(eid=eid)
-        elif not one(s.get('reason')) or len(one(s.get('reason'))) > ref_find.SEEN_CHARS or any(not one(l.get('seen')) or len(one(l.get('seen'))) > ref_find.SEEN_CHARS for l in mine):
+        elif not one(s.get('reason')) or len(one(s.get('reason'))) > ref_find.SEEN_CHARS or any(not one(l.get('seen')) or len(one(l.get('seen'))) > ref_find.SEEN_CHARS for l in mine) \
+                or any(len(one(l['not_checked'])) > ref_find.SEEN_CHARS for l in off):
             refused[eid] = LOOK_SEEN.format(eid=eid, max=ref_find.SEEN_CHARS)
         elif s.get('golden') and s['golden'] not in {p['id'] for p in pics}:
             refused[eid] = LOOK_GOLDEN.format(eid=eid)
         elif any(len(v) > ref_find.SEEN_CHARS for v in model.values()) or (any(p.get('notes') for p in pics) and not all(model.values())):
             refused[eid] = LOOK_MODEL.format(eid=eid, max=ref_find.SEEN_CHARS)
+        elif any(_line_fault(eid, p, looks[p['id']]) for p in pics):
+            refused[eid] = next(f for f in (_line_fault(eid, p, looks[p['id']]) for p in pics) if f)
         else:
             at = _now()
             for p in pics:
                 l = looks[p['id']]
-                p['look'] = {'who': who, 'at': at, 'view': one(l.get('view')) or p.get('view') or '', 'verdict': l['verdict'], 'seen': one(l['seen']), 'trial': None, 'ref': p['id']}
+                why, got = one(l.get('not_checked')), {a.get('id'): a for a in l.get('lines') or [] if isinstance(a, dict)}
+                p['look'] = {'who': who, 'at': at, 'view': one(l.get('view')) or p.get('view') or '', 'verdict': None if why else l['verdict'], 'seen': '' if why else one(l['seen']),
+                             'trial': None, 'ref': p['id'],
+                             **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': one(got[w['id']].get('seen'))}
+                                                                             for w in check_lines(p)]})}
             row['set_look'] = {'who': who, 'at': at, 'set': row['set'], 'recommend': s['recommend'], 'golden': s.get('golden') or None, 'reason': one(s['reason']),
                                **({k: v for k, v in model.items() if v})}
             recorded.append(eid)

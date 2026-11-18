@@ -605,19 +605,19 @@ WORDS = {
     'photo': 'Their photo',
     'picture': '{letter} · {view}',
     'before': 'Before: {letter}',
-    'check_by': "The program's check",
-    'check_line': '{pic}: {check}: {seen}',
-    'check_off': '{pic} was not checked: the check did not run.',
+    'check_by': "Claude's check",   # design/214: the check of a set is Claude's look, line by line; no model checks a set of a v2 round
+    'check_line': '{pic}: {seen}',
+    'check_off': '{pic} was not checked',
     'check_size': '{pic} is not the size asked for.',
     'check_parent': '{pic} was made from a picture that is not approved.',
     'pic_n': 'Picture {letter}',
     'pic_one': 'The picture',
-    'chip_fail': 'The check found {faults}',
-    'chip_pass': 'Check passed',
-    'chip_none': 'The check did not run',
-    'by_fail': "The program's check found:",
-    'by_pass': "The program's check found no fault.",
-    'by_none': "The program's check did not run on these pictures.",
+    'chip_fail': "Claude's check found {faults}",
+    'chip_pass': "Claude's check passed",
+    'chip_none': "Claude's check: not checked",
+    'by_fail': "Claude's check found:",
+    'by_pass': "Claude's check passed: no fault found.",
+    'by_none': "Claude's check: not checked.",
     'model_chose': 'The image model chose: {words}',
     'model_aside': 'It set aside: {words}',
     'partial': '{made} of {asked} pictures came back; missing: {missing}.',
@@ -1099,20 +1099,20 @@ def _round_v2(ctx, every, step):
         if live:
             sf = ref_sets.set_facts(session, plan, eid, row)
             shown = [p for p in sf.get('pictures') or [] if p['ref'] in {r['id'] for r in live}][:len(LETTERS)]
-            if (row.get('set_look') or {}).get('set') != row.get('set') or not shown or not all(p.get('look') for p in shown):
+            if (row.get('set_look') or {}).get('set') != row.get('set') or not shown or not all(p.get('look') for p in shown) or not ref_sets.looked(session, eid, row):
                 continue   # no set reaches the operator before its look is recorded
             if not every and V._answered(session, kinds, eid, row):
                 continue
             f, letter, one = facts(eid), {p['ref']: LETTERS[n] for n, p in enumerate(shown)}, len(shown) == 1   # `one`: a set of one picture (a place, design/213): no A, B, C to choose from
             named = lambda p: WORDS['pic_one'] if one else WORDS['pic_n'].format(letter=letter[p['ref']])
             states = [(p.get('check') or {}).get('state') or 'none' for p in shown]
-            state = 'fail' if 'fail' in states else 'pass' if 'pass' in states else 'none'
-            # design/211 review, S15: plain words, no size in pixels and no picture id; a check that did not run on a picture is said so, whatever the program's own lines found
+            state = 'fail' if 'fail' in states else 'none' if 'none' in states else 'pass'   # design/214: one result, Claude's check; a picture not checked is never counted as passed
+            # design/211 review, S15: plain words, no size in pixels and no picture id. design/214: a failed line is said as what was seen; a picture not checked is named, with why
             fault = lambda p, x: WORDS['check_' + x['check']].format(pic=named(p)) if x.get('check') in ('size', 'parent') else \
-                WORDS['check_line'].format(pic=named(p), check=x.get('check'), seen=x.get('seen'))
-            faults = [fault(p, x) for p in shown for x in (p.get('check') or {}).get('failed') or []] \
-                + ([WORDS['check_off'].format(pic=named(p)) for p, st in zip(shown, states) if st == 'none' or (p.get('check') or {}).get('error')] if state != 'none' else [])
-            check = {'state': state, 'by': WORDS['by_' + state], 'chip': WORDS['chip_fail'].format(faults=_n(len(faults), 'fault')) if state == 'fail' else WORDS['chip_' + state], 'lines': faults}
+                WORDS['check_line'].format(pic=named(p), seen=x.get('seen') or x.get('check'))
+            faults = [fault(p, x) for p in shown for x in (p.get('check') or {}).get('failed') or []]
+            off = [WORDS['check_off'].format(pic=named(p)) + (': ' + str(p['check']['error']) if (p.get('check') or {}).get('error') else '.') for p, st in zip(shown, states) if st == 'none']
+            check = {'state': state, 'by': WORDS['by_' + state], 'chip': WORDS['chip_fail'].format(faults=_n(len(faults), 'fault')) if state == 'fail' else WORDS['chip_' + state], 'lines': faults + off}
             proposed, again = sf.get('rec') or {}, int(sf.get('makes_left') or 0) > 0
             do = proposed.get('do') if proposed.get('do') in ('use', 'remake', 'doubt') else None
             chat, page, add = answers()

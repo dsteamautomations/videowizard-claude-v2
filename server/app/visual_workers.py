@@ -408,7 +408,12 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
             each = (result or {}).get('notes_each')   # design/213: each picture keeps the notes of its own turn; the set's notes are these joined (ref_sets.set_facts)
             for n, pic in enumerate(made):
                 pic.update({'view': names[n] if n < len(names) else '', **({'ask': asks[n]} if n < len(asks) else {}), **({'notes': each[n] if n < len(each) else ''} if each else {})})
-        if status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
+        if status == 'retained' and ref.get('set') and (session.get('round') or {}).get('v') == 2:
+            # design/214: a set of a v2 round is not checked by a model: Claude's look answers its check list (ref_sets.check_lines). The code checks stay.
+            from . import image_check
+            for pic in made:
+                pic['check'] = image_check.code_only(session, pic)
+        elif status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
             due = True   # design/92: checked after this transaction, with no lock held (check_image)
             for pic in made:   # design/211: every picture of a set is checked, not the first only
                 pic['check_pending'] = True

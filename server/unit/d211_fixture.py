@@ -167,7 +167,10 @@ def _set(eid, kind, n=1, status='candidate', checks=True, looks=True, failed=())
         if checks:
             row['check'] = _check(failed if i == 2 else ())
         if looks:
-            row['look'] = _look(view, 'weak' if (failed and i == 2) else 'pass', f'{view}: as asked.', ref=rid)
+            # design/214: a look answers the picture's check list, line by line (`lines`); the model's result above is of before and is no longer read for a v2 set
+            row['look'] = {**_look(view, 'weak' if (failed and i == 2) else 'pass', f'{view}: as asked.', ref=rid),
+                           'lines': [{'id': f'l{k}', 'check': c, 'pass': ok, 'seen': seen}
+                                     for k, (c, ok, seen) in enumerate([('the view', True, ''), ('no text', True, '')] + [(c, False, seen) for c, seen in (failed if i == 2 else ())], 1)]}
         out[rid] = row
     return sid, out
 
