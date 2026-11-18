@@ -220,6 +220,18 @@ def test_a_picture_that_could_not_be_opened_is_not_checked_and_the_set_can_still
     assert RS.round_looks(store, USER, RUN, [], sent, 'helper')['refused'] == {'T_LAY': RS.LOOK_SEEN.format(eid='T_LAY', max=300)}
 
 
+def test_not_checked_beside_a_verdict_or_lines_is_refused_and_nothing_of_the_set_is_recorded():
+    store, conn = film()
+    post(store, conn)
+    done(store, conn)
+    back(store)
+    sent, mine = sent_for(store)
+    mine['pictures'][1]['not_checked'] = 'no'          # a checked picture, the template's field filled all the same
+    out = RS.round_looks(store, USER, RUN, [], sent, 'helper')
+    assert list(out['refused']) == ['T_LAY'] and 'not_checked' in out['refused']['T_LAY'] and 'T_LAY' not in out['recorded']
+    assert not saved(store)['references'][mine['pictures'][1]['ref']].get('look')
+
+
 # ---------- 3. what the operator sees: one result, Claude's check ----------
 
 def test_the_operator_sees_claudes_check_passed_faults_or_not_checked_on_the_page_and_in_the_chat(monkeypatch):

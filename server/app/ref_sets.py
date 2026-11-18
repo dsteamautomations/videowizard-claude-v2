@@ -101,6 +101,9 @@ LOOK_MODEL = ("{eid}: the pictures of this set carry the image model's notes: sa
 LOOK_LINE_OPEN = ('{eid}: {pic}: the line "{check}" ({id}) has no answer: every line of every picture gets `pass`, true or false. Answer it in that picture\'s `lines` and '
                   'send the file again (`vw visuals round --looks <file>`).')
 LOOK_LINE_UNKNOWN = ('{eid}: {pic}: {id} is not a line of this picture now: list the sets again (`vw visuals round --looks`), answer the lines it gives and send the file again.')
+LOOK_NOT_CHECKED = ('{eid}: {pic}: `not_checked` is only for a picture that could not be opened, and then the picture carries no `verdict` and no `lines`. '
+                    'This one carries both: take `not_checked` out if the picture was checked, or the verdict and the lines if it was not, and send the file again '
+                    '(`vw visuals round --looks <file>`).')
 LOOK_LINE_WORDS = ('{eid}: {pic}: the line "{check}" ({id}) needs one plain sentence of what was seen (`seen`, at most {max} characters): a fail always, and a pass of a '
                    'fact of the drawing. Add it and send the file again (`vw visuals round --looks <file>`).')
 REST_NOT_NOW = 'The other sets are ordered once the first sets are back and have their look: not now.'
@@ -901,6 +904,8 @@ def round_looks(store, user, run, outputs, sets, by):
             refused[eid] = LOOK_SET_UNKNOWN.format(eid=eid, set=s.get('set'))
         elif missing:
             refused[eid] = LOOK_PICTURES.format(eid=eid, missing=', '.join(missing))
+        elif any(l.get('verdict') or l.get('lines') for l in off):   # a checked picture's answers are never dropped as 'not checked'
+            refused[eid] = LOOK_NOT_CHECKED.format(eid=eid, pic=next(str(l.get('view') or l.get('ref')) for l in off if l.get('verdict') or l.get('lines')))
         elif s.get('recommend') not in RECOMMENDS or any(l.get('verdict') not in ref_find.VERDICTS for l in mine):
             refused[eid] = LOOK_VERDICT.format(eid=eid)
         elif not one(s.get('reason')) or len(one(s.get('reason'))) > ref_find.SEEN_CHARS or any(not one(l.get('seen')) or len(one(l.get('seen'))) > ref_find.SEEN_CHARS for l in mine) \
