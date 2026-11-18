@@ -88,26 +88,41 @@ def test_the_drawn_line_shows_it_under_details_without_asking(monkeypatch):
 
 # ---------- B: the cause, earlier ----------
 
+def _b_plan(palette='navy #12324A, orange #FF8800, concrete slabs mid grey #8A8A8A'):
+    spec = lambda *parts: {'parts': list(parts)}
+    return {'foundation': {'graphic_style': {'palette': palette} if palette else None},
+            'gaps': [{'gap_id': 'G01', 'scenes': [{'id': 'SC1', 'shots': [{'id': 'D1', 'visual_type': 'drawn', 'drawing_spec': spec('Slab', 'Brick walls', 'Lintel')},
+                                                                          {'id': 'D2', 'visual_type': 'drawn', 'drawing_spec': spec('slabs', 'Wall')},
+                                                                          {'id': 'D3', 'visual_type': 'drawn', 'drawing_spec': spec('Lintel')},
+                                                                          {'id': 'F1', 'visual_type': 'footage'}]}]}]}
+
+
 def test_the_plan_warns_of_a_thing_two_drawn_shots_show_with_no_colour_in_the_palette():
-    class O:   # the check reads the parsed plan's fields; a small stand-in carries the same ones
-        def __init__(self, **kw):
-            self.__dict__.update(kw)
-    def shot(sid, parts, kind='drawn'):
-        return O(id=sid, visual_type=kind, drawing_spec=O(parts=parts) if parts is not None else None)
-    gs = O(palette='navy #12324A, orange #FF8800, concrete slabs mid grey #8A8A8A')
-    plan_ = O(foundation=O(graphic_style=gs), gaps=[O(gap_id='G01', choices=[], scenes=[O(shots=[shot('D1', ['Slab', 'Brick walls', 'Lintel']), shot('D2', ['slabs', 'Wall']),
-                                                                                                shot('D3', ['Lintel']), shot('F1', None, 'footage')])])])
-    w = VC.palette_warnings(plan_)
+    w = VC.palette_warnings(_b_plan())
     assert [x['kind'] for x in w] == ['palette_missing', 'palette_missing']
     assert 'brick walls' in w[0]['message'].lower() and 'D1' in w[0]['message'] and 'D2' in w[0]['message']   # "Brick walls" and "Wall" are one thing
     assert 'lintel' in w[1]['message'].lower()   # two drawn shots show it
     assert all('slab' not in x['message'].lower() for x in w)   # the palette names the slabs
+    assert 'before the operator approves the plan' in w[0]['message']
     assert 'palette_missing' in VC.WARNING_TECHNICAL
-    gs.palette = 'navy, orange, slabs mid grey, walls dark warm grey, lintel near black'
-    assert VC.palette_warnings(plan_) == []
-    plan_.foundation.graphic_style = None
-    assert VC.palette_warnings(plan_) == []   # no palette at all is the style_missing warning's, not this one's
-    assert 'palette_warnings(plan)' in open(VC.__file__, encoding='utf-8').read()
+    assert VC.palette_warnings(_b_plan('navy, orange, slabs mid grey, walls dark warm grey, lintel near black')) == []
+    assert VC.palette_warnings(_b_plan(None)) == []   # no palette at all is the style_missing warning's, not this one's
+
+
+def test_a_part_with_a_recorded_colour_is_never_named():
+    added = {'walls': {'thing': 'walls', 'colour': '#5A524C'}}
+    w = VC.palette_warnings(_b_plan(), added)
+    assert len(w) == 1 and 'lintel' in w[0]['message'].lower()
+
+
+def test_the_warning_is_raised_only_while_no_gap_was_ever_accepted():
+    p = _b_plan()
+    assert [x['kind'] for x in V.palette_due({'accepted': {}}, p)] == ['palette_missing', 'palette_missing']
+    assert V.palette_due({'accepted': {'G01': {'digest': 'd'}}}, p) == []   # an approved plan with specs: never (its palette is not edited)
+    assert V.palette_due({'accepted': {}, 'shared_pending': {'G01': {}}}, p) == []
+    assert V.palette_due({'accepted': {}, 'added_colours': {'lintel': {'thing': 'lintel'}, 'walls': {'thing': 'walls'}}}, p) == []
+    src = open(V.__file__, encoding='utf-8').read()
+    assert 'palette_due(session, plan)' in src and 'palette_warnings(plan)' not in open(VC.__file__, encoding='utf-8').read()
 
 
 def test_the_texts_say_claude_chooses_a_missing_neutral_and_the_operator_only_a_hue():

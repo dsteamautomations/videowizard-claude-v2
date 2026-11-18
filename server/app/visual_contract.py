@@ -1218,7 +1218,6 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                                           'build the graphics, or say why this film needs them still'})
     warnings.extend(course_warnings(plan, fps, drawn_in_run))   # design/103; design/126 TR1b
     warnings.extend(script_people_warnings(plan))   # design/151 Q4
-    warnings.extend(palette_warnings(plan))   # design/218 B
     result = plan.model_dump()
     answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
@@ -1341,28 +1340,29 @@ def script_people_warnings(plan):
     return out
 
 
-def palette_warnings(plan):
-    """design/218 B: a part that the drawing specs of two or more drawn shots show, with no colour in the palette, named so the assistant adds it
-    to the palette before the operator approves the plan (a warning, never a refusal). Read from the specs: before them the plan does not say
-    what a drawn shot shows. ponytail: a part is its last word without a plural s, matched as a word of the palette text."""
-    style = plan.foundation.graphic_style
-    if style is None:
+def palette_warnings(plan, added=None):
+    """design/218 B: a part that the drawing specs of two or more drawn shots show, with no colour in the palette nor one recorded since
+    (`added`, the session's added_colours), named so the assistant adds it to the palette before the operator approves the plan (a warning,
+    never a refusal; raised only before any gap is accepted: `visuals_stage.palette_due`). Read from the specs: before them the plan does not
+    say what a drawn shot shows. ponytail: a part is its last word without a plural s, matched as a word of the palette text."""
+    style = (plan.get('foundation') or {}).get('graphic_style')
+    if not style:
         return []
     word = lambda w: w[:-1] if len(w) > 3 and w.endswith('s') else w
-    named = {word(w) for w in re.findall(r'[a-z]+', style.palette.lower())}
+    last = lambda text: ([word(w) for w in re.findall(r'[a-z]+', str(text).lower())] or [''])[-1]
+    named = {word(w) for w in re.findall(r'[a-z]+', str(style.get('palette') or '').lower())} | {last(r.get('thing') or k) for k, r in (added or {}).items()}
     seen = {}   # key: (the first name given, [shot ids])
-    for gap in plan.gaps:
-        for scene in list(gap.scenes) + [sc for c in gap.choices for sc in c.scenes]:
-            for shot in scene.shots:
-                if shot.visual_type != 'drawn' or shot.drawing_spec is None:
+    for gap in plan.get('gaps') or []:
+        for scene in list(gap.get('scenes') or []) + [sc for c in gap.get('choices') or [] for sc in c.get('scenes') or []]:
+            for shot in scene.get('shots') or []:
+                if shot.get('visual_type') != 'drawn' or not shot.get('drawing_spec'):
                     continue
-                for part in shot.drawing_spec.parts:
-                    words = re.findall(r'[a-z]+', part.lower())
-                    if words:
-                        row = seen.setdefault(word(words[-1]), (part, []))
-                        row[1].append(shot.id) if shot.id not in row[1] else None
+                for part in shot['drawing_spec'].get('parts') or []:
+                    if last(part):
+                        row = seen.setdefault(last(part), (part, []))
+                        row[1].append(shot['id']) if shot['id'] not in row[1] else None
     return [{'kind': 'palette_missing', 'message': f"{name} is shown by drawn shots {', '.join(ids)} and the palette (foundation.graphic_style.palette) gives it no colour: "
-                                                   'add its colour to the palette now, so every drawing agrees and nobody is asked during the build'}
+                                                   'add its colour to the palette before the operator approves the plan, so every drawing agrees and nobody is asked during the build'}
             for key, (name, ids) in seen.items() if len(ids) > 1 and key not in named]
 
 

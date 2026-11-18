@@ -15,7 +15,9 @@
 | A2 | Every later brief's palette line is the plan's palette plus the added colours | `visuals_stage.palette_line` (in `motion_brief`) |
 | A3 | Shown without asking, under Details on the drawn graphic's line: "Added by Claude: dark warm grey for the walls, because the palette named none." | `pictures.colour_notes`, `drawn_line` |
 | A4 | The rule writer lists such a colour under "Colours to add", not as a question; the motion skill picks a neutral and names it under "Colours added" in REVIEW.md; section 11 says the assistant records it | `scripts/d218_wording_v3.py` |
-| B | The plan check warns (`palette_missing`, the assistant's list) when a part that the drawing specs of two or more drawn shots show has no word in the palette. Built on the specs: before them the plan does not say what a drawn shot shows | `visual_contract.palette_warnings` |
+| B | The check and the proposal warn (`palette_missing`, the assistant's list) when a part that the drawing specs of two or more drawn shots show has no word in the palette and no recorded colour; only while no gap was ever accepted (editing an approved palette sends the accepted gaps back), so the colour goes into the palette before the operator approves the plan. Built on the specs: before them the plan does not say what a drawn shot shows | `visual_contract.palette_warnings`, `visuals_stage.palette_due` |
+
+The picture heads the card's fonts (the offer's first four, `font_sample.CARD`: the question card holds four and adds Other) under "On the card", then "Others you can name" (two columns above ten).
 
 Edge cases: a long label is shortened at a word with "…"; a font whose file is missing gets a row "not installed on the server", the others are drawn; "Other" is never drawn.
 
@@ -29,7 +31,7 @@ Rows 169, 170 and 171 of `design/35-decision-log.md`.
 
 ## Not covered
 
-- B matches a part by its last word against the palette's words (a word match): "Brick walls" and "walls" are one thing; "the wall face" and "masonry" are two. A colour Claude added later (A) does not silence the warning when the plan is proposed again.
+- B matches a part by its last word against the palette's words (a word match): "Brick walls" and "walls" are one thing; "the wall face" and "masonry" are two. A plan approved before its specs exist never gets the warning: A covers it.
 - A brand colour rule is not read by the server: the instruction tells the assistant to ask then; the server only refuses a hue without words.
 - The step-6 questions list (design/_work/step6-questions-18-nov.md) is a list; nothing beyond A and B was built from it.
 - On today's offer every font holds the film's languages (`film.fonts_for` leaves the others out), so "English only" shows only if the offer changes; it is tested on a constructed offer.

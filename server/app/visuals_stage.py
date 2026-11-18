@@ -29,6 +29,7 @@ from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
 from .visual_contract import script_people_warnings   # design/151 Q4 (re-exported for the tool)
+from .visual_contract import palette_warnings   # design/218 B
 from .visual_contract import GAZE_CAMERA, take_seconds, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, gap_own_digest, shared_digest, note_free_gap, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
@@ -347,6 +348,14 @@ def stand_in_shots(session, plan):
     return out
 
 
+def palette_due(session, plan):
+    """design/218 B: the palette warning only while no gap was ever accepted; after that the approved palette is never edited (an edit sends the
+    accepted gaps back to the operator) and a drawing that needs a colour gets a recorded neutral (`vw motion colour`)."""
+    if session.get('accepted') or session.get('shared_pending'):
+        return []
+    return answer_warnings(plan, palette_warnings(plan, session.get('added_colours')))
+
+
 def carried_warnings(session, run, plan, outputs):
     """design/207: what the treatment settled, carried to the plan. Warnings, never refusals, the same from the check and the proposal:
     a gap with more still seconds than the operator accepted for it (half a second of tolerance; seconds whose way the treatment never told
@@ -411,6 +420,7 @@ def check(store, run, outputs, document):
     alike = look_alike_placed(store, session)   # design/89 H6: the pictures already placed that look alike
     warnings += answer_warnings(plan, [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike])   # design/124 Change 7
     warnings += carried_warnings(session, run, plan, outputs)   # design/207
+    warnings += palette_due(session, plan)   # design/218 B
     split = {}
     for gap in plan['gaps']:   # design/97 G3: a gap with choices is split by its recommended choice
         try:
@@ -432,6 +442,7 @@ def propose(conn, store, user, run, outputs, document):
     departed = _ways_departed(session, plan)   # a route that departs from the recorded treatment needs a new treatment, with the reason
     need(not departed, '\n'.join(departed))
     warnings = warnings + carried_warnings(session, run, plan, outputs)   # design/207: the same as the check returns
+    warnings = warnings + palette_due(session, plan)   # design/218 B
     new = new_version(store, run, session, plan, user, warnings)
     version, identity = new['version'], new['plan_digest']
     save_session(store, run, session)
