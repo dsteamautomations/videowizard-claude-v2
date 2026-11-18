@@ -82,6 +82,9 @@ W = {
              'Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.',
              'New pictures arrive while the film is being made. Claude checks each one first; it joins the list when it is checked.'],
     'later_step': 'Made from a step that was corrected.',
+    'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
+                    'these lines (`vw visuals image --element {element} --kind component …`).'),
+    'comp_unopened': 'Claude could not open it ({why}).',
 }
 PAGE = {   # layout.words.pictures: the page's chrome
     'todo': 'Needs your answer', 'coming': 'Still being made, nothing to do', 'nothing': W['nothing'], 'against': 'Against the check',
@@ -235,9 +238,9 @@ def lines(session, plan, ref):
 
 # ---------- when a picture is offered (C3) ----------
 
-def ready_at(ref):
+def _at(ref, field):
     try:
-        return datetime.fromisoformat(str(ref.get('ready_at')))
+        return datetime.fromisoformat(str(ref.get(field)))
     except ValueError:
         return None
 
@@ -248,40 +251,81 @@ def looked(ref):
     return look if look and look.get('sha256') == ref.get('sha256') else None
 
 
+def older(ref):
+    """A picture the model checked before the deploy (its record has the model's lines) and that the new worker never made: it keeps that check,
+    is offered as before and is never given to Claude (the critic's review, 18 Nov). Only a picture still `check_pending` at the deploy is."""
+    c = ref.get('check') or {}
+    return bool(c.get('model') or c.get('lines')) and not ref.get('look') and not ref.get('ready_at') and not ref.get('check_pending')
+
+
 def late(ref, now=None):
-    at = ready_at(ref)
+    """C3: the time-out counts from when Claude was first asked to check the picture (`asked_at`), never from when it was made: a film paused
+    overnight does not offer its pictures as not checked."""
+    at = _at(ref, 'asked_at')
     return bool(at) and (now or _now()) - at >= timedelta(minutes=PICTURE_LOOK_MINUTES)
 
 
 def offered(session, ref, plan=None, now=None):
-    """C3: a picture Claude checks is offered with its look recorded, or PICTURE_LOOK_MINUTES after it became a candidate (as not checked).
-    Any other picture: as before."""
-    if not claude_checks(session, ref, plan):
+    """C3: a picture Claude checks is offered with its look recorded, or PICTURE_LOOK_MINUTES after Claude was asked (as not checked).
+    A picture the model checked before the deploy, and any other picture: as before."""
+    if not claude_checks(session, ref, plan) or older(ref):
         return True
     return bool(looked(ref)) or late(ref, now)
 
 
 def due(session, plan, now=None):
     """The candidates that wait for Claude's look: checked by Claude, no look of their content yet. The ones past the time-out stay due: a look that comes before the operator's answer replaces "not checked"."""
-    return [r for r in session['references'].values() if r.get('status') == 'candidate' and r.get('sha256') and claude_checks(session, r, plan) and not looked(r)]
+    return [r for r in session['references'].values() if r.get('status') == 'candidate' and r.get('sha256') and claude_checks(session, r, plan) and not older(r) and not looked(r)]
 
 
 def stamp(session, plan):
-    """At the deploy and after: a candidate Claude checks that still waits for the model's check (`check_pending`) or has no `ready_at` is due
-    for a look from now. Returns True when the session changed (the caller saves it)."""
+    """At the deploy and after: a candidate Claude checks that still waits for the model's check (`check_pending`) is due for a look from now.
+    Returns True when the session changed (the caller saves it)."""
     changed = False
     for r in session['references'].values():
-        if r.get('status') == 'candidate' and claude_checks(session, r, plan) and (r.get('check_pending') or not r.get('ready_at')):
+        if r.get('status') == 'candidate' and claude_checks(session, r, plan) and r.get('check_pending'):
             r.pop('check_pending', None)
             r.setdefault('ready_at', _now().isoformat())
             changed = True
     return changed
 
 
+def asked(session, plan):
+    """C3: the first time Claude is asked to check a picture (listed by `looks_due`, or said by `waits_words`), it gets `asked_at`. True when the session changed."""
+    changed = False
+    for r in due(session, plan):
+        if not r.get('asked_at'):
+            r['asked_at'] = _now().isoformat()
+            changed = True
+    return changed
+
+
+def _failed_lines(ref):
+    look = looked(ref) or {}
+    return [_say(l['check'], l.get('seen')) for l in look.get('lines') or [] if l.get('pass') is False] + \
+        [_say(c.get('check'), c.get('seen')) for c in (ref.get('check') or {}).get('code') or [] if c.get('pass') is False and not c.get('advice')]
+
+
+def components_failed(session, plan):
+    """The critic's review (5): a component Claude's check failed (or could not open) stays a candidate and is never asked of the operator, so
+    the assistant is told plainly, with what failed, to make it again: never silent."""
+    out = []
+    for r in session['references'].values():
+        look = looked(r)
+        if r.get('kind') == 'component' and r.get('status') == 'candidate' and look and claude_checks(session, r, plan):
+            why = look.get('not_checked') and W['comp_unopened'].format(why=look['not_checked'])
+            fails = _failed_lines(r)
+            if why or fails:
+                out.append(W['comp_failed'].format(name=name_of(session, plan, r), ref=r['id'], lines=why or ' '.join(fails), element=r.get('element_id') or 'E'))
+    return out
+
+
 def waits_words(session, plan):
-    """The first thing `next` and `status` say while pictures wait for Claude's look (C2: the duty is never silent)."""
+    """The first thing `next` and `status` say while pictures wait for Claude's look (C2: the duty is never silent), then each failed component.
+    Stamps `asked_at` on the pictures it reports (the caller saves the session)."""
+    asked(session, plan)
     n = len(due(session, plan))
-    return LOOKS_DUE.format(n=n) if n else ''
+    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + components_failed(session, plan))
 
 
 def _big(store, session, ref_id):
@@ -309,7 +353,7 @@ def looks_due(store, run, outputs):
     if not V.round_v2(session):
         return {'pictures': [], 'then': PIC_LOOK_NONE, 'how': LOOK_HOW}
     plan = V.guarded(lambda: V.current_plan(store, session))
-    if stamp(session, plan):
+    if stamp(session, plan) | asked(session, plan):
         V.save_session(store, run, session)
     out = []
     for r in due(session, plan):
@@ -372,12 +416,13 @@ def record_looks(store, user, run, outputs, pictures, by):
                      **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': ' '.join(str(got[w['id']].get('seen') or '').split())}
                                                                for w in want]})}
         recorded.append(rid)
-        if r.get('kind') == 'component' and not why and all(l['pass'] for l in r['look']['lines']) and not any(c.get('pass') is False for c in (r.get('check') or {}).get('code') or []):
+        if r.get('kind') == 'component' and not why and not _failed_lines(r):   # the program's advice lines (transparency, light) never decide it
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
     left = [r['id'] for r in due(session, plan)]
-    return {'recorded': recorded, 'refused': refused, 'left': left, 'then': (LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE)}
+    failed = components_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent
+    return {'recorded': recorded, 'refused': refused, 'left': left, 'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE] + failed)}
 
 
 # ---------- the check as the page and the chat say it (F1, contract 3.8) ----------
@@ -410,7 +455,7 @@ def check_view(session, ref, plan=None, now=None):
     A film of before (round not v2) keeps its model's lines (`ref.check.lines`). States: pass, fail, not_checked, none."""
     adv = advice(ref)
     look = looked(ref)
-    if claude_checks(session, ref, plan):
+    if claude_checks(session, ref, plan) and not older(ref):   # a picture the model checked before the deploy keeps that check
         if look and look.get('not_checked'):
             return _view('not_checked', W['unopened'], adv=adv)
         if look:
@@ -554,8 +599,9 @@ def earlier_tries(session, ref):
 
 
 def _why(r):
-    notes = str((r.get('rejection') or {}).get('notes') or '').strip()
-    return W['why'].format(words=notes) if notes else W['why_none']
+    rej = r.get('rejection') or {}
+    notes = str(rej.get('notes') or '').strip()
+    return W['why'].format(words=notes) if notes else rej['cause'] if rej.get('cause') else W['why_none']
 
 
 def _details(ref, made_from=None):

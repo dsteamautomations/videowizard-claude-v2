@@ -1569,13 +1569,15 @@ def _waiting_items(ctx):
         if kind == 'question to answer':
             q = session['questions'][it]
             choices = [str(c) for c in (q.get('choices') or [])]
-            buttons = [_button(c[:40], f'c{i + 1}') for i, c in enumerate(choices)]   # a question always has two or more (the server refuses fewer)
-            item = _item(f'question:{it}', 'question', where, q['question'],
+            line = P.question_line(session, plan, it, q, ref) if w.get('step') != 'references' and len(choices) <= 4 and not (ref and P.video_shot(session, plan, ref)) else None
+            shown = [b['label'] for b in line['buttons']] if line else choices   # the critic's review (6): the chat says the page's words, with no amount
+            buttons = [_button(c[:40], f'c{i + 1}') for i, c in enumerate(shown)]   # a question always has two or more (the server refuses fewer)
+            item = _item(f'question:{it}', 'question', where, line['ask'] if line else q['question'],
                          lambda choice, quote, words, it=it, choices=choices: V.answer(store, user, run, outputs, it, words or choices[int(choice[1:]) - 1]), buttons[:4],
-                         text='\n'.join(f'- {c}' for c in choices) if len(choices) > 4 or any(len(c) > 40 for c in choices) else '', more=buttons[4:],
+                         text='\n'.join(f'- {c}' for c in shown) if len(shown) > 4 or any(len(c) > 40 for c in shown) else '', more=buttons[4:],
                          show=[_pic(run, it, f'question-{it}')] if ref and ref.get('sha256') else [])
-            if w.get('step') != 'references' and len(choices) <= 4 and not (ref and P.video_shot(session, plan, ref)):   # design/217: a question about a made picture is a line of step 6; a size or fact question stays in the chat
-                item['_line'] = P.question_line(session, plan, it, q, ref)
+            if line:   # design/217: a question about a made picture is a line of step 6; a size or fact question stays in the chat
+                item['_line'] = line
             items.append(item)
         elif kind in ('style sheet to approve', 'sheet to approve', 'picture to answer') and ref:
             line = P.picture_line(store, session, plan, ref, style=kind.startswith('style')) if kind.startswith('style') or (kind == 'picture to answer' and w.get('step') == 'pictures') else None
@@ -1605,8 +1607,11 @@ def _waiting_items(ctx):
                 V.need(1 <= k <= len(chain), f'{title(group)}: there is no step {k}.')
                 out = V.reject_reference(store, user, run, outputs, chain[k - 1]['id'], words, quote)
                 for later in chain[k:]:   # each later step was made from the one before it: made again from the corrected one
-                    if (session['references'].get(later['id']) or {}).get('status') in ('candidate', 'approved'):
-                        V.reject_reference(store, user, run, outputs, later['id'], P.W['later_step'], quote)
+                    if (V.session_of(store, run, outputs)['references'].get(later['id']) or {}).get('status') in ('candidate', 'approved'):
+                        V.reject_reference(store, user, run, outputs, later['id'], '', 'No')   # the critic's review (4): no reason, so nothing reaches the feedback or the library (as F4)
+                        s_ = V.session_of(store, run, outputs)
+                        s_['references'][later['id']]['rejection']['cause'] = P.W['later_step']   # shown with the earlier try, never a reason
+                        V.save_session(store, run, s_)
                 return out
             line = P.steps_line(store, session, plan, group, chain)
             buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct in this step.' if b['needs_words'] else '') for b in line['buttons']]
@@ -2026,7 +2031,7 @@ def next_item(conn, store, user, run, outputs, one=False):
     except (ValueError, V.Problem):
         plan = None
     if plan:
-        if P.stamp(session, plan):   # a picture that waited for the model's check at the deploy is given to Claude's check
+        if P.stamp(session, plan) | P.asked(session, plan):   # a picture that waited for the model's check at the deploy is given to Claude's check; C3: Claude is asked from now
             V.save_session(store, run, session)
         looks = P.waits_words(session, plan)
         if looks:

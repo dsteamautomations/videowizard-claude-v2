@@ -107,7 +107,10 @@ def video_copy(store, key, mark=''):
                 subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vf', f'scale={VIDEO_SIDE}:-2', '-c:v', 'libx264', '-crf', str(VIDEO_CRF), '-pix_fmt', 'yuv420p',
                                 '-an', '-movflags', '+faststart', dst], check=True, timeout=120)
                 with open(dst, 'rb') as f:
-                    store.put(out, f.read(), 'video/mp4')
+                    data = f.read()
+                if len(data) > V.OWN_PICTURE_MAX:   # the page's file store takes a file up to this size: above it, the frame sheet with its sentence; ponytail: made again on the next call, a marker if long drawings are common
+                    raise ValueError(f'the page copy is {len(data)} bytes, over the page limit')
+                store.put(out, data, 'video/mp4')
         _MADE.add(out)
     return out
 
@@ -1240,6 +1243,8 @@ def page_record(conn, store, user, run, outputs, answers):
         'No line waits for the operator now: revise the lines that are back with you (their words are on each), send the draft again, then `vw visuals page`.')
     if was == 'pictures' or now['step'] == P.W['step'] or any(k.startswith('pic:') for k in recorded + stale + [r['key'] for r in refused]):   # design/217: step 6's own "what next"
         here = CF._ctx(conn, store, user, run, outputs)
+        if here['plan'] and V.round_v2(here['session']) and P.asked(here['session'], here['plan']):   # C3: Claude is asked from now
+            V.save_session(store, run, here['session'])
         looks = P.waits_words(here['session'], here['plan'])
         rows = (now.get('layout') or {}).get('coming') if now['step'] == P.W['step'] else []
         then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', looks,

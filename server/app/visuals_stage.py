@@ -3955,6 +3955,15 @@ def _searches(session):
     return [{k: v for k, v in s.items() if k != 'results'} | {'results': s.get('results') or []} for s in (session.get('searches') or {}).values()]
 
 
+def parent_failed(session, p):
+    """Rule 0, fork 4: the failed must lines of a would-be parent. The critic's review of design/217 (3): on a v2 film they are Claude's failed
+    lines (`ref.look`, through `pictures.check_view`), not the model's `must_failed`, which such a picture no longer has."""
+    from . import pictures
+    if p and pictures.claude_checks(session, p) and not pictures.older(p):
+        return pictures.check_view(session, p)['faults']
+    return [l.get('check') for l in ((p or {}).get('check') or {}).get('must_failed') or []]
+
+
 def generate_image(conn, store, user, run, outputs, body, round_set=False):
     """Queue an OpenAI image job (paid, informed). The worker stores the PNG and creates the candidate reference.
     `round_set`: the order comes from the reference round (`_queue_sets`); a set of a v2 round is made no other way (design/211 review, M6)."""
@@ -4092,7 +4101,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
     _no_question(session, body['element_id'], body.get('shot_id'), *[p['id'] for p in parents if p])   # design/110 rule 0
     if not body.get('fix_of'):   # rule 0, fork 4: a parent approved with a failed must line is asked about once; a fix is that line's remedy
         for p in parents:
-            failed = [l.get('check') for l in ((p or {}).get('check') or {}).get('must_failed') or []]
+            failed = parent_failed(session, p)
             if p and p.get('status') == 'approved' and p.get('kind') in ('keyframe', 'state') and failed and not p.get('parent_ok'):
                 _open(session, p['id'], f"{p['id']} was approved with a failed must line ({', '.join(failed)}): use it as the parent of new pictures anyway, or make a new one?",
                       ['use it as the parent', 'make a new one'], 'server', fork='parent')
@@ -5899,7 +5908,7 @@ def render_motion(conn, store, user, run, outputs, body):
                         (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact}))).fetchone()
     save_session(store, run, session)
     return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames, **({'finish': request['finish'], 'tell_the_operator': motion.finish_words(request['finish'])} if request.get('finish') else {}),
-            'next': f'Rendering {frames} frames on the server, free: HyperFrames checks the project and the timing, renders, and the drawing and its sheet come to the Pictures and drawn graphics step '
+            'next': f'Rendering {frames} frames on the server: HyperFrames checks the project and the timing, renders, and the drawing and its sheet come to the Pictures and drawn graphics step '
                     '(`vw visuals page`): the operator selects it there or rejects it with what to change.'}
 
 
@@ -6406,7 +6415,7 @@ def status(conn, store, run, outputs, repair=True):
     marked = not kept(session) and mark_kept(session, run)   # design/151 hotfix: a new film is kept before its round
     plan = current_plan(store, session) if session.get('current') else None
     from . import pictures
-    stamped = bool(plan) and round_v2(session) and pictures.stamp(session, plan)   # design/217: a picture that waited for the model's check is given to Claude's check
+    stamped = bool(plan) and round_v2(session) and (pictures.stamp(session, plan) | pictures.asked(session, plan))   # design/217: a picture that waited for the model's check is given to Claude's check
     if (fixed or marked or stamped) and repair:
         save_session(store, run, session)
     looks = pictures.waits_words(session, plan) if plan and round_v2(session) else ''
