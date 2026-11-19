@@ -9,7 +9,7 @@ Fast and large. Every beat of the narration gets a hard change: a cut to a new f
 
 Labels are the loudest thing on screen: they slam in at large size, fill a good part of the frame, and are replaced by the next rather than kept. One label on screen at a time. Use the film's accent colour in full-frame flashes and wipes behind them.
 
-The framing changes by hard cuts: a cut to a closer view of the important part, a cut to the next. Nothing travels between two framings. Hold each framing long enough to read, then cut.
+The framing changes by hard cuts: a cut to a closer view of the important part, a cut to the next. Nothing travels between two framings. Hold each framing long enough to read, then cut. On a shot that explains the frame stays fixed: these cuts are for shots that do not explain.
 
 The picture should feel like it is cut to a beat even though it is silent: keep the changes evenly spaced within a sentence. Nothing drifts, nothing fades slowly, nothing eases gently. Do not shrink a label to make room; cut to a new framing.
 

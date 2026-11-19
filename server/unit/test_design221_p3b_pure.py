@@ -1,21 +1,23 @@
-"""design/221 (SK, 19 Nov 2026): the critic's seven points on phase 2 (design/_work/design221-critic-phase2.md).
+"""design/221 (SK, 19 Nov 2026): the critic's seven points on phase 2 (design/_work/design221-critic-phase2.md) and phase 3b, row 2.
 A1: the labels and cues of every drawn shot go in the plan with the plan (scene_motion without sha256); the brief before a build is refused while a
 drawn shot that carries text has none; a clean verdict binds the passed project to its shot (motion_bound) and the render needs no plan change; a
 later upload clears the binding; a verdict record keeps the digest of the rules and brief it answered and a record for other rules is ignored.
 A2: whole labels in the short-label rule. A3: a checker's own must only with one of the four must kinds. A4: "not seen" twice in a round is a failed
 must. A5: once a must, always a must; no downgrade without rules. A6: no verdict with a database and no finished check of the project.
-Without a database."""
+Row 2 (A7): a drawing that continues another is built on its passed project and its last frame, started only after it passed.
+Part C: the style texts agree with their camera head line. Without a database."""
 import json
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
-from app import pictures as P, visual_contract as VC, visuals_stage as VS
+from app import film, pictures as P, visual_contract as VC, visuals_stage as VS
 from app.errors import Problem
 from test_design130_p1_pure import FakeConn, motion_shot, motion_store, project
 from test_design221_p1_pure import NEW, edit_plan, visuals
-from test_design221_p2_pure import EVEN, LEAVES, RULES, SOLID, WARN, Jobs, selectable, upload, verdict
+from test_design221_p2_pure import EVEN, LEAVES, RULES, SOLID, WARN, Jobs, selectable, two_drawn, upload, verdict
 from test_visuals_stage_pure import USER, g, saved
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -155,9 +157,51 @@ def test_no_verdict_without_a_finished_check_of_the_project():
     assert verdict(store, sha, ALL, conn=Jobs(ready))['failed'] == []
 
 
+# ---------- row 2 (A7): a drawing that continues an earlier one ----------
+
+LINE = ("Continues from MO1: this drawing is built on MO1's project: start from a copy of MO1's files and from MO1's last frame, and open exactly as MO1 "
+        "ends (same framing, same size, same parts). It is started only after MO1's project has passed its fact check.")
+
+
+def continuing():
+    store = motion_store()
+    two_drawn(store)
+    no_sha(store)
+    return store
+
+
+def test_the_brief_says_the_drawing_is_built_on_the_earlier_project():
+    store = continuing()
+    assert LINE in VS.motion_brief(store, NEW, [], 'MO2')['brief'] and 'Continues from' not in VS.motion_brief(store, NEW, [], 'MO1')['brief']
+
+
+def test_a_continuing_drawing_is_refused_until_the_earlier_one_passed_then_gets_its_project_and_last_frame():
+    store = continuing()
+    with pytest.raises(Problem, match=r'MO2 continues from MO1: build and pass MO1 first'):
+        g(lambda: VS.motion_brief(store, NEW, [], 'MO2', build=True, conn=FakeConn([])))
+    sha = upload(store)
+    verdict(store, sha, {SOLID: True, EVEN: 'not seen', LEAVES: True})
+    with pytest.raises(Problem, match='build and pass MO1 first'):   # not clean yet
+        g(lambda: VS.motion_brief(store, NEW, [], 'MO2', build=True, conn=FakeConn([])))
+    verdict(store, sha, {EVEN: True})
+    out = g(lambda: VS.motion_brief(store, NEW, [], 'MO2', build=True, conn=FakeConn([])))
+    assert out['continues'] == {'shot_id': 'MO1', 'sha256': sha, 'project_key': f'run-1/visuals/motion/projects/{sha}.zip', 'last_frame_key': '', 'last_second': 3.96}
+    snaps = [{'id': 's1', 'run_id': 'run-1', 'unit': 'MO1', 'provider': 'motion', 'status': 'ready', 'request': {'kind': 'motion-snapshot', 'sha256': sha},
+              'result': {'snapshots': [{'at': 1.0, 'key': 'k1'}, {'at': 3.96, 'key': 'k-last'}]}},
+             {'id': 's2', 'run_id': 'run-1', 'unit': 'MO1', 'provider': 'motion', 'status': 'ready', 'request': {'kind': 'motion-snapshot', 'sha256': 'f' * 64},
+              'result': {'snapshots': [{'at': 3.96, 'key': 'other-project'}]}}]
+    assert g(lambda: VS.motion_brief(store, NEW, [], 'MO2', build=True, conn=FakeConn(snaps)))['continues']['last_frame_key'] == 'k-last'
+    assert VS.motion_brief(store, NEW, [], 'MO2')['lines']['Continues from'] == out['lines']['Continues from']   # the line does not change when MO1 passes
+
+
+def test_vw_brief_puts_the_earlier_project_and_frame_beside_the_brief():
+    vw = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
+    assert "out.get('continues')" in vw and "f'work/motion/{a.shot}/from-{c[\"shot_id\"]}" in vw and 'last-frame.png' in vw and 'vw motion snapshot --shot' in vw
+
+
 # ---------- the texts ----------
 
-def test_the_texts_say_labels_first_and_the_binding():
+def test_the_texts_say_labels_first_the_binding_and_the_order_of_a_diagram():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221d_wording_v3 as W
     stage = visuals()
@@ -172,12 +216,26 @@ def test_the_texts_say_labels_first_and_the_binding():
         assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(new) == 1, file
     later = texts['later']
     assert 'propose the revision, then `vw motion render --shot S`' not in later and 'Put `scene_motion: {sha256, labels, cues}`' not in later
-    assert 'the server binds the project that passed to its shot' in later
+    assert 'the server binds the project that passed to its shot' in later and 'shots of one diagram are built in order' in later
+    assert 'copy it to work/motion/S/refs/continues-from.png' not in later and 'from-<that shot>/' in later
     assert '`scene_motion: {labels, cues}`' in texts['plan'] and 'before the first brief' in texts['plan']
     gaps = (ROOT / 'plugin' / 'agents' / 'vw-plan-gaps.md').read_text(encoding='utf-8')
     assert '- `scene_motion` on a drawn shot' in gaps and 'never the corner note' in gaps
     check = (ROOT / 'plugin' / 'agents' / 'vw-motion-check.md').read_text(encoding='utf-8')
-    assert '"a wrong count", "a wrong fact", "a part that reads as something else" or "a label that cannot be read"' in check
+    assert '"a wrong count", "a wrong fact", "a part that reads as something else" or "a label that cannot be read"' in check and 'from-<shot>/last-frame.png' in check
+    skill = (ROOT / 'plugin' / 'skills' / 'motion' / 'SKILL.md').read_text(encoding='utf-8')
+    assert 'start from a copy of the files in `from-<shot>/`' in skill and 'refs/continues-from.png' not in skill
     retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     assert W.RETIRED and all(s in retired for s in W.RETIRED)
     assert 'put scene_motion: {sha256' not in (ROOT / 'server' / 'app' / 'visuals_stage.py').read_text(encoding='utf-8')
+
+
+# ---------- part C: the style texts and their camera ----------
+
+def test_a_style_that_allows_a_camera_move_says_so_and_bold_keeps_the_frame_on_a_shot_that_explains():
+    st = film.styles()
+    assert 'When the shot\'s Camera line names Step closer, Pull back or Pan along, the whole view moves that way, as one group.' in st['technical']['text']
+    assert 'unless the shot\'s Camera line names a move: then the whole picture moves as one group.' in st['lively']['text']
+    assert 'On a shot that explains the frame stays fixed: these cuts are for shots that do not explain.' in st['bold']['text']
+    for name, s in st.items():
+        assert 120 <= len(re.findall(r'\w+', s['text'])) <= 260, name   # the word pin of test_motion_style_fonts_pure

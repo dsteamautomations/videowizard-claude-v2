@@ -150,8 +150,11 @@
     "The camera snaps between framings: a punch-in on the important part, a whip to the next.",
     "A line the viewer reads holds at least 0.5 s plus 0.3 s a word.",
     "Pictures you may place (approved; copies beside this brief in refs/ to look at)",
+    "three or four at once, given only the shot id",
+    "copy it to work/motion/S/refs/continues-from.png and tell the builder and the checker",
     "Put `scene_motion: {sha256, labels, cues}` on the shot",
     "propose the revision, then `vw motion render --shot S`",
-    "and in \"kind\" that kind in one line"
+    "and in \"kind\" that kind in one line",
+    "the main assistant puts that shot's last frame in `refs/continues-from.png`"
   ]
 }

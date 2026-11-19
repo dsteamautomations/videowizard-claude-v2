@@ -2,7 +2,10 @@
 
 In v3.json: the labels and cues of every drawn shot go in the plan with the plan, before the first brief, with no sha256 (plan part); a clean
 verdict binds the passed project to its shot and the render needs no plan change (the sentence that put the sha in the plan and proposed a revision
-per drawing is retired; section 11). In plugin/: the planner writes `scene_motion` with the plan; the checker names the four must kinds word for word. The replaced sentences are in server/retired-sentences.json. Registered in scripts/c1_split_v3.py after design/221c's script.
+per drawing is retired); shots of one diagram are built in order, the others side by side; `vw motion brief` puts the earlier drawing's passed
+project and its last frame beside a continuing shot's brief (section 11). In plugin/: the planner writes `scene_motion` with the plan; the checker
+names the four must kinds word for word and reads the earlier last frame from from-<shot>/; the skill's builder starts a continuing shot from a copy
+of the earlier files. The replaced sentences are in server/retired-sentences.json. Registered in scripts/c1_split_v3.py after design/221c's script.
 Exact anchors, each found once; run once: python scripts/d221d_wording_v3.py"""
 import json
 import sys
@@ -16,6 +19,14 @@ PLAN_NEW = (PLAN_OLD + ' A drawn shot of a HyperFrames film carries its texts an
             '`scene_motion: {labels, cues}` (labels: every text the viewer reads, word for word, never the corner note, which is the server\'s; cues '
             '`{selector: "#id", word or at_s}`; no sha256: the server binds the project that passes its fact check). A drawing with no text at all has '
             '`labels: []`. `vw motion brief` is refused while a drawn shot that carries text has none.')
+BUILD_OLD = 'Then one `vw-motion-shot` helper per shot, three or four at once, given only the shot id;'
+BUILD_NEW = ('Then one `vw-motion-shot` helper per shot, given only the shot id: shots of one diagram are built in order (a shot whose brief says '
+             '"Continues from <shot>" is started only after that shot\'s project has passed its fact check), the others side by side, three or four at once;')
+FROM_OLD = ('When the brief says "Continues from <shot>", take that shot\'s last frame too (`vw motion snapshot --shot <that shot> --at <its last second>`), '
+            'copy it to work/motion/S/refs/continues-from.png and tell the builder and the checker.')
+FROM_NEW = ('When the brief says "Continues from <shot>", `vw motion brief` puts that shot\'s passed project and its last frame in '
+            'work/motion/S/from-<that shot>/ (when the frame is not taken yet, it says the snapshot to take); the builder copies the earlier files and '
+            'changes only what this shot adds, and the checker is given the last frame for the rules that compare with it.')
 BIND_OLD = ('Put `scene_motion: {sha256, labels, cues}` on the shot (labels word for word, never the spec\'s not-to-scale note: the server draws it in the '
             'lower right corner of every frame; cues `{selector: "#id", word or at_s}`), propose the revision, then `vw motion render --shot S` (free; it '
             'checks the timing).')
@@ -25,6 +36,8 @@ BIND_NEW = ('A clean verdict (no failed must, nothing not seen) binds: the serve
 
 PAIRS = [   # (where: 'common' or a part's name, the old sentence, the new one)
     ('plan', PLAN_OLD, PLAN_NEW),
+    ('later', BUILD_OLD, BUILD_NEW),
+    ('later', FROM_OLD, FROM_NEW),
     ('later', BIND_OLD, BIND_NEW),
 ]
 
@@ -35,15 +48,27 @@ GAPS_NEW = (GAPS_OLD + '\n- `scene_motion` on a drawn shot of a HyperFrames film
 KIND_OLD = 'then write "class": "must" and in "kind" that kind in one line.'
 KIND_NEW = ('then write "class": "must" and in "kind" that kind in its words: "a wrong count", "a wrong fact", "a part that reads as something else" or '
             '"a label that cannot be read" (any other kind is a should).')
+FRAME_OLD = 'you are also given that shot\'s last frame (work/motion/<shot>/refs/continues-from.png)'
+FRAME_NEW = 'you are also given that shot\'s last frame (from-<shot>/last-frame.png in this shot\'s folder)'
+READ_OLD = ('When the brief says "Continues from <shot>", the main assistant puts that shot\'s last frame in `refs/continues-from.png`: start your drawing '
+            'where it ends.')
+READ_NEW = ('When the brief says "Continues from <shot>", this drawing is built on that shot\'s passed project: start from a copy of the files in '
+            '`from-<shot>/` (beside the brief) and from its last frame (`from-<shot>/last-frame.png`); open exactly as it ends and change only what '
+            'this shot adds. Shots of one diagram are built in order, the others side by side.')
 
 HELPERS = [   # (file under plugin/, the old sentence, the new one)
     ('agents/vw-plan-gaps.md', GAPS_OLD, GAPS_NEW),
     ('agents/vw-motion-check.md', KIND_OLD, KIND_NEW),
+    ('agents/vw-motion-check.md', FRAME_OLD, FRAME_NEW),
+    ('skills/motion/SKILL.md', READ_OLD, READ_NEW),
 ]
 
-RETIRED = ['Put `scene_motion: {sha256, labels, cues}` on the shot',
+RETIRED = ['three or four at once, given only the shot id',
+           'copy it to work/motion/S/refs/continues-from.png and tell the builder and the checker',
+           'Put `scene_motion: {sha256, labels, cues}` on the shot',
            'propose the revision, then `vw motion render --shot S`',
-           'and in "kind" that kind in one line']
+           'and in "kind" that kind in one line',
+           'the main assistant puts that shot\'s last frame in `refs/continues-from.png`']
 
 
 def apply(prompt, parts):

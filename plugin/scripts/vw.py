@@ -961,8 +961,24 @@ def cmd_motion(a):
         (folder / 'brief.md').write_text(out['brief'], encoding='utf-8')
         save_json(folder / 'brief-lines.json', out.get('lines') or {})   # design/221 (the critic's A1): the brief the rules are written from, sent with the upload
         refs =[_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
-        emit({'shot_id': a.shot, 'brief': str(folder / 'brief.md'), 'refs': refs, 'project': str(folder / 'project')}, 0,
-             f"Brief for {a.shot} written to work/motion/{a.shot}/brief.md with {len(refs)} pictures in refs/: start vw-motion-rules for {a.shot}, then vw-motion-shot.")   # design/134 14
+        line, c = '', out.get('continues')
+        if c:   # design/221 row 2: the earlier drawing's passed project and its last frame, beside the brief
+            import zipfile
+            base_ = folder / f"from-{c['shot_id']}"
+            shutil.rmtree(base_, ignore_errors=True)
+            with zipfile.ZipFile(_download(m, c['project_key'], f'work/motion/{a.shot}/from-{c["shot_id"]}.zip')) as z:
+                for n in z.namelist():
+                    if not n.endswith('/') and '..' not in Path(n).parts and not Path(n).is_absolute():
+                        (base_ / n).parent.mkdir(parents=True, exist_ok=True)
+                        (base_ / n).write_bytes(z.read(n))
+            if c.get('last_frame_key'):
+                _download(m, c['last_frame_key'], f'work/motion/{a.shot}/from-{c["shot_id"]}/last-frame.png')
+                line = f" {c['shot_id']}'s passed project and its last frame are in work/motion/{a.shot}/from-{c['shot_id']}/ (last-frame.png)."
+            else:
+                line = (f" {c['shot_id']}'s passed project is in work/motion/{a.shot}/from-{c['shot_id']}/; its last frame is not taken yet: run "
+                        f"`vw motion snapshot --shot {c['shot_id']} --at {c['last_second']:g}` and copy the PNG to work/motion/{a.shot}/from-{c['shot_id']}/last-frame.png.")
+        emit({'shot_id': a.shot, 'brief': str(folder / 'brief.md'), 'refs': refs, 'project': str(folder / 'project'), **({'continues': c} if c else {})}, 0,
+             f"Brief for {a.shot} written to work/motion/{a.shot}/brief.md with {len(refs)} pictures in refs/: start vw-motion-rules for {a.shot}, then vw-motion-shot." + line)   # design/134 14
     if a.what == 'upload':
         proj = (ws / a.dir) if a.dir and (ws / a.dir).is_dir() else (Path(a.dir) if a.dir else folder / 'project')
         if not (proj / 'index.html').is_file():

@@ -11,7 +11,7 @@ Show the inside: cut-away sections slide open, an exploded view separates along 
 
 Each label is attached to its part by a thin leader line that draws first, then the label appears at its end and holds. Leader lines never cross, and a leader ends plainly, with no mark that could be read as a part. Dimension lines draw from one end to the other.
 
-The view is straight on or a fixed three-quarter angle and stays where it is. A closer look at a detail is a cut to a second framing or an inset beside the drawing. Keep everything aligned to an implied grid. No decoration, no perspective tricks, nothing that moves without a physical reason.
+The view is straight on or a fixed three-quarter angle and stays where it is. When the shot's Camera line names Step closer, Pull back or Pan along, the whole view moves that way, as one group. A closer look at a detail is a cut to a second framing or an inset beside the drawing. Keep everything aligned to an implied grid. No decoration, no perspective tricks, nothing that moves without a physical reason.
 
 motions:
 - Draw on (an outline appearing): the outline draws along its length at a steady speed, 0.6 to 1 s by its length; then its fill fades in over 0.3 s.

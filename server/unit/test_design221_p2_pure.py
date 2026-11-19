@@ -122,7 +122,7 @@ def test_the_brief_names_the_shot_it_continues_from():
     assert 'Continues from MO1:' in VS.motion_brief(store, NEW, [], 'MO2')['brief'] and 'Continues from' not in VS.motion_brief(store, NEW, [], 'MO1')['brief']
     store2 = motion_store()
     edit_plan(store2, lambda d: d['gaps'][1]['scenes'][0]['shots'].__setitem__(0, motion_shot(id='MO3', start_frame=900, end_frame=1150, return_of='MO1')))
-    assert "Continues from MO1: you are given MO1's last frame" in VS.motion_brief(store2, NEW, [], 'MO3')['brief']
+    assert "Continues from MO1: this drawing is built on MO1's project" in VS.motion_brief(store2, NEW, [], 'MO3')['brief']
 
 
 # ---------- row 13: later rounds ----------

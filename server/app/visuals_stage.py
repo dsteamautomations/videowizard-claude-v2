@@ -6301,6 +6301,12 @@ def open_rules(rec):
     return ([r['rule'] for r in (rec or {}).get('rules') or [] if (r.get('pass') is False and r.get('class') != 'should') or r.get('pass') == NOT_SEEN]
             + list((rec or {}).get('label_musts') or []))
 
+
+def passed_project(session, shot):
+    """design/221 row 2: the sha of the shot's project that passed its fact check (the bound one, else the plan's with a clean verdict), else ''."""
+    sha = (session.get('motion_bound') or {}).get(shot['id']) or ((shot.get('scene_motion') or {}).get('sha256') or '')
+    rounds = motion_rounds(session, shot['id'], sha) if sha else []
+    return sha if rounds and not open_rules(rounds[-1]) else ''
 MOTION_RULE_NEED = ('{shot}: the rule "{rule}" is not seen: say in `need` the frame or crop that would show it (a snapshot at 2.4 s, a crop of the joint) '
                     'and send the verdict again.')
 MOTION_RULE_FAILED_BEFORE = ('{shot}: in round 2 or 3 a verdict may leave out a rule that passed before, but every rule that failed before is answered: '
@@ -6405,8 +6411,8 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
 def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=None):
     """design/130 §4 step 1: the designer's brief for one drawn shot, built from the plan (the test bench's prompt.txt shape): the length to the frame,
     the narration with each word's second, what it shows, the palette, the spec, the claims, the labels, the pictures and the rules. Deterministic.
-    session: the one the caller already read (design/221, the critic's A2), else read here. build (`vw motion brief`): the gate before a build
-    (every drawn shot with text has its labels in the plan)."""
+    session: the one the caller already read (design/221, the critic's A2), else read here. build (`vw motion brief`): the gates before a build
+    (every drawn shot with text has its labels in the plan; a drawing that continues another waits for its passed project) and `continues`."""
     _motion_run(run)
     session = session or session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
@@ -6441,6 +6447,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
              ('Confirmed for the things in this shot', f"Confirmed for the things in this shot: {'; '.join(known)}" if known else '')]
     note = corner_note(spec)   # design/221 row 9: drawn by the server, so it is neither the spec's label nor a text on screen here
     prev = continues_from(plan, session, gap, shot)   # design/221 row 12
+    continues = {}
     if build:   # design/221 (the critic's A1): the labels and cues of every drawn shot are in the plan before the first brief, so no render is made stale by them later
         bare = [s['id'] for g_ in plan['gaps'] for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots']
                 if s.get('visual_type') == 'drawn' and not (s.get('scene_motion') or {}).get('labels')
@@ -6450,6 +6457,15 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
         need(not bare, f"Before the first brief, the texts of every drawn shot go in the plan: {', '.join(bare)} {'carries' if one else 'carry'} text and {'has' if one else 'have'} "
                        'no scene_motion.labels: add scene_motion: {labels: [every text the viewer reads, word for word, never the corner note], cues: [{selector: "#id", word or at_s}]} '
                        f"to {'it' if one else 'each'} in the plan, then propose the plan.")
+        if prev:   # design/221 row 2: built on the earlier drawing's passed project and its last frame
+            before = guarded(lambda: locate(store, session, prev))[3]
+            sha = passed_project(session, before)
+            need(sha, f"{shot['id']} continues from {prev}: build and pass {prev} first (a clean fact check), then brief {shot['id']}: this drawing is built on {prev}'s project.")
+            last = round((before['end_frame'] - before['start_frame'] - 1) / f, 3)
+            rows = conn.execute("select id, unit, request, result, status from vw2_jobs where run_id=%s and provider='motion' and unit=%s order by created_at", (run['id'], prev)).fetchall() if conn is not None else []
+            snaps = [s_ for j in rows if j.get('unit') == prev and j.get('status') == 'ready' and (j.get('request') or {}).get('kind') == 'motion-snapshot'
+                     and (j.get('request') or {}).get('sha256') == sha for s_ in (j.get('result') or {}).get('snapshots') or [] if float(s_['at']) >= last - 0.05]
+            continues = {'shot_id': prev, 'sha256': sha, 'project_key': session['motion_projects'][sha]['key'], 'last_frame_key': snaps[-1]['key'] if snaps else '', 'last_second': last}
     if spec:
         lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words({**spec, 'label': ''} if note else spec) or 'nothing stated'}"
                    + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
@@ -6464,7 +6480,8 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
               ('Look at', 'Look at these before you draw (in refs/): ' + '; '.join(f"{els.get(e, {}).get('name') or e}: " + ', '.join(f'refs/{rid}.png ({_shows(r)})' for rid, r in rs)
                                                                          for e, rs in look.items()) + '.' if look else ''),   # design/221 row 5: each thing's footage picture and approved pictures, opened first
               ('Pictures', 'Pictures you may place (approved): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.'),
-              ('Continues from', f"Continues from {prev}: you are given {prev}'s last frame; this drawing starts where it ends." if prev else ''),
+              ('Continues from', f"Continues from {prev}: this drawing is built on {prev}'s project: start from a copy of {prev}'s files and from {prev}'s last frame, and open "
+                                 f"exactly as {prev} ends (same framing, same size, same parts). It is started only after {prev}'s project has passed its fact check." if prev else ''),   # design/221 row 2
               ('Palette', palette_line(plan, session)),   # design/218: the plan's palette and the colours added since, the same for every drawing
               ('Fonts', f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
                + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "
@@ -6482,7 +6499,8 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     for k, t in lines:   # design/221 S3: one fingerprint per labelled line, so a later change of the brief can be named
         if k:
             prints[k] = hashlib.sha256((prints.get(k, '') + t).encode('utf-8')).hexdigest()[:16]
-    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs])), 'frames': frames, 'fps': str(fps), 'lines': prints}
+    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs])), 'frames': frames, 'fps': str(fps), 'lines': prints,
+            **({'continues': continues} if continues else {})}
 
 
 def spec_words(spec, known_only=False):
