@@ -237,7 +237,7 @@ def test_a_take_line_has_the_fixtures_fields_and_no_amount_of_money(held):
     assert line['name'] == 'Housing at work' and line['where'] == 'In the film at 0:00.0 to 0:05.2 (5.2 s) · Housing at work'      # a shot with no title: the gap's title, never the id
     assert line['takes'][0]['short'] == '' and line['takes'][0]['in_s'] == 0.44                                             # the place sits in the middle of a guide take: (6.04 - 5.16) / 2
     assert '₹' not in json.dumps(line, ensure_ascii=False) and 'rupee' not in json.dumps(line).lower()
-    assert '₹' not in json.dumps(T.PAGE, ensure_ascii=False) + json.dumps(T.W, ensure_ascii=False).replace(T.W['ordered'], '')   # the amount is said in the chat only
+    assert '₹' not in json.dumps(T.PAGE, ensure_ascii=False) + json.dumps({k: v for k, v in T.W.items() if k not in ('ordered', 'order_log')}, ensure_ascii=False)   # the amount is said in the chat only
 
 
 def test_a_shot_with_no_title_in_a_gap_of_several_is_named_by_the_gap_and_its_number(held):
@@ -316,7 +316,7 @@ def test_select_reject_and_use_the_earlier_take_call_the_chats_own_functions(hel
     assert calls == [('review', 'j2', 'rejected', 'A second helper appears.')] and 'again' not in s['guides']['S1']
     del calls[:]
     T.answer(None, None, USER, RUN, {}, 'S1', rows, 'old:1', 'Use take 1 after all', '')
-    assert calls == [('review', 'j2', 'rejected', T.W['old_used']), ('review', 'j1', 'accepted', ''), ('select', 'j1', '')]
+    assert calls == [('review', 'j1', 'accepted', ''), ('select', 'j1', ''), ('review', 'j2', 'rejected', T.W['old_used'])]   # the critic's S2: the earlier take is selected first
     with pytest.raises(ValueError):
         T.answer(None, None, USER, RUN, {}, 'S1', rows, 'old:7', 'x', '')
 

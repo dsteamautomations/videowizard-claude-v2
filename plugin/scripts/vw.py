@@ -916,7 +916,7 @@ def cmd_guide(a):
         out = write(base + '/guide/cause', {'shot_id': a.shot, 'cause': a.cause, 'notes': a.notes, 'fix': a.fix})
         emit(out, 0, out.get('next'))
     if a.what == 'shoot':
-        out = write(base + '/guide/shoot', {'shot_id': a.shot, 'quote': a.quote or '', 'again': bool(a.again)})   # design/222: with no --quote the server uses the word the operator gave on the page ("Make another"), and refuses when there is none
+        out = write(base + '/guide/shoot', {'shot_id': a.shot, 'quote': a.quote or '', 'again': bool(a.again), **({'cancel': True} if getattr(a, 'cancel', False) else {})})   # design/222: with no --quote the server uses the word the operator gave on the page ("Make another"), and refuses when there is none
         emit(out, 0, out.get('next'))
 
 
@@ -3923,6 +3923,7 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--cause', choices=['still', 'guide', 'words', 'model'])
     s.add_argument('--again', action='store_true', help='shoot: send the same request once more, only after a clip that came back unusable, on the operator\'s word')
+    s.add_argument('--cancel', action='store_true', help='shoot: withdraw the take the operator ordered on the page ("Make another"), with their words in --quote; nothing is made (design/222)')
     s.set_defaults(fn=cmd_guide)
     s = sub.add_parser('drawing'); s.add_argument('what', choices=['set', 'show', 'approve', 'reject'])   # design/200: a thing's drawing set
     for flag in ('--element', '--file', '--sha', '--quote', '--notes'):

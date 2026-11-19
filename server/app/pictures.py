@@ -386,7 +386,9 @@ def looks_due(store, run, outputs, take_rows=None):
         out.append({'ref': r['id'], 'sha10': str(r['sha256'])[:10], 'kind': r.get('kind'), 'name': name_of(session, plan, r), 'shot_id': V.made_for(session, r),
                     **({'n': step_of(session, r)} if r.get('kind') == 'state' else {}), 'key': _big(store, session, r['id']),
                     'inputs': [{**i, 'key': _big(store, session, i['ref'])} for i in inputs], 'request': (r.get('generation') or {}).get('prompt') or '', 'lines': lines(session, plan, r)})
-    return {'pictures': out, 'then': LOOKS_THEN if out else LOOKS_NONE, 'how': LOOK_HOW, **({'how_take': TAKE_LOOK_HOW} if any(p['kind'] == 'take' for p in out) else {})}
+    some = any(p['kind'] == 'take' for p in out)   # the critic's S8: the takes have their own helper, named in this answer
+    then = ' '.join(x for x in (LOOKS_THEN if any(p['kind'] != 'take' for p in out) else '', takes.W['looks_then'] if some else '') if x) or LOOKS_NONE
+    return {'pictures': out, 'then': then, 'how': LOOK_HOW, **({'how_take': TAKE_LOOK_HOW} if some else {})}
 
 
 def _fault(name, want, sent):
@@ -459,9 +461,12 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
+    from . import takes as takes_
+    takes_left = [str(row[4]['id']) for row in takes_.due(session, plan, take_rows)]   # the critic's S8: the takes still due are counted
     left = [r['id'] for r in due(session, plan)]
     failed = components_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent
-    return {'recorded': recorded, 'refused': refused, 'left': left, 'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE] + failed)}
+    return {'recorded': recorded, 'refused': refused, 'left': left + takes_left,
+            'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else '' if takes_left else LOOKS_NONE] + ([takes_.waits_words(session, plan, take_rows)] if takes_left else []) + failed).strip()}
 
 
 # ---------- the check as the page and the chat say it (F1, contract 3.8) ----------

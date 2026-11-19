@@ -1657,6 +1657,7 @@ class GuideCause(Write):
 class GuideShoot(Write):
     shot_id: str
     quote: str = ''   # design/222: empty when the operator's word was given on the page ("Make another"); `guide.shoot` refuses a take with no word at all
+    cancel: bool = False   # design/222: withdraw the take ordered on the page; nothing is made
     again: bool = False
 
 
@@ -1702,7 +1703,8 @@ def visuals_guide_cause(run_id: UUID, body: GuideCause, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/guide/shoot', status_code=201)
 def visuals_guide_shoot(run_id: UUID, body: GuideShoot, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.shoot(conn, storage(), user, run, outputs, body.shot_id, body.quote, body.again), 201)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.cancel_order(storage(), user, run, outputs, body.shot_id, body.quote) if body.cancel
+                         else guide.shoot(conn, storage(), user, run, outputs, body.shot_id, body.quote, body.again), 201)
 
 
 class DrawingSet(Write):   # design/200: a thing's drawing set (app/drawings.py); free, nothing is queued

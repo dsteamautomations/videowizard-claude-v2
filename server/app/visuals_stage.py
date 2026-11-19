@@ -2813,7 +2813,7 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
                                                    or (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'drawn'))]
     if gate and round_v2(session) and any(i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video' for _, i in items):
         from . import takes   # design/222: step 7 is shown at the end, on the page: a ready AI video take is not asked one by one (gate False: an answer given on the page that opened)
-        if not takes.complete(takes.expected(session, plan, take_rows, now)):
+        if not takes.complete(takes.expected(session, plan, take_rows, now)) or not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # the critic's S1: nor while step 6 is still being made
             items = [(a, i) for a, i in items if not (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video')]
     return [i for _, i in sorted(items, key=lambda x: x[0])]
 

@@ -42,6 +42,26 @@ VW-12's 17 takes, judged from frames by six helpers that had not seen Gemini's r
 
 Tests: `server/unit/test_design222_takes_pure.py` (the server, the served text, the plugin, the log) and `server/unit/test_design222_browser_pure.py` (the real page file in a browser, with the fixture).
 
+## The critic's points on the finished branch (19 Nov), each fixed with a test that failed first
+
+`server/unit/test_design222_critic_pure.py`.
+
+| Point | Fault | Fix |
+|---|---|---|
+| S1 | While step 6 was still being made, finished takes were asked one by one in the chat | `visuals_stage.waiting`: the takes wait for step 6 too |
+| S2 | "Use take n after all" rejected the newer take first; a refusal of the earlier one left both rejected | `takes.answer`: the earlier take is selected first (its reason is its timing note when it is short), then the newer one is rejected |
+| S3 | After a plain Reject nothing told the assistant to ask what happens to the shot | `takes.rejected_due`, said by `chat_flow.next_item` and after the page's done |
+| S4 | A take shot for an earlier plan kept the page closed, with no way out | it counts as complete and is on the page with Make another and Reject (no Select); `guide.same_of` counts the plan in the request's identity |
+| S5 | A changed layout lost the order given on the page | `guide.carried`, used by `set_scene` |
+| S6 | An order the cost limit refused stayed pending for ever; an order could not be withdrawn | `guide.cap_or_drop` drops it and keeps why; `guide.cancel_order` (`vw guide shoot --shot S --cancel --quote …`) |
+| S7 | The line with the amount was not said on the chat path, and was said again on a second "done" | `takes.ordered` counts each order once; the chat item says it when answered in the chat |
+| S8 | The looks answer named the pictures' helper for takes and did not count the takes left | `pictures.looks_due`, `record_looks` |
+| S9 | A take whose submission was unknown read "could not be made" | it is still open |
+| not built | no decision in the run's log for a take ordered on the page | `takes.answer` writes it, with its length and amount |
+| lesser | a failed jump measurement read "no jump"; a re-run of the worker's check lost Claude's lines on the card | `guide_worker.jumps` raises; `visual_workers.merged_check` |
+
+Left as it is, and said: the cost limit is tested per line when the page is built, and again when each ordered take is sent (several orders in one visit are refused one by one, in the order the assistant sends them, each said in the chat).
+
 ## Not covered, not verified
 
 - **Nothing has run on a real film.** No take made from a guide exists in the application, so the frames, the measured jump, the helper's check, the page with a guide take's own lines and "Make another" have only run in tests, and the page only with VW-12's takes (made the older way). The first real run must show: frames and the sheet stored for a take; the take listed by `vw visuals pictures --looks` and a look recorded; the page closed until all are checked, then open; a selection recorded from the page; a take ordered with "Make another" sent without a second card, with the one line said.

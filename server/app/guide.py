@@ -137,6 +137,12 @@ def _drawn_facts(session, parents):
     return out
 
 
+def carried(old):
+    """design/222 (the critic's S5): what a new scene keeps of the shot's entry besides its approved stills and its takes: the operator's word for
+    one more take given on the page ("Make another"), while it is not used."""
+    return {'again': old['again']} if old.get('again') and not old['again'].get('sent') else {}
+
+
 def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     """A helper's scene description for a shot: its shape, then every check that needs no Blender; refused before anything is rendered or paid.
     `overrides`: {'support': '<why>'} is the one refusal that can be overridden, with its reason on the record."""
@@ -166,7 +172,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     guides[shot_id] = {'sha256': sha, 'key': k, 'seconds': spec['seconds'], 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'marks': spec.get('marks') or {},
                        'checks': rows, 'overrides': [{'check': c, 'reason': why, 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()} for c, why in overrides.items()],
                        'frames': {'job_id': job_id, 'status': 'queued'}, 'verdicts': [], 'rounds_before': len(old.get('verdicts') or []) + int(old.get('rounds_before') or 0),
-                       'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
+                       **carried(old), 'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
     guides[shot_id]['drawing'] = _draw(store, run, session, spec, sha)   # design/200: free; the operator approves it before the still
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'scene', 'sha256': sha, 'key': k, 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'seconds': spec['seconds'],
@@ -382,6 +388,36 @@ def word_for(g, quote):
     return ordered, str(quote).strip()
 
 
+def same_of(render_sha, still_sha, prompt, plan_digest):
+    """The request's identity: the same guide, still and words for the same plan is never sent twice (the critic's S4: for another plan it is another request)."""
+    return digest({'guide': render_sha, 'still': still_sha, 'prompt': prompt, 'plan': plan_digest})
+
+
+def cap_or_drop(conn, store, run, session, shot_id, ordered, amount, what):
+    """The film's cost limit, before the take is paid for. The critic's S6: when it refuses a take ordered on the page, that order is dropped and why
+    is kept, so the shot does not stay "being redone" for ever; the refusal is raised as it is."""
+    try:
+        VS.check_cap(conn, run, session, amount, what)
+    except Problem as exc:
+        if ordered:
+            g = session['guides'][shot_id]
+            g.pop('again', None)
+            g['again_refused'] = str(getattr(exc, 'message', '') or exc)
+            VS.save_session(store, run, session)
+        raise
+
+
+def cancel_order(store, user, run, outputs, shot_id, quote):
+    """The critic's S6: the operator withdraws, in the chat, the take they ordered on the page. Nothing is made."""
+    session = VS.session_of(store, run, outputs)
+    g = entry_of(session, shot_id)
+    need(g.get('again') and not g['again'].get('sent'), f'No take of {shot_id} is ordered from the page: nothing to withdraw.')
+    need(str(quote or '').strip(), "Give the operator's words (--quote).")
+    g.pop('again')
+    VS.save_session(store, run, session)
+    return {'shot_id': shot_id, 'next': f'The order for another take of {shot_id} is withdrawn: nothing is made. Ask the operator what happens to the shot: cut it into shorter shots, another angle, or leave it out.'}
+
+
 def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     """The operator's go-ahead: one Gemini edit of the guide. Refused while anything of the card is missing, while a take is open, and when nothing
     changed since the last take (the same request is never sent twice; `again` only after a take that came back as the guide itself or at the wrong length)."""
@@ -406,7 +442,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     if open_job:
         raise Problem(409, 'JOB_OPEN', 'A take for this shot is still open; wait, recover or resolve it first.', job_id=str(open_job['id']))
     prompt = card['prompt']
-    same = digest({'guide': render['sha256'], 'still': still['sha256'], 'prompt': prompt})
+    same = same_of(render['sha256'], still['sha256'], prompt, digest(plan))
     before = [t for t in g.get('takes') or [] if t.get('same') == same]
     if before:
         blocked = (session.get('take_checks') or {}).get(before[-1].get('job_id') or '', {}).get('blocked')
@@ -414,7 +450,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
              if not blocked else 'The last take came back unusable (' + str(blocked) + '). To send the same request once more, the operator says so: `vw guide shoot --again --quote "…"`.')
         need(sum(1 for t in before) < 2, 'This request was already sent twice; change the guide, the still or the words.')
     seconds = int(g['seconds'])
-    VS.check_cap(conn, run, session, seconds * VS.prices()['video_inr_per_s'], f'a {seconds} s take')
+    cap_or_drop(conn, store, run, session, shot_id, ordered, seconds * VS.prices()['video_inr_per_s'], f'a {seconds} s take')
     gen = video_generators.GUIDE
     fps = float(session['source']['fps'])
     record = {'contract': 'videowizard-guide-take-v1', 'kind': 'guide', 'run_id': str(run['id']), 'shot_id': shot_id, 'plan_digest': digest(plan), 'attempt': len(g.get('takes') or []) + 1,

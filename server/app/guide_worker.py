@@ -245,6 +245,8 @@ def jumps(video_path):
     import re
     r = subprocess.run([settings().FFMPEG_EXECUTABLE, '-hide_banner', '-i', str(video_path), '-vf', f"select='gt(scene,{JUMP_SCORE})',metadata=print", '-an', '-f', 'null', '-'],
                        capture_output=True, timeout=120)
+    if r.returncode:   # a measurement that did not run is never read as "no jump": the line is left out
+        raise RuntimeError('ffmpeg: ' + r.stderr.decode('utf-8', 'replace')[-200:])
     return [float(x) for x in re.findall(r'pts_time:([0-9.]+)', r.stderr.decode('utf-8', 'replace'))]
 
 

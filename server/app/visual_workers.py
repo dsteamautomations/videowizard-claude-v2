@@ -641,6 +641,20 @@ def take_reading(snapshot, video_path, sha256, transport_factory):
     return record
 
 
+def merged_check(before, record, sha256):
+    """A take's check record written again (a re-run of the worker's check): Claude's look of the same file and when Claude was asked are kept, and
+    the scorecard carries the look's lines again."""
+    look = (before or {}).get('look') or {}
+    if look.get('sha256') != sha256:
+        return dict(record)
+    out = {**record, 'look': look, **({'asked_at': before['asked_at']} if before.get('asked_at') else {})}
+    if record.get('guide') and look.get('lines'):
+        from . import guide_worker
+        out['scorecard'], out['watch'] = guide_worker.scorecard(record.get('code_lines') or [], {'lines': look['lines']})
+        out['not_read'] = False
+    return out
+
+
 def check_take(job, result):
     """design/91 N3: the ready take measured before the operator watches it; the record on the session, under the run's lock. Never raises.
     design/222: Claude's look from frames joins the record later (`takes.record`); a look recorded before a re-run of this check is kept."""
@@ -657,8 +671,7 @@ def check_take(job, result):
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             k = f"{job['run_id']}/visuals/session.json"
             session = json.loads(store.get(k).decode('utf-8'))
-            before = (session.get('take_checks') or {}).get(str(job['id'])) or {}
-            session.setdefault('take_checks', {})[str(job['id'])] = {**{k: before[k] for k in ('look', 'asked_at') if k in before}, **record}
+            session.setdefault('take_checks', {})[str(job['id'])] = merged_check((session.get('take_checks') or {}).get(str(job['id'])) or {}, record, result['sha256'])
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
             if snapshot.get('kind') == 'guide':
                 from . import generations

@@ -1739,7 +1739,13 @@ def _waiting_items(ctx):
                     continue   # an earlier take of the shot: it is on the newest take's line
 
                 def run_(choice, quote, words, group=group):
-                    return T.answer(conn, store, user, run, outputs, group, V.take_jobs(conn, run), choice, quote, words)
+                    out = T.answer(conn, store, user, run, outputs, group, V.take_jobs(conn, run), choice, quote, words)
+                    if choice == 'again' and not ctx.get('page'):   # the critic's S7: answered in the chat, the one line with the amount is said here (on the page: once, after done)
+                        s_ = V.session_of(store, run, outputs)
+                        said = T.ordered(s_, V.current_plan(store, s_), V.prices()['video_inr_per_s'])
+                        V.save_session(store, run, s_)
+                        return {**(out or {}), 'tell': said}
+                    return out
                 buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell=b.get('hint') or '') for b in line['buttons']]
                 item = _item(f"take:{job['id']}", 'take', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:], text=T.chat_text(line),
                              show=[{'key': res['key'], 'name': f'{group}-take.mp4'}] if res.get('key') else [])
@@ -2140,7 +2146,7 @@ def next_item(conn, store, user, run, outputs, one=False):
         rows = V.take_jobs(conn, run)
         if T.asked(session, plan, rows):   # design/222: Claude is asked to check the takes from now
             V.save_session(store, run, session)
-        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.again_due(session, plan, rows)) if x)   # the takes that wait for Claude's check; a take ordered on the page
+        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows)) if x)   # the takes that wait for Claude's check; a take ordered on the page; a shot left with no take
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)

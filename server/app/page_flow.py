@@ -1304,10 +1304,12 @@ def page_record(conn, store, user, run, outputs, answers):
         if here['plan'] and T.asked(here['session'], here['plan'], rows):
             V.save_session(store, run, here['session'])
         ordered = T.ordered(here['session'], here['plan'], V.prices()['video_inr_per_s']) if here['plan'] else ''
-        if ordered:
-            tell = ordered
+        if ordered:   # the critic's S7: each order is said once (`ordered` marks it), beside any other line to tell
+            V.save_session(store, run, here['session'])
+            tell = ' '.join(x for x in (tell, ordered) if x)
         then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', T.W['ordered_how'] if ordered else '',
                                     T.waits_words(here['session'], here['plan'], rows) if here['plan'] else '', T.again_due(here['session'], here['plan'], rows) if here['plan'] else '',
+                                    T.rejected_due(here['session'], here['plan'], rows) if here['plan'] else '',
                                     PICTURES_LEFT.format(n=left) if now['step'] == T.W['step'] and left else now['then'] if now.get('closed') else TAKES_DONE) if x)
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,

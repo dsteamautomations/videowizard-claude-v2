@@ -177,7 +177,7 @@ Ask in this order, and change one thing:
 3. Is the fault in the guide (a reach, a path, a speed, a missing support)? Fix the scene. It is free.
 4. Only then the words, and only for what the guide and the still cannot carry.
 
-A second take is ordered by the operator on the page ("Make another", with their words): that is their word, so no card is shown again. Say the cause first (`vw guide cause`), change that one thing, then `vw guide shoot --shot S` (no `--quote`). If the cause is the still or the layout, its card comes first; if it is the model's own limit, no take is made.
+A second take is ordered by the operator on the page ("Make another", with their words): that is their word, so no card is shown again. Say the cause first (`vw guide cause`), change that one thing, then `vw guide shoot --shot S` (no `--quote`). If the cause is the still or the layout, its card comes first; if it is the model's own limit, no take is made. If the operator withdraws the order in the chat: `vw guide shoot --shot S --cancel --quote "<their words>"`; if the cost limit refuses it, the order is dropped: tell the operator the spend. A take rejected with no new one ordered: ask the operator what happens to the shot (cut it, another angle, or leave it out).
 
 The same request is never sent twice. After a second failure, do not try a third time: propose cutting the shot into shorter cuts, a closer angle, or leaving the detail out, and let the operator choose.
 
