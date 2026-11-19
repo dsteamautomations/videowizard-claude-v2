@@ -462,7 +462,8 @@ SETS_NONE = 'No set waits for the operator on the page now. Go on with `vw visua
 ROUND_NEXT = 'The reference round is complete. Go on with `vw visuals next`: it gives the next decision.'   # design/217: "(the stills and the graphics are not on the page yet)" retired: they are
 # design/217: step 6, the pictures and drawn graphics, on the page
 PICTURES_LEFT = '{n} line(s) still wait for the operator on the page: write the new round to the page and give them the link again.'
-PICTURES_WAIT = 'The pictures and drawings still being made are not ready. Wait for them (`vw visuals status --wait 900`), then run `vw visuals page`.'
+PICTURES_CLOSED = ('Nothing of step 6 is put on the page yet, so do not publish or write to it. Say the line of counts to the operator as it is and ask '
+                   'nothing with it; then go on with `vw visuals next`.')   # design/221 row 18: the page only when everything is made (PICTURES_WAIT retired)
 PICTURES_DONE = 'Every picture and drawing is answered. Go on with `vw visuals next`: it gives the next decision.'
 VIDEO_SIDE, VIDEO_CRF = 960, 30   # a drawing's page copy: 960 px wide, H.264, no sound (a flat drawing is tens of KB)
 ROUND_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
@@ -934,7 +935,8 @@ def _plan_step(ctx):
     if at == 'complete' and V.round_v2(ctx['session']):   # design/217: step 6 once the round is complete; a round of before keeps the chat
         # hotfix (VW-24, 18 Nov 2026): the page is step 6 from the moment the round is complete, also while nothing of it is made yet: an empty step 6 sent the
         # page back to a finished earlier step, and the assistant to the chat
-        return 'pictures', (_pictures_lines(ctx), P.coming(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run'])))
+        six = P.expected(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run']))   # design/221 row 18: the page only when everything is made
+        return 'pictures', ((_pictures_lines(ctx) if P.complete(six) else None), six)
     return ('refs', []) if at == 1 else ('sets', []) if at in (2, 'making', 'looking', 'rewrite') else ('spec', specs) if specs else ('plan', [])
 
 
@@ -951,9 +953,15 @@ def _pictures_lines(ctx):
     return out
 
 
-def _pictures_page(ctx, base, lines, rows):
+def _pictures_page(ctx, base, lines, six):
     """design/217: the round of step 6 (design/217-contract.md sections 2 and 3). A round over the document's size loses the details of its
-    last lines first; a line is never cut."""
+    last lines first; a line is never cut. design/221 row 18: while something of step 6 is being made (lines None) nothing is put on the page:
+    the answer is the line of counts."""
+    if lines is None:
+        count = P.status_line(six)
+        return {**base, 'step': P.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': P.W['page_later'],
+                'then': ' '.join(x for x in (count, P.W['page_later']) if x), 'how': PICTURES_CLOSED}
+    rows = P.coming(six)
     refused = ctx['session'].get('page_refused') or {}
     lines = [{'line': f'l{n:02d}', **l, **({'refused': refused[l['key']]} if l['key'] in refused else {})} for n, l in enumerate(lines, 1)]
     for l in reversed(lines):
@@ -969,7 +977,7 @@ def _pictures_page(ctx, base, lines, rows):
 def _pictures_answer(ctx, a, choice, words):
     """design/217 (contract 3.11): one answer of step 6, through the chat item's own run function. None when the item no longer waits with
     that content (stale). A choice not on the line, or words missing where the button needs them, is refused with the line's own sentence."""
-    item = next((i for i in CF._waiting_items(ctx) if i['id'] == a.get('item') and i.get('_line')), None)
+    item = next((i for i in CF._waiting_items({**ctx, 'page': True}) if i['id'] == a.get('item') and i.get('_line')), None)   # design/221: an answer on the page that opened is taken while a redo is made
     if not item:
         return None
     buttons = item['_line']['buttons']
@@ -1110,7 +1118,7 @@ def page_record(conn, store, user, run, outputs, answers):
         pass
     if any(str(a.get('key') or '').startswith('pic:') for a in answers):   # design/217: questions, the style sheet, then film order, as the server lists them
         try:
-            order = {'pic:' + i['id']: n for n, i in enumerate(CF._waiting_items(CF._ctx(conn, store, user, run, outputs)))}
+            order = {'pic:' + i['id']: n for n, i in enumerate(CF._waiting_items({**CF._ctx(conn, store, user, run, outputs), 'page': True}))}
         except Problem:
             order = {}
         answers.sort(key=lambda a: order.get(str(a.get('key') or ''), len(order)) if str(a.get('key') or '').startswith('pic:') else -1)
@@ -1246,9 +1254,8 @@ def page_record(conn, store, user, run, outputs, answers):
         if here['plan'] and V.round_v2(here['session']) and P.asked(here['session'], here['plan']):   # C3: Claude is asked from now
             V.save_session(store, run, here['session'])
         looks = P.waits_words(here['session'], here['plan'])
-        rows = (now.get('layout') or {}).get('coming') if now['step'] == P.W['step'] else []
         then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', looks,
-                                    PICTURES_LEFT.format(n=left) if now['step'] == P.W['step'] and left else PICTURES_WAIT if rows else
+                                    PICTURES_LEFT.format(n=left) if now['step'] == P.W['step'] and left else (ROUND_NEXT + ' ' if was != 'pictures' else '') + now['then'] if now.get('closed') else
                                     PICTURES_DONE if was == 'pictures' or any(k.startswith('pic:') for k in recorded + stale + [r['key'] for r in refused]) else ROUND_NEXT) if x)   # hotfix: the round just ended, nothing of step 6 is made yet
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,

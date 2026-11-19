@@ -1,6 +1,6 @@
 """design/217, the two halves together: a film at step 6 built with the server's own test pieces (as test_design217_server_pure.py), holding one
 item of every kind (a question, the style sheet, a still that failed Claude's check with an earlier try, a graphic in 3 steps, a drawn graphic
-with open rules and one with a finish, a picture being made, one waiting for Claude's check, a picture "not checked"). The round the SERVER emits
+with open rules and one with a finish, two pictures that could not be made (design/221 phase 4: the page opens only when everything is made), a picture "not checked"). The round the SERVER emits
 (`page_flow.page`) is checked against the frozen fixture's shape, written to the page as the tool writes it, drawn by the REAL page in a headless
 browser (the browser tests' harness), every line is answered there, the answer documents the page wrote go through the server's own record path
 (`page_flow.page_record`), and the film's state is read back. Without a database: the session is held in memory, the store is a dict."""
@@ -46,15 +46,15 @@ def film():
             ref('g2', 'state', 'G1', sha=SHA['b'], generation={'prompt': 'step 2', 'parents': [{'id': 'g1'}]}, look=ok(SHA['b'])),
             ref('g3', 'state', 'G1', sha=SHA['d'], generation={'prompt': 'step 3', 'parents': [{'id': 'g2'}]}, look=look(('exact text', "it reads 'enviromental'"))(SHA['d'])),
             ref('k3', shot_id='S3', sha=SHA['e'], ready_at=(NOW - timedelta(days=1)).isoformat(), asked_at=(NOW - timedelta(minutes=P.PICTURE_LOOK_MINUTES + 1)).isoformat()),
-            ref('k4', shot_id='S4', sha=SHA['d'], ready_at=NOW.isoformat()),
-            ref('k5', shot_id='S5', status='generating', sha=None),
+            ref('k4', shot_id='S4', status='failed', sha=None),
+            ref('k5', shot_id='S5', status='failed', sha=None),
             ref('fb', 'frame', None, status='approved', source={'media_id': 'C1'}), ref('fa', 'frame', None, status='approved', source={'media_id': 'C2'})]
     s = session(*refs)
     s['gap_neighbours'] = {'5': {'before': 'C1', 'after': 'C2'}}
     s['questions'] = {'k3': {'question': 'This picture already shows what happens later in the shot. Make a new picture, or use this one anyway?', 'fork': 'not_yet',
                              'choices': ['make a new picture', 'use this one anyway'], 'by': 'server'}}
     s['motion_checks'] = {'D1': [{'sha256': 'p' * 64, 'round': 3, 'rules': [{'rule': f'rule {n}', 'pass': True} for n in range(53)], 'stranger': ['0.1 s: a wall section.']}],
-                          'D2': [{'sha256': 'q' * 64, 'round': 3, 'rules': [{'rule': f'rule {n}', 'pass': n > 1} for n in range(53)], 'stranger': ['0 s: a slab.']}]}
+                          'D2': [{'sha256': 'q' * 64, 'round': 2, 'rules': [{'rule': f'rule {n}', 'pass': n > 1} for n in range(53)], 'stranger': ['0 s: a slab.']}]}
     s['assets'] = {}
     take = lambda jid, unit, fin, rk: {'id': jid, 'unit': unit, 'provider': 'drawn', 'status': 'ready', 'request': {'kind': 'motion', 'request_key': rk},
                                        'result': {'key': f'run-1/takes/{jid}.mp4', 'sha256': jid * 8, 'sheet_key': f'run-1/takes/{jid}-sheet.jpg',
@@ -165,7 +165,7 @@ def test_the_servers_round_has_the_fixtures_shape(server):
     assert set(pg['layout']) == set(FIXTURE['layout']) and pg['layout']['words']['pictures'] == FIXTURE['layout']['words']['pictures']
     assert pg['layout']['help'] == FIXTURE['layout']['help'] and 'made' not in pg['layout']   # not shown by the page: `end_foot` says it
     assert set(FIXTURE) - {'layout', 'lines'} <= set(pg) and set(pg) - set(FIXTURE) <= {'how', 'pictures', 'videos', 'pictures_failed', 'pic_docs', 'zoom_docs'}
-    assert [(c['name'], c['state']) for c in pg['layout']['coming']] == [('The brick kiln at dusk', 'checking'), ('The kiln at night', 'making')]
+    assert [(c['name'], c['state']) for c in pg['layout']['coming']] == [('The brick kiln at dusk', 'failed'), ('The kiln at night', 'failed')]   # design/221: shown as could not be made
     # the video page copy: `videos` [{code, key}] for the one that was made; "" and `none` for the one that was not
     d1, d2 = (l for l in pg['lines'] if l['kind'] == 'drawn')
     assert pg['videos'] == [{'code': d1['video']['code'], 'key': 'run-1/takes/j1.mp4.page.mp4'}] and d1['video']['code'].startswith('v') and len(d1['video']['code']) == 13
@@ -226,5 +226,5 @@ def test_the_round_drawn_by_the_page_answered_there_and_recorded_by_the_server(s
     assert refs['k3']['status'] == 'rejected' and refs['k3']['rejection']['notes'] == 'Two workers, not three.'
     assert ('finish', 'D1', False) in server['calls'] and s['reviews']['j1'][-1] == {'decision': 'rejected', 'notes': "made again without the effect, at the operator's word"}
     assert s['selections']['D2'] == {'job_id': 'j2', 'notes': 'The end frames hold long enough.'}                              # held: selected with the operator's reason (F3)
-    assert out['page']['step'] == P.W['step'] and [c['state'] for c in out['page']['layout']['coming']] == ['checking', 'making']
-    assert out['then'].endswith(PF.PICTURES_WAIT) and P.LOOKS_DUE.format(n=1) in out['then']                                   # k4 waits for Claude's look, k5 is being made
+    assert out['page']['step'] == P.W['step'] and out['page']['closed'] and out['page']['lines'] == []   # design/221 phase 4: three stills and a step are made again: the page waits
+    assert out['then'].endswith(P.W['page_later']) and 'Stills: 1 answered, 2 being redone, 2 could not be made.' in out['then']

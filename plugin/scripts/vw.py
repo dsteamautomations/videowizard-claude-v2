@@ -2407,8 +2407,10 @@ def cmd_visuals(a):
             card['card_file'], card['answers_path'] = str(folder / f"{card['id']}.html"), str(folder / f"{card['id']}.answers.json")   # full paths, for reading and writing; the command takes `answers_file`
             return (f"{card['step']}: {card['entries']} entries on one card ({card['id']}). Say: \"{card['say_before']}\" Card file: {card['card_file']}. "
                     f"Write the answers to: {card['answers_path']}. Then: vw visuals card --file {card['answers_file']}. " + out['how'])
-        if not item:
-            return ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', '')
+        if not item:   # design/221 row 18: a finished drawn graphic to show, with its one line, asking nothing
+            shows = [(_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}"), f.get('say') or '') for f in out.get('show') or []]
+            return ((f"Show these files, each with its line, and ask nothing: {'; '.join(p + ': ' + s for p, s in shows)}. " if shows else '')
+                    + ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', ''))
         (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
         paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show
         item['show_files'] = paths
@@ -2536,10 +2538,14 @@ def cmd_visuals(a):
                      done + f"{len(own_fetch)} picture(s) the operator added on the page are still to fetch. For each id, the Artifact tool: action \"read\", `url` {link or 'the page link'}, "
                             f"`path` the id, `out_dir` {folder / 'own'}. The ids: " + ', '.join(f'`path` {i}' for i in own_fetch) + '. Then run `vw visuals page --record` again: their lines '
                             'are recorded then. Nothing is recorded for those lines yet.')
+            if out['page'].get('closed'):   # design/221 row 18: step 6 is still being made: nothing is written to the page
+                emit({k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out}, 0, done + out['then'] + ' ' + out['page']['how'])
             info = hand(out['page'], {k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out}, said=done + (out.get('then') or '') + ' ')
             emit(info, 0, done + f"{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
         out = write(base + '/page', {'one': False}, wait=PAGE_WAIT)
-        info = hand(out, {'then': out['then']} if out.get('then') else None)   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
+        if out.get('closed'):   # design/221 row 18: the answer is the line of counts, not a page; nothing is published or written
+            emit({'closed': True, 'say': out.get('say') or '', 'then': out['then']}, 0, out['then'] + ' ' + out['how'])
+        info = hand(out,{'then': out['then']} if out.get('then') else None)   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
         emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} " + (out['then'] + ' ' if out.get('then') else '')
                       + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ")
                       + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"Round {info['round']}: {info['round_file']}. " + out['how'])
@@ -2948,7 +2954,8 @@ def cmd_visuals(a):
         waiting_line = (f"; {len(wt)} waiting for the operator: " + (f'all {on_page}' if paged == len(wt) else (f'{paged} of them are {on_page}; ' if paged else '')
                         + f"ask {'the others' if paged else 'them'} one at a time with `vw visuals next` (design/188), never from this list")) if wt else ''
         due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
-        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
+        six = (f"; step 6 (say this to the operator each time it changes, as it is, and ask nothing with it): {st['step6']}" if st.get('step6') else '')   # design/221 row 18
+        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + six + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)

@@ -41,6 +41,7 @@ def test_2_a_picture_checked_by_the_model_before_the_deploy_is_offered_with_that
     monkeypatch.setattr(V, 'visuals_spend', lambda *a: 0)
     got = []
     monkeypatch.setattr(V, 'approve_reference', lambda store, user, run, outputs, rid, sha, quote, conn=None: got.append(rid) or {})
+    s['references']['k2']['look'] = {'sha256': s['references']['k2']['sha256'], 'lines': []}   # design/221 phase 4: a step-6 still is handed out once everything is made
     ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
     item = next(i for i in CF._waiting_items(ctx) if i['id'] == f"picture:k1:{'a' * 10}")   # the id handed out in the chat before the deploy
     item['_run']('yes', 'Yes', '')

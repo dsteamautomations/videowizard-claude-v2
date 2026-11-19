@@ -25,6 +25,7 @@ LOOK_SAY = 300   # a look's sentence, at most (ref_find.SEEN_CHARS)
 W = {
     'step': 'Pictures and drawn graphics',
     'kind_question': 'A question about a picture already made', 'kind_style': 'The style sheet', 'kind_still': 'A still', 'kind_steps': 'A graphic in steps', 'kind_drawn': 'A drawn graphic',
+    'kind_component': 'A component',
     'style_name': 'The look of the graphics',
     'style_sub': 'One picture that sets the colours, lines and lettering of every graphic in the film.',
     'q_from': 'The server asks this about a picture already made. Nothing is made until you answer.',
@@ -68,27 +69,36 @@ W = {
     'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
     'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
     'fact_none': 'Not fact-checked yet.', 'fact_stale': 'Fact check: not passed. The brief changed after its rules were written:',
-    'fact_pass_notes': 'Fact check: passed, {k}. Every must rule held, after {r}; a note is a should rule that did not hold.', 'not_seen': 'Not seen yet ({need}): {rule}', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
+    'fact_pass_notes': 'Passed, {k}. Every must rule held, after {r}. A note is not a fault: it needs no reason to select.', 'not_seen': 'Not seen yet ({need}): {rule}', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
     'fact_passed_head': 'All {n} rules of the fact check (round {round})', 'fact_saw': 'What the checker saw', 'passed_rule': 'Passed: {rule}',
     'server_pass': "The server's check: passed.", 'server_fail': "The server's check: not passed. {k} lines are still open:", 'server_none': 'Not checked yet.',
     'alike': 'Steps {a} and {b} look almost the same: the change between them is small.',
     'size_ok': "Size: {seen}, the film's shape.", 'size_bad': 'Size: {seen}, not {want}.', 'parent_bad': 'Made from: a picture that was not approved ({seen}).',
     # the step's sentences
-    'say_need': '{n} need your answer:', 'say_need_one': '1 thing needs your answer:', 'say_coming': '{n} more are being made or checked: they come to the page later.',
-    'say_coming_one': '1 more is being made or checked: it comes to the page later.', 'say_done': 'Then say done here.', 'say_nothing': 'Nothing waits for you on the page now.',
-    'summary': '{n} to answer, {c} still being made or checked.', 'note': 'Answer what is ready, then say done in the chat.', 'nothing': 'Nothing waits for you now.',
-    'making': 'Being made. It joins the list when it is ready.', 'checking': 'Claude is checking it. It joins the list when it is checked.',
+    'say_need': '{n} need your answer:', 'say_need_one': '1 thing needs your answer:', 'say_failed': '{n} could not be made: they are listed apart.',
+    'say_failed_one': '1 could not be made: it is listed apart.', 'say_done': 'Then say done here.', 'say_nothing': 'Nothing waits for you on the page now.',
+    'summary': '{n} to answer, {c} could not be made.', 'note': 'Answer each line, then say done in the chat.', 'nothing': 'Nothing waits for you now.',
+    'failed': 'It could not be made. Claude tells you in the chat what happens to it.',
     'help': ['Each line on the left needs one answer. Answer them in any order, then say done in the chat.',
              'A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.',
              'Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.',
-             'New pictures arrive while the film is being made. Claude checks each one first; it joins the list when it is checked.'],
+             'This page opens when everything of the step is made. Claude checked each picture and drawing first.'],
+    # design/221 phase 4 (rows 18, 19): what step 6 must make, each thing's state, the line of counts, the page at the end
+    'page_later': 'The page opens when everything of step 6 is made.',
+    'page_now': ('Everything of step 6 is made: the operator answers it on the page, in one visit: run `vw visuals page` instead; ask here only where the page '
+                 'cannot be shown. '),
+    'shown': '{name}: made and checked, {notes}. You judge it on the page with the others.',
+    'stills_due': ('{n} still shots have no picture asked for yet ({ids}): order them now, beside the drawn graphics (`vw visuals image --shot S --element E '
+                   '--kind keyframe --prompt "…"`); they need nothing from the drawings.'),
+    'stills_due_one': ('1 still shot has no picture asked for yet ({ids}): order it now, beside the drawn graphics (`vw visuals image --shot S --element E '
+                       '--kind keyframe --prompt "…"`); it needs nothing from the drawings.'),
     'later_step': 'Made from a step that was corrected.',
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
     'comp_unopened': 'Claude could not open it ({why}).',
 }
 PAGE = {   # layout.words.pictures: the page's chrome
-    'todo': 'Needs your answer', 'coming': 'Still being made, nothing to do', 'nothing': W['nothing'], 'against': 'Against the check',
+    'todo': 'Needs your answer', 'coming': 'Could not be made', 'nothing': W['nothing'], 'against': 'Against the check',
     'done': {'answer': 'Answered', 'approve': 'Approved', 'again': 'Made again', 'fix': 'Made again, your words', 'select': 'Selected', 'reject': 'Rebuilt, your words', 'plain': 'Made again, no effect'},
     'undo': 'Undo', 'cancel': 'Cancel', 'details': 'Details', 'more': 'See all {n}', 'fewer': 'Show fewer', 'compare': 'Compare with the earlier try', 'stop': 'Stop comparing',
     'frames': 'Show its frames', 'video': 'Show the video', 'video_bad': 'The video could not be shown here; these are its frames.',
@@ -808,33 +818,123 @@ def chat_text(line):
     return '\n'.join('- ' + r for r in rows if r)
 
 
-# ---------- what is still coming (layout.coming) ----------
+# ---------- design/221 phase 4: what step 6 must make, and each thing's state ----------
 
-def coming(session, plan, take_rows, now=None):
-    """The items with no answer yet: being made (a picture `generating`, a drawing whose render is not ready) or made and waiting for Claude's check."""
-    out = []
-    kinds = {'keyframe': W['kind_still'], 'state': W['kind_steps'], 'style': W['kind_style']}
-    for r in session['references'].values():
-        if r.get('kind') not in kinds or r.get('set') or (r.get('kind') == 'keyframe' and video_shot(session, plan, r)):
+STATE = {'none': 'not started', 'making': 'being made', 'checking': 'being checked by Claude', 'redo': 'being redone', 'done': 'made and checked',
+         'held': 'held (needs a decision)', 'answered': 'answered', 'failed': 'could not be made'}
+ORDER = ('done', 'answered', 'checking', 'making', 'redo', 'held', 'failed', 'none')   # the order of the counts in the line
+GROUPS = (('drawn', 'Drawn graphics'), ('still', 'Stills'), ('steps', 'Graphics in steps'), ('component', 'Components'))
+COMPLETE = (STATE['done'], STATE['answered'], STATE['failed'])   # a thing that could not be made never keeps the page closed
+KIND_WORDS = {'drawn': 'kind_drawn', 'still': 'kind_still', 'steps': 'kind_steps', 'component': 'kind_component'}
+
+
+def _pictures_state(session, plan, mine, now, need=1):
+    """A still's (or a graphic in steps') state from the pictures made for its shot, in the order they were asked."""
+    live = [r for r in mine if r.get('status') in ('generating', 'candidate', 'approved')]
+    if any(r['status'] == 'generating' for r in live):
+        return 'redo' if any(r.get('status') in ('rejected', 'failed') for r in mine) else 'making'
+    made = [r for r in live if r['status'] == 'candidate' and r.get('sha256')]
+    if any(not offered(session, r, plan, now) for r in made):
+        return 'checking'
+    if live:
+        return ('done' if made else 'answered') if len(live) >= need else 'making'   # some steps of a graphic made: the others come
+    return ('failed' if mine[-1].get('status') == 'failed' else 'redo') if mine else 'none'   # only rejected tries: another is asked
+
+
+def _component_state(rs):
+    """A component (a part a drawn graphic places): approved by Claude's check, never asked of the operator."""
+    live = [r for r in rs if r.get('status') in ('generating', 'candidate', 'approved')]
+    if not live:
+        return 'failed' if rs[-1].get('status') == 'failed' else None   # rejected and replaced: not counted
+    if any(r['status'] == 'generating' for r in live):
+        return 'redo' if len(rs) > len(live) else 'making'
+    if any(r['status'] == 'approved' for r in live):
+        return 'done'
+    look = looked(live[-1])
+    return 'redo' if look and (look.get('not_checked') or _failed_lines(live[-1])) else 'checking'   # a failed one is made again by the assistant
+
+
+def _drawn_state(session, sh, take_rows):
+    """(state, the render job shown) of a drawn shot, from what the server knows: the render jobs, the held verdict, the verdicts, the uploads,
+    the still end-frame. 'made and checked' only once its render is ready."""
+    sid = sh['id']
+    last = next((j for j in reversed(take_rows or []) if j.get('provider') == 'drawn' and j.get('unit') == sid
+                 and ((session.get('reviews') or {}).get(str(j['id'])) or [{}])[-1].get('decision') != 'rejected'), None)
+    if V.held_drawing(session, sid):
+        return 'held', last
+    if last and last['status'] == 'ready':
+        return 'done', last
+    if last and last['status'] in ('queued', 'running', 'storage_pending'):
+        return 'making', None
+    if last:
+        return 'failed', None   # the render failed: another render is the assistant's
+    checks = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still')]
+    if checks:
+        return ('redo' if V.held_rules(checks[-1]) else 'checking' if V.open_rules(checks[-1]) else 'making'), None   # clean: its render comes next
+    if any(p.get('shot_id') == sid and not p.get('still') for p in (session.get('motion_projects') or {}).values()):
+        return 'checking', None
+    started = (session.get('motion_stills') or {}).get(sid) or (session.get('motion_checks') or {}).get(sid) or any(p.get('shot_id') == sid for p in (session.get('motion_projects') or {}).values())
+    return ('making' if started else 'none'), None
+
+
+def expected(session, plan, take_rows, now=None):
+    """Every thing step 6 must make, from the accepted plan and the session, in film order, then the components: [{kind, id, name, state, job?}];
+    kind still, steps, drawn or component; the state in plain words (STATE)."""
+    out, refs = [], list(session['references'].values())
+    for _, sh in V._accepted_shots(plan, session):
+        kind = {'still': 'still', 'graphic_sequence': 'steps', 'drawn': 'drawn'}.get(V.route_of(sh))
+        if not kind:
             continue
-        state = 'making' if r.get('status') == 'generating' else 'checking' if r.get('status') == 'candidate' and r.get('sha256') and not offered(session, r, plan, now) else None
+        sid, job = sh['id'], None
+        if sid in (session.get('selections') or {}) or sid in (session.get('assets') or {}):
+            state = 'answered'
+        elif kind == 'drawn':
+            state, job = _drawn_state(session, sh, take_rows)
+        else:
+            mine = [r for r in refs if r.get('kind') == ('keyframe' if kind == 'still' else 'state') and V.made_for(session, r) == sid and not r.get('set')]
+            state = _pictures_state(session, plan, mine, now, len(sh.get('states') or []) if kind == 'steps' else 1)
+        out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {})})
+    names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
+    by = {}
+    for r in refs:
+        if r.get('kind') == 'component':
+            by.setdefault(r.get('element_id') or r['id'], []).append(r)
+    for eid, rs in by.items():
+        state = _component_state(rs)
         if state:
-            name = W['style_name'] if r['kind'] == 'style' else name_of(session, plan, r)
-            row = {'name': name, 'kind_words': kinds[r['kind']], 'state': state, 'note': W[state]}
-            if row not in out:
-                out.append(row)
-    shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
-    for j in take_rows or []:
-        if j.get('provider') == 'drawn' and j.get('status') in ('queued', 'running') and j.get('unit') in shots:
-            row = {'name': str(shots[j['unit']].get('title') or j['unit']), 'kind_words': W['kind_drawn'], 'state': 'making', 'note': W['making']}
-            if row not in out:
-                out.append(row)
+            out.append({'kind': 'component', 'id': eid, 'name': str(names.get(eid) or eid), 'state': STATE[state]})
     return out
+
+
+def complete(items):
+    """The page of step 6 opens: every thing is made and checked, answered, or could not be made (a held drawing waits for its card)."""
+    return all(i['state'] in COMPLETE for i in items)
+
+
+def status_line(items):
+    """One short line of counts: 'Drawn graphics: 5 made and checked, 3 being redone, 1 held (needs a decision). Stills: 9 made and checked.'"""
+    out = []
+    for kind, head in GROUPS:
+        mine = [i['state'] for i in items if i['kind'] == kind]
+        if mine:
+            out.append(f"{head}: " + ', '.join(f'{mine.count(STATE[s])} {STATE[s]}' for s in ORDER if STATE[s] in mine) + '.')
+    return ' '.join(out)
+
+
+def stills_due(items):
+    """design/221 row 19: the still shots with no picture asked for yet, said in the tool's next-step line until each is ordered."""
+    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none']]
+    return (W['stills_due_one'] if len(ids) == 1 else W['stills_due']).format(n=len(ids), ids=', '.join(ids)) if ids else ''
+
+
+def coming(items):
+    """layout.coming: the things that could not be made, shown apart on the page (nothing is listed there while it is being made: the page opens at the end)."""
+    return [{'name': i['name'], 'kind_words': W[KIND_WORDS[i['kind']]], 'state': 'failed', 'note': W['failed']} for i in items if i['state'] == STATE['failed']]
 
 
 def say(lines, rows):
     """The one message the assistant posts with the link (contract 2.4)."""
-    more = (W['say_coming_one'] if len(rows) == 1 else W['say_coming'].format(n=len(rows))) if rows else ''
+    more = (W['say_failed_one'] if len(rows) == 1 else W['say_failed'].format(n=len(rows))) if rows else ''
     if not lines:
         return ' '.join(x for x in (W['say_nothing'], more) if x)
     head = W['say_need_one'] if len(lines) == 1 else W['say_need'].format(n=f'{len(lines)} things')

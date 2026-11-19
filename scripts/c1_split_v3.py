@@ -164,6 +164,8 @@ if __name__ == '__main__':
         prompt = d221d(prompt, parts)
         from d221e_wording_v3 import apply as d221e   # design/221 phase 3c: the shared parts drawn once and approved in the chat (row 1)
         prompt = d221e(prompt, parts)
+        from d221f_wording_v3 import apply as d221f   # design/221 phase 4: step 6 on the page once everything is made, the line of counts, a finished drawing shown in the chat, the held drawing's card, the stills at the start
+        prompt = d221f(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

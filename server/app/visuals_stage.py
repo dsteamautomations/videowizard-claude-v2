@@ -2719,7 +2719,7 @@ def supply_own(conn, store, user, run, outputs, element_id, content=None, url=''
         x.get('kind') == 'sheet' and x.get('sources_changed') and x.get('element_id') == element_id for x in session['references'].values()) else '.')}
 
 
-def waiting(session, plan, code, take_rows, budget=None):
+def waiting(session, plan, code, take_rows, budget=None, gate=True):
     """design/97 W1, W3, W4: what waits for the operator's verdict, in film order, each with its label and link: a checked candidate (a reference,
     the style sheet, a still, a start or end image, a sequence once every state is made), a ready take, a drawing spec, a reuse.
     UI change, 11 Nov 2026 (R6 to R9): every item names its kind and carries the card it waits on (its group: an element on References, a shot on
@@ -2806,7 +2806,13 @@ def waiting(session, plan, code, take_rows, budget=None):
     for j in take_rows:   # design/207 (D2): a reuse no longer waits for the operator (the older way, retired: "Reuse · <shot>", reuse to approve)
         sh, reviews = shots.get(j['unit']), session['reviews'].get(str(j['id'])) or []
         if sh and j['status'] == 'ready' and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected'):
-            add(sh['start_frame'], f"Take · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'take to select')
+            if held_drawing(session, j['unit']):   # design/221 row 18: a drawing held after its rounds is an early decision, a card in the chat
+                add(sh['start_frame'], f"Held drawing · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'held drawing')
+            else:
+                add(sh['start_frame'], f"Take · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'take to select')
+    if gate and round_v2(session) and not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # design/221 row 18: step 6 is shown at the end, on the page (gate False: an answer given on the page that opened)
+        items = [(a, i) for a, i in items if not (i['kind'] == 'graphics to approve' or (i['kind'] == 'picture to answer' and i['step'] == 'pictures')
+                                                   or (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'drawn'))]
     return [i for _, i in sorted(items, key=lambda x: x[0])]
 
 
@@ -6551,6 +6557,54 @@ def open_rules(rec):
             + list((rec or {}).get('label_musts') or []))
 
 
+HELD_ROUNDS = 3   # design/221 row 18: after round 3 a drawing with an open must is held; "One more round" on its card allows round 4, once
+HELD_LIMIT = ('{shot}: round {rnd} is past the last round ({top}): the drawing is held and the operator decides on its card in the chat (`vw visuals next`); '
+              '"One more round" there allows round 4, once.')
+HELD_MORE_USED = '{shot}: the one more round is used: select it anyway with a reason, or reject it.'
+
+
+def held_rules(rec):
+    """The failed musts of a verdict (a not-seen rule is still being judged, not failed)."""
+    return [r['rule'] for r in (rec or {}).get('rules') or [] if r.get('pass') is False and r.get('class') != 'should'] + list((rec or {}).get('label_musts') or [])
+
+
+def held_drawing(session, shot_id):
+    """design/221 row 18: the latest verdict of the shot's animated project when a must still fails after its last round (3, or 4 after "One more
+    round") and the operator has not answered its card; else None."""
+    rec = next((c for c in reversed((session.get('motion_checks') or {}).get(shot_id) or []) if not c.get('still')), None)
+    if not rec or not held_rules(rec) or int(rec.get('round') or 1) < HELD_ROUNDS + bool((session.get('motion_more') or {}).get(shot_id)):
+        return None
+    ans = (session.get('motion_held') or {}).get(shot_id) or {}
+    return None if (ans.get('sha256'), ans.get('round')) == (rec.get('sha256'), rec.get('round')) else rec
+
+
+def held_answer(conn, store, user, run, outputs, shot_id, job_id, choice, quote, words=''):
+    """design/221 row 18: the operator's answer on a held drawing's card: select it anyway (with their reason, as select_take asks of a held
+    drawing), reject it (rebuilt from round 1), or one more round (once: the server then takes round 4)."""
+    session = session_of(store, run, outputs)
+    rec = held_drawing(session, shot_id)
+    need(rec, f'{shot_id}: no drawing of it is held now: run `vw visuals next`.')
+    need(choice in ('select', 'reject', 'more'), f'Not an answer to a held drawing: {choice!r} (select, reject or more).')
+    need(choice != 'more' or not (session.get('motion_more') or {}).get(shot_id), HELD_MORE_USED.format(shot=shot_id))
+    words = str(words or '').strip()
+    need(choice != 'select' or words, "Say why it is right for the film all the same, in the operator's words.")
+    out = select_take(conn, store, user, run, outputs, job_id, quote, words) if choice == 'select' else {}   # refused there, nothing is recorded here
+    session = session_of(store, run, outputs)
+    session.setdefault('motion_held', {})[shot_id] = {'sha256': rec.get('sha256'), 'round': rec.get('round'), 'answer': choice, 'words': words, 'quote': quote,
+                                                      'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    if choice == 'more':
+        session.setdefault('motion_more', {})[shot_id] = True
+    save_session(store, run, session)
+    if choice == 'select':
+        return {**out, 'recorded': True}
+    review_take(conn, store, user, run, outputs, job_id, 'rejected', words or ("one more round, at the operator's word" if choice == 'more' else ''), '', quote)
+    if choice == 'more':
+        return {'recorded': True, 'for_the_assistant': (f"{shot_id}: one more round, at the operator's word: give the open musts to a `vw-motion-shot` helper to redo it and "
+                                                        'send its verdict as round 4. After it the operator decides again: select it anyway or reject it.')}
+    return {'recorded': True, 'for_the_assistant': f'{shot_id}: the operator rejected the held drawing' + (f': "{words}".' if words else '.')
+            + ' Give a new `vw-motion-shot` helper the open musts' + (' and these words' if words else '') + ' to rebuild it, and check it again from round 1.'}
+
+
 def passed_project(session, shot):
     """design/221 row 2: the sha of the shot's project that passed its fact check (the bound one, else the plan's with a clean verdict), else ''."""
     sha = (session.get('motion_bound') or {}).get(shot['id']) or ((shot.get('scene_motion') or {}).get('sha256') or '')
@@ -6604,6 +6658,8 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     blind = [r['rule'] for r in rules if r['pass'] == NOT_SEEN and not str(r.get('need') or '').strip()]
     need(not blind, MOTION_RULE_NEED.format(shot=shot['id'], rule=str(blind[0])[:160] if blind else ''))
     rnd = int(body.get('round') or 1)
+    top = HELD_ROUNDS + bool((session.get('motion_more') or {}).get(shot['id']))   # design/221 row 18: round 4 only after "One more round"
+    need(still or rnd <= top, HELD_LIMIT.format(shot=shot['id'], rnd=rnd, top=top))
     prev = ((session.get('motion_checks') or {}).get(shot['id']) or [None])[-1]
     same = (bool(prev) and prev.get('sha256') == sha and int(prev.get('round') or 1) == rnd
             and any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []))   # row 12: the frames a "not seen" asked for, answered in the same round
@@ -6653,13 +6709,17 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
             if png and (was_st.get('approved') or {}).get('png') == png:   # the same picture made again (the parts changed elsewhere): its approval stays
                 st['approved'] = was_st['approved']
             session.setdefault('motion_stills', {})[shot['id']] = st
-    elif not names and not blind:
+    elif (not names and not blind) or (names and rnd >= top):   # design/221 row 18: a drawing held after its last round is bound too, rendered for its card
         bound[shot['id']] = sha
     elif bound.get(shot['id']) == sha:
         bound.pop(shot['id'])
     save_session(store, run, session)
     n_notes = f"{len(notes)} note{'' if len(notes) == 1 else 's'}"
-    if still and names:
+    if names and not still and rnd >= top:
+        nxt = (f"Held after round {rnd}: {len(names)} must rule{' still fails' if len(names) == 1 else 's still fail'}. Render it (`vw motion render --shot {shot['id']}`): "
+               "the operator decides on its card in the chat (`vw visuals next`): select it anyway with a reason, reject it, or one more round"
+               + ('.' if top > HELD_ROUNDS else ' (once).'))
+    elif still and names:
         nxt = (f"{len(names)} rules failed on the still: give them to a vw-motion-shot helper for {shot['id']} to redo the still (the still's rounds do not count "
                "against the animation's three).")
     elif still and not blind:
@@ -7181,13 +7241,15 @@ def status(conn, store, run, outputs, repair=True):
     refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'set', 'set_n', 'notes', 'sources')}, 'note': (r.get('source') or {}).get('note') or '', 'sources_changed': bool(r.get('sources_changed'))}   # design/106 N4; design/110; design/151
             for r in session['references'].values()]
     take_rows = take_jobs(conn, run)
+    six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
+    step6 = ' '.join(x for x in (pictures.status_line(six), pictures.stills_due(six)) if x)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3
              for j in take_rows]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'busy': not repair, **({'pictures_waiting': looks} if looks else {}), **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+    return {'state': 'prepared', 'busy': not repair, **({'pictures_waiting': looks} if looks else {}), **({'step6': step6} if step6 else {}), **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6

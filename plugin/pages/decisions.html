@@ -1118,6 +1118,7 @@ function pVideo(l,onBad){   // the video page copy, on a loop with no sound; no 
 function pCheck(l){   // the check as one coloured line: its first fault in the head, the others behind "See all n" (a drawn graphic's open rules all in view)
   const c=l.check, w=SW(); if(!c) return null; const f=c.faults||[], all=c.show==='all', rest=all?f:f.slice(1), o=!!S.open.why;
   return mk('div',{class:'sverdict'+(c.state==='fail'?' bad':c.state==='pass'?'':' doubt'),id:'pcheck','data-state':c.state},mk('div',{},mk('b',{},c.head),
+    (c.notes||[]).length?mk('ul',{id:'pnotes'},c.notes.map(x=>mk('li',{},x))):null,   // design/221: a drawing that passed with notes lists them; a note is not a fault
     rest.length&&(all||o)?mk('ul',{},rest.map(x=>mk('li',{},x))):null,
     !all&&rest.length?mk('button',{class:'slink',id:'pmore',type:'button',on:{click:()=>{ S.open.why=!o; sMainDraw(); }}},o?w.fewer:String(w.more||'').replace('{n}',f.length)):null,
     c.by?mk('p',{class:'pby'},c.by):null)); }

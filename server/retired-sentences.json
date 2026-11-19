@@ -158,6 +158,8 @@
     "the main assistant puts that shot's last frame in `refs/continues-from.png`",
     "with no pictures it stops at a still key frame first",
     "first build the key frame as a still (everything in place, nothing moving)",
-    "answer \"key frame ready\" with its sha256, so it is checked before you animate"
+    "answer \"key frame ready\" with its sha256, so it is checked before you animate",
+    "as they become ready; a failed line is shown with its words",
+    "then show the operator the open musts"
   ]
 }

@@ -62,7 +62,7 @@ def test_the_page_shows_passed_with_notes_and_select_takes_it_without_words():
         v = P.fact_view(saved(store), store, {'unit': 'MO1', 'request': {'request_key': 'k'}}, 'MO1')
     finally:
         VS.load_json = orig
-    assert v['state'] == 'pass' and v['notes'] == [EVEN] and v['head'].startswith('Fact check: passed, 1 note.')
+    assert v['state'] == 'pass' and v['notes'] == [EVEN] and v['head'].startswith('Passed, 1 note.')   # design/221 phase 4: "Passed, N notes" on the page
     conn = selectable(store, sha)
     assert g(lambda: VS.select_take(conn, store, USER, NEW, [], 'job-9', 'yes'))['job_id'] == 'job-9'
 
@@ -278,7 +278,8 @@ def test_the_texts_say_must_and_should_not_seen_the_frames_later_rounds_and_the_
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221b_wording_v3 as W
     import d221d_wording_v3 as D221D   # design/221, the critic's seven points and phase 3b: changes sentences of this script
-    stage = D221D.before(visuals())
+    import d221f_wording_v3 as D221F   # design/221 phase 4: the held drawing's card replaces "then show the operator the open musts"
+    stage = D221D.before(D221F.before(visuals()))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

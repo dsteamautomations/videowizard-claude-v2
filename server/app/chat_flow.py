@@ -1580,7 +1580,7 @@ def _waiting_items(ctx):
             briefs[sid] = V.motion_brief(store, run, outputs, sid, session=session)['lines']
         return briefs[sid]
     take_rows = V.take_jobs(conn, run)
-    rows = V.waiting(session, plan, run.get('code'), take_rows, V._set_budget(run, session, V.visuals_spend(conn, run)))
+    rows = V.waiting(session, plan, run.get('code'), take_rows, V._set_budget(run, session, V.visuals_spend(conn, run)), **({'gate': False} if ctx.get('page') else {}))   # design/221: the page's answers are never held back
     frames = _round_frames(ctx)
     rows = [w for w in rows if w['kind'] not in ('set to judge', 'set to make') and w['item'] not in frames]   # the round's own items, above; the round's footage pictures, at its step 1
     shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
@@ -1664,6 +1664,20 @@ def _waiting_items(ctx):
             items.append(_item(f"still-end:{it}:{hashlib.sha256(''.join(st['png'] for st in sts).encode()).hexdigest()[:10]}", 'still end-frame', where, ask, run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the still, in their words.')],
                                show=[{'key': st['frame_key'], 'name': f'{sid}-still-end.png'} for sid, st in zip(ids, sts)]))
+        elif kind == 'held drawing':   # design/221 row 18: a must still fails after the last round: its frames, the open musts in full, three answers
+            job, rec = next((j for j in take_rows if str(j['id']) == str(it)), None), V.held_drawing(session, group)
+            if not job or not rec:
+                continue
+            musts, res = V.held_rules(rec), job.get('result') or {}
+
+            def run_(choice, quote, words, job=job, group=group):
+                return V.held_answer(conn, store, user, run, outputs, group, str(job['id']), choice, quote, words)
+            buttons = [_button('Select it anyway', 'select', words=True, tell='The drawing is held: ask the operator why it is right for the film all the same.'),
+                       _button('Reject it', 'reject')] + ([] if (session.get('motion_more') or {}).get(group) else [_button('One more round', 'more')])
+            items.append(_item(f"held:{group}:{str(rec.get('sha256'))[:10]}:{rec.get('round')}", 'held drawing', where,
+                               f"{title(group)}: held after round {rec.get('round')}: {len(musts)} must rule{' still fails' if len(musts) == 1 else 's still fail'}. What do you decide?",
+                               run_, buttons, text='\n'.join('- ' + m for m in musts),
+                               show=[{'key': k, 'name': f'{group}-{n}'} for k, n in ((res.get('key'), 'drawing.mp4'), (res.get('sheet_key'), 'frames.jpg')) if k]))
         elif kind in ('drawing spec to approve', 'material spec to approve'):
             key = V.material_key(group) if kind.startswith('material') else group
             specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once
@@ -1900,6 +1914,7 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
         'Correct every picture of it': 'The set is made again with your words, and they go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
         'Make it': 'Make the set now (paid)', 'Yes, use it': 'Use the footage picture', 'Yes, make one': 'Have a set made (paid)',
         'Take the effect away': 'Make the drawing again without the added effect',
+        'Select it anyway': 'Use it in the film; I will ask you why', 'Reject it': 'It is rebuilt from the start', 'One more round': 'The helpers try once more (allowed once)',
         'Use it as the reference': 'Take the footage picture; nothing is made', 'Make a clean set from it': 'A set is made from the footage picture', 'Have a set made': 'A set of three pictures is made',
         'No set needed': 'Its words carry it; nothing is made', 'Ask me each one': 'I ask you every thing in turn',
         'Make a set': 'A set is made of it; it comes back to you to judge', 'Minor corrections': 'The set is made again with your words', 'Leave out': 'This thing gets no reference',
@@ -2081,6 +2096,30 @@ def next_item(conn, store, user, run, outputs, one=False):
         looks = P.waits_words(session, plan)
         if looks:
             out['then'] = looks + (' ' + out['then'] if out.get('then') else '')
+        due = P.stills_due(P.expected(session, plan, V.take_jobs(conn, run)))   # design/221 row 19: the stills are ordered at the start of step 6
+        if due:
+            out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
+    return out
+
+
+STATUS_HOW = ' (the first is the count of step 6: say it each time it changes, as it is, and ask nothing with it)'
+SHOW_HOW = 'The tool saved the files of `show` in the run folder: show each to the operator with its `say` line, as it is; ask nothing about it. '
+
+
+def _step6(ctx):
+    """design/221 row 18: step 6's things (`pictures.expected`), on a film whose step 6 is answered on the page; else []."""
+    return P.expected(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run'])) if ctx['plan'] and V.round_v2(ctx['session']) else []
+
+
+def _finished(ctx, six):
+    """design/221 row 18: each drawn graphic whose render is ready, shown in the chat once (by its render job), to look at early; nothing is asked."""
+    shown, out = ctx['session'].setdefault('drawings_shown', {}), []
+    for i in six:
+        res = (i.get('job') or {}).get('result') or {}
+        if i['kind'] == 'drawn' and i['state'] == P.STATE['done'] and res.get('key') and shown.get(i['id']) != str(i['job']['id']):
+            n = len(P.fact_view(ctx['session'], ctx['store'], i['job'], i['id']).get('notes') or [])
+            out.append({'key': res['key'], 'name': f"{i['id']}-drawing.mp4", 'say': P.W['shown'].format(name=i['name'], notes=f"{n} note{'' if n == 1 else 's'}" if n else 'no notes')})
+            shown[i['id']] = str(i['job']['id'])
     return out
 
 
@@ -2108,15 +2147,24 @@ def _next_item(conn, store, user, run, outputs, one=False):
             session['chat_item'] = {'id': item['id'], 'at': datetime.now(timezone.utc).isoformat()}
             session.pop('chat_card', None)   # one at a time now: a card shown before is not answered any more
             V.save_session(store, run, session)
-        return {'item': _public(item, summary, len(items), one)}
+        pub = _public(item, summary, len(items), one)
+        if item.get('_line') and P.complete(_step6(ctx)):   # design/221 row 18: everything of step 6 is made: the page offers it, in one visit
+            pub['how'] = P.W['page_now'] + pub['how']
+        return {'item': pub}
     if session.pop('chat_item', None) or session.pop('chat_card', None):
         session.pop('chat_card', None)
         V.save_session(store, run, session)
-    lines = with_assistant + working(conn, run)
+    six = _step6(ctx)
+    count = P.status_line(six)
+    show = _finished({**ctx, 'session': session}, six)
+    if show:
+        V.save_session(store, run, session)
+    lines = ([count] if count else []) + with_assistant + working(conn, run)
     # design/211: a v2 round that waits for Claude (the looks at the made sets, a rewrite): the server's own sentence, as every status gives it; design/211 review, N6: and with the plan accepted and no round, what comes next
     turn = V.round_due(session, ctx['plan']) if V.round_v2(session) or (V.ROUND_V == 2 and not session.get('round')) else None
-    return {'item': None, 'needed': False, 'working': lines, 'say_last': NOTHING, **({'then': turn} if turn else {}),
-            'how': (FRAMES_ON_PAGE if _round_frames(ctx) else '') + 'Tell the operator the `working` lines as they are' + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
+    return {'item': None, 'needed': False, 'working': lines, 'say_last': NOTHING, **({'then': turn} if turn else {}), **({'show': show} if show else {}),
+            'how': (FRAMES_ON_PAGE if _round_frames(ctx) else '') + (SHOW_HOW if show else '') + 'Tell the operator the `working` lines as they are'
+                   + (STATUS_HOW if count else '') + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
 
 
 def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='', one=False):

@@ -6,7 +6,7 @@
  "open": true,
  "summary": "8 to answer, 4 still being made or checked.",
  "note": "Answer what is ready, then say done in the chat.",
- "say": "8 things need your answer:\n- The kiln picture shows the action too early\n- The look of the graphics\n- The finished three-storey building\n- The kiln worker with the clay pan\n- Fewer bricks, fewer resources\n- What the cavities do\n- The wall builds itself\n- The housing site\n4 more are being made or checked: they come to the page later. Then say done here.",
+ "say": "8 things need your answer:\n- The kiln picture shows the action too early\n- The look of the graphics\n- The finished three-storey building\n- The kiln worker with the clay pan\n- Fewer bricks, fewer resources\n- What the cavities do\n- The wall builds itself\n- The housing site\n4 could not be made: they are listed apart. Then say done here.",
  "preparing": "Getting 21 pictures ready for the page: about 2 minutes.",
  "layout": {
   "kind": "pictures",
@@ -14,18 +14,18 @@
    "Each line on the left needs one answer. Answer them in any order, then say done in the chat.",
    "A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.",
    "Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.",
-   "New pictures arrive while the film is being made. Claude checks each one first; it joins the list when it is checked."
+   "This page opens when everything of the step is made. Claude checked each picture and drawing first."
   ],
   "coming": [
-   {"name": "Two walls under the same load", "kind_words": "A drawn graphic", "state": "making", "note": "Being made. It joins the list when it is ready."},
-   {"name": "Less soil, less fuel", "kind_words": "A drawn graphic", "state": "making", "note": "Being made. It joins the list when it is ready."},
-   {"name": "The brick kiln at dusk", "kind_words": "A still", "state": "checking", "note": "Claude is checking it. It joins the list when it is checked."},
-   {"name": "Bricks on edge, step 2", "kind_words": "A graphic in steps", "state": "checking", "note": "Claude is checking it. It joins the list when it is checked."}
+   {"name": "Two walls under the same load", "kind_words": "A drawn graphic", "state": "failed", "note": "It could not be made. Claude tells you in the chat what happens to it."},
+   {"name": "Less soil, less fuel", "kind_words": "A drawn graphic", "state": "failed", "note": "It could not be made. Claude tells you in the chat what happens to it."},
+   {"name": "The brick kiln at dusk", "kind_words": "A still", "state": "failed", "note": "It could not be made. Claude tells you in the chat what happens to it."},
+   {"name": "Bricks on edge, step 2", "kind_words": "A graphic in steps", "state": "failed", "note": "It could not be made. Claude tells you in the chat what happens to it."}
   ],
   "words": {
    "pictures": {
     "todo": "Needs your answer",
-    "coming": "Still being made, nothing to do",
+    "coming": "Could not be made",
     "nothing": "Nothing waits for you now.",
     "against": "Against the check",
     "done": {"answer": "Answered", "approve": "Approved", "again": "Made again", "fix": "Made again, your words", "select": "Selected", "reject": "Rebuilt, your words", "plain": "Made again, no effect"},

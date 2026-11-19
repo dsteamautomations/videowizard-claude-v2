@@ -234,7 +234,7 @@ def test_the_screen_the_list_the_fold_and_the_count(browser):
     fold.click()
     rows = pg.locator('#pcoming li')
     assert rows.count() == 4 and [rows.nth(i).evaluate('e => e.firstChild.textContent') for i in range(4)] == [c['name'] for c in ROUND['layout']['coming']]
-    assert ROUND['layout']['coming'][2]['note'] in rows.nth(2).text_content() and rows.nth(2).get_attribute('data-state') == 'checking'   # C3: "Claude is checking it"
+    assert ROUND['layout']['coming'][2]['note'] in rows.nth(2).text_content() and rows.nth(2).get_attribute('data-state') == 'failed'   # design/221 phase 4: the fold lists what could not be made
     assert pg.locator('#pcoming button').count() == 0
     assert foot(pg) == W['foot'].replace('{n}', '0').replace('{m}', '8') + ' ' + W['foot_wait']
     # the first that needs an answer opens; the fonts
