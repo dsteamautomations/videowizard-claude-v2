@@ -232,13 +232,13 @@
    ],
    "pics": [
     {
-     "code": "p149e2e77163a",
+     "code": "pa0f8c5b28a0e",
      "label": "Take 1",
      "role": "frame",
      "take": 1
     },
     {
-     "code": "p149e2e77163a",
+     "code": "p84daa35a7812",
      "label": "Take 2",
      "role": "frame",
      "take": 2
@@ -266,7 +266,8 @@
      "prefill": "",
      "need": "Write your reason first. It is kept with the film.",
      "note": "",
-     "say": "Take 2 selected. It goes in the film at 0:00.0. Your reason: \"{words}\""
+     "say": "Take 2 selected. It goes in the film at 0:00.0. Your reason: \"{words}\"",
+     "end": "Take 2 selected, in the film at 0:00.0."
     },
     {
      "label": "Reject",
@@ -279,7 +280,8 @@
      "prefill": "One continuous shot: the picture jumps to another view at 1.5 s. Measured by the server. Objects: The cement bags on the pallet are gone from 1.5 s, with no one carrying them.",
      "need": "Write what is wrong first.",
      "note": "No further take is made from this camera: two were made. After this rejection Claude asks you in the chat: cut the shot, another angle, or leave it out.",
-     "say": "Take 2 rejected with your words: \"{words}\". No new take is ordered; Claude asks you in the chat what happens to the shot."
+     "say": "Take 2 rejected. No new take is ordered; Claude asks you in the chat what happens to the shot. Your words: \"{words}\"",
+     "end": "Take 2 rejected: \"{words}\""
     },
     {
      "label": "Use take 1 after all",
@@ -293,6 +295,7 @@
      "need": "Write your reason first. It is kept with the film.",
      "note": "",
      "say": "Take 1 selected. It goes in the film at 0:00.0.",
+     "end": "Take 1 selected, in the film at 0:00.0.",
      "sure": {
       "ask": "You rejected take 1 earlier. Use it in the film after all?",
       "go": "Use take 1 after all",
@@ -444,7 +447,12 @@
    ],
    "pics": [
     {
-     "code": "p149e2e77163a",
+     "code": "p1bd1900eb24f",
+     "label": "Your footage before this shot.",
+     "role": "before"
+    },
+    {
+     "code": "p73e90f163b2a",
      "label": "Take 1",
      "role": "frame",
      "take": 1
@@ -467,7 +475,8 @@
      "prefill": "",
      "need": "Write your reason first. It is kept with the film.",
      "note": "",
-     "say": "Take 1 selected. It goes in the film at 0:12.0."
+     "say": "Take 1 selected. It goes in the film at 0:12.0.",
+     "end": "Take 1 selected, in the film at 0:12.0."
     },
     {
      "label": "Make another",
@@ -480,7 +489,8 @@
      "prefill": "",
      "need": "Write what should change first. The next take is made from these words.",
      "note": "A new take is paid. Its price is said in the chat when you say done; nothing is ordered before that.",
-     "say": "Take 1 rejected with your words: \"{words}\". Another take is ordered when you say done; Claude says its price in the chat then."
+     "say": "Take 1 rejected. Another take is ordered when you say done; Claude says its price in the chat then. Your words: \"{words}\"",
+     "end": "Take 1 rejected, another take ordered: \"{words}\""
     },
     {
      "label": "Reject",
@@ -493,7 +503,8 @@
      "prefill": "",
      "need": "Write what is wrong first.",
      "note": "",
-     "say": "Take 1 rejected with your words: \"{words}\". No new take is ordered; Claude asks you in the chat what happens to the shot."
+     "say": "Take 1 rejected. No new take is ordered; Claude asks you in the chat what happens to the shot. Your words: \"{words}\"",
+     "end": "Take 1 rejected: \"{words}\""
     }
    ],
    "details": []
@@ -635,7 +646,7 @@
    ],
    "pics": [
     {
-     "code": "p149e2e77163a",
+     "code": "p41ca5fab3f31",
      "label": "Take 1",
      "role": "frame",
      "take": 1
@@ -784,6 +795,7 @@
     "end_note": "Go back to the chat and say done. This is what will happen then:",
     "end_foot": "Nothing is recorded or made before you say done.",
     "end_again": "New takes ordered when you say done: {n}. Claude says their price in the chat then.",
+    "end_reject": "For a take rejected with no new one ordered, Claude asks you in the chat what happens to the shot.",
     "foot": "{n} of {m} answered.",
     "foot_wait": "When all are answered, say done in the chat. Nothing is recorded before that.",
     "foot_done": "Go back to the chat and say done.",

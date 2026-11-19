@@ -12,7 +12,7 @@ New: the layout `layout.kind = "takes"`, its line kind `take`, its words `layout
 
 `step` is `"AI video"`. Open: `open`, `lines`, `say`, `summary`, `note`, `layout = {kind: "takes", help: [str], coming: [row], words}`. Closed (a take is being made or checked): `open: false`, `closed: true`, `lines: []`, `say` and `then` the line of counts, `note` "The page opens when every take is made and checked.", no `layout`; the assistant publishes nothing.
 
-`layout.words.takes` (the page holds no words): `todo`, `answered_head`, `coming`, `nothing`, `state_open`, `against`, `done {select, reject, again}`, `check_pass`, `more` ("See all {n}"), `seek` ("Go to {s} s"), `words_label`, `film`, `film_head`, `before`, `after`, `this_take`, `compare_only`, `details`, `d_check`, `d_passed` ("The {n} lines it passed"), `d_still`, `undo`, `cancel`, `close`, `change_in_chat`, `loading`, `missing`, `video_bad`, `left_one`, `left_many` ("{n}"), `left_note`, `end_head`, `end_note`, `end_foot`, `end_again` ("{n}"), `foot` ("{n} of {m} answered."), `foot_wait`, `foot_done`, `help`, `keys`. The only substitutions the page makes: `{n}`, `{m}`, `{s}` in these words and `{words}` in a button's `say`. No amount of money anywhere.
+`layout.words.takes` (the page holds no words): `todo`, `answered_head`, `coming`, `nothing`, `state_open`, `against`, `done {select, reject, again}`, `check_pass`, `more` ("See all {n}"), `seek` ("Go to {s} s"), `words_label`, `film`, `film_head`, `before`, `after`, `this_take`, `compare_only`, `details`, `d_check`, `d_passed` ("The {n} lines it passed"), `d_still`, `undo`, `cancel`, `close`, `change_in_chat`, `loading`, `missing`, `video_bad`, `left_one`, `left_many` ("{n}"), `left_note`, `end_head`, `end_note`, `end_foot`, `end_again` ("{n}"), `end_reject` (the end card's line when a take is rejected with no new one ordered), `foot` ("{n} of {m} answered."), `foot_wait`, `foot_done`, `help`, `keys`. The only substitutions the page makes: `{n}`, `{m}`, `{s}` in these words and `{words}` in a button's `say`. No amount of money anywhere.
 
 `layout.coming[]`: `{name, kind_words, state: "failed", note}` for a take that could not be made.
 
@@ -46,7 +46,7 @@ New: the layout `layout.kind = "takes"`, its line kind `take`, its words `layout
 
 ### 3.2 A button
 
-`label`, `choice` (`select`, `again`, `reject`, `old:<n>`), `act` (`select`, `again`, `reject`), `take`, `needs_words`, `hint`, `go`, `prefill`, `need`, `note` (a small line inside the open box: that a new take is paid; why no further take can be made), `say` (with `{words}`), and `sure {ask, go, back}` on "Use take n after all" when that take's check passed. "Make another" is absent when two takes were made from the camera or the cost limit would be passed.
+`label`, `choice` (`select`, `again`, `reject`, `old:<n>`), `act` (`select`, `again`, `reject`), `take`, `needs_words`, `hint`, `go`, `prefill`, `need`, `note` (a small line inside the open box: that a new take is paid; why no further take can be made), `say` (with `{words}`; shown with the answer and Undo), `end` (the short row of the end card, with `{words}`), and `sure {ask, go, back}` on "Use take n after all" when that take's check passed. "Make another" is absent when two takes were made from the camera or the cost limit would be passed.
 
 ### 3.3 What each choice calls (`takes.answer`, through the chat item's run function)
 

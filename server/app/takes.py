@@ -20,8 +20,9 @@ W = {
     'take_label': 'Take {n}', 'tab_rejected': 'Take {n}, rejected',
     'select': 'Select', 'again': 'Make another', 'reject': 'Reject', 'select_old': 'Use take {n} after all',
     'say_select': 'Take {n} selected. It goes in the film at {at}.', 'say_select_why': 'Take {n} selected. It goes in the film at {at}. Your reason: "{words}"',
-    'say_reject': 'Take {n} rejected with your words: "{words}". No new take is ordered; Claude asks you in the chat what happens to the shot.',
-    'say_again': 'Take {n} rejected with your words: "{words}". Another take is ordered when you say done; Claude says its price in the chat then.',
+    'say_reject': 'Take {n} rejected. No new take is ordered; Claude asks you in the chat what happens to the shot. Your words: "{words}"',
+    'say_again': 'Take {n} rejected. Another take is ordered when you say done; Claude says its price in the chat then. Your words: "{words}"',
+    'end_select': 'Take {n} selected, in the film at {at}.', 'end_reject': 'Take {n} rejected: "{words}"', 'end_again': 'Take {n} rejected, another take ordered: "{words}"',   # the end card's short rows
     'hint_reject': 'What is wrong with it?', 'go_reject': 'Reject with these words', 'need_words': 'Write what is wrong first.',
     'hint_again': 'What should change in the next take?', 'go_again': 'Make another with these words', 'need_again': 'Write what should change first. The next take is made from these words.',
     'again_paid': 'A new take is paid. Its price is said in the chat when you say done; nothing is ordered before that.',
@@ -92,6 +93,7 @@ PAGE = {   # layout.words.takes: the page's chrome (the page holds no words of i
     'left_one': '1 answer still needed', 'left_many': '{n} answers still needed', 'left_note': 'Choose one from the list on the left.',
     'end_head': 'All answered', 'end_note': 'Go back to the chat and say done. This is what will happen then:', 'end_foot': 'Nothing is recorded or made before you say done.',
     'end_again': 'New takes ordered when you say done: {n}. Claude says their price in the chat then.',
+    'end_reject': 'For a take rejected with no new one ordered, Claude asks you in the chat what happens to the shot.',
     'foot': '{n} of {m} answered.', 'foot_wait': 'When all are answered, say done in the chat. Nothing is recorded before that.', 'foot_done': 'Go back to the chat and say done.',
     'help': 'How this works', 'keys': 'Keys: the left and right arrows move between the shots. Escape closes what is open.'}
 
@@ -445,18 +447,18 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None, left_inr=Non
     more = _can_again(session, g, cur_job) and not cap
     buttons = [] if _stale(plan, cur_job) else [   # a take made for an earlier plan cannot be selected
         {'label': W['select'], 'choice': 'select', 'act': 'select', 'take': cur['n'], 'needs_words': bool(why), 'hint': why, 'go': W['go_why'] if why else '', 'prefill': '',
-         'need': W['need_why'], 'note': '', 'say': W['say_select_why' if why else 'say_select'].format(n=cur['n'], at=at, words='{words}')}]
+         'need': W['need_why'], 'note': '', 'say': W['say_select_why' if why else 'say_select'].format(n=cur['n'], at=at, words='{words}'), 'end': W['end_select'].format(n=cur['n'], at=at)}]
     if more:
         buttons.append({'label': W['again'], 'choice': 'again', 'act': 'again', 'take': cur['n'], 'needs_words': True, 'hint': W['hint_again'], 'go': W['go_again'], 'prefill': faults,
-                        'need': W['need_again'], 'note': W['again_paid'], 'say': W['say_again'].format(n=cur['n'], words='{words}')})
+                        'need': W['need_again'], 'note': W['again_paid'], 'say': W['say_again'].format(n=cur['n'], words='{words}'), 'end': W['end_again'].format(n=cur['n'], words='{words}')})
     buttons.append({'label': W['reject'], 'choice': 'reject', 'act': 'reject', 'take': cur['n'], 'needs_words': True, 'hint': W['hint_reject'], 'go': W['go_reject'], 'prefill': faults,
-                    'need': W['need_words'], 'note': '' if more else W['no_more_cap'] if cap and _can_again(session, g, cur_job) else W['no_more'], 'say': W['say_reject'].format(n=cur['n'], words='{words}')})
+                    'need': W['need_words'], 'note': '' if more else W['no_more_cap'] if cap and _can_again(session, g, cur_job) else W['no_more'], 'say': W['say_reject'].format(n=cur['n'], words='{words}'), 'end': W['end_reject'].format(n=cur['n'], words='{words}')})
     for t in takes[:-1]:   # an earlier, rejected take may be used after all: asked once when its check passed, with a typed reason when it did not
         ok = t['check']['state'] == 'pass' and not t['short']
         label = W['select_old'].format(n=t['n'])
         buttons.append({'label': label, 'choice': f"old:{t['n']}", 'act': 'select', 'take': t['n'], 'needs_words': not ok, 'hint': '' if ok else W['hint_why_old'].format(n=t['n']),
                         'go': '' if ok else W['go_why'], 'prefill': '', 'need': W['need_why'], 'note': '',
-                        'say': W['say_select' if ok else 'say_select_why'].format(n=t['n'], at=at, words='{words}'), **({'sure': {'ask': W['old_ask'].format(n=t['n']), 'go': label, 'back': W['back']}} if ok else {})})
+                        'say': W['say_select' if ok else 'say_select_why'].format(n=t['n'], at=at, words='{words}'), 'end': W['end_select'].format(n=t['n'], at=at), **({'sure': {'ask': W['old_ask'].format(n=t['n']), 'go': label, 'back': W['back']}} if ok else {})})
     before, after = _beside(session, plan, gap, sh, take_rows)
     still = next((s for s in g.get('stills') or [] if s.get('status') == 'approved' and s.get('key')), None)
     pics = before + [{'_key': (_rec(session, j).get('frames') or [{}])[0].get('key'), '_mark': str((j.get('result') or {}).get('sha256') or ''), 'label': W['frame'].format(n=k), 'role': 'frame', 'take': k}

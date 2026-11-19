@@ -369,6 +369,37 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .pagt{color:var(--chg);font-weight:600}
 .pcoming{list-style:none;margin:0 0 14px;padding:0} .pcoming li{padding:5px 10px 5px 20px;color:var(--muted);font-size:13px;line-height:1.35} .pcoming small{display:block;font-size:12px}
 .pnone{font-size:12px;color:var(--muted)}
+/* design/222 (SK, 19 Nov 2026): step 7, "AI video", in the same frame, as on the trial SK approved: the take large and playing, the words spoken during
+   the shot under its name and marked in time, beside it the check in one line, the buttons and two links; the film order and the details open over the page. */
+#sets .sapp{position:relative}
+.sstage.kstage{grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:20px} .kstage .sviewer{gap:6px;min-width:0}
+.kstage .pvbox{flex:1 1 auto;height:auto;min-height:150px} .pvbox.kbad{display:grid;place-items:center;padding:16px} .kbad .pnone{color:#e6edf3;font-size:13px}
+.khd{margin:0 0 8px}
+.kwords{margin-top:3px;font-size:15px;line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.kwords .ctx{color:var(--muted);opacity:.75} .kwords .w{border-radius:4px;padding:0 1px} .kwords .w.now{background:var(--accent);color:var(--surface)} .kwords .w.next{color:var(--muted)}
+.ktabs{flex:none;display:flex;gap:6px}
+#sets .ktab{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 12px;font-weight:600;font-size:13px}
+#sets .ktab[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.kstage .sverdict{display:block;padding:8px 14px;margin-bottom:10px} .kstage .sverdict b{display:inline;font-weight:600}
+.kshort{color:var(--chg);margin:0 0 8px} .kwas{color:var(--muted);margin:0 0 8px}
+.kstage .sbar{gap:8px;margin:2px 0 10px} #sets .kstage .sbtn{padding:8px 16px}
+.kstage .spanel,.kstage .sanswer{padding:10px 12px;margin:0 0 10px} .kstage .spanel textarea{min-height:54px}
+.klinks{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 6px}
+.srow.rej .sdot{background:var(--chg);color:var(--surface)}
+.kover{position:absolute;inset:0;background:rgba(10,14,20,.55);z-index:10;display:grid;place-items:center;padding:14px}
+.ksheet{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(1180px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.ksheet header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.ksheet h3{font:600 16px/1.2 var(--display);color:var(--fg);text-transform:none;letter-spacing:0}
+.kbody{padding:12px 16px;overflow:auto;min-height:0}
+.kfilm{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:12px} .kfilm figure{margin:0}
+.kpic{display:grid;place-items:center;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--line);color:var(--muted);font-size:12px}
+.kpic .ph{display:grid;place-items:center;width:100%;height:100%} .kpic img{width:100%;height:100%;object-fit:cover;display:block} .kfilm .now .kpic{outline:3px solid var(--accent);outline-offset:-3px}
+.kfilm figcaption{font-size:13px;color:var(--muted);margin-top:4px} .kfilm figcaption b{color:var(--fg)}
+.kdl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 28px} .kdl section{min-width:0;margin-bottom:10px}
+.kdl h4{font:600 12px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.kdl ul{margin:0;padding-left:18px} .kdl li{margin:2px 0} .kdl p{overflow-wrap:anywhere} .kdl .kpic{width:260px;max-width:100%}
+.scard.kend{max-width:1180px;margin:2vh auto 0;padding:12px 24px;max-height:100%;min-height:0;display:flex;flex-direction:column}   /* the list scrolls inside the card: its head, the count of new takes and its last line stay in view */
+.kend ul{margin:6px 0;padding-left:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:3px 36px;font-size:13px;line-height:1.4;max-width:none;overflow:auto;min-height:0} .kend p{font-size:13px}
 </style>
 
 <div class="wrap" id="wrap">
@@ -413,6 +444,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
   <div class="sapp">
     <nav class="srail" id="srail" aria-label="The sets"></nav>
     <main class="smain" id="smain" tabindex="-1"></main>
+    <div class="kover" id="kover" role="dialog" aria-modal="true" hidden></div>
   </div>
   <div class="sfoot" id="sfoot"></div>
 </div>
@@ -722,7 +754,7 @@ function heading(name,g,shut){   // design/211: the heading of a group of lines;
 function draw(force){
   const list=$('list');
   if(!ready){return;}
-  const kind=round&&round.layout&&round.layout.kind, things=kind==='things', sets=kind==='sets'||kind==='pictures';   // design/212: step 1 of the references has its own layout; design/216: step 2, the sets, the trial SK corrected; design/217: step 6 in the sets screen's frame
+  const kind=round&&round.layout&&round.layout.kind, things=kind==='things', sets=kind==='sets'||kind==='pictures'||kind==='takes';   // design/212: step 1 of the references has its own layout; design/216: step 2, the sets, the trial SK corrected; design/217: step 6 in the sets screen's frame
   $('things').hidden=!things; $('sets').hidden=!sets; $('wrap').hidden=things||sets;
   if(things){ tDraw(); return; }
   if(sets){ sDraw(); return; }
@@ -990,7 +1022,8 @@ const tFold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!targ
 // screen's (`layout.words.sets`). Answers are written as every line's answer is written (`write`, `ref`); nothing is recorded before "done".
 const S={round:'',cur:null,panel:null,msg:'',timer:0,help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{}};
 const PIC=()=>!!round&&(round.layout||{}).kind==='pictures';   // design/217: step 6 uses this frame with its own lines and words (`layout.words.pictures`)
-const SW=()=>(PIC()?W().pictures:W().sets)||{};
+const TK=()=>!!round&&(round.layout||{}).kind==='takes';   // design/222: step 7 uses this frame too, with `layout.words.takes`
+const SW=()=>(PIC()?W().pictures:TK()?W().takes:W().sets)||{};
 const sLines=()=>(round.lines||[]).filter(l=>l.key!=='sets:rest');
 const sRest=()=>(round.lines||[]).find(l=>l.key==='sets:rest'&&l.state==='open')||null;
 const sMade=l=>(l.pics||[]).filter(p=>!p.ref_only);
@@ -1001,14 +1034,14 @@ const sWaiting=()=>{ const r=sRest(); return r?sLines().filter(l=>(r.covers||[])
 const sItems=()=>sLines().filter(l=>l.state==='open').concat(sRest()&&sWaiting().length?[sRest()]:[]);   // what needs an answer, then the other sets (A10)
 const sJudged=()=>sLines().every(l=>l.case!=='judge'||sDone(l));
 const sBtn=(l,a)=>a.choice==='own'?{act:'own',label:(l.own||{}).label,say:(l.own||{}).say}:(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{};
-const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); if(PIC()) return !!(b&&b.sure); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
+const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); if(TK()){ const t=b&&(l.takes||[]).find(x=>x.n===b.take); return !!(b&&b.act==='select'&&t&&(t.check||{}).state!=='pass'); } if(PIC()) return !!(b&&b.sure); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
 function sMain(l){ const m=sMade(l), a=sAns(l), c=S.pick[l.line]; return m.find(p=>c?p.code===c:!!a&&!!p.choice&&p.choice===a.choice)||m[0]; }   // A7: A, unless another is made the main picture
 function sSays(l){   // the answer as it stands, in the server's words: the main picture's sentence, else the button's
   const a=sAns(l), w=SW(); if(!a) return l.kept?[w.kept,l.kept]:['',''];
   const p=(l.pics||[]).find(x=>x.choice&&x.choice===a.choice), b=sBtn(l,a), all=!!b.all&&b.all.choice===a.choice;
   return [w.answer,String((p&&p.say)||(all?b.all.say:b.say)||b.label||a.choice).replace('{words}',a.notes||'')]; }
 function sRefuse(m){ S.msg=m||''; const e=$('smsg'); if(e){ e.textContent=S.msg; e.hidden=!S.msg; } }
-function sGo(id){ clearTimeout(S.timer); S.cur=id; S.panel=null; S.msg=''; S.help=false; S.open={}; sDraw(); $('smain').scrollTop=0; }
+function sGo(id){ clearTimeout(S.timer); S.cur=id; S.panel=null; S.msg=''; S.help=false; S.open={}; S.over=null; sDraw(); $('smain').scrollTop=0; }
 function sAnswer(l,choice,notes,more){   // as every line's answer is written; after a moment the next thing that needs an answer opens
   S.panel=null; S.msg=''; write(l,choice,notes||'',more||{}); clearTimeout(S.timer);
   S.timer=setTimeout(()=>{ if(S.cur!==l.line) return; const n=sItems().find(x=>x.line!==l.line&&!sDone(x)); sGo(n?n.line:null); },1100); }
@@ -1127,7 +1160,7 @@ function pPanel(l){   // what opens under the buttons: "asks once" before an ans
   if(b.sure) return [mk('label',{},b.sure.ask),mk('div',{class:'sacts'},mk('button',{class:'sbtn',id:'ssure',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},b.sure.go),
     mk('button',{class:'sbtn primary',id:'sback',type:'button',on:{click:()=>sOpen(null)}},b.sure.back))];
   const k=l.line+'|'+b.choice, ta=mk('textarea',{id:'sfix',maxlength:String(MAX)}); ta.value=k in S.words?S.words[k]:(b.prefill||''); ta.addEventListener('input',()=>{ S.words[k]=ta.value; });
-  return [b.act==='select'&&l.held?mk('p',{class:'pfrom',id:'pheld'},l.held):null,mk('label',{for:'sfix'},b.hint||''),ta,
+  return [b.act==='select'&&l.held?mk('p',{class:'pfrom',id:'pheld'},l.held):null,mk('label',{for:'sfix'},b.hint||''),ta,b.note?mk('p',{class:'pby',id:'pnote'},b.note):null,   // design/222: what the button leads to, inside the box
     mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sfixsend',type:'button',on:{click:()=>{ const t=ta.value.trim().slice(0,MAX); if(!t){ sRefuse(b.need||w.words_need); ta.focus(); return; } sAnswer(l,b.choice,t); }}},b.go||b.label),cancel)]; }
 function pThing(l){
   const w=SW(), a=sAns(l), pics=l.pics||[], of=r=>pics.filter(p=>p.role===r), main=of('main')[0], steps=of('step'), sheet=of('sheet')[0];
@@ -1200,47 +1233,123 @@ function sRestView(r){   // "The other N sets": made together, or only some of t
   if(a) kids.push(mk('div',{class:'sanswer',id:'sanswer'},mk('p',{},mk('b',{},w.answer),sSays(r)[1]),mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(r)}},w.undo)));
   kids.push(mk('section',{class:'smore'},mk('h3',{},w.rest_more),sAcc('names',w.rest_names,waiting.length,mk('ul',{},waiting.map(t=>mk('li',{},t.title||t.name))))));
   return kids; }
+// ---------- design/222 (SK, 19 Nov 2026): step 7, "AI video" (`round.layout.kind==='takes'`), as on the trial SK approved ----------
+// One shot at a time: its name, the words spoken during it in time, the take large and playing (a tab per take, the newest open), beside it the check in
+// one line, the buttons of the take on the open tab and two links whose sheets open over the page. Every word is the round's (`layout.words.takes`, the
+// line, its takes and its buttons). Answers are written as every line's answer is written; a line answered earlier has no buttons.
+const kTake=l=>{ const ts=l.takes||[]; return ts.find(t=>t.n===S.view[l.line])||ts[ts.length-1]; };   // the take on the open tab: the newest unless another is chosen
+const kDone=l=>{ const a=sAns(l), b=a&&sBtn(l,a); return a?{act:b.act,against:sAgainst(l)}:l.state==='recorded'?l.answer||null:null; };
+function kRail(it){   // the name and a dot for its state, the state in words as its title; the lines answered earlier under their own heading
+  const w=SW(), rec=(round.lines||[]).filter(l=>l.state==='recorded');
+  const row=(l,i)=>{ const d=kDone(l), say=!d?w.state_open:d.against?w.against:(w.done||{})[d.act]||'';
+    return mk('li',{},mk('button',{class:'srow'+(d?(d.against?' against':d.act==='select'?' done':' rej'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,title:say,'aria-label':l.name+': '+say,on:{click:()=>sGo(l.line)}},
+      mk('i',{class:'sdot'},!d?String(i+1):d.against?'!':d.act==='again'?'↻':d.act==='select'?'✓':'×'),mk('span',{class:'snm'},l.name))); };
+  return [mk('ul',{},it.map(row))].concat(rec.length?[mk('h2',{},w.answered_head),mk('ul',{},rec.map(row))]:[]); }
+function kSeek(k,f){ const v=()=>PV[(k.video||{}).code];   // "Go to N s": the sheet closes, the player moves there and stops
+  return typeof f.at_s==='number'?mk('button',{class:'slink',type:'button','data-seek':String(f.at_s),on:{click:()=>{ kSheet(null); const p=v(); if(p){ p.currentTime=f.at_s; p.pause(); } }}},String(SW().seek||'').replace('{s}',f.at_s)):null; }
+function kCheck(k){   // ONE short line: the head, and on a failed check the first fault, its "Go to" and "See all N" (Details)
+  const c=k.check||{}, f=c.faults||[];
+  if(c.state!=='fail') return mk('div',{class:'sverdict'+(c.state==='pass'?'':' doubt'),id:'pcheck','data-state':c.state||''},mk('b',{},c.head));
+  return mk('div',{class:'sverdict bad',id:'pcheck','data-state':'fail'},mk('b',{},c.head),f[0]?[' ',f[0].text,' ',kSeek(k,f[0])]:null,
+    f.length>1?[' ',mk('button',{class:'slink',id:'pmore',type:'button',on:{click:()=>kSheet('details')}},String(SW().more||'').replace('{n}',f.length))]:null); }
+function kWords(l,k,v){   // the words spoken during the shot, the one being spoken marked as the take plays (also when dragged); a word is a whole unit; its time in the take is in_s + its second
+  const c=l.caption;
+  if(!c||!(c.words||[]).length) return l.words?mk('p',{class:'kwords',id:'pwords'},l.words):null;
+  const spans=c.words.map(x=>mk('span',{class:'w next'},x.t));
+  const p=mk('p',{class:'kwords',id:'pwords','aria-label':SW().words_label},c.pre?mk('span',{class:'ctx'},c.pre+' '):null,spans.map((s,i)=>[s,i<spans.length-1?' ':null]),c.post?mk('span',{class:'ctx'},' '+c.post):null);
+  if(!v) return p;
+  const mark=()=>{ const at=v.currentTime-(+k.in_s||0); let now=-1; c.words.forEach((x,i)=>{ if(at>=x.s) now=i; });
+    if(now===c.words.length-1&&at>c.words[now].e+0.4) now=c.words.length;   // past the last word: nothing is marked
+    spans.forEach((s,i)=>{ s.className='w '+(i===now?'now':i<now?'said':'next'); }); p.dataset.now=String(now); };
+  if(!v.kw){ v.kw=1; let raf=0; const run=()=>v.kmark&&v.kmark(), loop=()=>{ run(); raf=v.paused||!v.isConnected?0:requestAnimationFrame(loop); };   // the video is kept per take (PV): its listeners once
+    ['play','playing'].forEach(e=>v.addEventListener(e,()=>{ if(!raf) raf=requestAnimationFrame(loop); })); ['seeked','timeupdate','pause','loadedmetadata'].forEach(e=>v.addEventListener(e,run)); }
+  v.kmark=mark; mark(); return p; }
+function kSheet(o){ S.over=o; kOver(); const c=$('kclose'); if(c) c.focus(); }
+function kOver(){   // the film order or the details, over the page; Escape, Close or a click outside closes it; no answer button inside
+  const box=$('kover'), l=TK()&&!S.help&&(round.lines||[]).find(x=>x.line===S.cur), k=l&&kTake(l), w=SW();
+  if(!S.over||!k){ box.hidden=true; box.replaceChildren(); return; }
+  const pics=l.pics||[], c=k.check||{}, f=c.faults||[], li=xs=>mk('ul',{},xs.map(x=>mk('li',{},x)));
+  const pic=p=>{ const b=mk('div',{class:'kpic'},mk('span',{class:'ph'},p.missing?w.missing:w.loading)); if(!p.missing) loadThumb(p,b,()=>{},0); return b; };
+  let title, body;
+  if(S.over==='film'){
+    const row=[['before',w.before],['frame',w.this_take],['after',w.after]].map(([r,cap])=>{ const p=pics.find(x=>x.role===r&&(r!=='frame'||x.take===k.n));
+      return p&&mk('figure',{class:r==='frame'?'now':null,'data-code':p.code},pic(p),mk('figcaption',{},mk('b',{},cap+'. '),p.label)); }).filter(Boolean);
+    title=w.film_head; body=[mk('div',{class:'kfilm',style:'--n:'+row.length},row),mk('p',{class:'pby'},w.compare_only)];
+  } else {
+    const still=pics.find(p=>p.role==='still');
+    title=w.details; body=mk('div',{class:'kdl'},
+      mk('div',{},mk('section',{},mk('h4',{},w.d_check),f.length?mk('ul',{id:'dfaults'},f.map(x=>mk('li',{},x.text,' ',kSeek(k,x)))):mk('p',{},c.head),c.by?mk('p',{class:'pby'},c.by):null,c.not_judged?mk('p',{class:'pby'},c.not_judged):null),
+        (c.passed||[]).length?mk('section',{},mk('h4',{},String(w.d_passed||'').replace('{n}',c.passed.length)),li(c.passed)):null),
+      mk('div',{},(k.details||[]).map(d=>mk('section',{},mk('h4',{},d[0]),[].concat(d[1]||[]).map(x=>mk('p',{},x)))),still?mk('section',{},mk('h4',{},w.d_still),pic(still)):null));
+  }
+  box.replaceChildren(mk('div',{class:'ksheet',id:'ksheet'},mk('header',{},mk('h3',{},title+' · '+l.name),mk('span',{class:'sgrow'}),mk('button',{class:'sbtn',id:'kclose',type:'button',on:{click:()=>kSheet(null)}},w.close)),mk('div',{class:'kbody'},body)));
+  box.hidden=false; box.onclick=e=>{ if(e.target===box) kSheet(null); }; }
+function kThing(l){
+  const w=SW(), ts=l.takes||[], k=kTake(l), a=sAns(l), rec=l.state==='recorded', side=[];
+  if(!k) return [mk('h2',{class:'sname'},l.name)];
+  const vb=pVideo(k,()=>{ if(S.cur===l.line) sMainDraw(); }), v=vb&&PV[k.video.code];
+  if(v&&S.kplay!==l.line+'|'+k.n){ S.kplay=l.line+'|'+k.n; if(v.src&&v.paused){ const p=v.play(); if(p&&p.catch) p.catch(()=>{}); } }   // a take shown again plays again
+  const box=vb||mk('div',{class:'pvbox kbad'},mk('p',{class:'pnone',id:'pnone'},(k.video||{}).code?w.video_bad:(k.video||{}).none||w.video_bad)); box.id='sbig';
+  const tabs=ts.length>1?mk('div',{class:'ktabs',id:'ptabs',role:'tablist'},ts.map(t=>mk('button',{class:'ktab',type:'button',role:'tab','aria-selected':String(t===k),'data-take':String(t.n),on:{click:()=>{ S.view[l.line]=t.n; S.panel=null; S.msg=''; sMainDraw(); }}},t.tab))):null;
+  side.push(kCheck(k));
+  if(k.short) side.push(mk('p',{class:'kshort',id:'pshort'},k.short));
+  if(k.rejected) side.push(mk('p',{class:'kwas',id:'pwas'},k.rejected));
+  if(!rec){ const pass=(k.check||{}).state==='pass';
+    const bar=(l.buttons||[]).map((b,i)=>b.take===k.n&&mk('button',{class:'sbtn'+(pass&&b.act==='select'&&!b.sure?' primary':'')+(b.act==='reject'?' danger':''),type:'button','data-act':b.act,'data-choice':b.choice,
+      'aria-expanded':b.sure||b.needs_words?String(S.panel==='b'+i):null,on:{click:()=>{ if(b.sure||b.needs_words) return sOpen(S.panel==='b'+i?null:'b'+i); sAnswer(l,b.choice,''); }}},b.label)).filter(Boolean);
+    if(bar.length) side.push(mk('div',{class:'sbar',id:'pbar',role:'group','aria-label':l.ask||''},bar));
+    if(S.panel) side.push(mk('div',{class:'spanel',id:'spanel'},pPanel(l)));
+    side.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg)); }
+  const ans=a?[sSays(l)[1],sAgainst(l)]:rec&&l.answer?[l.answer.say,!!l.answer.against]:null;
+  if(ans) side.push(mk('div',{class:'sanswer'+(ans[1]?' against':''),id:'sanswer'},mk('p',{},ans[0],ans[1]?[' ',mk('span',{class:'pagt'},'('+w.against+')')]:null,rec?' '+w.change_in_chat:null),
+    a&&!rec?mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo):null));
+  side.push(mk('p',{class:'klinks',id:'plinks'},(l.pics||[]).some(p=>p.role==='before'||p.role==='after')?mk('button',{class:'slink',id:'pfilm',type:'button',on:{click:()=>kSheet('film')}},w.film):null,
+    mk('button',{class:'slink',id:'pdetails',type:'button',on:{click:()=>kSheet('details')}},w.details)));
+  return [mk('div',{class:'khd'},mk('h2',{class:'sname'},l.name),kWords(l,k,v)),mk('div',{class:'sstage kstage'},mk('div',{class:'sviewer'},tabs,box),mk('div',{class:'sside'},...side.flat(6).filter(Boolean)))]; }
 function sEnd(){   // A13: what will happen, thing by thing, before the operator says done
   const w=SW(), it=sItems(), left=it.filter(l=>!sDone(l));
-  if(PIC()&&!it.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.nothing),round.note&&mk('p',{},round.note))];   // design/217: nothing to answer now
-  if(PIC()&&!left.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>mk('li',{},mk('b',{},l.name+': '),sSays(l)[1],sAgainst(l)?' ('+w.against+')':''))),mk('p',{class:'sempty'},w.end_foot))];
+  if((PIC()||TK())&&!it.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.nothing),round.note&&mk('p',{},round.note))];   // design/217: nothing to answer now
+  const again=TK()?it.filter(l=>sBtn(l,sAns(l)||{}).act==='again').length:0;   // design/222: how many new takes "done" orders
+  if((PIC()||TK())&&!left.length) return [mk('div',{class:'scard'+(TK()?' kend':''),id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>{ const a=sAns(l)||{}, b=sBtn(l,a); return mk('li',{},mk('b',{},l.name+': '),TK()&&b.end?String(b.end).replace('{words}',a.notes||''):sSays(l)[1],sAgainst(l)?' ('+w.against+')':''); })),   // design/222: a take's row is its button's short `end`
+    again?mk('p',{id:'eagain'},String(w.end_again||'').replace('{n}',again)):null,
+    TK()&&it.some(l=>sBtn(l,sAns(l)||{}).choice==='reject')?mk('p',{id:'ereject'},w.end_reject):null,mk('p',{class:'sempty'},w.end_foot))];
   if(left.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},left.length===1?w.left_one:String(w.left_many||'').replace('{n}',left.length)),mk('p',{},w.left_note))];
   return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>mk('li',{},mk('b',{},(l.name||l.title)+': '),sSays(l)[1]))),mk('p',{class:'sempty'},w.end_foot))]; }
 function sRail(){
   const w=SW(), it=sItems(), kids=[mk('h2',{},w.todo)];
-  kids.push(mk('ul',{},it.map((l,i)=>{ const d=sDone(l), ag=l.key!=='sets:rest'&&sAgainst(l), a=sAns(l), b=a&&sBtn(l,a);
+  if(TK()) kids.push(...kRail(it)); else kids.push(mk('ul',{},it.map((l,i)=>{ const d=sDone(l), ag=l.key!=='sets:rest'&&sAgainst(l), a=sAns(l), b=a&&sBtn(l,a);
     return mk('li',{},mk('button',{class:'srow'+(d?(ag?' against':' done'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},
       mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},[l.kind_words,l.film_at].filter(Boolean).join(' · '))),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
-  const coming=PIC()&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
+  const coming=(PIC()||TK())&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
   if(coming.length){ const o=!!S.fold.coming;
     kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':'coming',on:{click:()=>{ S.fold.coming=!o; sRail(); }}},mk('span',{},w.coming),String(coming.length)));
     if(o) kids.push(mk('ul',{class:'pcoming',id:'pcoming'},coming.map(c=>mk('li',{'data-state':c.state},c.name,mk('small',{},[c.kind_words,c.note].filter(Boolean).join(' · ')))))); }
   const covered=(sRest()||{}).covers||[];
-  [['settled',w.settled,sLines().filter(l=>l.case==='settled')],['busy',w.busy,sLines().filter(l=>l.state!=='open'&&l.case!=='settled'&&covered.indexOf(l.key)<0)]].forEach(([g,title,rows])=>{
+  (TK()?[]:[['settled',w.settled,sLines().filter(l=>l.case==='settled')],['busy',w.busy,sLines().filter(l=>l.state!=='open'&&l.case!=='settled'&&covered.indexOf(l.key)<0)]]).forEach(([g,title,rows])=>{
     if(!rows.length) return; const o=!!S.fold[g];
     kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':g,on:{click:()=>{ S.fold[g]=!o; sRail(); }}},mk('span',{},title),String(rows.length)));
     if(o) kids.push(mk('ul',{class:'squiet'},rows.map(l=>mk('li',{},mk('button',{class:'srow',type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},mk('span',{class:'snm'},l.name||l.title)))))); });
   $('srail').replaceChildren(...kids); }
 function sCount(){ const w=SW(), it=sItems(), n=it.filter(sDone).length;   // A11: the one count
-  if(PIC()&&!it.length) return $('sfoot').replaceChildren(mk('span',{},w.nothing));
+  if((PIC()||TK())&&!it.length) return $('sfoot').replaceChildren(mk('span',{},w.nothing));
   $('sfoot').replaceChildren(mk('b',{},String(w.foot||'').replace('{n}',n).replace('{m}',it.length)),mk('span',{},n===it.length?w.foot_done:w.foot_wait)); }
 function sMainDraw(){
   const l=(round.lines||[]).find(x=>x.line===S.cur), w=SW(), main=$('smain'), top=main.scrollTop;
   const body=S.help?[mk('h2',{class:'sname'},w.help),[].concat((round.layout||{}).help||[]).map(x=>mk('p',{style:'max-width:65ch;margin-top:8px'},x)),mk('p',{style:'max-width:65ch;margin:8px 0 12px'},w.keys),
       mk('button',{class:'sbtn',id:'shelpclose',type:'button',on:{click:()=>{ S.help=false; sDraw(); }}},w.close)]
-    :l&&l.key==='sets:rest'?sRestView(l):l?(PIC()?pThing(l):sThing(l)):sEnd();
-  main.replaceChildren(mk('div',{class:'swrap'},...[].concat(body).flat(6).filter(Boolean))); main.scrollTop=top; }
+    :l&&l.key==='sets:rest'?sRestView(l):l?(TK()?kThing(l):PIC()?pThing(l):sThing(l)):sEnd();
+  main.replaceChildren(mk('div',{class:'swrap'},...[].concat(body).flat(6).filter(Boolean))); main.scrollTop=top; kOver(); }
 function sDraw(){
   if(S.round!==round.round){ const f=sItems().find(l=>!sDone(l));   // a new round: the first thing that needs an answer
-    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{}}); }
+    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,over:null,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{}}); }
   $('sstep').textContent=round.step||''; $('shelp').textContent=SW().help||''; $('shelp').setAttribute('aria-expanded',String(S.help));
   sRail(); sMainDraw(); sCount(); }
 $('shelp').addEventListener('click',()=>{ S.help=!S.help; sDraw(); });
 document.addEventListener('keydown',e=>{   // A15: the arrow keys and Escape stay; the large picture has its own keys
   if($('sets').hidden||zoomed||e.ctrlKey||e.metaKey||e.altKey||!round) return;
-  if(e.key==='Escape'){ if(S.panel) return sOpen(null); if(S.help){ S.help=false; return sDraw(); } return; }
-  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ const it=sItems(); if(!it.length) return; e.preventDefault();
+  if(e.key==='Escape'){ if(S.over) return kSheet(null); if(S.panel) return sOpen(null); if(S.help){ S.help=false; return sDraw(); } return; }
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||S.over) return;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ const it=TK()?(round.lines||[]):sItems(); if(!it.length) return; e.preventDefault();   // design/222: in step 7 every shot, the ones answered earlier too
     const i=it.findIndex(x=>x.line===S.cur), n=it[(Math.max(i,0)+(e.key==='ArrowRight'?(i<0?0:1):it.length-1))%it.length]; sGo(n.line); }
 });
 function tDraw(){

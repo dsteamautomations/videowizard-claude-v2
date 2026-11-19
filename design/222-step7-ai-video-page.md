@@ -62,6 +62,18 @@ Tests: `server/unit/test_design222_takes_pure.py` (the server, the served text, 
 
 Left as it is, and said: the cost limit is tested per line when the page is built, and again when each ordered take is sent (several orders in one visit are refused one by one, in the order the assistant sends them, each said in the chat).
 
+## The real page against the approved trial
+
+Checked with VW-12's 17 real takes on the real page file at page areas of 1536 x 510 and 1900 x 830 (no scroll of the page or the main area, no console error; the player's picture is 620 x 349 and 970 x 546). Screenshots and the scripts are outside the repository (`ux1-mockup/step7-trial/real-page/`). The differences from the trial:
+
+1. The trial's own banner is not on the real page.
+2. The left list is step 6's: a little wider (230 to 290 px against 210 to 270), its rows a little taller, the dot at the top of a two-line name.
+3. The player's background is step 6's black.
+4. The details sheet's right column is the take's rows in the server's order (where it sits, how it was asked for, how it was made), then the start picture; the trial had the picture second.
+5. In a pause of more than 0.4 s between two words the real page keeps the earlier word marked; the trial marked none.
+6. The take's video is kept while its line is open: opening a box or answering does not start it again from 0:00 (the trial did).
+7. The end card's rows read across in a grid and the list scrolls inside the card when it is long; the trial's read down in columns.
+
 ## Not covered, not verified
 
 - **Nothing has run on a real film.** No take made from a guide exists in the application, so the frames, the measured jump, the helper's check, the page with a guide take's own lines and "Make another" have only run in tests, and the page only with VW-12's takes (made the older way). The first real run must show: frames and the sheet stored for a take; the take listed by `vw visuals pictures --looks` and a look recorded; the page closed until all are checked, then open; a selection recorded from the page; a take ordered with "Make another" sent without a second card, with the one line said.
