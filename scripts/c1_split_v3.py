@@ -160,6 +160,8 @@ if __name__ == '__main__':
         prompt = d221b(prompt, parts)
         from d221c_wording_v3 import apply as d221c   # design/221 phase 3a: the camera flow per drawn shot, the shared look recorded once, the binding motion family
         prompt = d221c(prompt, parts)
+        from d221d_wording_v3 import apply as d221d   # design/221: the critic's seven points on phase 2 (labels and cues in the plan first, the passed project bound by the server), phase 3b (a drawing that continues an earlier one)
+        prompt = d221d(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

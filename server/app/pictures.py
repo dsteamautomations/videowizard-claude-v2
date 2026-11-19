@@ -558,7 +558,7 @@ def fact_view(session, store, job, shot_id, brief_now=None):
         sha = (V.load_json(store, job['request']['request_key']) or {}).get('sha256')
     except Exception:   # the request file cannot be read: no fact check is known
         sha = None
-    rounds = [c for c in (session.get('motion_checks') or {}).get(shot_id) or [] if sha and c.get('sha256') == sha]
+    rounds = V.motion_rounds(session, shot_id, sha) if sha else []   # design/221 (the critic's A1): a verdict on other rules is ignored
     if not rounds:
         return _view('none', W['fact_none'], show='all')
     last = rounds[-1]

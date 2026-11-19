@@ -220,7 +220,7 @@ class MotionCue(Model):   # design/130: an element of the HyperFrames project th
 
 
 class MotionScene(Model):   # design/130: the shot's HyperFrames project, uploaded apart from the plan and named here by its hash
-    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$')   # design/221 (the critic's A1): labels and cues go in with the plan; the server binds the project that passes its fact check
     labels: list[str] = Field(default_factory=list, max_length=20)   # every text the viewer reads, word for word; the server finds each in the project
     cues: list[MotionCue] = Field(default_factory=list, max_length=50)
 

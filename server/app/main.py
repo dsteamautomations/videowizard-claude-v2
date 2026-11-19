@@ -1576,7 +1576,7 @@ def visuals_motion_finish(run_id: UUID, body: MotionFinish, user=User, conn=DB):
 @app.get('/api/runs/{run_id}/visuals/motion/brief/{shot_id}')
 def visuals_motion_brief(run_id: UUID, shot_id: str, user=User, conn=DB):   # design/130 §4 step 1
     run, outputs = _visuals_run(conn, user, run_id)
-    return Response(visuals_stage.guarded(lambda: visuals_stage.motion_brief(storage(), run, outputs, shot_id)))
+    return Response(visuals_stage.guarded(lambda: visuals_stage.motion_brief(storage(), run, outputs, shot_id, build=True, conn=conn)))   # design/221: the gates before a build
 
 
 @app.get('/api/runs/{run_id}/visuals/motion/jobs/{job_id}')

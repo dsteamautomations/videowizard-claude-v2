@@ -169,8 +169,9 @@ def test_the_rule_writer_is_told_plainly_that_rules_md_holds_rules_only():
     assert 'Every line of rules.md is a rule: no heading, question, note or colour to add goes in it.' in rules
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221b_wording_v3 as W
+    import d221d_wording_v3 as D221D   # design/221, the critic's seven points and phase 3b: changes sentences of this script
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(new) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(D221D.now(file, new)) == 1, file
     split = (ROOT / 'scripts' / 'c1_split_v3.py').read_text(encoding='utf-8')
     assert split.index('d221(prompt, parts)') < split.index('d221b(prompt, parts)')
 

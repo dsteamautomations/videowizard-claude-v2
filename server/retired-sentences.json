@@ -149,6 +149,9 @@
     "The camera bobs lightly: a small nudge toward each new arrival",
     "The camera snaps between framings: a punch-in on the important part, a whip to the next.",
     "A line the viewer reads holds at least 0.5 s plus 0.3 s a word.",
-    "Pictures you may place (approved; copies beside this brief in refs/ to look at)"
+    "Pictures you may place (approved; copies beside this brief in refs/ to look at)",
+    "Put `scene_motion: {sha256, labels, cues}` on the shot",
+    "propose the revision, then `vw motion render --shot S`",
+    "and in \"kind\" that kind in one line"
   ]
 }
