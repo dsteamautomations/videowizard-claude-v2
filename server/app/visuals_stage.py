@@ -3474,7 +3474,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
         if v['verdict'] == 'correct':
             need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
-    again, held = [], {}
+    again, held, against = [], {}, []
     for eid in active:
         r, v = rd['elements'][eid], verdicts[eid]
         rows = _set_rows(session, eid, r.get('set'))
@@ -3490,6 +3490,8 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
         r['verdict'] = v['verdict']
         r.pop('answer', None)   # recorded: nothing stored is left behind
         if v['verdict'] == 'yes':
+            if v2 and ref_sets.approved_against(eid, r):   # SK, 19 Nov 2026: an approval beside a check that did not say "use" is said in the decision log
+                against.append((eid, ref_sets.approved_against(eid, r)))
             for x in rows:
                 x.update(status='approved', approval={**stamp, 'sha256': x.get('sha256')})
                 _feedback_image(session, run, user, x, 'pass', quote, '')
@@ -3513,6 +3515,16 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
         again.append(eid)
     rd['quote'] = quote
     save_session(store, run, session)
+    if against and conn is not None:   # the log is a record: it never stops the approval, and a failed insert stays inside its own savepoint
+        try:
+            from contextlib import nullcontext
+            from . import runlog
+            with (conn.transaction() if hasattr(conn, 'transaction') else nullcontext()):
+                for eid, line in against:
+                    runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'set {eid}', 'rule': "References step 2: an approval beside Claude's check",
+                                        'entry': line, 'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': quote, 'request_id': None})
+        except Exception as exc:   # noqa: BLE001
+            logging.getLogger('vw2.visuals').warning('decision log not written for run %s: %s', run.get('id'), exc)
     queued, errors = _queue_sets(conn, store, user, run, outputs, again) if again and not v2 else ([], {})
     if v2:   # design/216: a place held for these things is ordered in the same call as their approval
         queued = queued + ref_sets.release(conn, store, user, run, outputs)

@@ -849,6 +849,22 @@ def unused_refs(session, plan, shot, parents):
 
 # ---------- the states of a v2 round (visuals_stage._round_pass) ----------
 
+CHECK_SAID = {'remake': 'make again', 'doubt': 'doubtful'}
+
+
+def approved_against(eid, row):
+    """SK, 19 Nov 2026: the decision log's line for a set the operator approves although Claude's check of it did not say "use" (make again, doubtful, or no
+    check of the set it holds now); None when the check agreed. The reason is the check's own, on one line, 300 characters at most."""
+    look = row.get('set_look') or {}
+    rec = look.get('recommend') if look.get('set') == row.get('set') else None
+    if rec == 'use':
+        return None
+    if rec not in CHECK_SAID:
+        return f'set {eid}: approved by the operator; the set was not checked'
+    reason = ' '.join(str(look.get('reason') or '').split())
+    return f'set {eid}: approved by the operator; the check said {CHECK_SAID[rec]}' + (f': {reason[:299] + chr(8230) if len(reason) > 300 else reason}' if reason else '')
+
+
 def looked(session, eid, row):
     """A set's look is complete: the row's `set_look` is of the set it holds now and each of its pictures has a look. design/214: a look
     answers the picture's check list (`lines`), or says the picture was not checked; a look of before, with neither, stands only for a set
