@@ -47,7 +47,7 @@ def test_the_plan_names_labels_and_cues_without_a_sha():
 
 
 def test_the_brief_before_a_build_is_refused_while_a_drawn_shot_with_text_has_no_labels():
-    for over in ({'carries_text': True},   # design/221 phase 3c: a shot's message alone is its point, not text on screen
+    for over in ({'carries_text': True, 'drawing_spec': None},   # design/221 phase 3c: a shot's message alone is its point, not text on screen; fix set A3.3: with a corner note (an illustrative spec) and `labels: []` it is not asked
                  {'drawing_spec': {**motion_shot()['drawing_spec'], 'illustrative': False, 'label': 'Sill course'}}):
         store = motion_store(sh=motion_shot(scene_motion={'labels': [], 'cues': []}, **over))
         with pytest.raises(Problem) as e:

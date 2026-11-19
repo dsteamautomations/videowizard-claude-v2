@@ -172,8 +172,9 @@ def test_the_rule_writer_is_told_plainly_that_rules_md_holds_rules_only():
     import d221d_wording_v3 as D221D   # design/221, the critic's seven points and phase 3b: changes sentences of this script
     import fixset1_wording as FIX1   # fix set phase 1: the marks (still) and (motion) come after "Start every rule with `must:` or `should:`."
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
+    import fixset3_wording as FIX3   # fix set phase 3: the frame limit comes inside this script's sentences of the checker and the builder
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX2.now(file, FIX1.now(file, D221D.now(file, new)))) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX3.now(file, FIX2.now(file, FIX1.now(file, D221D.now(file, new))))) == 1, file
     split = (ROOT / 'scripts' / 'c1_split_v3.py').read_text(encoding='utf-8')
     assert split.index('d221(prompt, parts)') < split.index('d221b(prompt, parts)')
 

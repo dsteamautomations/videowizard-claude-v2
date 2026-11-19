@@ -170,6 +170,8 @@ if __name__ == '__main__':
         prompt = d222(prompt, parts)
         from fixset2_wording import apply as fixset2   # fix set phase 2: helpers started together, the stills first, a rule that compares with another drawing, the round's rule list, every shape that repeats
         prompt = fixset2(prompt, parts)
+        from fixset3_wording import apply as fixset3   # fix set phase 3: the stills in one call from a helper's file, a still another picture is made from, the frame limit, the corner note and a logo are no carried text
+        prompt = fixset3(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

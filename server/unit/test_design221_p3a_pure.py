@@ -192,8 +192,9 @@ def test_the_texts_say_the_camera_the_shared_look_the_binding_family_and_no_rule
     olds = {'common': before['prompt'], **{p['name']: p['text'] for p in before['parts']}}
     for where, old, new in W.PAIRS:
         assert texts[where].count(new) == 1 and olds[where].count(old) == 1, old[:50]
+    import fixset3_wording as FIX3   # fix set phase 3: the frame limit and "a refused call" come inside this script's sentence of the builder
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').replace('\r\n', '\n').count(new) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').replace('\r\n', '\n').count(FIX3.now(file, new)) == 1, file
     plan, later = texts['plan'], texts['later']
     assert '`camera_flow`' in plan and 'One camera flow per shot; fixed when in doubt' in plan and 'a comparison and a quantity always' in plan
     gaps = (ROOT / 'plugin' / 'agents' / 'vw-plan-gaps.md').read_text(encoding='utf-8')

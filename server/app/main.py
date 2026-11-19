@@ -1453,7 +1453,7 @@ class MotionTool(Write):   # design/130: a helper's check or snapshot, run on th
     shot_id: str
     op: Literal['check', 'snapshot']
     sha256: str = Field(default='', pattern=r'^([0-9a-f]{64})?$')
-    at: list[float] = Field(default_factory=list, max_length=12)
+    at: list[float] = Field(default_factory=list, max_length=200)   # fix set A3.6: the limit of 12 frames a call is refused by visuals_stage.motion_tool, in a sentence that says what to do
     zoom: str = Field(default='', max_length=80)
     crops: list[list[float]] = Field(default_factory=list, max_length=6)
 

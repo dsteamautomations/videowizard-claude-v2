@@ -266,20 +266,32 @@ def apply_parts(folder, svg):
     index.write_text(text[:body.end()] + layer + text[body.end():] if body else layer + text, encoding='utf-8')
 
 
-def parts_preview(svg, parts, ground, ink, width=900):
+PART_NAME_SIZE, PART_NAME_LINE = 20, 24   # the size of a part's name on the parts picture and the height of one of its lines, in px
+PART_NAME_EM = 0.6   # ponytail: a letter's width taken as 0.6 of its size (no font is measured here); a film in a wide script may need the name measured by Chromium
+
+
+def parts_preview(svg, parts, ground, ink, width=900, fonts=()):
     """design/221 row 1: one picture of the shared parts for the operator: each part drawn large with its name under it, on the film's ground,
-    three to a row. A self-contained SVG (Chromium makes it a PNG)."""
+    three to a row. A self-contained SVG (Chromium makes it a PNG). Fix set A3.1 (19 Nov 2026): each name is wrapped to its own cell (no line
+    wider than the cell, a row grows by the extra lines), and drawn in the film's font: `fonts`, the URLs of its files; none: the default."""
+    import textwrap
     inner = SVG_INNER.search(svg.strip()).group(1)
     cell, cols = width // 3, 3
     rows = (len(parts) + cols - 1) // cols
+    fit = int((cell - 20) / (PART_NAME_SIZE * PART_NAME_EM))   # the letters of one line
+    lines = [textwrap.wrap(p['title'] or p['id'], fit) or [p['id']] for p in parts]
+    high = cell + (max(map(len, lines), default=1) - 1) * PART_NAME_LINE
+    family = ','.join([f"'vw-part-{n}'" for n in range(len(fonts))] + ['sans-serif'])
+    faces = ''.join(f"@font-face{{font-family:'vw-part-{n}';src:url('{f}')}}" for n, f in enumerate(fonts))
     cells = []
     for i, p in enumerate(parts):
-        x, y = (i % cols) * cell, (i // cols) * cell
+        x, y = (i % cols) * cell, (i // cols) * high
+        cx = x + cell // 2
         cells.append(f'<use href="#{p["id"]}" x="{x + 20}" y="{y + 20}" width="{cell - 40}" height="{cell - 70}"/>'
-                     f'<text x="{x + cell // 2}" y="{y + cell - 22}" text-anchor="middle" font-family="sans-serif" font-size="20" fill="{ink}">'
-                     f'{html_lib.escape(p["title"] or p["id"])}</text>')
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{rows * cell}" viewBox="0 0 {width} {rows * cell}">'
-            f'<rect width="100%" height="100%" fill="{ground}"/>{inner}{"".join(cells)}</svg>')
+                     f'<text x="{cx}" y="{y + cell - 22}" text-anchor="middle" font-family="{family}" font-size="{PART_NAME_SIZE}" fill="{ink}">'
+                     + ''.join(f'<tspan x="{cx}" dy="{PART_NAME_LINE if n else 0}">{html_lib.escape(line)}</tspan>' for n, line in enumerate(lines[i])) + '</text>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{rows * high}" viewBox="0 0 {width} {rows * high}">'
+            + (f'<style>{faces}</style>' if faces else '') + f'<rect width="100%" height="100%" fill="{ground}"/>{inner}{"".join(cells)}</svg>')
 
 
 def _fraction(v):

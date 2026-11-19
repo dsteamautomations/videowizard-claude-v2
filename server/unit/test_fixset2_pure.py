@@ -401,7 +401,8 @@ def test_m3_the_labels_gate_names_every_drawn_shot_that_lacks_labels_in_one_refu
     store = load()
     def bare(d):
         for s in (shots_of(d)[1], shots_of(d)[2], shots_of(d, 1)[0]):
-            s.update(carries_text=True, scene_motion={'labels': [], 'cues': []})
+            s.update(carries_text=True)
+            s.pop('scene_motion', None)   # fix set A3.3: their texts are not written yet (with `labels: []` and a corner note they would not be asked)
     edit_plan(store, bare)
     with pytest.raises(Problem) as e:
         build(store, 'D1')

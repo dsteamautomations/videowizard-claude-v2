@@ -88,8 +88,13 @@ W = {
     'page_now': ('Everything of step 6 is made: the operator answers it on the page, in one visit: run `vw visuals page` instead; ask here only where the page '
                  'cannot be shown. '),
     'shown': '{name}: made and checked, {notes}. You judge it on the page with the others.',
-    'stills_due': ('{n} still shots have no picture asked for yet ({ids}): order them now, beside the drawn graphics (`vw visuals image --shot S --element E '
-                   '--kind keyframe --prompt "…"`); they need nothing from the drawings.'),
+    'stills_due': ('{n} still shots have no picture asked for yet ({ids}): order them now, all of them in one call, beside the drawn graphics '   # fix set A2.1: the batch command, one helper
+                   '(`vw visuals image --file out/images.json`, one row per still; one `vw-still-prompts` helper writes that file, started beside the parts helper); '
+                   'they need nothing from the drawings.'),
+    # fix set A2.2: a picture another picture is made from, asked early on one chat card: what its Yes carries
+    'parent_card': 'Another picture is made from this one, so it is asked now, before the page. Yes also allows it as the parent of new pictures.',
+    'parent_card_failed': ("Another picture is made from this one, so it is asked now, before the page. Claude's check failed a must line ({lines}): Yes approves it all the "
+                           'same, and also allows it as the parent of new pictures.'),
     'stills_due_one': ('1 still shot has no picture asked for yet ({ids}): order it now, beside the drawn graphics (`vw visuals image --shot S --element E '
                        '--kind keyframe --prompt "…"`); it needs nothing from the drawings.'),
     # design/221 (the critic's points 3, 4): a failed or stale render, said in the next step
@@ -968,6 +973,12 @@ def _drawn_state(session, sh, take_rows, plan=None):
         made, judged = _ts(last.get('created_at')), _ts(checks[-1].get('at')) if checks else None
         if made and judged and judged > made and V.held_rules(checks[-1]):
             return 'redo', None, said   # a verdict after the render failed a must (a comparison that came due): the old render is not the drawing any more
+        redrawn = [t for t in (_ts(p.get('at')) for p in (session.get('motion_projects') or {}).values() if p.get('shot_id') == sid and p.get('still')) if t]
+        if made and sid not in (session.get('motion_bound') or {}) and any(t > made for t in redrawn):
+            return 'redo', None, said   # fix set A3.5: a new still uploaded after the render (set_motion unbound the shot): being redone at once
+        was = (last.get('request') or {}).get('sha256')
+        if was and (session.get('motion_bound') or {}).get(sid) not in (None, was):
+            return 'making', None, said   # the redrawn project passed and is the bound one: this render is of the project before; its own render comes next
         return ('stale', None, said) if plan and _stale(session, plan, last) else ('done', last, said)
     if last and last['status'] in ('queued', 'running', 'storage_pending'):
         return 'making', None, said

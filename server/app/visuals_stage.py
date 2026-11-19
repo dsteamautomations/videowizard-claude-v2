@@ -2848,7 +2848,8 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
             else:
                 add(sh['start_frame'], f"Take · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'take to select')
     if gate and round_v2(session) and not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # design/221 row 18: step 6 is shown at the end, on the page (gate False: an answer given on the page that opened)
-        items = [(a, i) for a, i in items if not (i['kind'] == 'graphics to approve' or (i['kind'] == 'picture to answer' and i['step'] == 'pictures')
+        early = lambda i: (session['references'].get(i['item']) or {}).get('parent_wanted')   # fix set A2.2: a picture another picture is made from is an early decision: its card, by rule
+        items = [(a, i) for a, i in items if not (i['kind'] == 'graphics to approve' or (i['kind'] == 'picture to answer' and i['step'] == 'pictures' and not early(i))
                                                    or (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'drawn'))]
     if gate and round_v2(session) and any(i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video' for _, i in items):
         from . import takes   # design/222: step 7 is shown at the end, on the page: a ready AI video take is not asked one by one (gate False: an answer given on the page that opened)
@@ -4148,13 +4149,19 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
     else:   # design/124 decision 9: an end is made only from an approved start (the server makes it from end_prompt once the start is approved); a fix starts from its candidate
         for p in parents:
             if p and body['kind'] == 'keyframe' and p.get('kind') == 'keyframe' and p.get('status') == 'candidate' and p['id'] != body.get('fix_of'):
+                from . import pictures
+                early = pictures.claude_checks(session, p, plan)   # fix set A2.2: a picture of step 6 that another picture is made from is an early decision: its card comes now, in the chat
+                if early and not p.get('parent_wanted'):
+                    p['parent_wanted'] = True
+                    save_session(store, run, session)
                 need(False, f"{p['id']} is a start image still waiting for approval: an end image is made only from an approved start. Write the end with the start "
-                            "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start.")
+                            "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start."
+                            + (f" {p['id']} is asked of the operator now, in the chat (`vw visuals next`): once it is approved, order this picture again." if early else ''))
         need(all(p and (p['status'] == 'approved' or (p['status'] == 'candidate' and p['id'] == body.get('fix_of')))   # W4: a fix starts from its candidate, whatever its kind
                  for p in parents), 'Parents must be approved references of this run.')
     # design/215 (R1): of a v2 set's request the wording rules read only the words Claude or the operator added, never the plan's own words
     library.check_prompt(' '.join(x for x in (v2req['parts']['added'], v2req['parts']['operator']) if x) if v2row is not None else body['prompt'],
-                         fix=bool(body.get('fix_of')), placed=not (body.get('set') and round_v2(session)))   # defect 54: a v2 set's request is the plan's own words, placed by the server; design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
+                         fix=bool(body.get('fix_of')), placed=not (body.get('set') and round_v2(session)), picture=True)   # fix set A2.3: a picture's prompt: a depth word places nothing; defect 54: a v2 set's request is the plan's own words, placed by the server; design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
         starts = [p for p in parents if p['kind'] == 'keyframe']
         need(not starts or re.search(r'\bimage 1\b', body['prompt'], re.I),
@@ -4819,6 +4826,8 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         need(not flaw, f"{ref_id} cannot be the golden picture: it was approved with a stated flaw ({flaw}); make a new golden picture of {row.get('element_id')}.")
     quote = said(quote, 'Approved', user)   # design/99 C2
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
+    if row.get('parent_wanted'):   # fix set A2.2: approved as a picture another picture is made from: the same answer allows it as the parent (the fork-4 question is not asked after it)
+        row['parent_ok'] = True
     if row.get('golden_candidate'):
         session.setdefault('golden', {})[row['element_id']] = ref_id
     if row.get('kind') == 'sheet' and row.get('set_n') in (None, 1):   # a person's identity sheet is its golden picture (design/151: picture 1 of the set)
@@ -6034,8 +6043,8 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     held = pictures.rules_of(rules_text)
     session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
                                                       **({'rules': held, 'brief': lines} if held else {}), **({'still': True} if still else {})}
-    if not still:
-        (session.get('motion_bound') or {}).pop(shot_id, None)   # design/221 (the critic's A1): a later upload is bound only by its own clean verdict
+    if not still or sha != ((session.get('motion_stills') or {}).get(shot_id) or {}).get('sha256'):   # fix set A3.5: a new still of a bound shot is a redraw: its old project is no longer
+        (session.get('motion_bound') or {}).pop(shot_id, None)   # the drawing (the count says "being redone"; a drawing that continues it waits). design/221 (the critic's A1): a later upload is bound only by its own clean verdict
     save_session(store, run, session)
     cmp = comparing(session, plan, held)
     idle = {i for i, c in cmp.items() if c['state'] != 'ready'}
@@ -6147,6 +6156,16 @@ def corner_note(spec):
     return str((spec or {}).get('label') or '').strip() if (spec or {}).get('illustrative') else ''
 
 
+def note_or_logo_only(plan, shot):
+    """Fix set A3.3 (19 Nov 2026): the plan says this drawn shot shows no words of its own (its scene_motion is written and lists no label) and
+    what it does show to read is the server's corner note or a logo picture (an element of the shot named as a logo). Such a shot carries no
+    text for the labels gate, whatever its `carries_text` says. A shot whose texts are not written yet (no scene_motion) is still asked."""
+    if shot.get('scene_motion') is None or (shot['scene_motion'].get('labels') or []):
+        return False
+    names = {e['id']: str(e.get('name') or '') for e in plan.get('elements') or []}
+    return bool(corner_note(shot.get('drawing_spec'))) or any(re.search(r'\blogo\b', names.get(e, ''), re.I) for e in shot.get('element_ids') or [])
+
+
 def ground_colour(plan, run):
     """design/221 rows 1 and 9: the film's ground: the colour the plan's palette, then the film record's colours, names for the ground (background,
     paper, canvas, page); '' when none is named."""
@@ -6179,11 +6198,12 @@ PARTS_WAIT = "The shared parts wait for the operator's approval in the chat (`vw
 PARTS_REJECTED = ('The operator rejected the shared parts: "{words}". Give these words to a `vw-motion-parts` helper to redraw them, then upload again '
                   '(`vw motion parts --file work/motion/parts/parts.svg`).')
 PARTS_ONE = 'This film has one drawn graphic: it has no shared parts. Brief it directly (`vw motion brief --shot S`).'
+PARTS_AGAIN = ' Change the drawing, then upload it again: the same file is refused again.'   # fix set M6: each of these refusals ends with the next step
 PARTS_USE_ONE = ('{shot} shows {thing} but uses none of its shared parts: place the view this drawing shows, one of {ids}, with <use href="#part-…"> '
-                 '(drawn once for the whole film; do not redraw it).')
-PARTS_USE = '{shot} shows {thing} but does not use its shared part: place {id} with <use href="#{id}"> (drawn once for the whole film; do not redraw it).'
+                 '(drawn once for the whole film; do not redraw it).' + PARTS_AGAIN)
+PARTS_USE = '{shot} shows {thing} but does not use its shared part: place {id} with <use href="#{id}"> (drawn once for the whole film; do not redraw it).' + PARTS_AGAIN
 PARTS_USE_VIEW = ('{shot} shows {thing} in the view {view} but does not place its part of that view: place {ids} with <use href="#part-…"> '
-                  '(drawn once for the whole film; do not redraw it).')   # fix set B2
+                  '(drawn once for the whole film; do not redraw it).' + PARTS_AGAIN)   # fix set B2
 PARTS_OWN_ID = ('{shot} defines {ids}, the id of a shared part: the server puts the shared parts in the page; place them with <use href="#…"> and give your '
                 'own elements other ids.')
 PARTS_LINE = ('Use these parts (drawn once for the whole film; do not redraw them): {parts}. Place the view this drawing shows{view} with '
@@ -6293,7 +6313,8 @@ def set_parts(store, user, run, outputs, name, content):
         save_session(store, run, session)
         return {'sha256': sha, 'parts': [], 'next': PARTS_NONE}
     ground = ground_colour(plan, run) or '#FFFFFF'
-    preview = motion.parts_preview(text, parts, ground, note_colour(plan, run))
+    from . import drawn   # fix set A3.1: the names in the film's font (its files under server/fonts, as the font sample reads them); ponytail: a brand font given as a file is kept with the run, not on disk, so its film gets the default here
+    preview = motion.parts_preview(text, parts, ground, note_colour(plan, run), fonts=[(drawn.FONTS / f).as_uri() for f in film_font_files(run)])
     try:
         store.put(base + '.png', font_sample.render(f'<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:{ground}">{preview}</body></html>'), 'image/png')
         picture, why = base + '.png', ''
@@ -6387,15 +6408,20 @@ def _motion_request(store, session, run, shot_id, sha=None):
         'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
 
 
+SNAPSHOT_FRAMES = 12   # the frames one snapshot call takes (one HyperFrames run in the worker); kept at 12: the worker's time for more was not measured (fix set A3.6)
+
+
 def motion_tool(conn, store, user, run, outputs, body):
     """design/130 §4 step 3: `hyperframes check` or `snapshot` of an uploaded project of the shot, run in the worker on the VM (no laptop needs Node);
     the helper reads the findings or the PNGs back. Free; never a take."""
     _motion_run(run)
     op = body.get('op')
     need(op in ('check', 'snapshot'), 'op is check or snapshot (a render is `vw motion render`).')
+    asked = len(body.get('at') or [])   # fix set A3.6, M5: the limit is the server's own sentence, with what to do (it was the route's "at: List should have at most 12 items")
+    need(asked <= SNAPSHOT_FRAMES, f'A snapshot call takes at most {SNAPSHOT_FRAMES} frames (--at); {asked} were asked: nothing was taken. Ask in two calls of {SNAPSHOT_FRAMES} or fewer.')
     session = session_of(store, run, outputs)
     _shot, _spec, files, request = _motion_request(store, session, run, body['shot_id'], body.get('sha256'))
-    at = [round(float(t), 3) for t in (body.get('at') or [])][:12]
+    at = [round(float(t), 3) for t in (body.get('at') or [])]
     if op == 'snapshot':
         need(at and all(0 <= t <= request['frames'] / float(Fraction(str(request['fps']))) for t in at), 'Give the seconds to snapshot (--at 0.5,2.0), inside the shot.')
     crops = [[round(float(x), 4) for x in c] for c in (body.get('crops') or [])][:6]   # design/130 §4 step 5: close-ups for the checker, fractions of the frame
@@ -7019,7 +7045,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     if build:   # design/221 (the critic's A1): the labels and cues of every drawn shot are in the plan before the first brief, so no render is made stale by them later
         bare = [s['id'] for g_ in plan['gaps'] for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots']
                 if s.get('visual_type') == 'drawn' and not (s.get('scene_motion') or {}).get('labels')
-                and (s.get('carries_text')   # design/221 phase 3c: a shot's message is its point, not text on screen
+                and ((s.get('carries_text') and not note_or_logo_only(plan, s))   # design/221 phase 3c: a shot's message is its point, not text on screen; fix set A3.3
                      or _flat((s.get('drawing_spec') or {}).get('label')) not in ('', _flat(corner_note(s.get('drawing_spec')))))]
         one = len(bare) == 1
         need(not bare, f"Before the first brief, the texts of every drawn shot go in the plan: {', '.join(bare)} {'carries' if one else 'carry'} text and {'has' if one else 'have'} "

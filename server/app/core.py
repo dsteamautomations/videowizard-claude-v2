@@ -198,8 +198,12 @@ def load_run(conn, user, run_id, lock=False):
         conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run_id),))
         opened = open_defects(conn, run_id)   # design/48 O.2: every write waits for the builder while a defect is open
         if opened:
-            raise Problem(409, 'DEFECT_OPEN', f'defect {opened[0]} is open on this run; the builder resolves it, then the run continues', defect=opened[0], defects=opened)
+            raise Problem(409, 'DEFECT_OPEN', DEFECT_OPEN.format(n=opened[0]), defect=opened[0], defects=opened)
     return row
+
+
+DEFECT_OPEN = ('defect {n} is open on this run; the builder resolves it, then the run continues. Do not send this call again now: tell the operator, and send it once the '
+               'builder says the defect is fixed.')   # fix set M6 (19 Nov 2026): the refusal ends with the next step
 
 
 def list_runs(conn, user):

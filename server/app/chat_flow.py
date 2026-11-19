@@ -1623,12 +1623,19 @@ def _waiting_items(ctx):
 
             def run_(choice, quote, words, ref=ref):
                 if choice == 'yes':
-                    return V.approve_reference(store, user, run, outputs, ref['id'], ref['sha256'], quote, conn)
+                    out = V.approve_reference(store, user, run, outputs, ref['id'], ref['sha256'], quote, conn)
+                    if ref.get('parent_wanted'):   # fix set A2.2: one answer, the operator's: approved, and allowed as the parent of new pictures
+                        faults = P.check_view(session, ref, plan)['faults']
+                        _decided(conn, run, user, f"picture {ref['id']}", 'fix set A2.2 (a picture another picture is made from, approved in the chat)',
+                                 'approved, also as the parent of new pictures' + (", although Claude's check failed a must line: " + ' '.join(faults) if faults else ''), quote)
+                    return out
                 return V.reject_reference(store, user, run, outputs, ref['id'], '' if choice == 'no' else words, quote)   # design/217 (F4): a bare No carries no reason
             if line:   # design/217: the style sheet and a still say the page's words in the chat too (F1: the check from Claude's look and the program's lines)
+                faults = line['check']['faults'] if ref.get('parent_wanted') else None   # fix set A2.2: the card says plainly what its Yes carries
+                early = '' if faults is None else '- ' + (P.W['parent_card_failed'].format(lines=' '.join(faults)) if faults else P.W['parent_card']) + '\n'
                 item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_,
                              [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct.' if b['needs_words'] else '') for b in line['buttons']],
-                             text=P.chat_text(line), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
+                             text=early + P.chat_text(line), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
                 item['_line'] = line
             else:
                 item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f'{what}: is this picture right?', run_,
@@ -2153,9 +2160,15 @@ def next_item(conn, store, user, run, outputs, one=False):
         due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
+        show = _finished({'session': session, 'store': store}, six) if out.get('item') or out.get('card') else []   # fix set A3.4: a finished drawing is shown with the next answer too (with nothing waiting: `_next_item`), once
+        if show:
+            V.save_session(store, run, session)
+            out['show'], out['show_how'] = show, SHOW_FIRST
     return out
 
 
+SHOW_FIRST = ('First, before the decision: the tool saved the files of the top-level `show` in the run folder (finished drawn graphics): show each to the operator with its '
+              '`say` line, as it is; ask nothing about it. ')
 STATUS_HOW = ' (the first is the count of step 6: say it each time it changes, as it is, and ask nothing with it)'
 SHOW_HOW = 'The tool saved the files of `show` in the run folder: show each to the operator with its `say` line, as it is; ask nothing about it. '
 

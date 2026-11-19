@@ -169,6 +169,7 @@
     "the others side by side, three or four at once",
     "One helper per drawn shot, three or four at once",
     "place each with `<use href=\"#part-<name>\">`",
-    "the AI video and the recording are asked in the chat, one at a time"
+    "the AI video and the recording are asked in the chat, one at a time",
+    "order the still pictures at the start of the step, at the same time as the drawn graphics are begun (`vw visuals image --shot S"
   ]
 }

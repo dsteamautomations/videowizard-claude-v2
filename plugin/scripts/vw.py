@@ -532,7 +532,8 @@ def finish(payload, code):
     if code == 3:
         emit(payload, 3, 'The server needs the operator to decide: ' + ', '.join(payload.get('options', [])))
     if isinstance(payload, dict) and payload.get('code') == 'DEFECT_OPEN':   # design/48 O.2
-        emit(payload, 2, f"A defect is open on this run ({payload.get('defect')}); the builder is on it. Nothing more can be recorded until it is fixed.")
+        emit(payload, 2, f"A defect is open on this run ({payload.get('defect')}); the builder is on it. Nothing more can be recorded until it is fixed. "
+                         'Do not send this call again now: tell the operator, and send it once the builder says the defect is fixed.')   # fix set M6: the refusal ends with the next step
     emit(payload, code)
 
 
@@ -2410,15 +2411,16 @@ def cmd_visuals(a):
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
     def chat_line(out):   # design/188: the one decision as a line, its files saved in the run folder; or what is being made
         item, card = out.get('item'), out.get('card')
+        shows = [(_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}"), f.get('say') or '') for f in out.get('show') or []]   # design/221 row 18: a finished drawn graphic to show, with its one line, asking nothing
+        first = f"First show these finished drawings, each with its line, and ask nothing about them: {'; '.join(p + ': ' + s for p, s in shows)}. Then: " if shows else ''   # fix set A3.4: with the next decision too
         if card:   # design/190: the whole step on one card; its page is saved as a file (read it, never this answer, for the card's text)
             folder = ws / 'work' / 'chat'
             folder.mkdir(parents=True, exist_ok=True)
             (folder / f"{card['id']}.html").write_text(card.pop('widget_code'), encoding='utf-8')
             card['card_file'], card['answers_path'] = str(folder / f"{card['id']}.html"), str(folder / f"{card['id']}.answers.json")   # full paths, for reading and writing; the command takes `answers_file`
-            return (f"{card['step']}: {card['entries']} entries on one card ({card['id']}). Say: \"{card['say_before']}\" Card file: {card['card_file']}. "
+            return (first + f"{card['step']}: {card['entries']} entries on one card ({card['id']}). Say: \"{card['say_before']}\" Card file: {card['card_file']}. "
                     f"Write the answers to: {card['answers_path']}. Then: vw visuals card --file {card['answers_file']}. " + out['how'])
-        if not item:   # design/221 row 18: a finished drawn graphic to show, with its one line, asking nothing
-            shows = [(_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}"), f.get('say') or '') for f in out.get('show') or []]
+        if not item:
             return ((f"Show these files, each with its line, and ask nothing: {'; '.join(p + ': ' + s for p, s in shows)}. " if shows else '')
                     + ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', ''))
         (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
@@ -2430,7 +2432,7 @@ def cmd_visuals(a):
                    if str(item.get('id') or '').startswith('drawing:') else   # design/210
                    'The references are answered on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
                    if str(item.get('id') or '').startswith(('round1:', 'set:', 'setmake:', 'likeness:')) else '')   # design/210 part 2
-        return (on_page + f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
+        return (on_page + first + f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
         out = write(base + '/chat/next', {'one': bool(a.one)})

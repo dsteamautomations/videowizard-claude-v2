@@ -233,9 +233,16 @@ def check_quoted(prompt, entries):
             raise ValueError(f'The quoted words {words!r} are not an exact-text entry: anything to be read in the picture goes in exact_text with its place and size.')
 
 
-def check_prompt(prompt, fix=False, placed=True):
+DEPTH_OF = re.compile(r'\b(?:closer|further)\s+(?:from|to)\s+the\s+(?:camera|lens|viewer)\b', re.I)   # fix set A2.3: how far from the camera
+DEPTH_THE = re.compile(r'\bthe\s+(?:closer|further)\s+\w+', re.I)   # "the further stacks": which thing, not where it is put
+FOCUS = re.compile(r'\b(?:focus|soft|sharp|blurr?(?:ed|y)?)\b', re.I)
+
+
+def check_prompt(prompt, fix=False, placed=True, picture=False):
     """design/71 F2: the library's lint rules 3 and 8 as the server's own refusals, on every prompt. A logo is refused unless the sentence
-    says no to it (the standing line "do not add unrelated logos" stays); a model name, a pixel size or a resolution is refused with the word."""
+    says no to it (the standing line "do not add unrelated logos" stays); a model name, a pixel size or a resolution is refused with the word.
+    Fix set A2.3 (19 Nov 2026): `picture`, a still picture's own prompt: there 'closer' and 'further' that say what is nearer or further from the
+    camera (its distance from the camera, or which thing is in focus and which is soft) place nothing; any other use is a placement, as before."""
     text = str(prompt or '')
     for sentence in re.split(r'(?<=[.;:!?\n])\s+', text):
         if re.search(r'\blogos?\b', sentence, re.I) and not re.search(r"\b(no|not|never|without|don't|unrelated)\b", sentence, re.I):
@@ -254,6 +261,8 @@ def check_prompt(prompt, fix=False, placed=True):
     for sentence in re.split(r'(?<=[.;:!?\n])\s+', text) if placed else ():   # design/110 F2: a place is a landmark and a measured distance, never 'the centre' alone
         m = re.search(r'\b(centre|center|middle|nearby|closer|further)\b', sentence, re.I)
         if m and m.group(1).lower() in ('centre', 'center', 'middle') and re.search(r'\b(hero|of the frame|in frame)\b', sentence, re.I):   # design/217 (R2): the framing the guidance invites ("the product may sit centred as the hero") places nothing in the world
+            continue
+        if m and picture and m.group(1).lower() in ('closer', 'further') and (DEPTH_OF.search(sentence) or (DEPTH_THE.search(sentence) and FOCUS.search(sentence))):
             continue
         if m and not re.search(r'\d|\b(one|two|three|four|five|six|half|bricks?|paces?|body-lengths?|arm-lengths?|hands?|doorways?|courses?|metres?|meters?)\b', sentence, re.I):
             raise ValueError(f'The prompt places something at {m.group(1)!r} with no landmark and measured distance ({sentence.strip()[:80]!r}): say the landmark and how far from it, '

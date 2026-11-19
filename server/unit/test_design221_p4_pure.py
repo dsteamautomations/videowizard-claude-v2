@@ -339,7 +339,8 @@ def test_a_drawing_with_three_notes_fits_the_page(browser, size):
 def test_the_texts_say_the_page_at_the_end_the_counts_the_held_card_and_the_stills_first():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221f_wording_v3 as W
-    stage = visuals()
+    import fixset3_wording as FIX3   # fix set phase 3: the stills sentence of this script names the batch command now
+    stage = FIX3.before(visuals())
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)
