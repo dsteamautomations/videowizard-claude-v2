@@ -5963,9 +5963,11 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
     need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
     els = {e['id']: e for e in (guarded(lambda: current_plan(store, session)).get('elements') or [])}
-    for p in shared:
-        if p.get('element') in (shot.get('element_ids') or []) and not re.search(r'href\s*=\s*["\']#' + re.escape(p['id']) + r'["\']', text):
-            need(False, PARTS_USE.format(shot=shot_id, thing=(els.get(p['element']) or {}).get('name') or p['element'], id=p['id']))
+    for e in shot.get('element_ids') or []:   # defect 56 (VW-24, 19 Nov 2026): a thing may have several views among the parts (cut across, from above); a drawing places the view it shows, so one of them is enough
+        views = [p['id'] for p in shared if p.get('element') == e]
+        if views and not any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in views):
+            thing = (els.get(e) or {}).get('name') or e
+            need(False, PARTS_USE.format(shot=shot_id, thing=thing, id=views[0]) if len(views) == 1 else PARTS_USE_ONE.format(shot=shot_id, thing=thing, ids=', '.join(views)))
     from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
     notes = pictures.notes_in(rules_text)
     need(not notes, NOT_A_RULE.format(lines='; '.join(f'"{n}"' for n in notes[:12])))   # design/221 row 15
@@ -6035,6 +6037,8 @@ PARTS_WAIT = "The shared parts wait for the operator's approval in the chat (`vw
 PARTS_REJECTED = ('The operator rejected the shared parts: "{words}". Give these words to a `vw-motion-parts` helper to redraw them, then upload again '
                   '(`vw motion parts --file work/motion/parts/parts.svg`).')
 PARTS_ONE = 'This film has one drawn graphic: it has no shared parts. Brief it directly (`vw motion brief --shot S`).'
+PARTS_USE_ONE = ('{shot} shows {thing} but uses none of its shared parts: place the view this drawing shows, one of {ids}, with <use href="#part-…"> '
+                 '(drawn once for the whole film; do not redraw it).')
 PARTS_USE = '{shot} shows {thing} but does not use its shared part: place {id} with <use href="#{id}"> (drawn once for the whole film; do not redraw it).'
 PARTS_OWN_ID = ('{shot} defines {ids}, the id of a shared part: the server puts the shared parts in the page; place them with <use href="#…"> and give your '
                 'own elements other ids.')

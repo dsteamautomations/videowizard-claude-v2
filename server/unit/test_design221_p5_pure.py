@@ -259,3 +259,4 @@ def test_defect55_a_picture_kept_under_another_name_is_copied_to_where_the_plugi
     assert st.d['R/visuals/references/drawing-TILE-a-1.png'] == b'PNG-A' and st.puts == ['R/visuals/references/drawing-TILE-a-1.png']
     V.refs_fetchable(st, {'id': 'R'}, session, ids)   # a second brief copies nothing again
     assert st.puts == ['R/visuals/references/drawing-TILE-a-1.png']
+

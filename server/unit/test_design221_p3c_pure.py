@@ -211,6 +211,18 @@ def test_an_upload_that_redraws_a_shared_part_is_refused_and_names_it():
     assert upload(store, project(**{'compositions/wall.html': USES.replace('href=', 'xlink:href=')}))
 
 
+def test_defect56_a_thing_with_several_views_among_the_parts_needs_one_of_them_not_every_one():
+    store = two()
+    views = PARTS.replace('</svg>', '<symbol id="part-wall-plan" viewBox="0 0 200 100" data-element="E1"><title>Wall from above</title><rect width="200" height="30"/></symbol></svg>')
+    parts(store, views)
+    assert upload(store, project(**{'compositions/wall.html': USES}))   # the cut view alone: the drawing shows the wall cut across, not from above
+    assert upload(store, project(**{'compositions/wall.html': USES.replace('#part-wall"', '#part-wall-plan"')}))   # or the other view alone
+    with pytest.raises(Problem) as e:
+        upload(store)   # neither view placed
+    assert ('MO1 shows Wall section but uses none of its shared parts: place the view this drawing shows, one of part-wall, part-wall-plan, '
+            'with <use href="#part-…">') in str(e.value)
+
+
 def test_a_changed_part_changes_the_render_request_of_the_drawings_that_use_it():
     store = two()
     parts(store)
