@@ -1656,7 +1656,7 @@ class GuideCause(Write):
 
 class GuideShoot(Write):
     shot_id: str
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/222: empty when the operator's word was given on the page ("Make another"); `guide.shoot` refuses a take with no word at all
     again: bool = False
 
 

@@ -916,9 +916,7 @@ def cmd_guide(a):
         out = write(base + '/guide/cause', {'shot_id': a.shot, 'cause': a.cause, 'notes': a.notes, 'fix': a.fix})
         emit(out, 0, out.get('next'))
     if a.what == 'shoot':
-        if not (a.quote or '').strip():
-            emit({'action': 'refused', 'message': "A take is paid for on the operator's word: `vw guide shoot --shot S --quote \"<their words>\"`. Nothing was sent."}, 2)
-        out = write(base + '/guide/shoot', {'shot_id': a.shot, 'quote': a.quote, 'again': bool(a.again)})
+        out = write(base + '/guide/shoot', {'shot_id': a.shot, 'quote': a.quote or '', 'again': bool(a.again)})   # design/222: with no --quote the server uses the word the operator gave on the page ("Make another"), and refuses when there is none
         emit(out, 0, out.get('next'))
 
 

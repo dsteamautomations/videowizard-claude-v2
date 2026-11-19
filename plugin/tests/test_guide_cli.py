@@ -111,10 +111,10 @@ def test_the_takes_words_come_from_a_file_and_shoot_needs_the_operators_words(ha
     code, out, err = run(args(what='prompt', shot='VS1', file='work/take.txt'), capsys)
     assert code == 0 and sent[-1] == ('/api/runs/run-1/visuals/guide/prompt', {'shot_id': 'VS1', 'prompt': 'ONE action only: he walks.'}) and '40 words kept' in err
     n = len(sent)
-    for quote in (None, '', '   '):
-        code, out, err = run(args(what='shoot', shot='VS1', quote=quote), capsys)
-        assert code == 2 and 'Nothing was sent' in out['message']
-    assert len(sent) == n
+    # design/222: with no --quote the tool sends the call and the server decides: it uses the word the operator gave on the page ("Make another"),
+    # and refuses a take with no word at all (`guide.shoot`; server/unit/test_guide_route_pure.py)
+    assert run(args(what='shoot', shot='VS1', quote=None), capsys)[0] == 0
+    assert len(sent) == n + 1 and sent[-1] == ('/api/runs/run-1/visuals/guide/shoot', {'shot_id': 'VS1', 'quote': '', 'again': False})
     assert run(args(what='shoot', shot='VS1', quote='Yes, shoot it.', again=True), capsys)[0] == 0
     assert sent[-1] == ('/api/runs/run-1/visuals/guide/shoot', {'shot_id': 'VS1', 'quote': 'Yes, shoot it.', 'again': True})
 

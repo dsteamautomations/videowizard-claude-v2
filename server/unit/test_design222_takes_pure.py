@@ -418,3 +418,54 @@ def test_the_words_of_the_page_come_from_the_server_and_the_old_ways_are_named()
     assert T.PAGE['film'] == 'See it in the film' and T.PAGE['details'] == 'Details' and T.PAGE['change_in_chat'] == 'To change this answer, say so in the chat.'
     assert T.PAGE == FIXTURE['layout']['words']['takes']
     assert 'Gemini' not in json.dumps(T.W) and T.W['page_later'] == 'The page opens when every take is made and checked.'
+
+
+# ---------- the served text, the old ways, the plugin ----------
+
+ROOT = HERE.parents[1]
+
+
+def test_the_served_text_says_the_new_order_and_the_replaced_sentences_are_retired():
+    import sys
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    import d222_wording_v3 as D
+    v3 = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+    st = next(s for s in v3['stages'] if s['name'] == 'visuals')
+    later = next(p for p in st['parts'] if p['name'] == 'later')['text']
+    assert D.CHECK_NEW in later and D.SHOOT_NEW in later and 'Gemini reads every ready take' not in later
+    old = next(p for p in D.before(st)['parts'] if p['name'] == 'later')['text']
+    assert D.CHECK_OLD in old and D.CHECK_NEW not in old and D.SHOOT_NEW not in old
+    retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
+    assert all(s in retired for s in D.RETIRED) and not any(s in json.dumps(st, ensure_ascii=False) for s in D.RETIRED)
+    split = (ROOT / 'scripts' / 'c1_split_v3.py').read_text(encoding='utf-8')
+    assert split.index('d221f(prompt, parts)') < split.index('d222(prompt, parts)')
+    assert '₹' not in D.CHECK_NEW and 'vw-take-look' in D.CHECK_NEW and 'AI video: 11 made and checked, 4 being made.' in D.CHECK_NEW
+
+
+def test_the_plugin_has_the_take_helper_and_says_where_step_7_is_answered():
+    helper = (ROOT / 'plugin' / 'agents' / 'vw-take-look.md').read_text(encoding='utf-8')
+    assert 'name: vw-take-look' in helper and 'model: opus' in helper and 'vw visuals pictures --looks' in helper and 'cannot play' in helper and 'at_s' in helper
+    cmd = (ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert 'the AI video and the recording are asked in the chat, one at a time' not in cmd
+    assert 'the finished AI video takes are answered on the page' in cmd and 'vw-take-look' in cmd
+    skill = (ROOT / 'plugin' / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8')
+    assert 'the take arrives with its scorecard; select or reject as for any take' not in skill and 'on the page' in skill and 'Make another' in skill
+    tool = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
+    assert "'quote': a.quote or ''" in tool and 'A take is paid for on the operator\'s word: `vw guide shoot --shot S --quote' not in tool   # the word given on the page ("Make another") needs no --quote: the server decides
+
+
+def test_the_old_ways_are_in_the_decision_log():
+    log = (ROOT / 'design' / '35-decision-log.md').read_text(encoding='utf-8')
+    for n, words in ((226, 'Gemini 3.8 Flash'), (227, 'one by one'), (228, 'Shoot card'), (229, 'the join'), (230, 'start picture'), (231, '24/1')):
+        row = next((l for l in log.splitlines() if l.startswith(f'| {n} |')), '')
+        assert words in row and ('**Retired' in row or '**Kept' in row), n
+
+
+def test_a_take_with_no_word_at_all_is_refused_and_the_pages_word_stands_in_for_the_quote():
+    with pytest.raises(ValueError, match="paid for on the operator's word"):
+        G.word_for(guide(), '  ')
+    assert G.word_for(guide(), 'Yes, shoot it.') == (None, 'Yes, shoot it.')
+    order = {'job_id': 'j1', 'words': 'He lays the broom down.'}
+    assert G.word_for(guide(again=order), '') == (order, 'Make another: He lays the broom down.')
+    with pytest.raises(ValueError):                                     # the word is used once: the next take needs a new one
+        G.word_for(guide(again={**order, 'sent': 'j2'}), '')

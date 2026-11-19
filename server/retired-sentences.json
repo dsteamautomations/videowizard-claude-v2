@@ -162,6 +162,9 @@
     "as they become ready; a failed line is shown with its words",
     "then show the operator the open musts",
     "The main assistant names your upload in the plan and renders it.",
-    "the main assistant names your upload in the plan and renders it."
+    "the main assistant names your upload in the plan and renders it.",
+    "Gemini reads every ready take before the operator watches it",
+    "Fetch each ready take (`vw visuals fetch --job J`) and let the operator watch it",
+    "a new take only when the operator asks"
   ]
 }

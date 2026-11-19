@@ -371,6 +371,17 @@ def ready_card(session, shot_id, price_per_s):
             'look_for': 'On the overlay: every person and thing of the still sits on the red outlines of the guide.' + (' Before you pay: ' + ' '.join(warnings) if warnings else '')}
 
 
+def word_for(g, quote):
+    """design/222: the operator's word for this take: their words (--quote), else the word they gave on the page ("Make another") when it is not
+    used yet; with neither, the take is refused. Returns (the page's order or None, the words)."""
+    ordered = g.get('again') if not (g.get('again') or {}).get('sent') else None
+    if ordered and not str(quote or '').strip():
+        from . import takes
+        quote = takes.W['again_word'].format(words=ordered['words'])
+    need(str(quote or '').strip(), "A take is paid for on the operator's word: give their words (--quote).")
+    return ordered, str(quote).strip()
+
+
 def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     """The operator's go-ahead: one Gemini edit of the guide. Refused while anything of the card is missing, while a take is open, and when nothing
     changed since the last take (the same request is never sent twice; `again` only after a take that came back as the guide itself or at the wrong length)."""
@@ -380,11 +391,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     g = entry_of(session, shot_id)
     card = ready_card(session, shot_id, VS.prices()['video_inr_per_s'])
     need(card['ready'], 'Not ready to shoot; still missing: ' + ', '.join(card['missing']) + '.')
-    ordered = (g.get('again') if not (g.get('again') or {}).get('sent') else None)   # design/222: "Make another" on the page is the operator's word for one more take
-    if ordered and not str(quote or '').strip():
-        from . import takes
-        quote = takes.W['again_word'].format(words=ordered['words'])
-    need(str(quote or '').strip(), "A take is paid for on the operator's word: give their words (--quote).")
+    ordered, quote = word_for(g, quote)
     render, still = g['render'], card['still']
     camera = digest(VS.load_json(store, g['key'])['camera'])
     rejected = _rejected(session, g)

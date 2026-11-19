@@ -22,7 +22,8 @@ You write data and words. You never run Blender, never call a picture or video m
 | 6. The overlay | the operator looks at the overlay and approves the exact file, or it is repaired or rejected | free |
 | 7. The take's words | `vw guide prompt --shot S --file take.txt` | free |
 | 8. Shoot | only on the operator's word: `vw guide shoot --shot S --quote "<their words>"` | paid (one take) |
-| 9. Review | `vw visuals status`; the take arrives with its scorecard; select or reject as for any take | free |
+| 9. Claude's check | `vw visuals pictures --looks`: a `vw-take-look` helper judges the take from its frames (one every half second, the sheet at four a second, the still); the server measures real footage, the length, the first frame and one continuous shot | free |
+| 10. Review | on the page (`vw visuals page`), all takes together, once every take is made and checked: Select, Make another, or Reject. Until then say step 7's line of counts as it is and ask nothing | free |
 
 One helper builds one shot. The checker is always a different, fresh helper. After two failed rounds, show the operator what is still open before another round.
 
@@ -175,6 +176,8 @@ Ask in this order, and change one thing:
 2. Does its first frame match the still? If not, the fault is the still or the guide.
 3. Is the fault in the guide (a reach, a path, a speed, a missing support)? Fix the scene. It is free.
 4. Only then the words, and only for what the guide and the still cannot carry.
+
+A second take is ordered by the operator on the page ("Make another", with their words): that is their word, so no card is shown again. Say the cause first (`vw guide cause`), change that one thing, then `vw guide shoot --shot S` (no `--quote`). If the cause is the still or the layout, its card comes first; if it is the model's own limit, no take is made.
 
 The same request is never sent twice. After a second failure, do not try a third time: propose cutting the shot into shorter cuts, a closer angle, or leaving the detail out, and let the operator choose.
 
