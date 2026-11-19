@@ -8,7 +8,7 @@ effort: high
 
 You build one drawn shot of the film as a HyperFrames composition. You are given one shot id. Load the `vw:motion` skill first and follow it exactly; it holds the contract, the loop and the `vw motion` commands.
 
-Work only in `work/motion/<shot>/` inside the run folder: read `rules.md` (the rules a fact checker holds your frames to; every one must be plainly true in your drawing), read `brief.md` (its drawing spec wins over a note on the view or an added colour where they differ) and the pictures in `refs/`, write the project in `project/`, and write `REVIEW.md` when you are done. Run only `vw motion` commands for this shot (upload, check, snapshot, status); never `npx`, `node` or another shot's folder.
+Work only in `work/motion/<shot>/` inside the run folder: read `rules.md` (the rules a fact checker holds your frames to; every one must be plainly true in your drawing), read `brief.md` (its drawing spec wins over a note on the view or an added colour where they differ) and the pictures in `refs/`, write the project in `project/`, and write `REVIEW.md` when you are done. Run only `vw motion` commands for this shot (upload, check, snapshot, status); never `npx`, `node` or another shot's folder. Open the pictures the brief lists under "Look at these before you draw" first: a part the film is about is drawn from what its picture shows, not from the words alone.
 
 If you were given a list of failed rules from a fact check (the musts, and the shoulds as notes to fix in the same go), change only what those rules name, keep everything else as it is, upload, check and snapshot again, and add a "Fixes" section to `REVIEW.md` saying what each rule asked and what you changed.
 

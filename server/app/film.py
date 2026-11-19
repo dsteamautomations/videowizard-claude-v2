@@ -36,6 +36,18 @@ DEFAULT_STYLE = 'restrained'
 STYLE_ORDER = ('restrained', 'lively', 'bold', 'technical', 'editorial', 'playful', 'data-led', 'product')
 OLDER_STYLE = ('Calm, eased, technical: arrivals on long ease-outs (`power3.out`, `expo.out`), a build in sequence (staggered, never all at once), '
                'a label that lands and holds dead still, a slow push-in only when the brief asks. Flat, clean, technical.')   # the one style every film had before; kept for films without a recorded style
+EVERY_STYLE = ('In every style: a label that has landed does not move, grow, fade or drift until it leaves. The whole frame does not push in, pan or drift unless this shot\'s own '
+               'lines above ask for it; when they do, the whole picture moves as one group. After a strong move (a part that travels far, lands with a bounce or changes the '
+               'whole picture) nothing else moves while the viewer reads what landed: about 0.5 s plus 0.3 s for each word. The last label of the shot holds at least 2 s, or to '
+               'the end of the shot when the shot is shorter. One move in the shot is the strongest, and it is on the claim; every other move is quieter. Text moves as whole '
+               'labels, lines or words, never letter by letter.')   # design/221a F1: under every style's text, one copy (the style files keep their word pin)
+CAMERA = {   # design/221 section 10: the camera flows of a drawn shot that explains; a shot names one (`camera_flow`), none named is Fixed
+    'fixed': ('Fixed', 'the frame does not move; parts and labels move inside it.'),
+    'step_closer': ('Step closer', 'once, from the whole to one part: the whole picture scales up as one group toward that part, then rests.'),
+    'pull_back': ('Pull back', 'once, from one part to the whole: the whole picture scales down as one group, then rests.'),
+    'pan_along': ('Pan along', 'the whole picture moves sideways as one group along a long object, a process in a line or a map, then rests.'),
+    'follow': ('Follow', 'a step closer as each part is named, at most three in the shot; the whole picture moves as one group and rests before each label lands.'),
+    'slow_push_in': ('Slow push-in', 'the whole picture scales up a few percent through the shot to hold one idea; only when no label is near the edge.')}
 SCRIPT_RANGES = {'latin': [(0x41, 0x5A), (0x61, 0x7A), (0xC0, 0xD6), (0xD8, 0xF6), (0xF8, 0x24F)], 'devanagari': [(0x0900, 0x097F)], 'tamil': [(0x0B80, 0x0BFF)], 'telugu': [(0x0C00, 0x0C7F)],
                  'kannada': [(0x0C80, 0x0CFF)], 'malayalam': [(0x0D00, 0x0D7F)]}
 SCRIPT_NAMES = {'latin': 'English', 'devanagari': 'Hindi', 'tamil': 'Tamil', 'telugu': 'Telugu', 'kannada': 'Kannada', 'malayalam': 'Malayalam'}
@@ -43,14 +55,18 @@ SCRIPT_NAMES = {'latin': 'English', 'devanagari': 'Hindi', 'tamil': 'Tamil', 'te
 
 @lru_cache(maxsize=1)
 def styles():
-    """{name: {title, for, first: [categories it is recommended first for], also: [...], text}}; a file that is empty or has no text is left out (E3)."""
+    """{name: {title, for, first: [categories it is recommended first for], also: [...], text, energy, camera: [flow names], motions: [lines]}}; a file that
+    is empty or has no text is left out (E3). design/221a F3: the family is its own section after a line `motions:`, so the style's text keeps its word pin."""
     out = {}
     for path in sorted(STYLE_DIR.glob('*.md')):
-        head, _, text = path.read_text(encoding='utf-8').partition('\n\n')
+        head, _, body = path.read_text(encoding='utf-8').replace('\r\n', '\n').partition('\n\n')
+        text, _, fam = body.partition('\nmotions:\n')
         meta = dict((k.strip(), v.strip()) for k, v in (line.split(':', 1) for line in head.splitlines() if ':' in line))
         if text.strip() and meta.get('title'):
             cats = lambda key: [c.strip() for c in meta.get(key, '').split(',') if c.strip()]
-            out[path.stem] = {'title': meta['title'], 'for': meta.get('for', ''), 'first': cats('first'), 'also': cats('also'), 'text': text.strip()}
+            out[path.stem] = {'title': meta['title'], 'for': meta.get('for', ''), 'first': cats('first'), 'also': cats('also'), 'text': text.strip(),
+                              'energy': int(meta['energy']) if meta.get('energy', '').isdigit() else None, 'camera': cats('camera') or ['Fixed'],
+                              'motions': [l.strip() for l in fam.splitlines() if l.strip().startswith('- ')]}
     return out
 
 
@@ -74,11 +90,20 @@ def motion(run):
 
 
 def style_part(run):
-    """S4: the 'Motion style' part of a drawn shot's brief."""
+    """S4: the 'Motion style' part of a drawn shot's brief; design/221a F1, F3 and design/221 section 10: its camera flows, its motions, the fixed paragraph last."""
     name = motion(run)
     if name and name in styles():
-        return f"Motion style ({styles()[name]['title']}): how things move and appear in this film. It never changes the facts, the labels, the colours, the font or the timing above.\n{styles()[name]['text']}"
+        s = styles()[name]
+        return '\n'.join([f"Motion style ({s['title']}): how things move and appear in this film. It never changes the facts, the labels, the colours, the font or the timing above.",
+                          s['text'], '', f"Camera flows this style allows on a shot that explains: {', '.join(s['camera'])}.",
+                          *(['The motions of this film, by name. Use these for these jobs and no others:', *s['motions']] if s['motions'] else []), EVERY_STYLE])
     return f'Motion style (the older fixed style, kept for this film): {OLDER_STYLE}'
+
+
+def camera_allowed(run, flow):
+    """design/221 section 10 point 4: whether the film's motion style allows a camera flow (a key of CAMERA); True with no style recorded."""
+    name = motion(run)
+    return not (name and name in styles()) or CAMERA[flow or 'fixed'][0].lower() in [c.lower() for c in styles()[name]['camera']]
 
 
 def need_motion(run):

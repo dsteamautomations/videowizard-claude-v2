@@ -307,6 +307,7 @@ class Shot(Model):
     carries_text: bool = False   # design/112 K2, K4: the still shows words (a label, a title, a caption): push_in only, placed whole, never cropped or panned
     scene_svg: SvgScene | None = None   # design/117 P2 (design/113 E1 was the primitive scene)
     scene_motion: MotionScene | None = None   # design/130: the HyperFrames project of a drawn shot on a motion film
+    camera_flow: Literal['', 'fixed', 'step_closer', 'pull_back', 'pan_along', 'follow', 'slow_push_in'] = ''   # design/221 section 10: a drawn shot's one camera flow (film.CAMERA); empty is fixed
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
@@ -1249,7 +1250,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
                             'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds',
-                            'transition_in', 'transition_out', 'transition_reason', 'size', 'size_reason', 'camera_reason', 'claim', 'warning_answers'):   # design/89, 91, 103, 124: absent stays absent
+                            'transition_in', 'transition_out', 'transition_reason', 'size', 'size_reason', 'camera_reason', 'claim', 'warning_answers', 'camera_flow'):   # design/89, 91, 103, 124, 221: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 if shot.get('drawing_spec') and original_shot.get('drawing_spec'):   # design/106: absent stays absent
                     if 'proportions' not in original_shot['drawing_spec']: shot['drawing_spec'].pop('proportions', None)
@@ -1263,7 +1264,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
     return result, warnings
 
 
-SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers', 'scene_svg', 'scene_motion', 'drawing_spec'), ('size', 'material_spec')   # design/124 C2 fix 6: specs are researched after the picture search and approved in their own table, so they never need the gap accepted again   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale
+SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers', 'scene_svg', 'scene_motion', 'drawing_spec', 'camera_flow'), ('size', 'material_spec')   # design/124 C2 fix 6: specs are researched after the picture search and approved in their own table, so they never need the gap accepted again   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale; design/221: a drawn shot's camera flow is proposed with the plan and changed without reopening its gap
 
 
 def _drop(d, keys):

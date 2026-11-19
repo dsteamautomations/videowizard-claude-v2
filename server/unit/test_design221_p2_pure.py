@@ -211,7 +211,8 @@ def test_the_render_skips_the_note_in_its_word_for_word_check_and_the_brief_says
     named(store, upload(store, files))
     assert VS.render_motion(FakeConn([]), store, USER, NEW, [], {'shot_id': 'MO1'})['frames'] == 100
     b = VS.motion_brief(store, NEW, [], 'MO1')['brief']
-    assert ('Corner note: "illustrative, not to scale" is drawn by the server in the lower right corner of every frame. Do not draw it, and keep that corner free.') in b
+    assert ('Corner note: "illustrative, not to scale" is drawn by the server in the lower right corner of every frame, in the box from 80 % of the width and 90 % '
+            'of the height to the edges. Do not draw it, and keep that corner free.') in b   # design/221 phase 3a: the box is given
     assert 'only these: "Solid brick-on-edge course at sill level".' in b
 
 

@@ -138,6 +138,17 @@
     "Snapshot each shot at its beats with crops of the parts its rules name",
     "Failed rules go to a new `vw-motion-shot` helper with only those rules; at most two redo rounds, then show the operator the open rules.",
     "A rule you cannot judge from these frames fails",
-    "PNGs of the moments that matter (each build step, each label landing, the end)"
+    "PNGs of the moments that matter (each build step, each label landing, the end)",
+    "Avoid stillness longer than about two seconds while the narration is speaking.",
+    "the camera follows the subject with pans and gentle zooms, never faster than the eye can read",
+    "moves only by panning along the object or stepping closer to a detail",
+    "in another a single slow push-in of a few percent across the whole shot",
+    "The whole frame drifts slowly in one direction through the shot",
+    "letters easing from slightly wide to their final spacing",
+    "The camera orbits and moves closer or further along smooth arcs",
+    "The camera bobs lightly: a small nudge toward each new arrival",
+    "The camera snaps between framings: a punch-in on the important part, a whip to the next.",
+    "A line the viewer reads holds at least 0.5 s plus 0.3 s a word.",
+    "Pictures you may place (approved; copies beside this brief in refs/ to look at)"
   ]
 }

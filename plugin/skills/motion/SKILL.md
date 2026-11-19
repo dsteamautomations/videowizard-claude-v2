@@ -19,10 +19,12 @@ The server places these at check and render; refer to them, never create them:
 ## The brief is the contract
 
 - A note on the view or a colour the brief lists as added is below the spec: the spec wins where they differ.
+- The brief's "Shared look (every drawing of this film)" lines hold for every drawing of the film, below the spec like a note. The main assistant recorded them before the first brief: a choice with no fact in it is its own, and logged; one that changes a fact or a proportion was asked once, with the others, before the first drawing was built. Never stop to ask about them.
 - The root's `data-duration`, `data-fps`, `data-width`, `data-height` are exactly the brief's. The length is to the frame.
 - A part another drawing shows from another direction or at another scale is the same part: draw it as this drawing's spec and view say, and make the change of view readable (the view visibly turns or cuts; a label such as "section" only where the brief lists it); never a part that morphs into another shape.
 - Every text on screen is one of the brief's labels, word for word, and nothing else. Put each label in an element with a stable `id`. The corner note the brief names is drawn by the server in the lower right corner: never draw it, and keep that corner free.
 - What appears when follows the narration: an element named by a word appears at that word's second (the brief lists each word's start). The plan's cues (`#id` at a word) are checked by the server against the render.
+- Open the pictures the brief lists under "Look at these before you draw" first: a part the film is about is drawn from what its picture shows, not from the words alone.
 - The claims and the drawing spec are facts: draw the parts, sizes, relationships and proportions as the spec says, and only those. A real object is drawn as it is built (a wall shows its bond; an opening has a lintel); when unsure, draw less, never something false.
 - Colours are the brief's palette, with the colours it lists as added for every drawing. A thing the palette gives no colour: choose a neutral (a grey, an off-white or a near-black) that keeps it apart from what touches it and name it in `REVIEW.md` under "Colours added" (the thing, #RRGGBB, its words, one reason); never stop to ask. A real hue is the operator's: name it in `REVIEW.md` as a question.
 - Silent: no audio, no music.
@@ -41,7 +43,31 @@ Details: `references/format.md` (the project shape, attributes, timing) and `ref
 
 ## Motion craft, for these shots
 
-How things move and appear is the film's, not this skill's: follow the brief's "Motion style" part for the pace, the arrivals, the labels, the camera and the changes between states. Where the brief's own lines for this shot ask for something the style does not, the brief's lines win for that shot. A line the viewer reads holds at least 0.5 s plus 0.3 s a word.
+How things move and appear is the film's, not this skill's. Follow, in this order: the lines of the brief that are about this shot; then the brief's "In every style" lines; then its "Motion style" text and the motions it names. Use the film's named motions for their jobs and no others; for a job they do not cover (a callout, a number, a chart, a before-and-after, a list of steps) use the extra motion of that job below, at the style's pace. Read references/motion.md only for a number none of these gives (an ease, a stagger, an overlap, how long an exit takes); where it disagrees with the brief, the brief wins. Its parts about a whole film (the beat grid, transitions between scenes, title sizes, letter-by-letter text) are not for a drawn shot. In REVIEW.md, name each motion you used and which move is the strongest.
+
+A motion outside these only for a reason the brief's lines for this shot give: say the reason in REVIEW.md. The main assistant sends a drawing back once when it used another motion without one.
+
+The extra motions (a calm style takes the longer time and no overshoot; Lively and Product the middle; Bold and Playful the shorter, with the style's own landing):
+- Leader then label (a callout): a thin leader draws from the part to the label's place in 0.6 s; the label arrives at its end by the film's own label motion and holds. Leaders never cross; a leader ends plainly.
+- Count up (a number): counts to its real value in 0.6 to 1 s and lands with its mark.
+- Grow from the baseline (a chart): one mark at a time, each 0.6 to 0.8 s, stopping exactly on its value.
+- Wipe between states (a before-and-after): a straight edge crosses in 0.6 to 1 s, the new state behind it.
+- Step list (points or steps, one at a time): each item arrives by the film's own label motion, 0.4 s apart.
+
+## The camera
+
+The brief's "Camera" line names the shot's one camera flow (Fixed when the plan names none): Fixed (the frame does not move); Step closer (once, from the whole to one part); Pull back (once, from one part to the whole); Pan along (a long object, a process in a line, a map); Follow (a step closer as each part is named, at most three in the shot); Slow push-in (a few percent, to hold one idea through a long sentence, only when no label is near the edge).
+
+1. One camera flow per shot: the one the brief names, and no other move of the frame.
+2. The one way to move the camera: the whole picture is one group that scales and moves; nothing inside it moves to fake the camera. The corner note is the server's and stays outside it.
+3. A label lands only after the camera has come to rest; its reading time counts from then.
+4. Keep the lower right corner free: the server draws the corner note there, outside the moving picture.
+5. A drawing that continues another opens exactly as the earlier shot ended.
+6. Judge a label's size at the end framing.
+7. Never move the camera during a comparison or a quantity: a zoom changes how big things look. The plan gives such a shot Fixed.
+8. Advice: do not move the camera at the moment a part changes state; it makes the change harder to follow.
+9. The move starts on the narration's word and is never faster than the eye can follow.
+10. The last second of the shot is still.
 
 ## A finish, when it suits the shot
 

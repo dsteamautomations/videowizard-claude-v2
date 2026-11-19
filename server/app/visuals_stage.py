@@ -391,6 +391,10 @@ def carried_warnings(session, run, plan, outputs):
                 out.append({'kind': 'stand_in_real', 'shot_id': sh['id'],
                             'message': f"shot {sh['id']} shows {name}, a real person, as a stand-in: the picture is made from the description, not from their own photo. "
                                        'To show them as they are, the operator gives a photo and records their permission.'})
+            if sh['visual_type'] == 'drawn' and not film.camera_allowed(run, sh.get('camera_flow')):   # design/221 section 10 point 4: a warning, never a refusal
+                out.append({'kind': 'camera_flow', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']}: the camera flow {film.CAMERA[sh.get('camera_flow') or 'fixed'][0]} is not one the film's motion style allows "
+                                       f"({', '.join(film.styles()[film.motion(run)]['camera'])}). Choose one of those, or fixed when in doubt."})
     alike = alike_people(plan) if is_kept(session, run) else []   # the reference round of such a film refuses them, one pair at a time: here they are named together, before it
     if alike:
         out.append({'kind': 'people_alike',
@@ -6115,13 +6119,15 @@ def drawing_note(session, plan, user, shots, text):
     need(text, 'Give the note as one plain line (--text).')
     need(len(text) <= 300, 'The note is one plain line of at most 300 characters.')
     drawn = {s['id'] for s in drawn_shots(plan)}
+    shared = list(shots or []) == ['all']   # design/221 row 7: the shared look, a line for every drawing of the film
+    shots = sorted(drawn) if shared else shots
     need(shots and all(s in drawn for s in shots), f"Name the drawn shots the note is for (--shot): {', '.join(s for s in shots if s not in drawn) or 'none given'} "
                                                    f"is not a drawn shot of the plan ({', '.join(sorted(drawn)) or 'none'}).")
     rows = session.setdefault('drawing_notes', [])
-    same = next((r for r in rows if r['text'] == text and set(r['shots']) == set(shots)), None)
+    same = next((r for r in rows if r['text'] == text and (set(r['shots']) == set(shots) or shared and r.get('shared'))), None)
     if same:
         return same
-    rows.append({'text': text, 'shots': list(dict.fromkeys(shots)), 'by': 'claude', 'user': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    rows.append({'text': text, 'shots': list(dict.fromkeys(shots)), **({'shared': True} if shared else {}), 'by': 'claude', 'user': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     return rows[-1]
 
 
@@ -6129,8 +6135,12 @@ def withdraw_note(session, shots, text):
     """design/218b: the named drawings leave the note that reads `text`; a note with no drawing left is deleted."""
     text = ' '.join(str(text or '').split())
     rows = session.get('drawing_notes') or []
+    if list(shots or []) == ['all']:   # design/221 row 7: a shared-look line leaves every drawing
+        need(any(r['text'] == text and r.get('shared') for r in rows), f'No shared-look line reads "{text}": nothing to withdraw.')
+        session['drawing_notes'] = [r for r in rows if not (r['text'] == text and r.get('shared'))]
+        return
     for shot in shots:
-        row = next((r for r in rows if r['text'] == text and shot in r['shots']), None)
+        row = next((r for r in rows if r['text'] == text and shot in r['shots'] and not r.get('shared')), None)   # a shared-look line leaves only with --shot all
         need(row, f'No note on {shot} reads "{text}": nothing to withdraw (the notes are in its brief, `vw motion brief --shot {shot}`).')
         row['shots'].remove(shot)
     session['drawing_notes'] = [r for r in rows if r['shots']]
@@ -6144,7 +6154,7 @@ def add_note(store, user, run, outputs, body):
         return {'notes': session['drawing_notes'], 'next': f"Withdrawn from {', '.join(body['shots'])}: the next briefs of those drawings no longer carry it."}
     row = drawing_note(session, current_plan(store, session), user, body['shots'], body['text'])
     save_session(store, run, session)
-    return {'note': row, 'next': f"Recorded for {', '.join(row['shots'])}: the next briefs of those drawings carry it (`vw motion brief`); the operator sees it under Details, nothing is asked."}
+    return {'note': row, 'next': f"Recorded for {'every drawing of this film (the shared look)' if row.get('shared') else ', '.join(row['shots'])}: the next briefs of those drawings carry it (`vw motion brief`); the operator sees it under Details, nothing is asked."}
 
 
 def palette_line(plan, session):
@@ -6371,7 +6381,9 @@ def motion_brief(store, run, outputs, shot_id, session=None):
     spec = shot.get('drawing_spec') or {}
     fonts = _motion_fonts(store, session, run)
     pictures = sorted(brief_pictures(session, shot), key=lambda p: p[0].lower())   # design/221 S3: one order whatever order the session was saved in
+    look = look_pictures(session, shot)
     sm = shot.get('scene_motion') or {}
+    shared = [f"- {n['text']}" for n in session.get('drawing_notes') or [] if n.get('shared')]
     for miss in film.missing_letters(film.font(run), sm.get('labels') or []):   # design/179 E7: named before the render, not after
         need(False, f"The label \"{miss['label']}\" has letters the film's font ({film.font(run)}) does not hold: {' '.join(miss['letters'][:8])}. Ask the operator: another font for this film "
                     '(`vw font` lists those that hold its language), or other words for the label.')
@@ -6384,6 +6396,7 @@ def motion_brief(store, run, outputs, shot_id, session=None):
              ('Shows', said_(piece('Shows', shot.get('depicts') or shot.get('purpose')), piece('Message', shot.get('message')))),
              ('Claims', f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."),
              ('Framing', said_(piece('Framing', shot.get('framing')), piece('Appearance', shot.get('appearance') or (plan.get('foundation') or {}).get('appearance')))),
+             ('Camera', 'Camera: ' + ': '.join(film.CAMERA[shot.get('camera_flow') or 'fixed'])),   # design/221 section 10: one flow per shot; none named is Fixed
              ('Confirmed for the things in this shot', f"Confirmed for the things in this shot: {'; '.join(known)}" if known else '')]
     note = corner_note(spec)   # design/221 row 9: drawn by the server, so it is neither the spec's label nor a text on screen here
     prev = continues_from(plan, session, gap, shot)   # design/221 row 12
@@ -6392,12 +6405,15 @@ def motion_brief(store, run, outputs, shot_id, session=None):
                    + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
     shown = [l for l in sm.get('labels') or [] if _flat(l) != _flat(note)]
     lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in shown) or 'name them in the plan (scene_motion.labels) and use them exactly'}."),
-              ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame. Do not draw it, and keep that corner free.' if note else ''),
+              ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame, in the box from 80 % of the width and 90 % of the height to the edges. '
+                                             'Do not draw it, and keep that corner free.' if note else ''),
               ('Length', f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\"."),
               ('Narration', f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\""),
               ('Each word\'s start', f"Each word's start, seconds from the shot's start: {timed}."),
               ('Progression', piece('Progression', shot.get('information_progression'))),
-              ('Pictures', 'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.'),
+              ('Look at', 'Look at these before you draw (in refs/): ' + '; '.join(f"{els.get(e, {}).get('name') or e}: " + ', '.join(f'refs/{rid}.png ({_shows(r)})' for rid, r in rs)
+                                                                         for e, rs in look.items()) + '.' if look else ''),   # design/221 row 5: each thing's footage picture and approved pictures, opened first
+              ('Pictures', 'Pictures you may place (approved): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.'),
               ('Continues from', f"Continues from {prev}: you are given {prev}'s last frame; this drawing starts where it ends." if prev else ''),
               ('Palette', palette_line(plan, session)),   # design/218: the plan's palette and the colours added since, the same for every drawing
               ('Fonts', f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
@@ -6405,7 +6421,8 @@ def motion_brief(store, run, outputs, shot_id, session=None):
                   '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else '')),
               ('Rules', f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; every label at least 2.6 % of the frame height, inside the inner 90 %; "
                'every label sentence case as written above.'),
-              *(('Note on the view', f'Note on the view (the spec above wins where they differ): {n["text"]}') for n in session.get('drawing_notes') or [] if shot['id'] in n['shots']),   # design/218b: below the spec; this shot is a drawn shot of the plan (located above)
+              *(('Note on the view', f'Note on the view (the spec above wins where they differ): {n["text"]}') for n in session.get('drawing_notes') or [] if shot['id'] in n['shots'] and not n.get('shared')),
+              ('Shared look', '\n'.join(['Shared look (every drawing of this film):', *shared]) if shared else ''),   # design/221 row 7: recorded once before the first brief (`vw motion note --shot all`)   # design/218b: below the spec; this shot is a drawn shot of the plan (located above)
               ('', ''), ('Motion style', film.style_part(run))]   # design/179 S4: the film's motion style; the fixed 'flat, clean, technical' is gone
     for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16); design/221 row 14: each with where it comes from
         for source, rules in _subject_rules(store, stem):
@@ -6415,7 +6432,7 @@ def motion_brief(store, run, outputs, shot_id, session=None):
     for k, t in lines:   # design/221 S3: one fingerprint per labelled line, so a later change of the brief can be named
         if k:
             prints[k] = hashlib.sha256((prints.get(k, '') + t).encode('utf-8')).hexdigest()[:16]
-    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': [rid for rid, _ in pictures], 'frames': frames, 'fps': str(fps), 'lines': prints}
+    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs])), 'frames': frames, 'fps': str(fps), 'lines': prints}
 
 
 def spec_words(spec, known_only=False):
@@ -6439,6 +6456,23 @@ def brief_pictures(session, shot):
     gold = {golden_of(session, e) for e in els} - {None}
     return [(rid, r) for rid, r in session['references'].items() if r.get('status') == 'approved' and r.get('key')
             and (r.get('kind') == 'style' or rid in gold or (r.get('kind') in ('component', 'sheet') and r.get('element_id') in els))]
+
+
+def look_pictures(session, shot):
+    """design/221 row 5: for each thing of a drawn shot, its approved pictures (its footage frames first), to look at before drawing."""
+    out = {}
+    for e in shot.get('element_ids') or []:
+        rs = sorted(((rid, r) for rid, r in session['references'].items() if r.get('status') == 'approved' and r.get('key') and (r.get('element_id') == e or rid == golden_of(session, e))),
+                    key=lambda p: (p[1].get('kind') != 'frame', p[0].lower()))
+        if rs:
+            out[e] = rs
+    return out
+
+
+def _shows(r):
+    """What a picture shows, in the brief's words."""
+    what = r.get('name') or r.get('subject') or r.get('kind')
+    return f'{what}, from the footage' if r.get('kind') == 'frame' else what
 
 
 def motion_job(conn, store, run, job_id):
