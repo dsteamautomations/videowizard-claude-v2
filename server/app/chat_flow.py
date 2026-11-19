@@ -9,7 +9,11 @@ The gate: the item handed out is kept in the session (`chat_item`); an answer na
 choose the order, show two things at once or skip one.
 
 The order: the treatment (one line), the plan (one gap), the reference round (one element, then one set), then everything `waiting()` lists
-(an open question, a picture, a sheet, a spec, a take), an AI video shot's still and its word to shoot, then the gaps ready to record."""
+(an open question, a picture, a sheet, a spec, a take), an AI video shot's still and its word to shoot, then the gaps ready to record.
+
+design/222 (SK, 19 Nov 2026): the finished AI video takes are no longer asked here one by one: they are judged on the page (`takes`), all together, once
+every take is made and checked. The shot's layout drawing, the still, the word to make the first take and "send it again" stay cards here; the word for
+a second take is "Make another" on the page."""
 import hashlib
 import json
 import re
@@ -19,6 +23,7 @@ from io import BytesIO
 from pathlib import Path
 
 from . import pictures as P
+from . import takes as T
 from . import visuals_stage as V
 
 NOTHING = 'Nothing is needed from you now.'
@@ -1724,6 +1729,23 @@ def _waiting_items(ctx):
                 continue
             motion_take = (job.get('request') or {}).get('kind') == 'motion'
             drawn = job.get('provider') == 'drawn'
+            if not drawn and V.round_v2(session):   # design/222: an AI video take: one item per shot (its newest take), the page's own line, words and answers
+                found = next(((g_, sh, k, of) for g_, sh, k, of in T.video_shots(plan, session) if sh['id'] == group), None)
+                if not found or any(i['id'] == f'take:{job["id"]}' for i in items):
+                    continue
+                left = V.cap_of(session) - V.visuals_spend(conn, run)['spent_inr']
+                line = T.line(store, session, plan, *found, take_rows, left_inr=left, price_inr_per_s=V.prices()['video_inr_per_s'])
+                if line['takes'][-1]['job'] != str(job['id']):
+                    continue   # an earlier take of the shot: it is on the newest take's line
+
+                def run_(choice, quote, words, group=group):
+                    return T.answer(conn, store, user, run, outputs, group, V.take_jobs(conn, run), choice, quote, words)
+                buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell=b.get('hint') or '') for b in line['buttons']]
+                item = _item(f"take:{job['id']}", 'take', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:], text=T.chat_text(line),
+                             show=[{'key': res['key'], 'name': f'{group}-take.mp4'}] if res.get('key') else [])
+                item['_line'] = line
+                items.append(item)
+                continue
             ev = res.get('evidence') or {}
             line = P.drawn_line(store, session, plan, job, check, fin, motion_take, brief_now) if drawn else None
             if line:   # design/217 (F3): held as select_take holds it: the fact check of the project it was rendered from, no fact check yet, the server's lines, the timing
@@ -1797,7 +1819,7 @@ def _guide_items(ctx):
         last = takes[-1] if takes else None
         again = bool(last and last['status'] == 'ready' and not rejected(last) and unusable(last))   # the clip that came back is not a take: the same request may go once more, on the operator's word
         stamp = stamp + (':again:' + str(last['id']) if again else '')
-        if card['ready'] and not open_take and (g.get('shoot_asked') or {}).get('stamp') != stamp:
+        if card['ready'] and not open_take and (g.get('shoot_asked') or {}).get('stamp') != stamp and not T.again_pending(g):   # design/222: "Make another" on the page gave the word: no second Shoot card
             def run_(choice, quote, words, sid=sid, stamp=stamp, again=again):
                 out = guide.shoot(conn, store, user, run, outputs, sid, quote, again) if choice == 'shoot' else {'for_the_assistant': words}
                 s = V.session_of(store, run, outputs)
@@ -2115,7 +2137,13 @@ def next_item(conn, store, user, run, outputs, one=False):
         looks = P.waits_words(session, plan)
         if looks:
             out['then'] = looks + (' ' + out['then'] if out.get('then') else '')
-        six = P.expected(session, plan, V.take_jobs(conn, run))
+        rows = V.take_jobs(conn, run)
+        if T.asked(session, plan, rows):   # design/222: Claude is asked to check the takes from now
+            V.save_session(store, run, session)
+        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.again_due(session, plan, rows)) if x)   # the takes that wait for Claude's check; a take ordered on the page
+        if more:
+            out['then'] = more + (' ' + out['then'] if out.get('then') else '')
+        six = P.expected(session, plan, rows)
         due = ' '.join(x for x in (P.drawn_due(six), P.stills_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
@@ -2169,13 +2197,14 @@ def _next_item(conn, store, user, run, outputs, one=False):
             V.save_session(store, run, session)
         pub = _public(item, summary, len(items), one)
         if item.get('_line') and P.complete(_step6(ctx)):   # design/221 row 18: everything of step 6 is made: the page offers it, in one visit
-            pub['how'] = P.W['page_now'] + pub['how']
+            pub['how'] = (T.W['page_now'] if item['_line'].get('kind') == 'take' else P.W['page_now']) + pub['how']   # design/222: a take is answered on the page of step 7
         return {'item': pub}
     if session.pop('chat_item', None) or session.pop('chat_card', None):
         session.pop('chat_card', None)
         V.save_session(store, run, session)
     six = _step6(ctx)
-    count = P.status_line(six)
+    seven = T.expected(session, ctx['plan'], V.take_jobs(conn, run)) if ctx['plan'] and V.round_v2(session) else []   # design/222: step 7's line of counts
+    count = ' '.join(x for x in (P.status_line(six), T.status_line(seven)) if x)
     show = _finished({**ctx, 'session': session}, six)
     if show:
         V.save_session(store, run, session)

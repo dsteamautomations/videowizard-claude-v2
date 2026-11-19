@@ -380,6 +380,10 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     g = entry_of(session, shot_id)
     card = ready_card(session, shot_id, VS.prices()['video_inr_per_s'])
     need(card['ready'], 'Not ready to shoot; still missing: ' + ', '.join(card['missing']) + '.')
+    ordered = (g.get('again') if not (g.get('again') or {}).get('sent') else None)   # design/222: "Make another" on the page is the operator's word for one more take
+    if ordered and not str(quote or '').strip():
+        from . import takes
+        quote = takes.W['again_word'].format(words=ordered['words'])
     need(str(quote or '').strip(), "A take is paid for on the operator's word: give their words (--quote).")
     render, still = g['render'], card['still']
     camera = digest(VS.load_json(store, g['key'])['camera'])
@@ -417,8 +421,11 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     k = VS.key(run, f'takes/{identity}.request.json')
     VS.save_json(store, k, record)
     session['preparations'][shot_id] = {'preparation_id': identity, 'key': k, 'guide': True}
-    job_id = _queue(conn, run, shot_id, 'video', {'kind': 'take', 'preparation_id': identity, 'request_key': k, 'provider': gen['provider'], 'model': gen['model'], 'duration_seconds': seconds})
+    job_id = _queue(conn, run, shot_id, 'video', {'kind': 'take', 'preparation_id': identity, 'request_key': k, 'provider': gen['provider'], 'model': gen['model'], 'duration_seconds': seconds,
+                                                  'plan_digest': record['plan_digest']})   # design/222: the page counts a take shot for another plan as "must be made again"
     g.setdefault('takes', []).append({'job_id': job_id, 'same': same, 'camera': camera, 'preparation_id': identity, 'quote': str(quote).strip(), 'by': user['id'], 'at': now()})
+    if ordered:
+        ordered['sent'] = job_id   # the word is used: the next take needs a new one
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'take sent', 'job_id': job_id, 'model': gen['model'], 'seconds': seconds, 'prompt': prompt, 'guide_sha256': render['sha256'], 'still_sha256': still['sha256'],
                                                     'request_key': k, 'quote': str(quote).strip(), 'again': bool(before), 'by': user['id'], 'by_name': user.get('name') or ''})
@@ -579,6 +586,8 @@ def set_cause(conn, store, user, run, outputs, shot_id, cause, notes, fix):
     first = next((r for r in check.get('scorecard') or [] if r['line'] == 'first frame'), None)
     need(not (cause == 'words' and first and first['state'] == 'Fail'), "The take's first frame did not match the still: the fault is before the video, in the still or the guide. No wording fixes that.")
     last['cause'] = {'cause': cause, 'notes': str(notes).strip(), 'fix': str(fix).strip(), 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
+    if cause == 'model' or len([t for t in rejected if t.get('camera') == last.get('camera')]) >= 2:
+        g.pop('again', None)   # design/222: no take is made (the ladder): the word given on the page for one more is dropped
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'cause of the last take', 'job_id': last['job_id'], 'cause': cause, 'notes': str(notes).strip(), 'fix': str(fix).strip(), 'by': user['id'], 'by_name': user.get('name') or ''})
     here = [t for t in rejected if t.get('camera') == last.get('camera')]

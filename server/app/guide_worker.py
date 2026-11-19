@@ -227,6 +227,46 @@ def first_frame_line(first, still):
             'shift_pct': round(m['shift'] * 100, 2), 'zoom_pct': round(abs(m['scale'] - 1) * 100, 2)}
 
 
+def frame_rate(value):
+    """A file's frame rate as a number: ffprobe gives it as text like "24/1" (design/222: `float()` of that raised, and no sheet was ever made)."""
+    from fractions import Fraction
+    try:
+        return float(Fraction(str(value))) or 24.0
+    except (ValueError, ZeroDivisionError):
+        return 24.0
+
+
+JUMP_SCORE = 0.25   # ffmpeg's scene score between two neighbouring frames above which the picture has jumped to another view; on VW-12's 17 takes it marks exactly the three with a jump (0.51 to 0.60) and no other
+FRAME_EVERY_S, FRAME_WIDTH = 0.5, 960   # design/222: the frames Claude judges a take from: one every half second, the first and the last, this wide
+
+
+def jumps(video_path):
+    """The seconds at which the picture jumps to another view (a sudden change between two neighbouring frames), measured from the file."""
+    import re
+    r = subprocess.run([settings().FFMPEG_EXECUTABLE, '-hide_banner', '-i', str(video_path), '-vf', f"select='gt(scene,{JUMP_SCORE})',metadata=print", '-an', '-f', 'null', '-'],
+                       capture_output=True, timeout=120)
+    return [float(x) for x in re.findall(r'pts_time:([0-9.]+)', r.stderr.decode('utf-8', 'replace'))]
+
+
+def continuous_line(at):
+    """design/222: one continuous shot, measured. It marks the take's line; the take is not set aside."""
+    line = {'check': 'one continuous shot', 'weight': 'must', 'pass': not at, 'pass_when': 'the clip is one shot from its first frame to its last: the picture never jumps to another view',
+            'seen': 'no jump to another view' if not at else 'the picture jumps to another view at ' + ' and at '.join(f'{t:.1f} s' for t in at[:4])}
+    return {**line, 'at_s': round(at[0], 1)} if at else line
+
+
+def half_second_frames(video_path, seconds, folder):
+    """The frames Claude judges the take from: [(second, jpeg file)], one every FRAME_EVERY_S, then the last frame."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    ff = settings().FFMPEG_EXECUTABLE
+    subprocess.run([ff, '-y', '-v', 'error', '-i', str(video_path), '-vf', f'fps={1 / FRAME_EVERY_S:g},scale={FRAME_WIDTH}:-2', '-q:v', '3', str(folder / 'h-%03d.jpg')], check=True, timeout=180)
+    out = [(round(i * FRAME_EVERY_S, 1), p) for i, p in enumerate(sorted(folder.glob('h-*.jpg')))]
+    last = folder / 'last.jpg'
+    subprocess.run([ff, '-y', '-v', 'error', '-sseof', '-0.25', '-i', str(video_path), '-vf', f'scale={FRAME_WIDTH}:-2', '-q:v', '3', '-update', '1', str(last)], timeout=120)
+    return out + ([(round(float(seconds), 1), last)] if last.is_file() and (not out or round(float(seconds), 1) > out[-1][0]) else [])
+
+
 def blocked_by(lines):
     """Why a clip is not shown as a take, in the operator's words; None when it may be shown."""
     failed = {l['check']: l for l in lines if l.get('pass') is False}
@@ -239,11 +279,12 @@ def blocked_by(lines):
     return None
 
 
-SCORECARD = ('real footage and length', 'first frame', 'people', 'the action', 'objects', 'bodies and contact', 'the place and the light', 'the join')
+SCORECARD = ('real footage and length', 'first frame', 'one continuous shot', 'people', 'the action', 'objects', 'bodies and contact', 'the place and the light')   # design/222: "the join" is retired (the page's film order is how it is judged); one continuous shot is measured
 
 
 def scorecard(code_lines, reading):
-    """The eight lines of the review, each Pass, Fail or Not sure, with one thing to watch and the second it happens. Not sure is never rounded up."""
+    """The lines of the review, each Pass, Fail or Not sure, with one thing to watch and the second it happens. Not sure is never rounded up.
+    design/222: `reading` is Claude's look from frames ({lines: [{check, pass, seen, at_s}]}), None before it comes."""
     by = {l['check']: l for l in code_lines}
     read = {l['check']: l for l in (reading or {}).get('lines') or []}
 
@@ -253,11 +294,12 @@ def scorecard(code_lines, reading):
         return 'Pass' if all(l['pass'] for l in ls) else 'Fail'
     rows = [{'line': 'real footage and length', 'state': state(by.get('real footage'), by.get('as long as the guide')), 'seen': '; '.join(l['seen'] for l in (by.get('real footage'), by.get('as long as the guide')) if l)},
             {'line': 'first frame', 'state': state(by.get('first frame matches the still')), 'seen': (by.get('first frame matches the still') or {}).get('seen', '')}]
-    for name in SCORECARD[2:7]:
+    if by.get('one continuous shot'):
+        rows.append({'line': 'one continuous shot', 'state': state(by['one continuous shot']), 'seen': by['one continuous shot'].get('seen', ''), 'at_s': by['one continuous shot'].get('at_s')})
+    for name in SCORECARD[3:]:
         l = read.get(name)
         rows.append({'line': name, 'state': state(l), 'seen': (l or {}).get('seen') or ('not read' if not l else ''), 'at_s': (l or {}).get('at_s')})
-    rows.append({'line': 'the join', 'state': 'Not sure', 'seen': 'judged in the film, between its neighbours; no tool sees it'})
-    worst = next((r for r in rows if r['state'] == 'Fail'), None) or next((r for r in rows[2:7] if r['state'] == 'Not sure'), None)
+    worst = next((r for r in rows if r['state'] == 'Fail'), None) or next((r for r in rows if r['line'] in SCORECARD[3:] and r['state'] == 'Not sure'), None)
     watch = {'line': worst['line'], 'what': worst['seen'], 'at_s': worst.get('at_s')} if worst else {'line': 'the action', 'what': 'the one action of the shot, from its first move to its last', 'at_s': None}
     return rows, watch
 
@@ -279,7 +321,11 @@ def take_checks(snapshot, video_path, store, run_id, jid, reading):
         first_png = motion.frames_png(video_path, [0])[0]
         first = Image.open(BytesIO(first_png))
         lines.append(first_frame_line(first, still))
-        fps = float(ev.get('fps') or 24)
+        try:   # design/222: one continuous shot, measured; a fault here leaves the line out, never the take
+            lines.append(continuous_line(jumps(video_path)))
+        except Exception:
+            pass
+        fps = frame_rate(ev.get('fps'))
         n = max(1, int(round(ev['duration_seconds'] * fps)))
         idx = sorted(set(range(0, n, max(1, int(round(fps / 4))))) | {n - 1})
         sheet = drawn.sheet(motion.frames_png(video_path, idx), fps, ev.get('width') or 1280, ev.get('height') or 720)
@@ -292,9 +338,14 @@ def take_checks(snapshot, video_path, store, run_id, jid, reading):
         pair.save(buf, format='JPEG', quality=88)
         out['pair_key'] = f'{run_id}/visuals/takes/{jid}-first-frame-and-still.jpg'
         store.put(out['pair_key'], buf.getvalue(), 'image/jpeg')
+        out['frames'] = []   # design/222: what Claude judges the take from, stored beside it
+        for at, path in half_second_frames(video_path, ev['duration_seconds'], Path(video_path).with_name('frames')):
+            k = f'{run_id}/visuals/takes/{jid}-f-{int(round(at * 10)):04d}.jpg'
+            store.put(k, path.read_bytes(), 'image/jpeg')
+            out['frames'].append({'at_s': at, 'key': k})
     except Exception as exc:
         out['code_error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
-    out['blocked'] = blocked_by(lines) or ('the checks could not be run (' + out['code_error'] + ')' if out.get('code_error') and len(lines) < 3 else None)
+    out['blocked'] = blocked_by(lines) or ('the checks could not be run (' + out['code_error'] + ')' if out.get('code_error') and len([l for l in lines if l['check'] != 'one continuous shot']) < 3 else None)
     out['code_lines'] = lines
     out['scorecard'], out['watch'] = scorecard(lines, reading)
     out['not_read'] = bool((reading or {}).get('error')) or not (reading or {}).get('lines')

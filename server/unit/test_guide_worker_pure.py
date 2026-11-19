@@ -174,9 +174,13 @@ def reading(**passes):
 
 
 def test_the_scorecard_has_eight_lines_and_one_thing_to_watch():
-    rows, watch = W.scorecard(CODE, reading())
-    assert [r['line'] for r in rows] == list(W.SCORECARD) and [r['state'] for r in rows] == ['Pass'] * 7 + ['Not sure']
-    assert rows[-1]['seen'].startswith('judged in the film') and watch['line'] == 'the action'
+    # design/222: "the join" is retired (the page's film order is how it is judged); "one continuous shot" is measured and joins the card when its line was made
+    rows, watch = W.scorecard(CODE + [W.continuous_line([])], reading())
+    assert [r['line'] for r in rows] == list(W.SCORECARD) and [r['state'] for r in rows] == ['Pass'] * 8
+    assert 'the join' not in W.SCORECARD and watch['line'] == 'the action'
+    assert [r['line'] for r in W.scorecard(CODE, reading())[0]] == [l for l in W.SCORECARD if l != 'one continuous shot']   # a record made before design/222 has no such line
+    jumped, watch = W.scorecard(CODE + [W.continuous_line([1.08])], reading())
+    assert jumped[2] == {'line': 'one continuous shot', 'state': 'Fail', 'seen': 'the picture jumps to another view at 1.1 s', 'at_s': 1.1} and watch['line'] == 'one continuous shot'
 
 
 def test_a_failed_line_is_the_thing_to_watch_with_its_second():

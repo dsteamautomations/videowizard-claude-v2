@@ -363,16 +363,19 @@ def name_of(session, plan, ref):
     return f'{title}, step {n}' if n else title
 
 
-def looks_due(store, run, outputs):
+def looks_due(store, run, outputs, take_rows=None):
     """`GET /api/runs/{run_id}/visuals/pictures/looks`: {pictures: [{ref, sha10, kind, name, shot_id, n?, key, inputs: [{ref, role, key}],
-    request, lines}], then, how}. The keys are the 1600 px copies. Stamps the pictures that waited for the model's check at the deploy."""
+    request, lines}], then, how}. The keys are the 1600 px copies. Stamps the pictures that waited for the model's check at the deploy.
+    design/222: the AI video takes that wait for Claude's check are in the same list (kind `take`: `key` is the sheet at four a second, `inputs`
+    the frames with their second and the still), judged by `how_take`."""
+    from . import takes
     session = V.session_of(store, run, outputs)
     if not V.round_v2(session):
         return {'pictures': [], 'then': PIC_LOOK_NONE, 'how': LOOK_HOW}
     plan = V.guarded(lambda: V.current_plan(store, session))
-    if stamp(session, plan) | asked(session, plan):
+    if stamp(session, plan) | asked(session, plan) | takes.asked(session, plan, take_rows):
         V.save_session(store, run, session)
-    out = []
+    out = takes.listed(session, plan, take_rows)
     for r in due(session, plan):
         inputs = [{'ref': p.get('id'), 'role': 'step before' if r.get('kind') == 'state' and (session['references'].get(p.get('id')) or {}).get('kind') == 'state' else
                    'scene' if (session['references'].get(p.get('id')) or {}).get('kind') == 'frame' else 'parent'} for p in (r.get('generation') or {}).get('parents') or [] if p.get('id')]
@@ -383,7 +386,7 @@ def looks_due(store, run, outputs):
         out.append({'ref': r['id'], 'sha10': str(r['sha256'])[:10], 'kind': r.get('kind'), 'name': name_of(session, plan, r), 'shot_id': V.made_for(session, r),
                     **({'n': step_of(session, r)} if r.get('kind') == 'state' else {}), 'key': _big(store, session, r['id']),
                     'inputs': [{**i, 'key': _big(store, session, i['ref'])} for i in inputs], 'request': (r.get('generation') or {}).get('prompt') or '', 'lines': lines(session, plan, r)})
-    return {'pictures': out, 'then': LOOKS_THEN if out else LOOKS_NONE, 'how': LOOK_HOW}
+    return {'pictures': out, 'then': LOOKS_THEN if out else LOOKS_NONE, 'how': LOOK_HOW, **({'how_take': TAKE_LOOK_HOW} if any(p['kind'] == 'take' for p in out) else {})}
 
 
 def _fault(name, want, sent):
@@ -406,7 +409,18 @@ def _fault(name, want, sent):
     return None
 
 
-def record_looks(store, user, run, outputs, pictures, by):
+TAKE_LOOK_HOW = {
+    'judge': ['A row of kind `take` is a video take. You cannot play it: judge it from its frames. `picture` is the sheet at four frames a second (small pictures in order, the time under each); '
+              'each `frame` input is one frame, every half second, with its second (`at_s`), then the last frame; the `still` input is the approved picture the take started from; `request` is what the take was asked to show.',
+              'Look at every frame, in order, and at the sheet: the sheet shows what happens between two half-second frames. Answer every line of `lines`, pass or fail, from what the frames show, never from the request.',
+              'With a fail, say in one plain sentence what you saw, in words the operator can send back, and give `at_s`: the second of the frame that shows it.',
+              'What the still already shows is not a fault of the take: judge the take against the still where the request and the still differ.',
+              'You are not asked how things move between the frames (speed, a jerk): the operator plays the take. A thing present in one frame and gone in the next with no hand near it fails its line.',
+              'A take whose frames you could not open is `not_checked`, with why, and then has no lines. Never pass a line you did not look at.'],
+    'file': 'The same file as for pictures: one row per take with its `ref`, its `sha10` as listed, and one answer per line: {id, pass, seen, at_s}.'}
+
+
+def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
     """`POST /api/runs/{run_id}/visuals/pictures/looks`: each picture's look, line by line (contract 5.4, 5.5). A refused picture records
     nothing; the others record. Returns {recorded: [ref], refused: {ref: message}, left: [ref], then}."""
     session = V.session_of(store, run, outputs)
@@ -417,6 +431,14 @@ def record_looks(store, user, run, outputs, pictures, by):
     for p in pictures or []:
         p = p if isinstance(p, dict) else {}
         rid = str(p.get('ref') or '')
+        if rid not in session['references'] and any(str(j['id']) == rid for j in take_rows or []):   # design/222: an AI video take's look
+            from . import takes
+            fault = takes.record(session, plan, take_rows, p, who, at)
+            if fault:
+                refused[rid] = fault
+            else:
+                recorded.append(rid)
+            continue
         r = session['references'].get(rid) or {}
         name = name_of(session, plan, r) if r else rid
         if not (r.get('status') == 'candidate' and r.get('sha256') and claude_checks(session, r, plan) and str(r['sha256'])[:10] == str(p.get('sha10') or '')[:10] and p.get('sha10')):

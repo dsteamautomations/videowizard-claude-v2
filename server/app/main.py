@@ -1974,13 +1974,13 @@ def visuals_picture_looks_due(run_id: UUID, user=User, conn=DB):
     """design/217: the step-6 pictures that wait for Claude's check, with their lines. It makes the large copies and stamps the pictures that waited for the model's check, so it takes the run's lock."""
     from . import pictures
     run, outputs = _visuals_run(conn, user, run_id)
-    return Response(visuals_stage.guarded(lambda: pictures.looks_due(storage(), run, outputs)))
+    return Response(visuals_stage.guarded(lambda: pictures.looks_due(storage(), run, outputs, visuals_stage.take_jobs(conn, run))))   # design/222: with the takes that wait for Claude's check
 
 
 @app.post('/api/runs/{run_id}/visuals/pictures/looks')
 def visuals_picture_looks(run_id: UUID, body: PictureLooks, user=User, conn=DB):
     from . import pictures
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: pictures.record_looks(storage(), user, run, outputs, body.pictures, body.by))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: pictures.record_looks(storage(), user, run, outputs, body.pictures, body.by, visuals_stage.take_jobs(conn, run)))
 
 
 @app.post('/api/runs/{run_id}/visuals/round/rest')

@@ -1,0 +1,795 @@
+{
+ "round": "r20261119-120000-000000",
+ "title": "VideoWizard decisions VW-99",
+ "how": "The operator answers this step on a page, not on a card. 1. If `url` is empty, publish the page with the Artifact tool: `file_path` is `page_file`, the title is `title`, `capabilities` exactly as given, an icon of your choice; then run `vw visuals page --url \"<the link it gives>\"`. If there is no Artifact tool, or it fails, run `vw visuals next` and show the card instead, and say once that the page is not available. If `republish` is true, the page at the link was published by an older tool: publish it again to the same link (the Artifact tool with `file_path` `page_file`, `url` the link and `capabilities` again, exactly as given), then run `vw visuals page --url` with that link. 2. Send the pictures before the round, when there are any (design/210). For each batch in `picture_batches`: ArtifactData, action \"batch\", `url` the page's link, `writes` the batch, unchanged. If a batch fails, or a picture stays grey on the page, run `vw visuals page --pictures-again` and send what it gives; if that fails too, stop here, run `vw visuals next` and ask this step in the chat. Then for each list in `zoom_uploads`: the Artifact tool, action \"publish\", `url` the page's link, `asset` true, `file_paths` the list; save its answer, exactly as it came, to `uploaded_file` with the Write tool, and run `vw visuals page --uploaded \"<that file>\"`: it gives one more batch in `picture_batches`, sent the same way. If an upload fails, go on, and tell the operator that the large pictures are not available on the page. 3. Write this round to the page with the ArtifactData tool: action \"set\", `url` the page's link, collection \"rounds\", doc_id `round`, file_path `round_file`. Type none of its content. 4. Say to the operator `say`, exactly as it is, then the link: add nothing to it, no count and no summary of your own (design/216). Then wait. Do not post the lines in the chat as well. 5. When the operator says done: ArtifactData, action \"list\", collection `answers_collection`, out_dir `answers_dir`; then run `vw visuals page --record`. If it lists pictures the operator added on the page (`own_fetch`), fetch each one: the Artifact tool, action \"read\", `url` the page's link, `path` the picture's id, `out_dir` `own_dir`; then run `vw visuals page --record` again: their lines are recorded then (design/210). 6. It prints what was recorded and writes the next round: do steps 2 and 3 again with the new `round` and `round_file`, then follow `then`. An answer the operator gives in the chat instead is recorded with `vw visuals decide`, as before.",
+ "capabilities": {
+  "db": {
+   "rules": [
+    {
+     "path": "rounds",
+     "read": "view",
+     "write": "owner"
+    },
+    {
+     "path": "pics",
+     "read": "view",
+     "write": "owner"
+    },
+    {
+     "path": "zoom",
+     "read": "view",
+     "write": "owner"
+    }
+   ]
+  },
+  "assets": {},
+  "user": {}
+ },
+ "step": "AI video",
+ "open": true,
+ "lines": [
+  {
+   "line": "l01",
+   "key": "pic:take:j2",
+   "item": "take:j2",
+   "state": "open",
+   "kind": "take",
+   "name": "Housing construction at work, shot 1",
+   "kind_words": "An AI video take",
+   "ask": "Is this take right for the film?",
+   "where": "In the film at 0:00.0 to 0:05.2 (5.2 s) · Housing construction at work",
+   "film_at": "0:00.0",
+   "words": "As the demand for affordable housing continues to grow, the construction sector faces",
+   "caption": {
+    "pre": "",
+    "post": "a major challenge.",
+    "words": [
+     {
+      "t": "As",
+      "s": 0.08,
+      "e": 0.32
+     },
+     {
+      "t": "the",
+      "s": 0.44,
+      "e": 0.68
+     },
+     {
+      "t": "demand",
+      "s": 0.8,
+      "e": 1.04
+     },
+     {
+      "t": "for",
+      "s": 1.16,
+      "e": 1.4
+     },
+     {
+      "t": "affordable",
+      "s": 1.52,
+      "e": 1.76
+     },
+     {
+      "t": "housing",
+      "s": 1.88,
+      "e": 2.12
+     },
+     {
+      "t": "continues",
+      "s": 2.24,
+      "e": 2.48
+     },
+     {
+      "t": "to",
+      "s": 2.6,
+      "e": 2.84
+     },
+     {
+      "t": "grow,",
+      "s": 2.96,
+      "e": 3.2
+     },
+     {
+      "t": "the",
+      "s": 3.32,
+      "e": 3.56
+     },
+     {
+      "t": "construction",
+      "s": 3.68,
+      "e": 3.92
+     },
+     {
+      "t": "sector",
+      "s": 4.04,
+      "e": 4.28
+     },
+     {
+      "t": "faces",
+      "s": 4.4,
+      "e": 4.64
+     }
+    ]
+   },
+   "takes": [
+    {
+     "n": 1,
+     "job": "j1",
+     "label": "Take 1",
+     "tab": "Take 1, rejected",
+     "video": {
+      "code": "v96dd734d517a",
+      "label": "Take 1",
+      "none": ""
+     },
+     "secs": "6.0",
+     "in_s": 0.44,
+     "short": "",
+     "rejected": "Rejected. You said: The helper looks into the camera.",
+     "check": {
+      "state": "pass",
+      "head": "Check passed",
+      "faults": [],
+      "by": "Claude looked at 13 frames of this take (one every half second, the first and the last), the sheet at four a second and the start picture, against 5 lines. The server measured the rest: real footage, the length, the first frame, one continuous shot.",
+      "not_judged": "Not judged: how things move between the frames. Play the take.",
+      "passed": [
+       "Real footage: the clip differs from its guide by 31.0 % on 6 frames",
+       "As long as the guide: the clip is 6.0 s, the guide 6.0 s",
+       "First frame matches the still: shifted 0.4 % of the width, zoom 0.2 %",
+       "One continuous shot: no jump to another view",
+       "People",
+       "The action",
+       "Objects",
+       "Bodies and contact",
+       "The place and the light"
+      ]
+     },
+     "details": [
+      [
+       "Where it sits in the film",
+       [
+        "In the film at 0:00.0 to 0:05.2 (5.2 s) · Housing construction at work",
+        "The take is 6.0 s; its place in the film is 5.2 s."
+       ]
+      ],
+      [
+       "How the take was asked for",
+       [
+        "ONE action only: he lays the brick."
+       ]
+      ],
+      [
+       "How it was made",
+       [
+        "The video AI made it as an edit of the guide, started from the approved still.",
+        "Take 1 of this shot."
+       ]
+      ]
+     ]
+    },
+    {
+     "n": 2,
+     "job": "j2",
+     "label": "Take 2",
+     "tab": "Take 2",
+     "video": {
+      "code": "v2994fba507bd",
+      "label": "Take 2",
+      "none": ""
+     },
+     "secs": "6.0",
+     "in_s": 0.44,
+     "short": "",
+     "rejected": "",
+     "check": {
+      "state": "fail",
+      "head": "Check:",
+      "faults": [
+       {
+        "text": "One continuous shot: the picture jumps to another view at 1.5 s. Measured by the server.",
+        "at_s": 1.5
+       },
+       {
+        "text": "Objects: The cement bags on the pallet are gone from 1.5 s, with no one carrying them.",
+        "at_s": 1.5
+       }
+      ],
+      "by": "Claude looked at 13 frames of this take (one every half second, the first and the last), the sheet at four a second and the start picture, against 5 lines. The server measured the rest: real footage, the length, the first frame, one continuous shot.",
+      "not_judged": "Not judged: how things move between the frames. Play the take.",
+      "passed": [
+       "Real footage: the clip differs from its guide by 31.0 % on 6 frames",
+       "As long as the guide: the clip is 6.0 s, the guide 6.0 s",
+       "First frame matches the still: shifted 0.4 % of the width, zoom 0.2 %",
+       "People",
+       "The action",
+       "Bodies and contact",
+       "The place and the light"
+      ]
+     },
+     "details": [
+      [
+       "Where it sits in the film",
+       [
+        "In the film at 0:00.0 to 0:05.2 (5.2 s) · Housing construction at work",
+        "The take is 6.0 s; its place in the film is 5.2 s."
+       ]
+      ],
+      [
+       "How the take was asked for",
+       [
+        "ONE action only: he lays the brick."
+       ]
+      ],
+      [
+       "How it was made",
+       [
+        "The video AI made it as an edit of the guide, started from the approved still.",
+        "Take 2 of this shot."
+       ]
+      ]
+     ]
+    }
+   ],
+   "pics": [
+    {
+     "code": "p149e2e77163a",
+     "label": "Take 1",
+     "role": "frame",
+     "take": 1
+    },
+    {
+     "code": "p149e2e77163a",
+     "label": "Take 2",
+     "role": "frame",
+     "take": 2
+    },
+    {
+     "code": "pacf2cdb5345c",
+     "label": "The shot after, a still picture.",
+     "role": "after"
+    },
+    {
+     "code": "pcaa6d716520b",
+     "label": "The picture the take started from",
+     "role": "still"
+    }
+   ],
+   "buttons": [
+    {
+     "label": "Select",
+     "choice": "select",
+     "act": "select",
+     "take": 2,
+     "needs_words": true,
+     "hint": "The check did not pass it. Why is it right for the film all the same?",
+     "go": "Select it with this reason",
+     "prefill": "",
+     "need": "Write your reason first. It is kept with the film.",
+     "note": "",
+     "say": "Take 2 selected. It goes in the film at 0:00.0. Your reason: \"{words}\""
+    },
+    {
+     "label": "Reject",
+     "choice": "reject",
+     "act": "reject",
+     "take": 2,
+     "needs_words": true,
+     "hint": "What is wrong with it?",
+     "go": "Reject with these words",
+     "prefill": "One continuous shot: the picture jumps to another view at 1.5 s. Measured by the server. Objects: The cement bags on the pallet are gone from 1.5 s, with no one carrying them.",
+     "need": "Write what is wrong first.",
+     "note": "No further take is made from this camera: two were made. After this rejection Claude asks you in the chat: cut the shot, another angle, or leave it out.",
+     "say": "Take 2 rejected with your words: \"{words}\". No new take is ordered; Claude asks you in the chat what happens to the shot."
+    },
+    {
+     "label": "Use take 1 after all",
+     "choice": "old:1",
+     "act": "select",
+     "take": 1,
+     "needs_words": false,
+     "hint": "",
+     "go": "",
+     "prefill": "",
+     "need": "Write your reason first. It is kept with the film.",
+     "note": "",
+     "say": "Take 1 selected. It goes in the film at 0:00.0.",
+     "sure": {
+      "ask": "You rejected take 1 earlier. Use it in the film after all?",
+      "go": "Use take 1 after all",
+      "back": "Go back"
+     }
+    }
+   ],
+   "details": []
+  },
+  {
+   "line": "l02",
+   "key": "pic:take:j3",
+   "item": "take:j3",
+   "state": "open",
+   "kind": "take",
+   "name": "Wire-cut bricks",
+   "kind_words": "An AI video take",
+   "ask": "Is this take right for the film?",
+   "where": "In the film at 0:12.0 to 0:17.6 (5.6 s) · Good bricks, right strength",
+   "film_at": "0:12.0",
+   "words": "Wire-cut bricks are generally preferred because of their accurate dimensions and neat finish.",
+   "caption": {
+    "pre": "",
+    "post": "",
+    "words": [
+     {
+      "t": "Wire-cut",
+      "s": 0.08,
+      "e": 0.32
+     },
+     {
+      "t": "bricks",
+      "s": 0.44,
+      "e": 0.68
+     },
+     {
+      "t": "are",
+      "s": 0.8,
+      "e": 1.04
+     },
+     {
+      "t": "generally",
+      "s": 1.16,
+      "e": 1.4
+     },
+     {
+      "t": "preferred",
+      "s": 1.52,
+      "e": 1.76
+     },
+     {
+      "t": "because",
+      "s": 1.88,
+      "e": 2.12
+     },
+     {
+      "t": "of",
+      "s": 2.24,
+      "e": 2.48
+     },
+     {
+      "t": "their",
+      "s": 2.6,
+      "e": 2.84
+     },
+     {
+      "t": "accurate",
+      "s": 2.96,
+      "e": 3.2
+     },
+     {
+      "t": "dimensions",
+      "s": 3.32,
+      "e": 3.56
+     },
+     {
+      "t": "and",
+      "s": 3.68,
+      "e": 3.92
+     },
+     {
+      "t": "neat",
+      "s": 4.04,
+      "e": 4.28
+     },
+     {
+      "t": "finish.",
+      "s": 4.4,
+      "e": 4.64
+     }
+    ]
+   },
+   "takes": [
+    {
+     "n": 1,
+     "job": "j3",
+     "label": "Take 1",
+     "tab": "Take 1",
+     "video": {
+      "code": "v3d28ce5b55af",
+      "label": "Take 1",
+      "none": ""
+     },
+     "secs": "6.0",
+     "in_s": 0.44,
+     "short": "",
+     "rejected": "",
+     "check": {
+      "state": "pass",
+      "head": "Check passed",
+      "faults": [],
+      "by": "Claude looked at 13 frames of this take (one every half second, the first and the last), the sheet at four a second and the start picture, against 5 lines. The server measured the rest: real footage, the length, the first frame, one continuous shot.",
+      "not_judged": "Not judged: how things move between the frames. Play the take.",
+      "passed": [
+       "Real footage: the clip differs from its guide by 31.0 % on 6 frames",
+       "As long as the guide: the clip is 6.0 s, the guide 6.0 s",
+       "First frame matches the still: shifted 0.4 % of the width, zoom 0.2 %",
+       "One continuous shot: no jump to another view",
+       "People",
+       "The action",
+       "Objects",
+       "Bodies and contact",
+       "The place and the light"
+      ]
+     },
+     "details": [
+      [
+       "Where it sits in the film",
+       [
+        "In the film at 0:12.0 to 0:17.6 (5.6 s) · Good bricks, right strength",
+        "The take is 6.0 s; its place in the film is 5.6 s."
+       ]
+      ],
+      [
+       "How the take was asked for",
+       [
+        "ONE action only: he lays the brick."
+       ]
+      ],
+      [
+       "How it was made",
+       [
+        "The video AI made it as an edit of the guide, started from the approved still.",
+        "Take 1 of this shot."
+       ]
+      ]
+     ]
+    }
+   ],
+   "pics": [
+    {
+     "code": "p149e2e77163a",
+     "label": "Take 1",
+     "role": "frame",
+     "take": 1
+    },
+    {
+     "code": "pcaa6d716520b",
+     "label": "The picture the take started from",
+     "role": "still"
+    }
+   ],
+   "buttons": [
+    {
+     "label": "Select",
+     "choice": "select",
+     "act": "select",
+     "take": 1,
+     "needs_words": false,
+     "hint": "",
+     "go": "",
+     "prefill": "",
+     "need": "Write your reason first. It is kept with the film.",
+     "note": "",
+     "say": "Take 1 selected. It goes in the film at 0:12.0."
+    },
+    {
+     "label": "Make another",
+     "choice": "again",
+     "act": "again",
+     "take": 1,
+     "needs_words": true,
+     "hint": "What should change in the next take?",
+     "go": "Make another with these words",
+     "prefill": "",
+     "need": "Write what should change first. The next take is made from these words.",
+     "note": "A new take is paid. Its price is said in the chat when you say done; nothing is ordered before that.",
+     "say": "Take 1 rejected with your words: \"{words}\". Another take is ordered when you say done; Claude says its price in the chat then."
+    },
+    {
+     "label": "Reject",
+     "choice": "reject",
+     "act": "reject",
+     "take": 1,
+     "needs_words": true,
+     "hint": "What is wrong with it?",
+     "go": "Reject with these words",
+     "prefill": "",
+     "need": "Write what is wrong first.",
+     "note": "",
+     "say": "Take 1 rejected with your words: \"{words}\". No new take is ordered; Claude asks you in the chat what happens to the shot."
+    }
+   ],
+   "details": []
+  },
+  {
+   "line": "l03",
+   "key": "pic:take-done:S4",
+   "item": "take-done:S4",
+   "state": "recorded",
+   "kind": "take",
+   "name": "Helper spraying the wall",
+   "kind_words": "An AI video take",
+   "ask": "Is this take right for the film?",
+   "where": "In the film at 0:18.4 to 0:23.4 (5.0 s) · Pointing and curing",
+   "film_at": "0:18.4",
+   "words": "After construction, the walls are cured continuously for at least seven days.",
+   "caption": {
+    "pre": "",
+    "post": "",
+    "words": [
+     {
+      "t": "After",
+      "s": 0.08,
+      "e": 0.32
+     },
+     {
+      "t": "construction,",
+      "s": 0.44,
+      "e": 0.68
+     },
+     {
+      "t": "the",
+      "s": 0.8,
+      "e": 1.04
+     },
+     {
+      "t": "walls",
+      "s": 1.16,
+      "e": 1.4
+     },
+     {
+      "t": "are",
+      "s": 1.52,
+      "e": 1.76
+     },
+     {
+      "t": "cured",
+      "s": 1.88,
+      "e": 2.12
+     },
+     {
+      "t": "continuously",
+      "s": 2.24,
+      "e": 2.48
+     },
+     {
+      "t": "for",
+      "s": 2.6,
+      "e": 2.84
+     },
+     {
+      "t": "at",
+      "s": 2.96,
+      "e": 3.2
+     },
+     {
+      "t": "least",
+      "s": 3.32,
+      "e": 3.56
+     },
+     {
+      "t": "seven",
+      "s": 3.68,
+      "e": 3.92
+     },
+     {
+      "t": "days.",
+      "s": 4.04,
+      "e": 4.28
+     }
+    ]
+   },
+   "takes": [
+    {
+     "n": 1,
+     "job": "j4",
+     "label": "Take 1",
+     "tab": "Take 1",
+     "video": {
+      "code": "v98ae4552fbd6",
+      "label": "Take 1",
+      "none": ""
+     },
+     "secs": "6.0",
+     "in_s": 0.44,
+     "short": "",
+     "rejected": "",
+     "check": {
+      "state": "pass",
+      "head": "Check passed",
+      "faults": [],
+      "by": "Claude looked at 13 frames of this take (one every half second, the first and the last), the sheet at four a second and the start picture, against 5 lines. The server measured the rest: real footage, the length, the first frame, one continuous shot.",
+      "not_judged": "Not judged: how things move between the frames. Play the take.",
+      "passed": [
+       "Real footage: the clip differs from its guide by 31.0 % on 6 frames",
+       "As long as the guide: the clip is 6.0 s, the guide 6.0 s",
+       "First frame matches the still: shifted 0.4 % of the width, zoom 0.2 %",
+       "One continuous shot: no jump to another view",
+       "People",
+       "The action",
+       "Objects",
+       "Bodies and contact",
+       "The place and the light"
+      ]
+     },
+     "details": [
+      [
+       "Where it sits in the film",
+       [
+        "In the film at 0:18.4 to 0:23.4 (5.0 s) · Pointing and curing",
+        "The take is 6.0 s; its place in the film is 5.0 s."
+       ]
+      ],
+      [
+       "How the take was asked for",
+       [
+        "ONE action only: he lays the brick."
+       ]
+      ],
+      [
+       "How it was made",
+       [
+        "The video AI made it as an edit of the guide, started from the approved still.",
+        "Take 1 of this shot."
+       ]
+      ]
+     ]
+    }
+   ],
+   "pics": [
+    {
+     "code": "p149e2e77163a",
+     "label": "Take 1",
+     "role": "frame",
+     "take": 1
+    },
+    {
+     "code": "pcaa6d716520b",
+     "label": "The picture the take started from",
+     "role": "still"
+    }
+   ],
+   "buttons": [],
+   "details": [],
+   "answer": {
+    "say": "Take 1 selected. It is in the film at 0:18.4.",
+    "against": false,
+    "act": "select"
+   }
+  }
+ ],
+ "say": "2 takes need your answer:\n- Housing construction at work, shot 1\n- Wire-cut bricks\nThen say done here.",
+ "summary": "2 to answer.",
+ "note": "Answer each take, then say done in the chat.",
+ "layout": {
+  "kind": "takes",
+  "help": [
+   "Each shot on the left has one take to judge. Play it, then select it for the film, ask for another with your words, or reject it. Answer in any order, then say done in the chat.",
+   "Claude checked each take first, from frames of it. \"Check passed\", or the first thing it found; \"Go to 5 s\" jumps the player to that second. The check marks problems; it never decides.",
+   "Under the shot's name are the words spoken during it; the word being spoken is marked as the take plays. No sound is played.",
+   "\"See it in the film\" shows what comes before and after the shot, only to compare. \"Details\" has everything else about the take.",
+   "A shot that has two takes shows them as two tabs. A take answered earlier stays in the list; to change its answer, say so in the chat.",
+   "\"Make another\" orders one more take, made from your words. It is paid; its price is said in the chat when you say done.",
+   "This page opens when every take of the film is made and checked."
+  ],
+  "coming": [],
+  "words": {
+   "leave": "No reference needed",
+   "leave_set": "Go on without a reference",
+   "set": "Make a set",
+   "fix": "Make a set with words",
+   "loss_head": "With no reference of it",
+   "done": {
+    "use": "Approved",
+    "set": "Make a set",
+    "fix": "Set with your words",
+    "own": "Own picture",
+    "ignore": "No reference"
+   },
+   "wait_out": "Not made",
+   "wait_made": "Will be made",
+   "corrections_head": "The operator's corrections",
+   "searched_head": "What the picture model searched",
+   "sets": {
+    "todo": "Needs your answer",
+    "settled": "Settled earlier, nothing to do",
+    "busy": "Being made or looked at, nothing to answer yet",
+    "suggested": "Suggested",
+    "against": "Against advice",
+    "against_say": "This goes against Claude's advice.",
+    "done": {
+     "approve": "Approved",
+     "fix": "Made again, your words",
+     "again": "Made again",
+     "remake": "Made again",
+     "own": "Your picture",
+     "make": "Will be made",
+     "set": "Will be made",
+     "leave": "No reference",
+     "rest": "Will be made",
+     "rest_out": "Some not made",
+     "photo": "Another photo",
+     "standin": "A stand-in"
+    },
+    "more": "more",
+    "main": "Main picture",
+    "compare": "Compare with your footage",
+    "stop": "Stop comparing",
+    "footage_head": "Your footage: click one to see it beside the set",
+    "answer": "Your answer: ",
+    "kept": "Kept from before: ",
+    "undo": "Undo",
+    "cancel": "Cancel",
+    "details": "Details",
+    "fix_ask": "What should change?",
+    "fix_need": "Write what should change first.",
+    "again_go": "Make the set again",
+    "no_large": "The large picture is not available.",
+    "loading": "Loading…",
+    "missing": "Not available",
+    "gate_wait": "The buttons work when every picture has shown.",
+    "gate_bad": "A picture is missing: {pics}. This set cannot be answered here: tell the assistant in the chat.",
+    "left_one": "1 answer still needed",
+    "left_many": "{n} answers still needed",
+    "left_note": "Choose one from the list on the left.",
+    "end_head": "All answered",
+    "end_note": "Go back to the chat and say done. This is what will happen then:",
+    "end_foot": "Nothing is recorded or made before you say done.",
+    "foot": "{n} of {m} answered.",
+    "foot_wait": "When all are answered, say done in the chat. Nothing is made before that.",
+    "foot_done": "Go back to the chat and say done.",
+    "help": "How this works",
+    "keys": "Keys: the left and right arrows move between the things that need an answer. Escape closes what is open.",
+    "close": "Close",
+    "rest_kind": "Not made yet. They are made together, in one go, after you say done in the chat.",
+    "rest_before": "Answer the first sets before this.",
+    "rest_before_why": "A fault in the first sets would repeat in all of these.",
+    "rest_more": "More, if you want it",
+    "rest_names": "Which sets these are"
+   },
+   "takes": {
+    "todo": "Needs your answer",
+    "answered_head": "Answered earlier",
+    "coming": "Could not be made",
+    "nothing": "Nothing waits for you now.",
+    "state_open": "needs your answer",
+    "against": "Against the check",
+    "done": {
+     "select": "Selected",
+     "reject": "Rejected",
+     "again": "Another ordered"
+    },
+    "check_pass": "Check passed",
+    "more": "See all {n}",
+    "seek": "Go to {s} s",
+    "words_label": "The words spoken during this shot",
+    "film": "See it in the film",
+    "film_head": "In the film",
+    "before": "Before this shot",
+    "after": "After this shot",
+    "this_take": "This take",
+    "compare_only": "Shown to compare. Nothing here needs an answer.",
+    "details": "Details",
+    "d_check": "The check",
+    "d_passed": "The {n} lines it passed",
+    "d_still": "The picture the take started from",
+    "undo": "Undo",
+    "cancel": "Cancel",
+    "close": "Close",
+    "change_in_chat": "To change this answer, say so in the chat.",
+    "loading": "Loading…",
+    "missing": "Not available",
+    "video_bad": "The take could not be played here. Tell the assistant in the chat.",
+    "left_one": "1 answer still needed",
+    "left_many": "{n} answers still needed",
+    "left_note": "Choose one from the list on the left.",
+    "end_head": "All answered",
+    "end_note": "Go back to the chat and say done. This is what will happen then:",
+    "end_foot": "Nothing is recorded or made before you say done.",
+    "end_again": "New takes ordered when you say done: {n}. Claude says their price in the chat then.",
+    "foot": "{n} of {m} answered.",
+    "foot_wait": "When all are answered, say done in the chat. Nothing is recorded before that.",
+    "foot_done": "Go back to the chat and say done.",
+    "help": "How this works",
+    "keys": "Keys: the left and right arrows move between the shots. Escape closes what is open."
+   }
+  }
+ }
+}

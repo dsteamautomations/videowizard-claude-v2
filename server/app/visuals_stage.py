@@ -2758,8 +2758,6 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
             add(-1, f"Reference sheet · {eid}" if r['kind'] == 'sheet' else f"Picture to answer · {eid} · {r['kind']}", 'references', eid, r['id'], 'sheet to approve' if r['kind'] == 'sheet' else 'picture to answer')
         elif sh and route_of(sh) == 'still':
             add(sh['start_frame'], f"Still · {sh['id']}{title(sh)}", 'pictures', sh['id'], r['id'], 'picture to answer')
-        elif sh and route_of(sh) == 'video':
-            add(sh['start_frame'], f"{'Start and end' if sh.get('end_state_exact') else 'Start image'} · {sh['id']}{title(sh)}", 'takes', sh['id'], r['id'], 'picture to answer')   # design/124 A4 item 23
     if rd_pass in (2, 'making'):   # F3: a ready set is answered while another is being made. One item per set, on its element's card; a set with a whole stored answer waits for Done only
         for eid, row in rd['elements'].items():
             if row.get('ignored') or row.get('from_footage') or eid not in kinds:
@@ -2813,6 +2811,10 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
     if gate and round_v2(session) and not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # design/221 row 18: step 6 is shown at the end, on the page (gate False: an answer given on the page that opened)
         items = [(a, i) for a, i in items if not (i['kind'] == 'graphics to approve' or (i['kind'] == 'picture to answer' and i['step'] == 'pictures')
                                                    or (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'drawn'))]
+    if gate and round_v2(session) and any(i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video' for _, i in items):
+        from . import takes   # design/222: step 7 is shown at the end, on the page: a ready AI video take is not asked one by one (gate False: an answer given on the page that opened)
+        if not takes.complete(takes.expected(session, plan, take_rows, now)):
+            items = [(a, i) for a, i in items if not (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video')]
     return [i for _, i in sorted(items, key=lambda x: x[0])]
 
 

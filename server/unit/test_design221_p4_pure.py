@@ -221,7 +221,7 @@ def test_nothing_needed_gives_the_line_of_counts_first_and_the_stills_reminder()
     store = motion_store()
     edit_session(store, lambda s: s.update(round=V2))
     out = nothing_needed(store, [])
-    assert out['item'] is None and out['working'][0] == 'Drawn graphics: 1 being made. Stills: 1 not started. Components: 1 made and checked.'
+    assert out['item'] is None and out['working'][0] == 'Drawn graphics: 1 being made. Stills: 1 not started. Components: 1 made and checked. AI video: 1 not started.'   # design/222: step 7's counts join the line
     assert 'the first is the count of step 6: say it each time it changes, as it is, and ask nothing with it' in out['how']
     assert ('1 still shot has no picture asked for yet (IM1): order it now, beside the drawn graphics (`vw visuals image --shot S --element E --kind keyframe '
             '--prompt "…"`); it needs nothing from the drawings.') in out['then']

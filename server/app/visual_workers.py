@@ -625,15 +625,31 @@ def process_take(job):
         return 'submission_unknown', {'phase': 'submit'}, 'Provider acceptance is unknown. Reconcile the retained attempt before any replacement.', None, None
 
 
+def take_reading(snapshot, video_path, sha256, transport_factory):
+    """design/222 (SK, 19 Nov 2026): a take made from a guide is checked by Claude from frames (`takes.record`), so Gemini 3.8 Flash no longer watches
+    it: only the camera's drift is measured here. Any other take keeps the reading it had."""
+    from . import image_check
+    if snapshot.get('kind') != 'guide':
+        return image_check.run_take_check(snapshot, video_path, sha256, transport_factory)
+    record = {'lines': [], 'must_failed': [], 'model': None}
+    try:
+        drift = image_check.take_drift(video_path, snapshot)
+        if drift:
+            record['lines'].append(drift)
+    except Exception as exc:   # the take is never held back by its measurement
+        record['drift_error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
+    return record
+
+
 def check_take(job, result):
-    """design/91 N3: the ready take read by Gemini before the operator watches it; the record on the session, under the run's lock. Never raises.
-    ponytail: runs in the take worker (about a minute a take); a queue of its own if takes pile up behind it."""
+    """design/91 N3: the ready take measured before the operator watches it; the record on the session, under the run's lock. Never raises.
+    design/222: Claude's look from frames joins the record later (`takes.record`); a look recorded before a re-run of this check is kept."""
     from . import image_check
     from .analysis_jobs import transport_factory
     store = storage()
     try:
         snapshot = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
-        record = image_check.run_take_check(snapshot, SPOOL / str(job['id']) / 'output.mp4', result['sha256'], transport_factory)
+        record = take_reading(snapshot, SPOOL / str(job['id']) / 'output.mp4', result['sha256'], transport_factory)
         if snapshot.get('kind') == 'guide':   # integration step D: the two checks that block, the sheets and the scorecard
             from . import guide_worker
             record.update(guide_worker.take_checks(snapshot, SPOOL / str(job['id']) / 'output.mp4', store, job['run_id'], str(job['id']), record))
@@ -641,7 +657,8 @@ def check_take(job, result):
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             k = f"{job['run_id']}/visuals/session.json"
             session = json.loads(store.get(k).decode('utf-8'))
-            session.setdefault('take_checks', {})[str(job['id'])] = record
+            before = (session.get('take_checks') or {}).get(str(job['id'])) or {}
+            session.setdefault('take_checks', {})[str(job['id'])] = {**{k: before[k] for k in ('look', 'asked_at') if k in before}, **record}
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
             if snapshot.get('kind') == 'guide':
                 from . import generations

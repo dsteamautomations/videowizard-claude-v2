@@ -17,6 +17,7 @@ from PIL import Image
 
 from . import chat_flow as CF
 from . import pictures as P
+from . import takes as T
 from . import film as F
 from . import runlog
 from . import visuals_stage as V
@@ -120,16 +121,16 @@ def _with_videos(store, page):
     (`zoom_uploads`); a line whose copy cannot be made shows its frame sheet with `video.none`."""
     videos = {}
     for line in page['lines']:
-        v = line.get('video')
-        if not isinstance(v, dict) or '_key' not in v:
-            continue
-        key, mark = v.pop('_key'), v.pop('_mark', '')
-        code = 'v' + pic_code(key, mark)[1:]
-        try:
-            videos.setdefault(code, {'code': code, 'key': video_copy(store, key, mark)}) if key else None
-        except Exception:   # no copy: the frames stand in for it
-            key = ''
-        v.update(code=code if key else '', none='' if key else P.W['video_none'])
+        for v in [line.get('video')] + [t.get('video') for t in line.get('takes') or []]:   # design/222: every take of an AI video line
+            if not isinstance(v, dict) or '_key' not in v:
+                continue
+            key, mark = v.pop('_key'), v.pop('_mark', '')
+            code = 'v' + pic_code(key, mark)[1:]
+            try:
+                videos.setdefault(code, {'code': code, 'key': video_copy(store, key, mark)}) if key else None
+            except Exception:   # no copy: the frames stand in for it
+                key = ''
+            v.update(code=code if key else '', none='' if key else P.W['video_none'])
     if videos:
         page['videos'] = list(videos.values())
     return page
@@ -465,6 +466,9 @@ PICTURES_LEFT = '{n} line(s) still wait for the operator on the page: write the 
 PICTURES_CLOSED = ('Nothing of step 6 is put on the page yet, so do not publish or write to it. Say the line of counts to the operator as it is and ask '
                    'nothing with it; then go on with `vw visuals next`.')   # design/221 row 18: the page only when everything is made (PICTURES_WAIT retired)
 PICTURES_DONE = 'Every picture and drawing is answered. Go on with `vw visuals next`: it gives the next decision.'
+TAKES_CLOSED = ('Nothing of step 7 is put on the page yet, so do not publish or write to it. Say the line of counts to the operator as it is and ask '
+                'nothing with it; then go on with `vw visuals next`.')   # design/222: the page only when every take is made and checked
+TAKES_DONE = 'Every take on the page is answered. Go on with `vw visuals next`: it gives the next decision.'
 VIDEO_SIDE, VIDEO_CRF = 960, 30   # a drawing's page copy: 960 px wide, H.264, no sound (a flat drawing is tens of KB)
 ROUND_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
 OWN_PERMISSION = "A real person's photo is used only with their permission. Write in the box on this line that you have it, then add the photo again."
@@ -935,8 +939,13 @@ def _plan_step(ctx):
     if at == 'complete' and V.round_v2(ctx['session']):   # design/217: step 6 once the round is complete; a round of before keeps the chat
         # hotfix (VW-24, 18 Nov 2026): the page is step 6 from the moment the round is complete, also while nothing of it is made yet: an empty step 6 sent the
         # page back to a finished earlier step, and the assistant to the chat
-        six = P.expected(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run']))   # design/221 row 18: the page only when everything is made
-        return 'pictures', ((_pictures_lines(ctx) if P.complete(six) else None), six)
+        rows = V.take_jobs(ctx['conn'], ctx['run'])
+        six = P.expected(ctx['session'], ctx['plan'], rows)   # design/221 row 18: the page only when everything is made
+        lines = _pictures_lines(ctx) if P.complete(six) else None
+        seven = T.expected(ctx['session'], ctx['plan'], rows)   # design/222: step 7, AI video, once step 6 has nothing left to answer; a film with no AI video has none
+        if seven and lines is not None and not lines:
+            return 'takes', ((_takes_lines(ctx) if T.complete(seven) else None), seven)
+        return 'pictures', (lines, six)
     return ('refs', []) if at == 1 else ('sets', []) if at in (2, 'making', 'looking', 'rewrite') else ('spec', specs) if specs else ('plan', [])
 
 
@@ -945,12 +954,42 @@ def _pictures_lines(ctx):
     (questions, the style sheet, then film order): the same id, the same buttons, the same run function."""
     out = []
     for i in CF._waiting_items(ctx):
-        if not i.get('_line'):
+        if not i.get('_line') or i['_line'].get('kind') == 'take':   # design/222: an AI video take is a line of step 7
             continue
         line = dict(i['_line'])
         line['pics'] = [{**pic(p['_key'], p['label'], p.get('_mark')), **{k: v for k, v in p.items() if k not in ('_key', 'label', '_mark')}} for p in line['pics'] if p.get('_key')]
         out.append({'key': 'pic:' + i['id'], 'item': i['id'], 'state': 'open', **line})
     return out
+
+
+def _coded(line):
+    return [{**pic(p['_key'], p['label'], p.get('_mark')), **{k: v for k, v in p.items() if k not in ('_key', 'label', '_mark')}} for p in line['pics'] if p.get('_key')]
+
+
+def _takes_lines(ctx):
+    """design/222: the lines of step 7 in film order: the chat's own take items (the same id, the same buttons, the same run function), then the
+    takes answered earlier, which stay in view with their decision and have no buttons."""
+    out = [{'key': 'pic:' + i['id'], 'item': i['id'], 'state': 'open', **{**i['_line'], 'pics': _coded(i['_line'])}} for i in CF._waiting_items(ctx) if (i.get('_line') or {}).get('kind') == 'take']
+    return out + [{**l, 'pics': _coded(l)} for l in T.recorded(ctx)]
+
+
+def _takes_page(ctx, base, lines, seven):
+    """design/222: the round of step 7. While a take is being made or checked (lines None) nothing is put on the page: the answer is the line of
+    counts. A round over the document's size loses the details and the passed lines of its last lines first; a line is never cut."""
+    if lines is None:
+        count = T.status_line(seven)
+        return {**base, 'step': T.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': T.W['page_later'],
+                'then': ' '.join(x for x in (count, T.W['page_later']) if x), 'how': TAKES_CLOSED}
+    rows = T.coming(seven)
+    refused = ctx['session'].get('page_refused') or {}
+    lines = [{'line': f'l{n:02d}', **l, **({'refused': refused[l['key']]} if l['key'] in refused else {})} for n, l in enumerate(lines, 1)]
+    for l in reversed(lines):
+        if len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) <= ROUND_BYTES:
+            break
+        l['takes'] = [{**t, 'details': [], 'check': {**t['check'], 'passed': []}} for t in l['takes']]
+    n = len([l for l in lines if l['state'] == 'open'])
+    return {**base, 'step': T.W['step'], 'open': bool(n), 'lines': lines, 'say': T.say(lines, rows), 'summary': T.W['summary'].format(n=n), 'note': T.W['note'] if n else T.W['nothing'],
+            'layout': {'kind': 'takes', 'help': T.W['help'], 'coming': rows, 'words': {**page_words(), 'takes': T.PAGE}}}
 
 
 def _pictures_page(ctx, base, lines, six):
@@ -1051,6 +1090,8 @@ def _page(conn, store, user, run, outputs):
             return _round_page(ctx, base, step)
         if step == 'pictures':   # design/217
             return _pictures_page(ctx, base, *lines)
+        if step == 'takes':   # design/222
+            return _takes_page(ctx, base, *lines)
         out = _drawing_page(ctx, base, lines) if step == 'draw' else _spec_page(ctx, base, lines) if step == 'spec' else _plan_page(ctx, base)
         if _round_due(ctx, out):
             out['then'] = _start()   # nothing waits on the page and the round is not started: what the assistant does next
@@ -1257,6 +1298,17 @@ def page_record(conn, store, user, run, outputs, answers):
         then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', looks,
                                     PICTURES_LEFT.format(n=left) if now['step'] == P.W['step'] and left else (ROUND_NEXT + ' ' if was != 'pictures' else '') + now['then'] if now.get('closed') else
                                     PICTURES_DONE if was == 'pictures' or any(k.startswith('pic:') for k in recorded + stale + [r['key'] for r in refused]) else ROUND_NEXT) if x)   # hotfix: the round just ended, nothing of step 6 is made yet
+    if was == 'takes' or now['step'] == T.W['step']:   # design/222: step 7's own "what next": Claude's check, a take ordered on the page (its one line, said and not asked), what is left
+        here = CF._ctx(conn, store, user, run, outputs)
+        rows = V.take_jobs(conn, run)
+        if here['plan'] and T.asked(here['session'], here['plan'], rows):
+            V.save_session(store, run, here['session'])
+        ordered = T.ordered(here['session'], here['plan'], V.prices()['video_inr_per_s']) if here['plan'] else ''
+        if ordered:
+            tell = ordered
+        then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', T.W['ordered_how'] if ordered else '',
+                                    T.waits_words(here['session'], here['plan'], rows) if here['plan'] else '', T.again_due(here['session'], here['plan'], rows) if here['plan'] else '',
+                                    PICTURES_LEFT.format(n=left) if now['step'] == T.W['step'] and left else now['then'] if now.get('closed') else TAKES_DONE) if x)
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
             'log': said or 'nothing answered'}   # design/205: the record call's own log line
