@@ -183,7 +183,8 @@ def test_the_corner_note_sentence_gives_its_box():
 def test_the_texts_say_the_camera_the_shared_look_the_binding_family_and_no_rule_from_the_guidance():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221c_wording_v3 as W
-    stage = visuals()
+    import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
+    stage = FIX2.before(visuals())
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

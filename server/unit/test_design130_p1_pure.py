@@ -35,7 +35,7 @@ def zipped(files, top=''):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w') as z:
         for name, text in files.items():
-            z.writestr(top + name, text)
+            z.writestr(zipfile.ZipInfo(top + name), text)   # a fixed date: the same files give the same zip (and sha256) whatever second it is made in
     return buf.getvalue()
 
 

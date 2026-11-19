@@ -168,6 +168,8 @@ if __name__ == '__main__':
         prompt = d221f(prompt, parts)
         from d222_wording_v3 import apply as d222   # design/222: step 7 on the page: Claude checks each take from frames, the takes answered on the page once all are made and checked, "Make another"
         prompt = d222(prompt, parts)
+        from fixset2_wording import apply as fixset2   # fix set phase 2: helpers started together, the stills first, a rule that compares with another drawing, the round's rule list, every shape that repeats
+        prompt = fixset2(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

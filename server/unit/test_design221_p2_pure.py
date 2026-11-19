@@ -279,7 +279,8 @@ def test_the_texts_say_must_and_should_not_seen_the_frames_later_rounds_and_the_
     import d221b_wording_v3 as W
     import d221d_wording_v3 as D221D   # design/221, the critic's seven points and phase 3b: changes sentences of this script
     import d221f_wording_v3 as D221F   # design/221 phase 4: the held drawing's card replaces "then show the operator the open musts"
-    stage = D221D.before(D221F.before(visuals()))
+    import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
+    stage = D221D.before(D221F.before(FIX2.before(visuals())))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)
@@ -289,7 +290,7 @@ def test_the_texts_say_must_and_should_not_seen_the_frames_later_rounds_and_the_
         assert texts[where].count(new) == 1 and olds[where].count(old) == 1, old[:50]
     import fixset1_wording as FIX1   # fix set phase 1: the marks (still) and (motion) come after "Start every rule with `must:` or `should:`."
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX1.now(file, D221D.now(file, new))) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX2.now(file, FIX1.now(file, D221D.now(file, new)))) == 1, file
     later = texts['later']
     frames = 'the first frame, each cue, the middle of each move, the last frame, and a close-up of each labelled part'
     assert frames in later and 'Only a failed must sends the drawing back' in later and '"not seen"' in later and 'keeps its pass' in later

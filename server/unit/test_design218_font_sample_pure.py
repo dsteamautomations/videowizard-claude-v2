@@ -138,7 +138,8 @@ def test_the_wording_is_in_once_retired_by_name_and_registered():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d218_wording_v3 as W
     import d221_wording_v3 as D221   # design/221: a later script that replaces this one's font sentence (the font first, no brief before it): the text as it was before it
-    stage = D221.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))
+    import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
+    stage = D221.before(FIX2.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))
     part = {p['name']: p['text'] for p in stage['parts']}
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
@@ -152,7 +153,7 @@ def test_the_wording_is_in_once_retired_by_name_and_registered():
     everything = stage['prompt'] + ''.join(part.values())
     assert all(s in retired and s not in everything for s in W.RETIRED)
     cmd = (ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert all(new in cmd for _, new in W.COMMANDS) and '`vw font --sample`' in cmd
+    assert all(FIX2.now('commands/vw.md', new) in cmd for _, new in W.COMMANDS) and '`vw font --sample`' in cmd   # design/222 replaced the end of this sentence (the finished takes are answered on the page); named in fixset2_wording
     assert FS.NOT_AVAILABLE in part['later'] and 'Step 6, the pictures and drawn graphics, is answered on the page too' in stage['prompt']
     split = (ROOT / 'scripts' / 'c1_split_v3.py').read_text(encoding='utf-8')
     assert split.index('d217(prompt, parts)') < split.index('d218(prompt, parts)')

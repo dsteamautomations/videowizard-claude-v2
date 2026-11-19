@@ -356,6 +356,24 @@ def palette_due(session, plan):
     return answer_warnings(plan, palette_warnings(plan, session.get('added_colours')))
 
 
+CAMERA_CLOSER = re.compile(r'\b(?:push(?:es|ed|ing)?[- ]in|zoom(?:s|ed|ing)?(?: in| out)?|doll(?:y|ies|ying)|pull(?:s|ed|ing)?[- ]back|punch(?:es|ing)?[- ]in)\b', re.I)
+CAMERA_SIDEWAYS = re.compile(r'\b(?:pan(?:s|ned)?\s+(?:slowly\s+)?(?:along|across|left|right|up|down|over|to|from|with)|panning|'
+                             r'track(?:s|ed|ing)?\s+(?:along|across|with|past)|tilt(?:s|ed|ing)?\s+(?:up|down)|whip(?:s|ping)?\s+(?:to|pan))\b', re.I)
+LARGE_CHANGE = re.compile(r'\b(?:whole|entire|all of the|most of|more than half|two[- ]thirds|three[- ]quarters|throughout|everywhere)\b', re.I)   # fix set M4: a change an edit region (a third at most) cannot hold
+
+
+def camera_words(shot):
+    """Fix set M1 (19 Nov 2026): the words of a drawn shot that ask for a camera move its camera_flow does not allow, else '': a fixed flow (none
+    named is fixed) allows none; a flow that scales the picture allows no sideways move; Pan along allows no move closer or back."""
+    flow = shot.get('camera_flow') or 'fixed'
+    text = ' '.join(str(shot.get(k) or '') for k in ('depicts', 'purpose', 'message', 'framing', 'information_progression', 'camera', 'camera_move'))
+    for no, words in (('pan_along', CAMERA_SIDEWAYS), ('step_closer pull_back follow slow_push_in', CAMERA_CLOSER)):
+        m = None if flow in no.split() else words.search(text)
+        if m:
+            return m.group(0)
+    return ''
+
+
 def carried_warnings(session, run, plan, outputs):
     """design/207: what the treatment settled, carried to the plan. Warnings, never refusals, the same from the check and the proposal:
     a gap with more still seconds than the operator accepted for it (half a second of tolerance; seconds whose way the treatment never told
@@ -395,6 +413,22 @@ def carried_warnings(session, run, plan, outputs):
                 out.append({'kind': 'camera_flow', 'shot_id': sh['id'],
                             'message': f"shot {sh['id']}: the camera flow {film.CAMERA[sh.get('camera_flow') or 'fixed'][0]} is not one the film's motion style allows "
                                        f"({', '.join(film.styles()[film.motion(run)]['camera'])}). Choose one of those, or fixed when in doubt."})
+            move = camera_words(sh) if sh['visual_type'] == 'drawn' else ''   # fix set M1: settled with the plan, not asked in the middle of the builds
+            if move:
+                out.append({'kind': 'camera_words', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']}: its words ask for a camera move (\"{move}\") and its camera flow is {film.CAMERA[sh.get('camera_flow') or 'fixed'][0]}. "
+                                       'Settle it now, in the plan, not at the build: name the flow the shot needs (camera_flow), or take the move out of its words; '
+                                       "when the choice is the operator's, ask it with the plan."})
+            big = next((c['what'] for c in sh.get('changes') or [] if LARGE_CHANGE.search(c.get('what') or '')), '') if sh.get('end_state_exact') else ''   # fix set M4
+            if big:
+                out.append({'kind': 'end_change_large', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']} ends on an exact end picture, which is an edit inside one region of its start, a third of the frame at most; its change "
+                                       f'reads as larger ("{big}"). Plan it start-only (end_state_exact false), so the motion carries the change, or as a new picture of its own.'})
+        for sh, before, between in apart(shots):   # fix set M2: a drawing continues another only when they are next to each other in the film
+            out.append({'kind': 'continues_apart', 'shot_id': sh['id'],
+                        'message': f"shot {sh['id']} does not continue the drawing {before['id']}: {', '.join(b['id'] for b in between)} {'is' if len(between) == 1 else 'are'} between "
+                                   f"them in the film. A drawing opens where another ends only when the two are next to each other, so {sh['id']} is built as its own drawing. "
+                                   'Put them next to each other to continue, or name the return (return_of) when the same diagram comes back.'})
     alike = alike_people(plan) if is_kept(session, run) else []   # the reference round of such a film refuses them, one pair at a time: here they are named together, before it
     if alike:
         out.append({'kind': 'people_alike',
@@ -2784,10 +2818,14 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
     stills = session.get('motion_stills') or {}   # design/221 row 3: a still end-frame with no failed must; the stills of one diagram in one card when ready together
     pend = {sid for sid, st in stills.items() if sid in shots and st.get('frame_key') and not st.get('rejected') and not still_approved(st)}
     gap_of = {sh['id']: g_ for g_, sh in _accepted_shots(plan, session)}
+    carded = set()   # fix set A1.3: each still on one card, the cards in the order of the film
     for sid in sorted(pend, key=lambda s: shots[s]['start_frame']):
+        if sid in carded:
+            continue
         mine, linked = diagram_shots(plan, session, gap_of[sid], shots[sid])
         group = sorted({s['id'] for s in mine + linked} | {sid}, key=lambda s: (shots.get(s) or {}).get('start_frame', 0))
-        ids = group if len(group) > 1 and set(group) <= pend else [sid]
+        ids = [s for s in group if s not in carded] if len(group) > 1 and set(group) <= pend else [sid]
+        carded |= set(ids)
         add(shots[ids[0]]['start_frame'], 'Still end-frames · ' + ', '.join(ids) if len(ids) > 1 else f'Still end-frame · {sid}{title(shots[sid])}', 'takes', ids[0], ','.join(ids),
             'still end-frame to approve')
     for e in plan.get('elements') or []:   # design/111 F10: approved once, on the References step, on the material's own card
@@ -5970,8 +6008,11 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     text = ' '.join(motion._texts(files).values())
     own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
     need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
-    els = {e['id']: e for e in (guarded(lambda: current_plan(store, session)).get('elements') or [])}
+    plan = guarded(lambda: current_plan(store, session))
+    els = {e['id']: e for e in plan.get('elements') or []}
     placed = lambda ids: any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in ids)
+    for p in shared:   # fix set A1.1: a shape that is no thing of the plan, drawn once: the drawings its part names place it
+        need(p.get('element') or shot_id not in (p.get('shots') or []) or placed([p['id']]), PARTS_USE.format(shot=shot_id, thing=p['title'] or p['id'], id=p['id']))
     mine = view_parts(session, shot)
     for e in shot.get('element_ids') or []:   # defect 56 (VW-24, 19 Nov 2026): a thing may have several views among the parts (cut across, from above); a drawing places the view it shows
         views = [p['id'] for p in shared if p.get('element') == e]
@@ -5996,19 +6037,97 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     if not still:
         (session.get('motion_bound') or {}).pop(shot_id, None)   # design/221 (the critic's A1): a later upload is bound only by its own clean verdict
     save_session(store, run, session)
+    cmp = comparing(session, plan, held)
+    idle = {i for i, c in cmp.items() if c['state'] != 'ready'}
+    held = [h for h in held if h['id'] not in idle]   # fix set A1.2: a comparison with nothing to compare with yet waits as a note: no checker is asked for it
+    frames = compare_frames(cmp)
+    with_ = {'compare': frames} if frames else {}
+    told = ''.join(f" {len([c for c in cmp.values() if c['with'] == f['shot_id'] and c['state'] == 'ready'])} rule(s) compare with {f['shot_id']}: {f['shot_id']}'s approved still "
+                   f"end-frame is saved in work/motion/{shot_id}/with-{f['shot_id']}/last-frame.png for the checker." for f in frames)
+    again = round_rules(session, shot_id, sha, cmp)   # fix set A1.6: from round 2 of the animated project, the rules the round before left open
     if still:
         last = last_second(shot, fps)
         mine = still_rules(held)   # fix set B3: the still's checker is given the musts a still can show and no other rule
         return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000], 'still': True,
-                **({'still_rules': mine} if mine is not None else {}),
-                'next': f"Still stored. Check it (`vw motion check --shot {shot_id} --sha {sha}`), snapshot its last frame (`vw motion snapshot --shot {shot_id} --sha {sha} --at {last:g}`) "
-                        "and give it to a fresh vw-motion-check helper for the must rules a still can show; a verdict with no failed must brings the still to the operator in the chat."
-                        + (f" Those rules ({len(mine)}) are in work/motion/{shot_id}/rules-still.md: the checker answers each of them and no other." if mine is not None else '')}
+                **({'still_rules': mine} if mine is not None else {}), **with_,
+                'next': (f"Still stored. Check it (`vw motion check --shot {shot_id} --sha {sha}`), snapshot its last frame (`vw motion snapshot --shot {shot_id} --sha {sha} --at {last:g}`). "
+                         f"No rule of this drawing is one a still can show, so no checker is needed: write work/motion/{shot_id}/check-1.json as "
+                         f'{{"shot_id": "{shot_id}", "sha256": "{sha}", "round": 1, "rules": []}} and send it (`vw motion verdict`); it brings the still to the operator in the chat.'
+                         if mine == [] else   # the carry-over c2: the still passes on the server's own checks
+                         f"Still stored. Check it (`vw motion check --shot {shot_id} --sha {sha}`), snapshot its last frame (`vw motion snapshot --shot {shot_id} --sha {sha} --at {last:g}`) "
+                         "and give it to a fresh vw-motion-check helper for the must rules a still can show; a verdict with no failed must brings the still to the operator in the chat."
+                         + (f" Those rules ({len(mine)}) are in work/motion/{shot_id}/rules-still.md: the checker answers each of them and no other." if mine is not None else '')) + told}
     effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
             **({'finish': effects, 'finish_note': motion.finish_note(files, effects) or 'The server adds this finish at snapshot and render; the drawing must be complete without it.'} if effects else {}),
+            **({'round_rules': again} if again is not None else {}), **with_,
             'next': f"Project stored. Check it with `vw motion check --shot {shot_id} --sha {sha}`, then snapshot it for the fact check; a clean verdict binds it to {shot_id} "
-                    f"(nothing goes in the plan), then `vw motion render --shot {shot_id}`."}
+                    f"(nothing goes in the plan), then `vw motion render --shot {shot_id}`."
+                    + (f" The {len(again)} rules the round before left open are in work/motion/{shot_id}/rules-round.md: the checker answers those, and looks at the whole frame "
+                       "for a must-kind fault." if again is not None else '') + told}
+
+
+def comparing(session, plan, held):
+    """Fix set A1.2 (19 Nov 2026): the rules marked as comparing with another drawing (`must (still, with D1):`), {rule id: {with, rule, state}}:
+    `ready` with that drawing's approved still end-frame (png, key: what the checker compares with; the rule is a must), `waits` while it has none
+    (the rule is a note: it holds nothing), `closed` when it is no drawn shot of the plan now. A rule marked with a shared part's id is a plain
+    must: the parts are always there."""
+    if not any(h.get('with') for h in held or []):
+        return {}
+    drawn, parts = set(drawn_ids(plan, session)), {p['id'] for p in (session.get('motion_parts_approved') or {}).get('parts') or []}
+    out = {}
+    for h in held or []:
+        other = h.get('with')
+        if other and other not in parts:
+            st = (session.get('motion_stills') or {}).get(other) or {}
+            out[h['id']] = {'with': other, 'rule': h['rule'], **({'state': 'closed'} if other not in drawn else
+                                                                {'state': 'ready', 'png': st['png'], 'key': st['frame_key']} if still_approved(st) and st.get('frame_key') else {'state': 'waits'})}
+    return out
+
+
+def compare_frames(cmp):
+    """Fix set A1.2: the other drawings' approved still end-frames the checker of a drawing is given, [{shot_id, key}], one per drawing."""
+    return list({c['with']: {'shot_id': c['with'], 'key': c['key']} for c in cmp.values() if c['state'] == 'ready'}.values())
+
+
+def compared(session, plan, shot_id):
+    """Fix set A1.2: what stands with the comparisons of a drawing whose last verdict is clean (one with an open rule is checked again anyway):
+    {due, waits, closed: [{with, rule}], round}. `due`: the other drawing's still end-frame is approved and this verdict did not answer the
+    rule against that picture; the drawing counts as being checked until it does."""
+    rec = next((c for c in reversed((session.get('motion_checks') or {}).get(shot_id) or []) if not c.get('still')), None)
+    row = (session.get('motion_projects') or {}).get((rec or {}).get('sha256') or '') or {}
+    out = {'due': [], 'waits': [], 'closed': [], 'round': int((rec or {}).get('round') or 1)}
+    if not rec or open_rules(rec) or not row.get('rules'):
+        return out
+    from . import pictures
+    cmp = comparing(session, plan, row['rules'])
+    said = {pictures.rule_id(r.get('rule')): r for r in rec.get('rules') or []}
+    for i, c in cmp.items():
+        if c['state'] != 'ready':
+            out[c['state']].append(c)
+        elif said.get(i, {}).get('with_png') != c['png']:
+            out['due'].append(c)
+    return out
+
+
+def round_rules(session, shot_id, sha, cmp=None):
+    """Fix set A1.6 (19 Nov 2026): the rules the checker of an animated project's later round is given, as lines: the rules of this upload that
+    the drawing's last verdict left failed or not seen or did not answer (a rule written anew; a comparison not answered against the other
+    drawing's picture as it is now: `cmp`, comparing()), and the faults that verdict's checker added and left failed. Only when that verdict
+    answered the same brief lines: None in a first round, after a clean verdict, after a verdict of the still, and when the brief changed since;
+    then every rule is answered again. (The still's own list is short: still_rules.)"""
+    from . import pictures
+    row, cmp = (session.get('motion_projects') or {}).get(sha) or {}, cmp or {}
+    prev = ((session.get('motion_checks') or {}).get(shot_id) or [None])[-1]
+    if row.get('still') or not prev or prev.get('still') or not row.get('rules') or prev.get('brief_at') != digest(row.get('brief') or {}):
+        return None
+    said = {pictures.rule_id(r.get('rule')): r for r in prev.get('rules') or []}
+    if all(r.get('pass') is True for r in said.values()):
+        return None
+    mine = [h for h in row['rules'] if cmp.get(h['id'], {'state': 'ready'})['state'] == 'ready'
+            and (said.get(h['id'], {}).get('pass') is not True or (h['id'] in cmp and said[h['id']].get('with_png') != cmp[h['id']]['png']))]
+    return [f"{h.get('class') or 'must'}: {h['rule']}" for h in mine] + [f"{r.get('class') or 'must'}: {r['rule']}" for i, r in said.items()
+                                                                        if i not in {h['id'] for h in row['rules']} and r.get('pass') is not True]
 
 
 def still_rules(held):
@@ -6069,6 +6188,11 @@ PARTS_OWN_ID = ('{shot} defines {ids}, the id of a shared part: the server puts 
                 'own elements other ids.')
 PARTS_LINE = ('Use these parts (drawn once for the whole film; do not redraw them): {parts}. Place the view this drawing shows{view} with '
               '<use href="#part-<name>"> (one view of a thing is enough): the server puts them in the page, and parts.svg beside this brief shows them.')   # fix set A3.2: was "Place each"
+PARTS_EVERY = ('Shapes that are no thing of the plan repeat too: read every spec below and list first each shape that two or more drawings show, with the '
+               'drawings that show it and its count where a spec gives one; then draw each once, and name on its symbol the drawings that show it '
+               '(data-shots, from: {ids}). Where two specs give another count or proportion for the same shape, that is an open choice: answer with it '
+               'and the count you recommend.')   # fix set A1.1, A1.5
+PARTS_NONE = 'No shape repeats across the drawings: there are no shared parts. Brief the drawings now (`vw motion brief --shot S`).'   # fix set A1.1: nothing to show, so no card
 MOTION_PARTS_CHANGED = 'Its parts changed since this drawing was rendered: render it again (`vw motion render --shot {shot}`); nothing is rebuilt.'
 
 
@@ -6090,9 +6214,11 @@ def need_parts(plan, session):
 
 
 def shot_parts(session, shot):
-    """design/221 row 1: the approved parts a shot uses: those drawing one of its things, and those that draw no thing of the plan."""
+    """design/221 row 1: the approved parts a shot uses: those drawing one of its things, and those that draw no thing of the plan. Fix set A1.1:
+    a part that names its drawings (data-shots) is used by those; one of no thing that names none is every drawing's, as before."""
     els = set(shot.get('element_ids') or [])
-    return [p for p in (session.get('motion_parts_approved') or {}).get('parts') or [] if not p.get('element') or p['element'] in els]
+    return [p for p in (session.get('motion_parts_approved') or {}).get('parts') or []
+            if p.get('element') in els or shot['id'] in (p.get('shots') or []) or not (p.get('element') or p.get('shots'))]
 
 
 def view_parts(session, shot):
@@ -6136,7 +6262,8 @@ def parts_brief(store, run, outputs):
     twice = [(e, [sid for sid in ids if e in (shots[sid].get('element_ids') or [])]) for e in els]
     twice = '; '.join(f"{e} {els[e].get('name') or e} ({', '.join(s)})" for e, s in twice if len(s) >= 2)
     head = ['# Shared parts of the drawn graphics', '', f"Things shown by two or more drawings (each is a part to draw once): {twice or 'none'}.",
-            'Things of the plan (data-element names the id): ' + '; '.join(f"{e} {x.get('name') or e}" for e, x in els.items()) + '.']
+            'Things of the plan (data-element names the id): ' + '; '.join(f"{e} {x.get('name') or e}" for e, x in els.items()) + '.',
+            PARTS_EVERY.format(ids=', '.join(ids))]   # fix set A1.1: every shape that repeats, not only the plan's things
     return {'brief': '\n'.join(head + [f"\n## {b['shot_id']}\n\n{b['brief']}" for b in briefs]), 'refs': need_pictures(store, run, session, list(dict.fromkeys(r for b in briefs for r in b['refs'])), 'The shared parts'),
             **({'rejected': (session.get('motion_parts') or {})['rejected']['words']} if (session.get('motion_parts') or {}).get('rejected') else {})}
 
@@ -6154,11 +6281,17 @@ def set_parts(store, user, run, outputs, name, content):
         text = content.decode('utf-8')
     except UnicodeDecodeError:
         text = ''
-    parts, problems = motion.read_parts(text, {e['id'] for e in plan.get('elements') or []}) if text else ([], ['the parts file is not UTF-8 text'])
+    parts, problems = motion.read_parts(text, {e['id'] for e in plan.get('elements') or []}, drawn_ids(plan, session)) if text else ([], ['the parts file is not UTF-8 text'])
     need(not problems, 'The parts file breaks the rules: ' + '; '.join(problems[:6]))
     sha = hashlib.sha256(content).hexdigest()
     base = f"{run['id']}/visuals/motion/parts/{sha}"
     store.put(base + '.svg', content, 'image/svg+xml')
+    if not parts:   # fix set A1.1: a film where no shape repeats: nothing to draw and nothing to show, so it stands at once
+        at = datetime.now(timezone.utc).isoformat()
+        session['motion_parts'] = {'sha256': sha, 'key': base + '.svg', 'name': name, 'parts': [], 'by': user['id'], 'at': at}
+        session['motion_parts_approved'] = {'sha256': sha, 'key': base + '.svg', 'parts': [], 'quote': 'no shape repeats: nothing to approve', 'by': user['id'], 'at': at}
+        save_session(store, run, session)
+        return {'sha256': sha, 'parts': [], 'next': PARTS_NONE}
     ground = ground_colour(plan, run) or '#FFFFFF'
     preview = motion.parts_preview(text, parts, ground, note_colour(plan, run))
     try:
@@ -6537,12 +6670,24 @@ def diagram_shots(plan, session, gap, shot):
 
 
 def continues_from(plan, session, gap, shot):
-    """design/221 row 12: the drawn shot this one continues: the previous drawn shot of its gap, else the drawn shot it returns to; '' for none."""
-    mine, linked = diagram_shots(plan, session, gap, shot)
-    before = [s for s in mine if s['start_frame'] < shot['start_frame']]
-    if before:
+    """design/221 row 12: the drawn shot this one continues: the drawn shot right before it in its gap, else the drawn shot it returns to; '' for
+    none. Fix set M2 (19 Nov 2026): only a drawn shot next to it in the film (no other shot between them) is continued; the plan check says so
+    (`apart`)."""
+    before = [s for sc in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])) for s in sc['shots'] if s['start_frame'] < shot['start_frame']]
+    if before and max(before, key=lambda s: s['start_frame']).get('visual_type') == 'drawn':
         return max(before, key=lambda s: s['start_frame'])['id']
-    return next((s['id'] for s in linked if s['id'] == shot.get('return_of')), '')
+    return next((s['id'] for s in diagram_shots(plan, session, gap, shot)[1] if s['id'] == shot.get('return_of')), '')
+
+
+def apart(shots):
+    """Fix set M2: the drawn shots of one gap (its shots in film order) that follow an earlier drawing with another shot between them and name no
+    return: [(the shot, the earlier drawing, the shots between)]. Such a drawing does not continue the earlier one."""
+    out, order = [], sorted(shots, key=lambda s: s['start_frame'])
+    for n, s in enumerate(order):
+        back = next((k for k in range(n - 1, -1, -1) if order[k].get('visual_type') == 'drawn'), None)
+        if s.get('visual_type') == 'drawn' and back is not None and back < n - 1 and not s.get('return_of'):
+            out.append((s, order[back], order[back + 1:n]))
+    return out
 
 
 LABEL_MUST = '{message}. It is a label of this shot only, so this is a must: keep it on screen at least its floor, then upload and check again.'   # design/221 row 17
@@ -6656,6 +6801,32 @@ def passed_project(session, shot):
         return sha   # design/221 (the critic's point 1, phases 3-4): a held drawing the operator selected anyway, or a selected shot, is passed for the drawing after it
     rounds = motion_rounds(session, shot['id'], sha) if sha else []
     return sha if rounds and not open_rules(rounds[-1]) else ''
+
+
+def drawn_turn(session, plan, gap, shot, shots):
+    """Fix set A1.4 (19 Nov 2026): whose turn a drawn shot is, from what the server holds: ('still' | 'motion': its builder can start now;
+    'check-still' | 'check': its checker can start now; '': the operator's turn, the render's, or nothing yet, the drawing it waits on or '').
+    `shots`: the plan's shots by id. Nothing can start before the shared parts are approved."""
+    sid = shot['id']
+    mine = sorted(((p.get('at') or '', sha, p) for sha, p in (session.get('motion_projects') or {}).items() if p.get('shot_id') == sid), key=lambda x: x[0])
+    if not mine:
+        if len(drawn_ids(plan, session)) >= 2 and not parts_ready(session):
+            return '', ''
+        prev = continues_from(plan, session, gap, shot)
+        return ('', prev) if prev and not (prev in shots and passed_project(session, shots[prev])) else ('still', '')
+    _, sha, row = mine[-1]
+    rec = next((c for c in reversed((session.get('motion_checks') or {}).get(sid) or []) if c.get('sha256') == sha), None)
+    kind = 'still' if row.get('still') else 'motion'
+    if not rec or any(r.get('pass') == NOT_SEEN for r in rec.get('rules') or []):
+        return ('check-still' if row.get('still') else 'check'), ''
+    if held_rules(rec):   # a failed must: its redo, unless the drawing is held after its last round
+        return ('' if not row.get('still') and int(rec.get('round') or 1) >= HELD_ROUNDS + bool((session.get('motion_more') or {}).get(sid)) else kind), ''
+    st = (session.get('motion_stills') or {}).get(sid) or {}
+    if row.get('still') and st.get('sha256') == sha and (st.get('rejected') or still_approved(st)):
+        return ('still' if st.get('rejected') else 'motion'), ''   # the operator's Reject: the still again; their Approve: its motion
+    return '', ''   # the operator's card, or the render
+
+
 MOTION_RULE_NEED = ('{shot}: the rule "{rule}" is not seen: say in `need` the frame or crop that would show it (a snapshot at 2.4 s, a crop of the joint) '
                     'and send the verdict again.')
 MOTION_RULE_FAILED_BEFORE = ('{shot}: in round 2 or 3 a verdict may leave out a rule that passed before, but every rule that failed before is answered: '
@@ -6686,12 +6857,16 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     sha = body.get('sha256') or ''
     need(sha in (session.get('motion_projects') or {}), f"{shot['id']}: {sha[:12]}… is no uploaded project of this film.")
     rules = body.get('rules') or []
-    need(rules and all(isinstance(r, dict) and (r.get('pass') is True or r.get('pass') is False or r.get('pass') == NOT_SEEN) and str(r.get('rule') or '').strip() for r in rules),
-         'The verdict lists the rules checked; every rule has pass true or false (or "not seen", with the frame it needs in `need`) and its words (`rule`).')
-    rules = [{**r, 'rule': str(r['rule'])[m.end():] if (m := pictures.RULE_CLASS.match(str(r['rule']))) else r['rule']} for r in rules]   # row 11: a class copied into the words is not part of them
     held = ((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []
     was = ((session.get('motion_projects') or {}).get(sha) or {}).get('brief')
     still = bool(((session.get('motion_projects') or {}).get(sha) or {}).get('still'))   # design/221 row 3: a verdict is the still's by its project's mark
+    cmp = comparing(session, plan, held)   # fix set A1.2: the rules that compare with another drawing
+    idle = {i for i, c in cmp.items() if c['state'] != 'ready'}   # nothing to compare with yet (or the other drawing left the plan): a note, not this verdict's
+    bare = still and still_rules([h for h in held if h['id'] not in idle]) == []   # the carry-over c2: no rule of the list is one a still can show: an empty verdict passes the still
+    need((rules or bare) and all(isinstance(r, dict) and (r.get('pass') is True or r.get('pass') is False or r.get('pass') == NOT_SEEN) and str(r.get('rule') or '').strip() for r in rules),
+         'The verdict lists the rules checked; every rule has pass true or false (or "not seen", with the frame it needs in `need`) and its words (`rule`).')
+    rules = [{**r, 'rule': str(r['rule'])[m.end():] if (m := pictures.RULE_CLASS.match(str(r['rule']))) else r['rule']} for r in rules]   # row 11: a class copied into the words is not part of them
+    rules = [{**r, **({'with_png': cmp[i]['png']} if i in cmp else {})} for r in rules for i in [pictures.rule_id(r['rule'])] if i not in idle]   # compared with this picture of the other drawing
     frame = ''
     if still and conn is not None:   # the checker judged the still's last frame: the card shows that frame
         frame = last_frame_key(conn, run, shot['id'], sha, last_second(shot, session['source']['fps']))
@@ -6711,15 +6886,20 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     top = HELD_ROUNDS + bool((session.get('motion_more') or {}).get(shot['id']))   # design/221 row 18: round 4 only after "One more round"
     need(still or rnd <= top, HELD_LIMIT.format(shot=shot['id'], rnd=rnd, top=top))
     prev = ((session.get('motion_checks') or {}).get(shot['id']) or [None])[-1]
+    said = {pictures.rule_id(r.get('rule')): r for r in (prev or {}).get('rules') or []}
+    fresh = {i for i, c in cmp.items() if c['state'] == 'ready' and said.get(i, {}).get('with_png') != c['png']}   # fix set A1.2: a comparison not yet answered against the other drawing's picture as it is now
     same = (bool(prev) and prev.get('sha256') == sha and int(prev.get('round') or 1) == rnd
-            and any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []))   # row 12: the frames a "not seen" asked for, answered in the same round
+            and (any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []) or bool(fresh)))   # row 12: the frames a "not seen" asked for, answered in the same round; A1.2: a comparison that came due
     later = bool(prev) and not same and rnd >= 2 and rnd > int(prev.get('round') or 1)   # row 13: round 2 or 3 answers what failed and what the fix touched
-    earlier = {pictures.rule_id(r.get('rule')): r for r in (prev or {}).get('rules') or []} if same or later else {}
+    brief_at = digest(was or {})   # fix set A1.6: a pass stands only for the same brief lines (a record from before names none: it counts, the older way)
+    earlier = {i: e for i, e in said.items() if i not in idle and i not in fresh} if (same or later) and prev.get('brief_at', brief_at) == brief_at else {}
     if still:   # the same for what an earlier verdict of the still recorded: a motion rule's answer, or an unmarked rule's not seen or "not seen twice"
         earlier = {i: e for i, e in earlier.items() if marks.get(i) != 'motion'
                    and (marks.get(i) == 'still' or (e.get('pass') != NOT_SEEN and not str(e.get('where') or '').startswith('not seen twice')))}
     got = {i: ({**r, 'pass': False, 'twice': True, 'where': f"not seen twice in round {rnd} ({r.get('need')})"} if same and r['pass'] == NOT_SEEN and earlier.get(i, {}).get('pass') == NOT_SEEN else r)
            for i, r in ((pictures.rule_id(r.get('rule')), r) for r in rules)}   # design/221 (the critic's A4): not seen twice in a round is a failed must
+    out_ = idle | ({i for i, r in got.items() if r.get('twice')} if still else set())   # the carry-over c1: on a still a rule not seen twice is left out (the animated drawing answers it): a still never loops on "not seen"
+    got, earlier = {i: r for i, r in got.items() if i not in out_}, {i: e for i, e in earlier.items() if i not in out_}
     if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)
         known = {h['id']: h for h in held}
         unknown = [r['rule'] for i, r in got.items() if i not in known and i not in earlier and r.get('group') != 'seen']   # a fault the checker adds of its own is a new rule, group "seen"
@@ -6727,10 +6907,10 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
         open_before = [e['rule'] for i, e in earlier.items() if later and e.get('pass') is not True and i not in got]
         need(not open_before, MOTION_RULE_FAILED_BEFORE.format(shot=shot['id'], n=len(open_before), rule=str(open_before[0])[:160] if open_before else ''))
         skipped = [h['rule'] for h in held if (not still or (h.get('shows') == 'still' and h.get('class') != 'should'))   # row 3, fix set B3: a still answers the musts marked as ones a still can show; an unmarked list, any of them
-                   and h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
+                   and h['id'] not in out_ and h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
         need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
         rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held
-                 if not still or h['id'] in got or h['id'] in earlier]
+                 if (not still or h['id'] in got or h['id'] in earlier) and h['id'] not in out_]
         rules += [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in known and i not in got]
     else:
         rules = [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in got] if same else []
@@ -6743,9 +6923,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     notes = [r['rule'] for r in rules if r['pass'] is False and r['class'] == 'should']
     blind = [{'rule': r['rule'], 'need': str(r.get('need') or '')} for r in rules if r['pass'] == NOT_SEEN]
     rec = {'sha256': sha, 'round': rnd, 'stranger': [str(x)[:500] for x in body.get('stranger') or []][:20] or list((prev or {}).get('stranger') or []) * same,
-           'rules': [{k: (str(r.get(k))[:500] if k not in ('pass', 'carried') else r[k]) for k in ('n', 'group', 'rule', 'pass', 'class', 'kind', 'where', 'fix', 'need', 'carried') if k in r}
+           'rules': [{k: (str(r.get(k))[:500] if k not in ('pass', 'carried') else r[k]) for k in ('n', 'group', 'rule', 'pass', 'class', 'kind', 'where', 'fix', 'need', 'carried', 'with_png') if k in r}
                      for r in rules][:80],
-           **({'label_musts': labels} if labels else {}), 'answered': answered((session.get('motion_projects') or {}).get(sha)),   # the critic's A1: the rules and brief it answered
+           **({'label_musts': labels} if labels else {}), 'answered': answered((session.get('motion_projects') or {}).get(sha)), 'brief_at': brief_at,   # the critic's A1: the rules and brief it answered
            **({'still': True} if still else {}), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session.setdefault('motion_checks', {}).setdefault(shot['id'], []).append(rec)
     names = [r['rule'] for r in failed] + labels
@@ -6894,8 +7074,10 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
         if k:   # design/221 row 1: the parts line also carries the drawings of its parts, so a part drawn again makes the rules be read again
             prints[k] = hashlib.sha256((prints.get(k, '') + t + (''.join(p['digest'] for p in used) if k == 'Use these parts' else '')).encode('utf-8')).hexdigest()[:16]
     refs = list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs]))
+    mine = [p for p in (session.get('motion_projects') or {}).values() if p.get('shot_id') == shot['id'] and p.get('rules')] if build else []
+    compare = compare_frames(comparing(session, plan, max(mine, key=lambda p: p.get('at') or '')['rules'])) if mine else []   # fix set A1.2: the stills its latest rules compare with
     return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': need_pictures(store, run, session, refs, shot['id']) if build else refs, 'frames': frames, 'fps': str(fps), 'lines': prints,
-            **({'continues': continues} if continues else {}), **({'parts_key': session['motion_parts_approved']['key']} if used else {})}
+            **({'continues': continues} if continues else {}), **({'parts_key': session['motion_parts_approved']['key']} if used else {}), **({'compare': compare} if compare else {})}
 
 
 def spec_words(spec, known_only=False):
@@ -7336,7 +7518,7 @@ def status(conn, store, run, outputs, repair=True):
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
-    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.stills_due(six)) if x)
+    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six)) if x)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3

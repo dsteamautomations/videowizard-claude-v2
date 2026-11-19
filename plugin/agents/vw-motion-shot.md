@@ -1,6 +1,6 @@
 ---
 name: vw-motion-shot
-description: VideoWizard's builder of one drawn shot as a HyperFrames composition, on a film started with --drawn motion. Given one shot id with its brief in work/motion/<shot>/, builds the project, uploads, checks and snapshots it with vw motion, and writes work/motion/<shot>/REVIEW.md. One helper per drawn shot, three or four at once.
+description: VideoWizard's builder of one drawn shot as a HyperFrames composition, on a film started with --drawn motion. Given one shot id with its brief in work/motion/<shot>/, builds the project, uploads, checks and snapshots it with vw motion, and writes work/motion/<shot>/REVIEW.md. One helper per drawn shot, all that do not wait on another started together.
 tools: Read, Write, Edit, Bash, Skill
 model: opus
 effort: high

@@ -165,6 +165,10 @@
     "the main assistant names your upload in the plan and renders it.",
     "Gemini reads every ready take before the operator watches it",
     "Fetch each ready take (`vw visuals fetch --job J`) and let the operator watch it",
-    "a new take only when the operator asks"
+    "a new take only when the operator asks",
+    "the others side by side, three or four at once",
+    "One helper per drawn shot, three or four at once",
+    "place each with `<use href=\"#part-<name>\">`",
+    "the AI video and the recording are asked in the chat, one at a time"
   ]
 }

@@ -192,10 +192,12 @@ PART_VIEWS = ('cutaway', 'plan', 'side', 'elevation')   # the views a drawing sp
 SVG_INNER = re.compile(r'<svg\b[^>]*>(.*)</svg>\s*$', re.S)
 
 
-def read_parts(text, elements):
+def read_parts(text, elements, drawn=None):
     """design/221 row 1: the film's shared parts file, one <svg> of <symbol id="part-<name>"> (a <title>, a viewBox, data-element naming a thing of
     the plan when it draws one, data-view naming the view it is drawn in when the thing has several), checked like a project: no network, no script,
-    no picture or file, no DOCTYPE. ([{id, title, element, view, digest}], [each problem in one line])."""
+    no picture or file, no DOCTYPE. ([{id, title, element, view, digest}], [each problem in one line]). Fix set A1.1: a part names the drawn shots
+    that show it with data-shots (`drawn`: the film's drawn shots, when the caller knows them), kept as `shots`; an <svg> with nothing in it says
+    that no shape repeats across the drawings: no part and no problem."""
     import hashlib
     from xml.etree import ElementTree as ET
     if re.search(r'<!DOCTYPE|<!ENTITY', text, re.I):
@@ -238,8 +240,12 @@ def read_parts(text, elements):
         view = el.get('data-view') or ''   # fix set B2: the view the part is drawn in, in the spec's own words, so a drawing can be told which view to place
         if view not in ('', *PART_VIEWS):
             out.append(f"{pid}: data-view is the view the part is drawn in, one of {', '.join(PART_VIEWS)}, or left out")
-        parts.append({'id': pid, 'title': title, 'element': element, 'view': view, 'digest': hashlib.sha256(ET.tostring(el)).hexdigest()[:16]})
-    if not parts and not out:
+        shots = (el.get('data-shots') or '').replace(',', ' ').split()   # fix set A1.1: the drawings that show a part, so a shape that is no thing of the plan reaches their briefs
+        for s in shots if drawn is not None else []:
+            if s not in drawn:
+                out.append(f'{pid}: data-shots names the drawn shots that show the part; {s} is none of them')
+        parts.append({'id': pid, 'title': title, 'element': element, 'view': view, **({'shots': shots} if shots else {}), 'digest': hashlib.sha256(ET.tostring(el)).hexdigest()[:16]})
+    if not parts and not out and len(root):
         out.append('the parts file has no <symbol id="part-…">: one symbol per shared part')
     return parts, list(dict.fromkeys(out))
 

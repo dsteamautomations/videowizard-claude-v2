@@ -976,6 +976,8 @@ def cmd_motion(a):
         refs =[_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
         if out.get('parts_key'):   # design/221 row 1: the film's approved shared parts beside the brief, for the builder to read and preview
             _download(m, out['parts_key'], f'work/motion/{a.shot}/parts.svg')
+        for c in out.get('compare') or []:   # fix set A1.2: the other drawing's approved still end-frame, for a rule that compares with it (a comparison that came due)
+            _download(m, c['key'], f"work/motion/{a.shot}/with-{c['shot_id']}/last-frame.png")
         line, c = '', out.get('continues')
         if c:   # design/221 row 2: the earlier drawing's passed project and its last frame, beside the brief
             import zipfile
@@ -1010,6 +1012,12 @@ def cmd_motion(a):
             (folder / 'rules-still.md').write_text(''.join(f'{n}. {r}\n' for n, r in enumerate(out['still_rules'], 1)), encoding='utf-8')
         else:
             (folder / 'rules-still.md').unlink(missing_ok=True)
+        if out.get('round_rules') is not None:   # fix set A1.6: from round 2, the rules the round before left open: what the round's checker reads in place of rules.md
+            (folder / 'rules-round.md').write_text(''.join(f'{n}. {r}\n' for n, r in enumerate(out['round_rules'], 1)), encoding='utf-8')
+        else:
+            (folder / 'rules-round.md').unlink(missing_ok=True)
+        for c in out.get('compare') or []:   # fix set A1.2: the other drawing's approved still end-frame, for a rule that compares with it
+            _download(m, c['key'], f"work/motion/{a.shot}/with-{c['shot_id']}/last-frame.png")
         emit(out, 0, out.get('next'))
     if a.what in ('check', 'snapshot'):
         sha = a.sha or (json.loads(last.read_text(encoding='utf-8')).get('sha256') if last.is_file() else '')

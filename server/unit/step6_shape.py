@@ -71,13 +71,14 @@ def build(store, shot_id):
     return g(lambda: VS.motion_brief(store, NEW, [], shot_id, build=True, conn=FakeConn([])))
 
 
-def upload(store, shot_id, *part_ids, still=False, marked=True, more=''):
-    return g(lambda: VS.set_motion(store, USER, NEW, [], shot_id, 'shot.zip', drawing(*part_ids, more=more), rules_text(marked), **({'still': True} if still else {})))
+def upload(store, shot_id, *part_ids, still=False, marked=True, more='', rules=None):
+    """rules: the drawing's own rules.md in place of the fixture's (fix set phase 2: a rule that compares with another drawing)."""
+    return g(lambda: VS.set_motion(store, USER, NEW, [], shot_id, 'shot.zip', drawing(*part_ids, more=more), rules or rules_text(marked), **({'still': True} if still else {})))
 
 
 def answers(said):
-    """{rule number in the fixture: its answer} as {the rule's words: its answer}."""
-    return {RULES[int(n)]: v for n, v in said.items()}
+    """{rule number in the fixture: its answer} as {the rule's words: its answer}; a key that is no number is a rule's own words."""
+    return {RULES[int(n)] if str(n).isdigit() else n: v for n, v in said.items()}
 
 
 def verdict(store, shot_id, sha, said, rnd=1):

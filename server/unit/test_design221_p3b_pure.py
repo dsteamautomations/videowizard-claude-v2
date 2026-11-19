@@ -205,7 +205,8 @@ def test_vw_brief_puts_the_earlier_project_and_frame_beside_the_brief():
 def test_the_texts_say_labels_first_the_binding_and_the_order_of_a_diagram():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221d_wording_v3 as W
-    stage = visuals()
+    import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
+    stage = FIX2.before(visuals())
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

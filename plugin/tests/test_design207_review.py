@@ -44,7 +44,8 @@ def test_the_command_text_keeps_the_operator_in_the_chat_and_on_the_decisions_pa
     for gone in ('prints the visuals page link', 'and the page link once', 'on the page or `vw visuals footage', 'or the operator approves on the page', 'Try a fix on the page',
                  'the label and the link `vw visuals status` prints', 'Done on the page', ', or on the page)', 'ticked on the page', '`, or the page)'):
         assert gone not in VISUALS, gone
-    assert 'The treatment, the plan, the sizes, materials and graphic specs, the reference drawings, the two steps of the references and the pictures and drawn graphics are answered on the page' in VISUALS   # design/217   # the operator's one page: the decisions page (the design/210 wording review names every step on it)
+    assert ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings, the two steps of the references, the pictures and drawn graphics and the finished AI video takes '
+            'are answered on the page') in VISUALS   # design/217; design/222 (55e57f8) added the finished takes to this sentence (the carry-over c3 of fix set phase 2: this pin was left behind)   # the operator's one page: the decisions page (the design/210 wording review names every step on it)
     assert OWNER in VISUALS and 'tell the operator to ask the owner' in VISUALS
     assert 'never to answer for the operator' in VISUALS and 'after the plan is proposed' in VISUALS
 

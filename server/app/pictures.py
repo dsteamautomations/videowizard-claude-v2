@@ -98,6 +98,18 @@ W = {
                             'upload it, check it and render it again (`vw motion render --shot {shot}`).'),
     'render_stale_one': '1 drawn graphic must be rendered again (the plan or the shared parts changed): `vw motion render --shot {shot}`.',
     'render_stale': '{n} drawn graphics must be rendered again (the plan or the shared parts changed): `vw motion render --shot S` for each ({ids}).',
+    # fix set phase 2 (19 Nov 2026), A1.2: a rule that compares with another drawing; A1.4: what can start now
+    'compare_due': ("{shot}: its comparison with {other} is due ({other}'s still end-frame is approved): run `vw motion brief --shot {shot}` (it saves {other}'s frame in "
+                    'work/motion/{shot}/with-{other}/), give a fresh vw-motion-check helper the rule{s} "{rule}" with that frame and {shot}\'s last frame, and send its '
+                    'verdict with the same round ({round}): a fail is a failed must of {shot}.'),
+    'compare_waits': "{shot}: its comparison with {other} waits until {other}'s still end-frame is approved ({n} rule{s}); {shot} is not held by it.",
+    'compare_closed': '{shot}: its comparison with {other} is closed ({n} rule{s}): {other} is no drawn graphic of the plan now.',
+    'start_now': 'Start now, together in one message: {what}.',
+    'start_stills': 'the builders of the still end-frames of {ids} ({n})',
+    'start_motion': 'the builders of the motion of {ids} ({n})',
+    'start_checks': 'the checkers of {ids} ({n})',
+    'motion_after': 'The motion of {ids} comes after the still end-frames.',
+    'waits_on': 'Waiting on another drawing: {pairs}.',
     'later_step': 'Made from a step that was corrected.',
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
@@ -549,21 +561,23 @@ def rule_id(text):
     return hashlib.sha1(' '.join(str(text or '').split()).lower().encode('utf-8')).hexdigest()[:8]
 
 
-RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*(?:\(\s*(still|motion)\s*\))?[*_]*\s*:\s*[*_]*\s*', re.I)
+RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*(?:\(\s*(still|motion)?\s*,?\s*(?:with\s+([A-Za-z0-9_-]+))?\s*\))?[*_]*\s*:\s*[*_]*\s*', re.I)
 
 
 def rules_of(text):
     """C6: the rules of a drawing (`work/motion/<shot>/rules.md`) as the server keeps them: every list line, numbered or bulleted, with its id.
     design/221 row 11: a rule starts with `must:` or `should:`; the class is kept beside the rule, never in its words or its id; no class is a must.
     Fix set B3 (19 Nov 2026): after the class the rule writer marks what shows the rule, `must (still):` (the finished picture, standing still) or
-    `must (motion):` (only the moving drawing); kept as `shows`. A rule with no mark (a list written before) has no `shows`."""
+    `must (motion):` (only the moving drawing); kept as `shows`. A rule with no mark (a list written before) has no `shows`.
+    Fix set A1.2: a rule that compares with another drawing names it in the mark, `must (still, with D1):`; kept as `with`."""
     out = {}
     for raw in str(text or '').splitlines():
         m = re.match(r'\s*(?:[-*]|\d+[.)])\s+(.*\S)', raw)
         if m:
             c = RULE_CLASS.match(m.group(1))
             words = ' '.join(m.group(1)[c.end() if c else 0:].split())
-            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must', **({'shows': c.group(2).lower()} if c and c.group(2) else {})})
+            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must', **({'shows': c.group(2).lower()} if c and c.group(2) else {}),
+                                           **({'with': c.group(3)} if c and c.group(3) else {})})
     return list(out.values())
 
 
@@ -927,6 +941,14 @@ def _failed_render(session, sid, rows, last):
     return 'redo', W['render_failed'].format(shot=sid, error=err)
 
 
+def _by_other(rows):
+    """Fix set A1.2: a drawing's comparing rules by the drawing they compare with, {other: [the rules' words]}."""
+    out = {}
+    for c in rows:
+        out.setdefault(c['with'], []).append(c['rule'])
+    return out
+
+
 def _drawn_state(session, sh, take_rows, plan=None):
     """(state, the render job shown, the next step) of a drawn shot, from what the server knows: the render jobs, the held verdict, the verdicts,
     the uploads, the still end-frame. 'made and checked' only once its render is ready and not stale."""
@@ -936,16 +958,24 @@ def _drawn_state(session, sh, take_rows, plan=None):
     last = rows[-1] if rows else None
     if V.held_drawing(session, sid):
         return 'held', last, ''
+    checks = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still')]
+    cmp = V.compared(session, plan, sid) if plan else {}   # fix set A1.2: its rules that compare with another drawing
+    said = ' '.join(W['compare_' + k].format(shot=sid, other=o, n=len(rs), s='' if len(rs) == 1 else 's', rule=rs[0], round=cmp['round']) for k in ('due', 'waits', 'closed')
+                    for o, rs in _by_other(cmp.get(k) or []).items())
+    if cmp.get('due'):
+        return 'checking', None, said   # a comparison that came due is a must not yet judged: never dropped, and the page waits for it
     if last and last['status'] == 'ready':
-        return ('stale', None, '') if plan and _stale(session, plan, last) else ('done', last, '')
+        made, judged = _ts(last.get('created_at')), _ts(checks[-1].get('at')) if checks else None
+        if made and judged and judged > made and V.held_rules(checks[-1]):
+            return 'redo', None, said   # a verdict after the render failed a must (a comparison that came due): the old render is not the drawing any more
+        return ('stale', None, said) if plan and _stale(session, plan, last) else ('done', last, said)
     if last and last['status'] in ('queued', 'running', 'storage_pending'):
-        return 'making', None, ''
+        return 'making', None, said
     if last:
         state, due = _failed_render(session, sid, rows, last)
         return state, None, due
-    checks = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still')]
     if checks:
-        return ('redo' if V.held_rules(checks[-1]) else 'checking' if V.open_rules(checks[-1]) else 'making'), None, ''   # clean: its render comes next
+        return ('redo' if V.held_rules(checks[-1]) else 'checking' if V.open_rules(checks[-1]) else 'making'), None, said   # clean: its render comes next
     if any(p.get('shot_id') == sid and not p.get('still') for p in (session.get('motion_projects') or {}).values()):
         return 'checking', None, ''
     started = (session.get('motion_stills') or {}).get(sid) or (session.get('motion_checks') or {}).get(sid) or any(p.get('shot_id') == sid for p in (session.get('motion_projects') or {}).values())
@@ -956,19 +986,23 @@ def expected(session, plan, take_rows, now=None):
     """Every thing step 6 must make, from the accepted plan and the session, in film order, then the components: [{kind, id, name, state, job?}];
     kind still, steps, drawn or component; the state in plain words (STATE)."""
     out, refs = [], list(session['references'].values())
-    for _, sh in V._accepted_shots(plan, session):
+    shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
+    for gap, sh in V._accepted_shots(plan, session):
         kind = {'still': 'still', 'graphic_sequence': 'steps', 'drawn': 'drawn'}.get(V.route_of(sh))
         if not kind:
             continue
-        sid, job, due = sh['id'], None, ''
+        sid, job, due, turn = sh['id'], None, '', ('', '')
         if sid in (session.get('selections') or {}) or sid in (session.get('assets') or {}):
             state = 'answered'
         elif kind == 'drawn':
             state, job, due = _drawn_state(session, sh, take_rows, plan)
+            if state in ('none', 'making', 'checking', 'redo'):
+                turn = V.drawn_turn(session, plan, gap, sh, shots)   # fix set A1.4: whose turn it is
         else:
             mine = [r for r in refs if r.get('kind') == ('keyframe' if kind == 'still' else 'state') and V.made_for(session, r) == sid and not r.get('set')]
             state = _pictures_state(session, plan, mine, now, len(sh.get('states') or []) if kind == 'steps' else 1)
-        out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {})})
+        out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
+                    **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
     names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
     by = {}
     for r in refs:
@@ -1007,6 +1041,18 @@ def drawn_due(items):
     stale = [i['id'] for i in items if i['kind'] == 'drawn' and i['state'] == STATE['stale']]
     out = [W['render_stale_one'].format(shot=stale[0]) if len(stale) == 1 else W['render_stale'].format(n=len(stale), ids=', '.join(stale))] if stale else []
     return ' '.join(out + [i['due'] for i in items if i['kind'] == 'drawn' and i.get('due')])
+
+
+def starts(items):
+    """Fix set A1.4, A1.3 (19 Nov 2026): the helpers of the drawn graphics that can start now, to be started together in one message, and which
+    drawing waits on which; the motion is named only when no still end-frame is left to build or check (the stills come first)."""
+    of = lambda *turns: [i['id'] for i in items if i['kind'] == 'drawn' and i.get('turn') in turns]
+    stills, motion, checks = of('still'), of('motion'), of('check-still', 'check')
+    first = stills or of('check-still')
+    what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_stills', stills), ('start_motion', [] if first else motion), ('start_checks', checks)) if ids]
+    waits = [f"{i['id']} on {i['waits_on']}" for i in items if i['kind'] == 'drawn' and i.get('waits_on')]
+    return ' '.join(x for x in (W['start_now'].format(what='; '.join(what)) if what else '', W['motion_after'].format(ids=', '.join(motion)) if first and motion else '',
+                                W['waits_on'].format(pairs='; '.join(waits)) if waits else '') if x)
 
 
 def coming(items):

@@ -110,7 +110,7 @@ def test_the_parts_brief_holds_every_drawn_brief_and_the_things_shown_twice():
     (PARTS.replace('id="part-arrow"', 'id="part-wall"'), 'part-wall is defined twice'),
     (PARTS.replace(' viewBox="0 0 100 20"', ''), 'part-arrow has no viewBox'),
     ('<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>', 'holds symbols only'),
-    ('<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'no <symbol id="part-'),
+    ('<svg xmlns="http://www.w3.org/2000/svg"><defs/></svg>', 'no <symbol id="part-'),   # fix set A1.1: an <svg> with nothing in it now says that no shape repeats (test_fixset2_pure)
     ('<svg', 'not an SVG file'),
 ])
 def test_the_parts_file_is_checked_like_a_project(text, match):
@@ -266,7 +266,8 @@ def test_the_parts_helper_and_the_texts():
     assert 'Look at these before you draw' in agent and 'operator\'s words' in agent
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221e_wording_v3 as W
-    stage = visuals()
+    import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
+    stage = FIX2.before(visuals())
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)
@@ -275,7 +276,7 @@ def test_the_parts_helper_and_the_texts():
     for where, old, new in W.PAIRS:
         assert texts[where].count(new) == 1 and olds[where].count(old) == 1, old[:50]
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(new) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX2.now(file, new)) == 1, file   # c4: "place each with" is now "place the view this drawing shows with"
     later = texts['later']
     assert '`vw motion parts --file work/motion/parts/parts.svg`' in later and 'one `vw-motion-parts` helper' in later and 'rendered again, not rebuilt' in later
     skill = (ROOT / 'plugin' / 'skills' / 'motion' / 'SKILL.md').read_text(encoding='utf-8')

@@ -1466,7 +1466,8 @@ WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missi
                      'technique_unnamed', 'container_unnamed', 'script_person_missing',   # design/149 B5, B9; design/151 Q4
                      'size_open', 'size_repeat', 'size_close_first', 'look_alike', 'look_only',   # design/207 (SK, 16 Nov 2026): moved from the operator's list; look_only and passer_by are no longer raised, kept so old answers load
                      'material_bare', 'compare_not_person', 'view_missing', 'look_wide', 'extra_repeated', 'animals_many', 'same_setup',
-                     'people_alike', 'palette_missing')   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
+                     'people_alike', 'palette_missing',   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
+                     'camera_words', 'continues_apart', 'end_change_large')   # fix set M1, M2, M4 (19 Nov 2026): settled with the plan, not at the build
 
 
 def answer_warnings(plan, warnings):
