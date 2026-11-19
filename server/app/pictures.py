@@ -516,6 +516,20 @@ def rules_of(text):
     return list(out.values())
 
 
+NOTE_HEAD = re.compile(r'\b(questions?|notes?)\b', re.I)
+
+
+def notes_in(text):
+    """design/221 row 15: the list lines of a rules text that stand under a heading saying Question(s) or Note(s) (they belong in questions.md)."""
+    out, under = [], False
+    for raw in str(text or '').splitlines():
+        if re.match(r'\s*(?:[-*]|\d+[.)])\s+\S', raw):
+            out += [raw.strip()] if under else []
+        elif re.match(r'\s*(?:#+\s|\*\*|__)', raw) or raw.rstrip().endswith(':'):   # a heading: '# …', '**…**' or a line ending in a colon
+            under = bool(NOTE_HEAD.search(raw))
+    return out
+
+
 def fact_view(session, store, job, shot_id):
     """F3, C6: a motion drawing's fact check, from the verdicts of the project it was rendered from (as `select_take` reads them): passed, not
     passed with its open rules in full, or none yet. N is the number of rules the server holds for the project (else the verdict's)."""

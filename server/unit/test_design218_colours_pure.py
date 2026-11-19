@@ -69,9 +69,9 @@ def test_bad_input_is_refused_by_name():
 
 def test_every_later_brief_gets_the_plans_palette_and_the_added_colours():
     s, p = {}, plan(drawn('D1'))
-    assert V.palette_line(p, s) == 'Palette: navy #12324A, orange #FF8800, concrete mid grey #8A8A8A.'
+    assert V.palette_line(p, s) == 'Palette (not yet approved): navy #12324A, orange #FF8800, concrete mid grey #8A8A8A.'   # design/221: said approved or not yet
     add(s, p)
-    assert V.palette_line(p, s) == ('Palette: navy #12324A, orange #FF8800, concrete mid grey #8A8A8A. Added for every drawing of this film (the spec wins where they differ): '
+    assert V.palette_line(p, s) == ('Palette (not yet approved): navy #12324A, orange #FF8800, concrete mid grey #8A8A8A. Added for every drawing of this film (the spec wins where they differ): '
                                      'walls #5A524C (dark warm grey).')
     assert 'palette_line(plan, session)' in open(V.__file__, encoding='utf-8').read()   # motion_brief's palette line is this one
 
@@ -132,11 +132,12 @@ def test_the_texts_say_claude_chooses_a_missing_neutral_and_the_operator_only_a_
     root = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(root / 'scripts'))
     import d218_wording_v3 as W
+    import d221_wording_v3 as D221   # design/221: a later script that moves the rule writer's questions and colours to questions.md
     later = next(p['text'] for s in json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'
                  for p in s['parts'] if p['name'] == 'later')
     assert later.count(W.COLOUR) == 1 and '`vw motion colour --shot D1,D2' in later
     for file, old, new in W.HELPERS:
         text = (root / 'plugin' / file).read_text(encoding='utf-8')
-        assert text.count(new) == 1, file
+        assert text.count(D221.now(file, new)) == 1, file
     assert 'Colours to add' in (root / 'plugin' / 'agents' / 'vw-motion-rules.md').read_text(encoding='utf-8')
     assert 'never stop to ask' in (root / 'plugin' / 'skills' / 'motion' / 'SKILL.md').read_text(encoding='utf-8')

@@ -3665,7 +3665,7 @@ def cmd_pull(a):
     emit({**full, 'next': nxt, 'resolve': found, 'workspace': str(workspace(a.code))}, 0, pull_line(a.code, nxt, found))
 
 
-TEXT_STAGES = ('intake', 'brief', 'script')
+TEXT_STAGES = ('intake', 'brief', 'script', 'visuals')   # design/221 row 22: the visuals stage too, so the operator's answers there are logged as theirs
 
 
 def cmd_log(a):

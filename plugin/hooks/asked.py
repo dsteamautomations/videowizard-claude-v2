@@ -2,7 +2,7 @@
 tool, and each answer, becomes one entry of the run's log, so the person's time can be told from the assistant's. Before the tool the guard calls
 log() (no second process on every tool call); after the tool this file runs as its own hook, for the question tool only. The entry is written by
 `vw log` in a process of its own that is never waited for; it never blocks or delays the question, and any failure is silent. `vw log` keeps the
-entry only in the text stages (intake, brief, script). Silent outside the operator folder and without an active run."""
+entry only in the text stages (intake, brief, script) and the visuals stage (design/221). Silent outside the operator folder and without an active run."""
 import json
 import os
 import subprocess

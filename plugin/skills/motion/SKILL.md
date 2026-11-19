@@ -9,7 +9,7 @@ You build one drawn shot. HyperFrames renders HTML to video by seeking a paused 
 
 ## Your folder
 
-`runs/<code>/work/motion/<shot>/` holds `brief.md` (read it first, whole), `rules.md` (the numbered rules a fact checker will hold your frames to: every one must be plainly true in your drawing) and `refs/` (the approved pictures, to look at). Build the project in `work/motion/<shot>/project/`: `index.html` at its root, one scene in `compositions/`. Write every file by hand; there is no `init`.
+`runs/<code>/work/motion/<shot>/` holds `brief.md` (read it first, whole), `rules.md` (the numbered rules a fact checker will hold your frames to: every one must be plainly true in your drawing) and `refs/` (the approved pictures, to look at). `questions.md` beside them holds the rule writer's questions and notes: they are not rules, and they are not yours. The main assistant decides each point (a choice with no fact behind it is its own, and logged; a question about a fact goes to the operator once, with the others, before the first drawing is built). Build the project in `work/motion/<shot>/project/`: `index.html` at its root, one scene in `compositions/`. Write every file by hand; there is no `init`.
 
 The server places these at check and render; refer to them, never create them:
 - `assets/vendor/gsap.min.js`: GSAP (load it with `<script src="assets/vendor/gsap.min.js">`).
@@ -35,7 +35,7 @@ The server places these at check and render; refer to them, never create them:
 4. Never tween `display` or `visibility` on a `.clip`; animate a child. No CSS `transform` on an element GSAP transforms. Use `fromTo`, not `from`.
 5. A scene file puts its styles, markup and scripts inside `<template>` and styles its root as `#root` (`inset: 0`).
 6. Asset paths are `assets/...` with no leading `/`.
-7. Content inside the 90 % action-safe box, text inside the 80 % title-safe box; text at least 2.6 % of the frame height.
+7. Content inside the 90 % action-safe box, text inside the 80 % title-safe box; every label at least 2.6 % of the frame height.
 
 Details: `references/format.md` (the project shape, attributes, timing) and `references/motion.md` (eases, entrances, holds, what looks generated). Read them from the plugin's `skills/motion/references/` folder.
 

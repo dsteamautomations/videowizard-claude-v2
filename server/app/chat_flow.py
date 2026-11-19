@@ -1546,7 +1546,7 @@ def _drawing_items(ctx):
                      'Check that each person faces what they do and that the working hand can reach it.']
             lines += (['Changed from the plan to make the shot possible:'] + [f'- {c}' for c in d['changes']]) if d.get('changes') else []
             lines += (['Notes:'] + [f'- {c}' for c in d['notes']]) if d.get('notes') else []
-            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'AI video, the layout drawing of the shot', f"{shots[sid].get('title') or sid}: is the shot laid out right in these two drawings?", run_,
+            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'Step 7, AI video: the layout drawing of the shot', f"{shots[sid].get('title') or sid}: is the shot laid out right in these two drawings?", run_,
                                [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawing of the shot.')],
                                text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in d['views']]))
     return items
@@ -1721,7 +1721,7 @@ def _guide_items(ctx):
                     return guide.approve_still(conn, store, user, run, outputs, sid, still['id'], still['sha256'], quote)
                 return guide.reject_still(conn, store, user, run, outputs, sid, still['id'], words, quote)
             show = ([{'key': still['overlay_key'], 'name': f'{sid}-still-on-the-guide.png'}] if still.get('overlay_key') else []) + [{'key': still['key'], 'name': f'{sid}-still.png'}]
-            items.append(_item(f"still:{sid}:{still['id']}", 'still', 'AI video, the still',
+            items.append(_item(f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',
                                f'{title}: this still starts the shot. On the first picture, does every person and thing sit on the red outlines?', run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show))
             continue
@@ -1746,7 +1746,7 @@ def _guide_items(ctx):
                 return {**out, **({'tell': 'The take is being made. ' + NOTHING} if choice == 'shoot' else {})}
             show = [{'key': k, 'name': n} for k, n in ((card.get('guide_key'), f'{sid}-guide.mp4'), ((card.get('still') or {}).get('overlay_key'), f'{sid}-still-on-the-guide.png')) if k]
             why = str((checks.get(str(last['id'])) or {}).get('blocked')) if again else ''
-            items.append(_item(f"shoot:{sid}:{hashlib.sha256(stamp.encode()).hexdigest()[:10]}", 'shoot', 'AI video, the take',
+            items.append(_item(f"shoot:{sid}:{hashlib.sha256(stamp.encode()).hexdigest()[:10]}", 'shoot', 'Step 7, AI video: the take',
                                (f"{title}: the clip that came back cannot be used ({why}). Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
                                 else f"{title}: make the take now? It is {card['seconds']} s and costs about ₹{card['cost_inr']:g}."), run_,
                                [_button('Send it again' if again else 'Shoot', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],

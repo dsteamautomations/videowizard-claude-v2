@@ -137,7 +137,8 @@ def test_the_question_and_the_command_say_to_show_the_sample_first():
 def test_the_wording_is_in_once_retired_by_name_and_registered():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d218_wording_v3 as W
-    stage = next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    import d221_wording_v3 as D221   # design/221: a later script that replaces this one's font sentence (the font first, no brief before it): the text as it was before it
+    stage = D221.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))
     part = {p['name']: p['text'] for p in stage['parts']}
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing

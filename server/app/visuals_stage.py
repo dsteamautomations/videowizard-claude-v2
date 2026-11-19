@@ -4422,10 +4422,16 @@ def _dedupe(lines):
     return [l for l in lines if not (l['check'] in seen or seen.add(l['check']))]
 
 
-def researched(label, spec, material=False):
+def researched(label, spec, material=False, real_thing=False):
     """design/124 C2: a spec is approved only when its research is done: every unknown size tried in all four sources, illustrative earned (warned in the plan)."""
     from .visual_contract import DrawingSpec, MaterialSpec, spec_research_needs
-    guarded(lambda: spec_research_needs(label, (MaterialSpec if material else DrawingSpec).model_validate(spec)))
+    guarded(lambda: spec_research_needs(label, (MaterialSpec if material else DrawingSpec).model_validate(spec), real_thing))
+
+
+def draws_real_thing(plan, shot):
+    """design/221 row 4 (as the plan's `spec_proportions_missing`): a diagram shot that names an object or a material element of the plan."""
+    kinds = {e['id']: e.get('kind') for e in plan.get('elements') or []}
+    return shot.get('graphic_kind') == 'diagram' and any(kinds.get(e) in ('object', 'material') for e in shot.get('element_ids') or [])
 
 
 def approve_spec(store, user, run, outputs, shot_id, quote):
@@ -4449,11 +4455,11 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
         (session.get('spec_corrections') or {}).pop(shot_id, None)
         save_session(store, run, session)
         return {'element_id': element['id'], 'table': spec_table(spec), 'sentence': material_sentence(element), 'next': f"Material spec of {element['id']} approved: every picture that shows it carries it word for word."}
-    _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
+    plan, _, _, shot = guarded(lambda: locate(store, session, shot_id))
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
     need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; approve the revised one.')   # review 27 Oct
-    researched(f'shot {shot_id}', spec)
+    researched(f'shot {shot_id}', spec, real_thing=draws_real_thing(plan, shot))
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     (session.get('spec_corrections') or {}).pop(shot_id, None)
     save_session(store, run, session)
@@ -4530,7 +4536,7 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, sh['id'], spec):   # review 27 Oct: the assistant's turn, not approved over
             waiting_.append(sh['id'])
         elif spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            researched(f"shot {sh['id']}", spec)   # design/124 C2: refused before anything is saved
+            researched(f"shot {sh['id']}", spec, real_thing=draws_real_thing(plan, sh))   # design/124 C2: refused before anything is saved
             session.setdefault('spec_approvals', {})[sh['id']] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(sh['id'], None)
             approved.append({'shot_id': sh['id'], 'table': spec_table(spec)})
@@ -5835,13 +5841,15 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='')
     names = _motion_fonts(store, session, run)[1]
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
+    need(not pictures.notes_in(rules_text), NOT_A_RULE)   # design/221 row 15
+    lines = motion_brief(store, run, outputs, shot_id)['lines']   # design/221 S3: the brief the rules were written from, line by line
     sha = hashlib.sha256(content).hexdigest()
     k = f"{run['id']}/visuals/motion/projects/{sha}.zip"
     store.put(k, content, 'application/zip')
-    from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
     held = pictures.rules_of(rules_text)
     session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
-                                                      **({'rules': held} if held else {})}
+                                                      **({'rules': held, 'brief': lines} if held else {})}
     save_session(store, run, session)
     effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
@@ -5973,13 +5981,17 @@ def subject_rule_files():
 
 
 def _subject_rules(store, stem):
-    """The subject's rules: the repo's seed lines, then the operators' additions kept in storage (every film reads both)."""
+    """The subject's rules: the repo's seed lines, then the operators' additions kept in storage (every film reads both). design/221 row 14: as
+    [(where they come from, rules)]: the subject file, then each film a rule was added on, in the order they were added."""
     seed = [l[2:].strip() for l in (SUBJECT_RULES / f'{stem}.md').read_text(encoding='utf-8').splitlines() if l.startswith('- ')]
     try:
-        added = [r['rule'] for r in json.loads(store.get(f'subject-rules/{stem}.json').decode('utf-8'))]
+        added = json.loads(store.get(f'subject-rules/{stem}.json').decode('utf-8'))
     except Problem:
         added = []
-    return seed + added
+    films = {}
+    for r in added:
+        films.setdefault(f"added on film {r['run']}" if r.get('run') else 'added by an operator', []).append(r['rule'])
+    return [(f'from the subject file {stem}.md', seed)] * bool(seed) + list(films.items())
 
 
 NEUTRAL_MAX_CHROMA = 0.10   # design/218: a colour whose brightest and darkest channel differ by at most this share is a neutral (a grey, an off-white, a near-black)
@@ -6082,7 +6094,8 @@ def palette_line(plan, session):
     from .font_sample import drawn_shots
     drawn = {s['id'] for s in drawn_shots(plan)}   # a colour whose drawings all left the plan is not given (existence only)
     added = '; '.join(f"{r['thing']} {r['colour']} ({r['words']})" for r in (session.get('added_colours') or {}).values() if drawn & set(r['shots']))
-    return f"Palette: {base.rstrip('.')}." + (f' Added for every drawing of this film (the spec wins where they differ): {added}.' if added else '')
+    approved = bool(session.get('accepted') or session.get('shared_pending'))   # design/221 row 14: as palette_due counts it: approved once a gap was accepted
+    return f"Palette ({'approved' if approved else 'not yet approved'}): {base.rstrip('.')}." + (f' Added for every drawing of this film (the spec wins where they differ): {added}.' if added else '')
 
 
 def add_subject_rule(store, user, run, subject, rule, quote):
@@ -6116,6 +6129,14 @@ MOTION_RULE_OPEN = ('{shot}: the verdict leaves {n} rule(s) of the project witho
 MOTION_RULE_UNKNOWN = ('{shot}: "{rule}" is not a rule of this project (rules.md as it was uploaded): copy each rule\'s words as they are, or upload the project again '
                        'with its rules (`vw motion upload`).')
 MOTION_RULE_WORDS = '{shot}: the failed rule "{rule}" says nothing of what was seen: give `where` (or `fix`) in one plain sentence and send the verdict again.'
+NOT_A_RULE = 'A note or a question is not a rule: move it to questions.md.'   # design/221 row 15
+MOTION_BRIEF_CHANGED = ('{shot}: the brief changed after these rules were written, in the line(s): {names}. Read the rules of this drawing again against the new brief '
+                        '(`vw motion brief --shot {shot}`), then upload again with the rules (`vw motion upload --shot {shot}`).')   # design/221 S3
+
+
+def brief_changed(was, now):
+    """design/221 S3: the labels of the brief's lines that differ between the brief the rules were written from and the brief now, in the brief's order."""
+    return [k for k in list(now) + [k for k in was if k not in now] if was.get(k) != now.get(k)]
 
 
 def motion_verdict(store, user, run, outputs, body):
@@ -6130,6 +6151,10 @@ def motion_verdict(store, user, run, outputs, body):
     need(rules and all(isinstance(r, dict) and isinstance(r.get('pass'), bool) and str(r.get('rule') or '').strip() for r in rules),
          'The verdict lists the rules checked; every rule has pass true or false and its words (`rule`).')
     held = ((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []
+    was = ((session.get('motion_projects') or {}).get(sha) or {}).get('brief')
+    if was:   # design/221 S3: no verdict on rules written from an older brief
+        changed = brief_changed(was, motion_brief(store, run, outputs, shot['id'])['lines'])
+        need(not changed, MOTION_BRIEF_CHANGED.format(shot=shot['id'], names=', '.join(f'"{k}"' for k in changed)))
     if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)
         from . import pictures
         known = {h['id']: h for h in held}
@@ -6149,6 +6174,7 @@ def motion_verdict(store, user, run, outputs, body):
     save_session(store, run, session)
     names = [r['rule'] for r in failed]
     return {'shot_id': shot['id'], 'round': rec['round'], 'failed': names,
+            'log': f"round {rec['round']}: {len(names)} of {len(rules)} rules failed" + (': ' + '; '.join(f'"{n}"' for n in names) if names else ''),   # design/221 row 22: the log line says what failed
             'next': (f"{len(names)} rules failed: give them to a vw-motion-shot helper for {shot['id']} to redo (round {rec['round'] + 1}; after round 3 the drawing is held)."
                      if names else f"Clean: name {sha[:12]}… in the plan's scene_motion and `vw motion render --shot {shot['id']}`.")}
 
@@ -6160,6 +6186,8 @@ def motion_brief(store, run, outputs, shot_id):
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: a brief is for a drawn shot.")
+    need_motion_style(run)   # design/221 S1: no brief before its facts: the motion style (asked at the treatment), then the font; a film from before passes as it did
+    need_font(run, session)
     fps, W, H = _film_frame(session)
     frames = shot['end_frame'] - shot['start_frame']
     exact = Fraction(frames) / Fraction(str(fps))
@@ -6167,36 +6195,62 @@ def motion_brief(store, run, outputs, shot_id):
     words = [w for w in ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words') or [] if shot['start_frame'] <= w['start_frame'] < shot['end_frame']]
     timed = ', '.join(f"{w['text']} {(w['start_frame'] - shot['start_frame']) / f:.2f}" for w in words) or 'none recorded: key cues with at_s'
     spec = shot.get('drawing_spec') or {}
-    dims = '; '.join(f"{d.get('part')} {d.get('measure')} {d.get('value')} {d.get('unit')} ({d.get('status') or 'given'})" for d in spec.get('dimensions') or [])
     fonts = _motion_fonts(store, session, run)
-    pictures = brief_pictures(session, shot)
+    pictures = sorted(brief_pictures(session, shot), key=lambda p: p[0].lower())   # design/221 S3: one order whatever order the session was saved in
     sm = shot.get('scene_motion') or {}
     for miss in film.missing_letters(film.font(run), sm.get('labels') or []):   # design/179 E7: named before the render, not after
         need(False, f"The label \"{miss['label']}\" has letters the film's font ({film.font(run)}) does not hold: {' '.join(miss['letters'][:8])}. Ask the operator: another font for this film "
                     '(`vw font` lists those that hold its language), or other words for the label.')
-    lines = [f"# Brief: drawn shot {shot['id']} (HyperFrames)", '',
-             f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\".",
-             f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\"",
-             f"Each word's start, seconds from the shot's start: {timed}.",
-             f"Shows: {shot.get('depicts') or shot.get('purpose')}. Message: {shot.get('message') or '-'}. Progression: {shot.get('information_progression') or '-'}.",
-             f"Framing: {shot.get('framing')}. Appearance: {shot.get('appearance') or (plan.get('foundation') or {}).get('appearance') or '-'}.",
-             palette_line(plan, session),   # design/218: the plan's palette and the colours added since, the same for every drawing
-             f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."]
+    said_ = lambda *pieces: ' '.join(p for p in pieces if p)   # design/221 row 14: an empty value is left out, never printed as "None" or "-"
+    piece = lambda name, value: f'{name}: {str(value).rstrip(".")}.' if value not in (None, '', '-') else ''
+    els = {e['id']: e for e in plan.get('elements') or []}
+    known = [said_(f"{els[e].get('name') or e}:", spec_words(els[e]['material_spec'], known_only=True)) for e in shot.get('element_ids') or []
+             if (els.get(e) or {}).get('material_spec') and spec_words(els[e]['material_spec'], known_only=True)]   # design/221 row 4: a size confirmed on the thing reaches every shot that shows it
+    lines = [('', f"# Brief: drawn shot {shot['id']} (HyperFrames)"), ('', ''),   # design/221 row 6: what it shows first, then its facts, the text, the timings, then the look
+             ('Shows', said_(piece('Shows', shot.get('depicts') or shot.get('purpose')), piece('Message', shot.get('message')))),
+             ('Claims', f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."),
+             ('Framing', said_(piece('Framing', shot.get('framing')), piece('Appearance', shot.get('appearance') or (plan.get('foundation') or {}).get('appearance')))),
+             ('Confirmed for the things in this shot', f"Confirmed for the things in this shot: {'; '.join(known)}" if known else '')]
     if spec:
-        lines += [f"Drawing spec, view {view_words(spec)}: parts {', '.join(spec.get('parts') or []) or '-'}; sizes {dims or '-'}; relationships {'; '.join(spec.get('relationships') or []) or '-'}; "
-                  f"proportions {'; '.join(spec.get('proportions') or []) or '-'}; label \"{spec.get('label') or ''}\"" + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.')]
-    lines += [f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in sm.get('labels') or []) or 'name them in the plan (scene_motion.labels) and use them exactly'}.",
-              'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.',
-              f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
-              + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "
-                 '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else ''),
-              f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; text at least 2.6 % of the frame height, inside the inner 90 %; "
-              'every label sentence case as written above.',
-              *(f'Note on the view (the spec above wins where they differ): {n["text"]}' for n in session.get('drawing_notes') or [] if shot['id'] in n['shots']),   # design/218b: below the spec; this shot is a drawn shot of the plan (located above)
-              '', film.style_part(run)]   # design/179 S4: the film's motion style; the fixed 'flat, clean, technical' is gone
-    for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16)
-        lines += ['', f'Subject rules ({stem}): every one holds in this drawing.', *(f'- {r}' for r in _subject_rules(store, stem))]
-    return {'shot_id': shot['id'], 'brief': '\n'.join(lines) + '\n', 'refs': [rid for rid, _ in pictures], 'frames': frames, 'fps': str(fps)}
+        lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words(spec) or 'nothing stated'}" + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
+    lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in sm.get('labels') or []) or 'name them in the plan (scene_motion.labels) and use them exactly'}."),
+              ('Length', f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\"."),
+              ('Narration', f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\""),
+              ('Each word\'s start', f"Each word's start, seconds from the shot's start: {timed}."),
+              ('Progression', piece('Progression', shot.get('information_progression'))),
+              ('Pictures', 'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.'),
+              ('Palette', palette_line(plan, session)),   # design/218: the plan's palette and the colours added since, the same for every drawing
+              ('Fonts', f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
+               + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "
+                  '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else '')),
+              ('Rules', f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; every label at least 2.6 % of the frame height, inside the inner 90 %; "
+               'every label sentence case as written above.'),
+              *(('Note on the view', f'Note on the view (the spec above wins where they differ): {n["text"]}') for n in session.get('drawing_notes') or [] if shot['id'] in n['shots']),   # design/218b: below the spec; this shot is a drawn shot of the plan (located above)
+              ('', ''), ('Motion style', film.style_part(run))]   # design/179 S4: the film's motion style; the fixed 'flat, clean, technical' is gone
+    for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16); design/221 row 14: each with where it comes from
+        for source, rules in _subject_rules(store, stem):
+            lines += [('', ''), ('Subject rules', '\n'.join([f'Subject rules ({stem}), {source}: every one holds in this drawing.', *(f'- {r}' for r in rules)]))]
+    lines = [(k, t) for k, t in lines if t or not k]
+    prints = {}
+    for k, t in lines:   # design/221 S3: one fingerprint per labelled line, so a later change of the brief can be named
+        if k:
+            prints[k] = hashlib.sha256((prints.get(k, '') + t).encode('utf-8')).hexdigest()[:16]
+    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': [rid for rid, _ in pictures], 'frames': frames, 'fps': str(fps), 'lines': prints}
+
+
+def spec_words(spec, known_only=False):
+    """design/221 rows 4 and 14: a spec's parts, sizes, relationships, proportions and label in the brief's words; an empty piece is left out, an
+    unknown size says so with no number, a size with no status gets no word. known_only: the confirmed and measured sizes and the proportions only."""
+    def size(d):
+        if d.get('status') == 'unknown' or d.get('value') is None:
+            return f"{d.get('part')} {d.get('measure')} unknown (no figure)"
+        return ' '.join(str(x) for x in (d.get('part'), d.get('measure'), f"{d['value']:g}" if isinstance(d['value'], (int, float)) else d['value'], d.get('unit')) if x not in (None, '')) \
+            + (f" ({d['status']})" if d.get('status') else '')
+    dims = [d for d in spec.get('dimensions') or [] if not known_only or (d.get('status') in ('confirmed', 'measured') and d.get('value') is not None)]
+    pieces = ([] if known_only else [('parts', ', '.join(spec.get('parts') or []))]) + [('sizes', '; '.join(size(d) for d in dims))] \
+        + ([] if known_only else [('relationships', '; '.join(spec.get('relationships') or []))]) + [('proportions', '; '.join(spec.get('proportions') or []))] \
+        + ([] if known_only else [('label', f'"{spec["label"]}"' if spec.get('label') else '')])
+    return '; '.join(f'{k} {v}' for k, v in pieces if v)
 
 
 def brief_pictures(session, shot):

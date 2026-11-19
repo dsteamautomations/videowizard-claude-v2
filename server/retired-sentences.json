@@ -129,6 +129,11 @@
     "a fix is made only on request: `vw visuals fix --ref R`",
     "approved on the Pictures step like any picture",
     "made first as a style sheet (`vw visuals image --element _STYLE --kind style",
-    "A graphic sequence is reviewed as its states, in the chat"
+    "A graphic sequence is reviewed as its states, in the chat",
+    "Before the first drawn graphic the server asks the film's font in the chat",
+    "when the brief leaves a fact open, show the operator rules.md and ask them to tick, strike or add, once",
+    "list it at the end under \"Questions for the operator\"",
+    "Leave out what the server checks itself and no still frame can show",
+    "every label word for word and that no other text appears"
   ]
 }

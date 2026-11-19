@@ -55,13 +55,15 @@ def _entry(run_id, stage, step, body, status, response, run_code=None):
     words = next((_short(body[k], 1000) for k in WORD_KEYS if str(body.get(k) or '').strip()), '')
     entry = {'run_id': run_id, 'stage': stage, 'about': about, 'quote': words, 'request_id': body.get('request_id'),
              'by_kind': 'operator' if words or run_code else 'assistant', 'by_name': '', **({'run_code': run_code} if run_code else {})}
-    if status >= 400:
-        return {**entry, 'kind': 'refusal', 'rule': str(response.get('code') or status), 'entry': f"{step} refused: {_short(response.get('message') or '', 1500)}"}
+    if status >= 400:   # design/221 row 22: a 422 from the form check carries `detail` (each field and why), not `message`
+        form = '; '.join(f"{'.'.join(str(x) for x in (d.get('loc') or [])[1:]) or 'body'}: {d.get('msg')}" for d in response.get('detail') or [] if isinstance(d, dict)) \
+            if isinstance(response.get('detail'), list) else str(response.get('detail') or '')
+        return {**entry, 'kind': 'refusal', 'rule': str(response.get('code') or status), 'entry': f"{step} refused: {_short(response.get('message') or form, 1500)}"}
     if response.get('status') == 'rejected' or response.get('act_on'):
         said = list(response.get('refusals') or []) + list(response.get('act_on') or []) + ([response['error']] if response.get('error') else [])
         return {**entry, 'kind': 'refusal', 'rule': 'check', 'entry': f"{step} rejected: " + _short('; '.join(map(str, said)), 1500)}
     made = ', '.join(f'{k} {response[k]}' for k in ('reference_id', 'job_id', 'job', 'version', 'status') if isinstance(response.get(k), (str, int)))   # `job`: the voices page's narrate-again
-    said = f": {_short(response['log'], 400)}" if isinstance(response.get('log'), str) and response['log'] else ''   # design/205: what the step returned, in a line
+    said = f": {_short(response['log'], 1500)}" if isinstance(response.get('log'), str) and response['log'] else ''   # design/205: what the step returned, in a line
     return {**entry, 'kind': 'step', 'rule': '', 'entry': step + (f' ({made})' if made else '') + said}
 
 

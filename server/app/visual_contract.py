@@ -424,10 +424,14 @@ def _illustrative_needs(label, spec):
         need(spec.illustrative, f'{label}: a size is unknown: set illustrative true; the drawing then carries "not to scale" and shows no figure for that size.')
 
 
-def spec_research_needs(label, spec):
-    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size says what was tried, illustrative set whenever a size is unknown."""
+def spec_research_needs(label, spec, real_thing=False):
+    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size says what was tried, illustrative set whenever a size is unknown.
+    design/221 row 4: real_thing (a diagram shot that names an object or a material of the plan): at least one proportion or one known size."""
     _dimension_needs(label, spec.dimensions)
     _illustrative_needs(label, spec)
+    need(not real_thing or spec.proportions or any(d.status != 'unknown' and d.value is not None for d in spec.dimensions),
+         f'{label}: this diagram draws a real thing of the plan, and its spec has no proportion and no known size. Add the proportions that matter '
+         '(proportions, for example "a box about 3 : 2 : 1") or one known size with its source.')
 
 
 def _research_warning(label, spec, **where):
