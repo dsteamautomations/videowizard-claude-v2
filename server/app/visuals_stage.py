@@ -2780,6 +2780,9 @@ def waiting(session, plan, code, take_rows, budget=None):
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec) and not correction_pending(session, sid, spec):
             add(sh['start_frame'], f'Drawing spec to approve · {sid}{title(sh)}', 'takes' if on_takes(sh) else 'pictures', sid, 'spec', 'drawing spec to approve')   # on its own shot's card, on the tab that shows it
+    up = session.get('motion_parts') or {}
+    if up.get('picture_key') and not up.get('rejected') and not parts_ready(session):   # design/221 row 1: one card in the chat, before any drawn shot's items
+        add(-1, f"Shared parts · {len(up.get('parts') or [])} parts", 'pictures', 'parts', up['sha256'], 'shared parts to approve')
     for e in plan.get('elements') or []:   # design/111 F10: approved once, on the References step, on the material's own card
         if e.get('material_spec') and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), e['material_spec']):
             add(-1, f"Material spec to approve · {e['id']}", 'references', e['id'], 'specs', 'material spec to approve')
@@ -5643,6 +5646,10 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     if prep.get('kind') in ('drawn', 'motion'):   # design/113 E3: a drawing stands on the plan it was rendered from; design/130: so does a motion drawing
         again = '`vw motion render --shot S`' if prep.get('kind') == 'motion' else '`vw visuals draw --shot S`'
         need(prep.get('plan_digest') == digest(current_plan(store, session)), f'The plan changed since this drawing was rendered; render it again ({again}).')
+        made = (session.get('motion_projects') or {}).get(prep.get('sha256') or '') if prep.get('kind') == 'motion' else None
+        if made:   # design/221 row 1: a drawing rendered with parts that are not the approved ones now is rendered again, not rebuilt
+            from . import motion
+            need((prep.get('parts') or {}).get('used') == parts_in_force(session, motion.unpack(store.get(made['key']))).get('used'), MOTION_PARTS_CHANGED.format(shot=job['unit']))
         failed = [l.get('check') for l in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('must_failed') or []]   # design/117 answer 1: held after the loop
         need(not failed or str(notes or '').strip(), f"This drawing is held: {', '.join(failed)} still failed after the server's passes. Select it with --notes saying why it is taken anyway, or reject it with what to change.")
         if prep.get('kind') == 'motion':   # design/130 §4 step 6: a motion drawing is selected after a clean fact check of the project it was rendered from
@@ -5875,6 +5882,14 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     names = _motion_fonts(store, session, run)[1]
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    shared = (session.get('motion_parts_approved') or {}).get('parts') or []   # design/221 row 1: a project uses the shared parts of its things, never its own copy
+    text = ' '.join(motion._texts(files).values())
+    own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
+    need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
+    els = {e['id']: e for e in (guarded(lambda: current_plan(store, session)).get('elements') or [])}
+    for p in shared:
+        if p.get('element') in (shot.get('element_ids') or []) and not re.search(r'href\s*=\s*["\']#' + re.escape(p['id']) + r'["\']', text):
+            need(False, PARTS_USE.format(shot=shot_id, thing=(els.get(p['element']) or {}).get('name') or p['element'], id=p['id']))
     from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
     notes = pictures.notes_in(rules_text)
     need(not notes, NOT_A_RULE.format(lines='; '.join(f'"{n}"' for n in notes[:12])))   # design/221 row 15
@@ -5906,15 +5921,171 @@ def corner_note(spec):
     return str((spec or {}).get('label') or '').strip() if (spec or {}).get('illustrative') else ''
 
 
-def note_colour(plan, run):
-    """design/221 row 9: the corner note's colour on the film's ground: the colour the plan's palette, then the film record's colours, names for the
-    ground (background, paper, canvas, page); charcoal on a light ground, off-white on a dark one; no ground named: a light ground is taken."""
+def ground_colour(plan, run):
+    """design/221 rows 1 and 9: the film's ground: the colour the plan's palette, then the film record's colours, names for the ground (background,
+    paper, canvas, page); '' when none is named."""
     for text in (str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''), str(film.colours(run) or '')):
         for m in re.finditer(r'([^,;#]*?)\s*(#[0-9A-Fa-f]{6})\b', text):
             if GROUND_WORDS.search(m.group(1)):
-                r, g_, b = (int(m.group(2)[i:i + 2], 16) / 255 for i in (1, 3, 5))
-                return NOTE_DARK if 0.2126 * r + 0.7152 * g_ + 0.0722 * b >= 0.5 else NOTE_LIGHT
-    return NOTE_DARK
+                return m.group(2)
+    return ''
+
+
+def note_colour(plan, run):
+    """design/221 row 9: the corner note's colour on the film's ground: charcoal on a light ground, off-white on a dark one; no ground named: a light
+    ground is taken."""
+    ground = ground_colour(plan, run)
+    if not ground:
+        return NOTE_DARK
+    r, g_, b = (int(ground[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return NOTE_DARK if 0.2126 * r + 0.7152 * g_ + 0.0722 * b >= 0.5 else NOTE_LIGHT
+
+
+def drawn_ids(plan, session):
+    """design/221 row 1: the drawn shots of the plan's chosen scenes, in plan order."""
+    return [s['id'] for g_ in plan['gaps'] for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots'] if s.get('visual_type') == 'drawn']
+
+
+PARTS_FIRST = ('This film has {n} drawn graphics: their shared parts are drawn once, before any brief. Run `vw motion parts`, start one `vw-motion-parts` helper, '
+               'and upload its file with `vw motion parts --file work/motion/parts/parts.svg`; the operator approves its picture in the chat (`vw visuals next`). '
+               'Then brief each drawing.')
+PARTS_WAIT = "The shared parts wait for the operator's approval in the chat (`vw visuals next`): no brief before they are approved."
+PARTS_REJECTED = ('The operator rejected the shared parts: "{words}". Give these words to a `vw-motion-parts` helper to redraw them, then upload again '
+                  '(`vw motion parts --file work/motion/parts/parts.svg`).')
+PARTS_ONE = 'This film has one drawn graphic: it has no shared parts. Brief it directly (`vw motion brief --shot S`).'
+PARTS_USE = '{shot} shows {thing} but does not use its shared part: place {id} with <use href="#{id}"> (drawn once for the whole film; do not redraw it).'
+PARTS_OWN_ID = ('{shot} defines {ids}, the id of a shared part: the server puts the shared parts in the page; place them with <use href="#…"> and give your '
+                'own elements other ids.')
+PARTS_LINE = ('Use these parts (drawn once for the whole film; do not redraw them): {parts}. Place each with <use href="#part-<name>">: the server puts them '
+              'in the page, and parts.svg beside this brief shows them.')
+MOTION_PARTS_CHANGED = 'Its parts changed since this drawing was rendered: render it again (`vw motion render --shot {shot}`); nothing is rebuilt.'
+
+
+def parts_ready(session):
+    """design/221 row 1: the latest parts upload is the approved one."""
+    ok = session.get('motion_parts_approved') or {}
+    return bool(ok) and ok.get('sha256') == (session.get('motion_parts') or {}).get('sha256')
+
+
+def need_parts(plan, session):
+    """design/221 row 1: with two or more drawn graphics, no brief before the shared parts are approved."""
+    n = len(drawn_ids(plan, session))
+    if n < 2:
+        return
+    up = session.get('motion_parts') or {}
+    need(up, PARTS_FIRST.format(n=n))
+    need(not up.get('rejected'), PARTS_REJECTED.format(words=(up.get('rejected') or {}).get('words')))
+    need(parts_ready(session), PARTS_WAIT)
+
+
+def shot_parts(session, shot):
+    """design/221 row 1: the approved parts a shot uses: those drawing one of its things, and those that draw no thing of the plan."""
+    els = set(shot.get('element_ids') or [])
+    return [p for p in (session.get('motion_parts_approved') or {}).get('parts') or [] if not p.get('element') or p['element'] in els]
+
+
+def parts_in_force(session, files):
+    """design/221 rows 1 and 3: the approved parts a project places, {key, used: {part id: its digest}}, for the render request (a changed part it uses
+    changes the request, so its take is rendered again); {} when it places none. ponytail: a part placed only inside another part is not followed."""
+    ok = session.get('motion_parts_approved') or {}
+    text = ' '.join(motion_texts(files).values())
+    used = {p['id']: p['digest'] for p in ok.get('parts') or [] if re.search(r'href\s*=\s*["\']#' + re.escape(p['id']) + r'["\']', text)}
+    return {'key': ok['key'], 'used': used} if used else {}
+
+
+def motion_texts(files):
+    from . import motion
+    return motion._texts(files)
+
+
+def parts_brief(store, run, outputs):
+    """design/221 row 1: what the `vw-motion-parts` helper reads: the things two or more drawings show, then every drawn shot's brief (its spec, the
+    sizes confirmed on its things, the palette, the fonts, the shared look, the pictures to look at); and the operator's words on a rejected file."""
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    ids = drawn_ids(plan, session)
+    need(len(ids) >= 2, PARTS_ONE)
+    briefs = [motion_brief(store, run, outputs, sid, session=session) for sid in ids]
+    shots = {sid: guarded(lambda sid=sid: locate(store, session, sid))[3] for sid in ids}
+    bare = [sid for sid in ids if shots[sid].get('drawing_spec') and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(shots[sid]['drawing_spec'])]
+    need(not bare, f"The shared parts are drawn from the approved specs: approve the drawing spec of {', '.join(bare)} first (on the page, `vw visuals page`).")
+    els = {e['id']: e for e in plan.get('elements') or []}
+    twice = [(e, [sid for sid in ids if e in (shots[sid].get('element_ids') or [])]) for e in els]
+    twice = '; '.join(f"{e} {els[e].get('name') or e} ({', '.join(s)})" for e, s in twice if len(s) >= 2)
+    head = ['# Shared parts of the drawn graphics', '', f"Things shown by two or more drawings (each is a part to draw once): {twice or 'none'}.",
+            'Things of the plan (data-element names the id): ' + '; '.join(f"{e} {x.get('name') or e}" for e, x in els.items()) + '.']
+    return {'brief': '\n'.join(head + [f"\n## {b['shot_id']}\n\n{b['brief']}" for b in briefs]), 'refs': list(dict.fromkeys(r for b in briefs for r in b['refs'])),
+            **({'rejected': (session.get('motion_parts') or {})['rejected']['words']} if (session.get('motion_parts') or {}).get('rejected') else {})}
+
+
+def set_parts(store, user, run, outputs, name, content):
+    """design/221 row 1: the film's shared parts file (one SVG of symbols, from the `vw-motion-parts` helper), checked like a project and kept with
+    the run, with one picture of the parts (Chromium, as the font sample; the file itself when Chromium cannot draw it); asked in the chat."""
+    from . import font_sample, motion
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    need(len(drawn_ids(plan, session)) >= 2, PARTS_ONE)
+    need(re.search(r'\.svg$', name or '', re.I) and content and len(content) <= motion.MAX_PARTS, 'The shared parts are one .svg file under 1 MB (work/motion/parts/parts.svg).')
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError:
+        text = ''
+    parts, problems = motion.read_parts(text, {e['id'] for e in plan.get('elements') or []}) if text else ([], ['the parts file is not UTF-8 text'])
+    need(not problems, 'The parts file breaks the rules: ' + '; '.join(problems[:6]))
+    sha = hashlib.sha256(content).hexdigest()
+    base = f"{run['id']}/visuals/motion/parts/{sha}"
+    store.put(base + '.svg', content, 'image/svg+xml')
+    ground = ground_colour(plan, run) or '#FFFFFF'
+    preview = motion.parts_preview(text, parts, ground, note_colour(plan, run))
+    try:
+        store.put(base + '.png', font_sample.render(f'<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:{ground}">{preview}</body></html>'), 'image/png')
+        picture, why = base + '.png', ''
+    except Exception as exc:   # noqa: BLE001: no Chromium: the card shows the drawing itself
+        store.put(base + '-preview.svg', preview.encode('utf-8'), 'image/svg+xml')
+        picture, why = base + '-preview.svg', f'{exc.__class__.__name__}: {exc}'[:200]
+    session['motion_parts'] = {'sha256': sha, 'key': base + '.svg', 'name': name, 'parts': parts, 'picture_key': picture, **({'picture_error': why} if why else {}),
+                               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'sha256': sha, 'parts': [p['id'] for p in parts],
+            'next': f"Shared parts stored ({len(parts)}): their picture is in the chat for the operator to approve (`vw visuals next`); no brief before."
+                    + (' The picture could not be drawn by the server: the card shows the parts drawing itself.' if why else '')}
+
+
+def parts_changed(store, session):
+    """design/221 row 1: the drawn shots whose last render placed parts that are not the approved ones now (rendered again, not rebuilt)."""
+    from . import motion
+    out = []
+    for sid, prep in (session.get('preparations') or {}).items():
+        try:
+            req = load_json(store, prep['key']) if prep.get('drawn') and prep.get('key') else {}
+            row = (session.get('motion_projects') or {}).get(req.get('sha256') or '') if req.get('kind') == 'motion' else None
+            if row and (req.get('parts') or {}).get('used') != (parts_in_force(session, motion.unpack(store.get(row['key']))).get('used')):
+                out.append(sid)
+        except (Problem, ValueError, KeyError):
+            continue
+    return out
+
+
+def parts_answer(store, user, run, outputs, sha, ok, quote, words=''):
+    """design/221 row 1: the operator's Approve (the file's digest recorded; it is the one pasted into every drawing) or Reject with their words
+    (sent back for the helper to redraw; the next upload replaces the file and is asked again)."""
+    session = session_of(store, run, outputs)
+    up = session.get('motion_parts') or {}
+    need(up.get('sha256') == sha, 'These shared parts are not the latest upload: run `vw visuals next` again.')
+    at = datetime.now(timezone.utc).isoformat()
+    if ok:
+        session['motion_parts_approved'] = {**{k: up[k] for k in ('sha256', 'key', 'parts')}, 'quote': quote, 'by': user['id'], 'at': at}
+        up.pop('rejected', None)
+        save_session(store, run, session)
+        stale = parts_changed(store, session)
+        return {'recorded': True, 'for_the_assistant': 'The shared parts are approved: brief the drawings now (`vw motion brief --shot S`).'
+                + (f" Its parts changed for {', '.join(stale)}: render each again (`vw motion render --shot S`) after its brief, rules and verdict are read again." if stale else '')}
+    need(str(words or '').strip(), 'Say what to change in the parts, in the operator\'s words.')
+    up['rejected'] = {'words': str(words).strip(), 'quote': quote, 'by': user['id'], 'at': at}
+    save_session(store, run, session)
+    return {'recorded': True, 'for_the_assistant': PARTS_REJECTED.format(words=str(words).strip())}
 
 
 def _motion_request(store, session, run, shot_id, sha=None):
@@ -5948,8 +6119,10 @@ def _motion_request(store, session, run, shot_id, sha=None):
     finish = motion.finish_in_force(motion.finish_of(files)[0], off=bool((session.get('motion_finish_off') or {}).get(shot['id'])))   # design/186: only when there is one, so an older shot's request is unchanged
     note = corner_note(spec)   # design/221 row 9: from the spec, so a project not yet named in the plan gets it too
     note_fonts = list(dict.fromkeys(list(film_font_files(run)) + ([Path(session['font']['name']).name] if session.get('font') else []) + ['NotoSans-Variable.ttf']))
+    parts = parts_in_force(session, files)   # design/221 row 1: the approved parts it places, pasted by the server; a changed one changes this request
     return shot, spec, files, {
         **({'finish': finish} if finish else {}),
+        **({'parts': parts} if parts else {}),
         **({'note': {'text': note, 'fonts': note_fonts, 'colour': note_colour(plan, run)}} if note else {}),
         'kind': 'motion', 'shot_id': shot['id'], 'sha256': sha, 'project_key': row['key'], 'width': W, 'height': H, 'fps': str(fps), 'frames': frames,
         'images': images, 'fonts': fonts, 'labels': labels, 'sidecar': motion.sidecar(seconds, [c['selector'] for c in cues or []]),
@@ -6451,12 +6624,13 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     if build:   # design/221 (the critic's A1): the labels and cues of every drawn shot are in the plan before the first brief, so no render is made stale by them later
         bare = [s['id'] for g_ in plan['gaps'] for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots']
                 if s.get('visual_type') == 'drawn' and not (s.get('scene_motion') or {}).get('labels')
-                and (s.get('carries_text') or str(s.get('message') or '').strip()
+                and (s.get('carries_text')   # design/221 phase 3c: a shot's message is its point, not text on screen
                      or _flat((s.get('drawing_spec') or {}).get('label')) not in ('', _flat(corner_note(s.get('drawing_spec')))))]
         one = len(bare) == 1
         need(not bare, f"Before the first brief, the texts of every drawn shot go in the plan: {', '.join(bare)} {'carries' if one else 'carry'} text and {'has' if one else 'have'} "
                        'no scene_motion.labels: add scene_motion: {labels: [every text the viewer reads, word for word, never the corner note], cues: [{selector: "#id", word or at_s}]} '
                        f"to {'it' if one else 'each'} in the plan, then propose the plan.")
+        need_parts(plan, session)   # design/221 row 1: two or more drawn graphics: their shared parts, drawn once and approved, before any brief
         if prev:   # design/221 row 2: built on the earlier drawing's passed project and its last frame
             before = guarded(lambda: locate(store, session, prev))[3]
             sha = passed_project(session, before)
@@ -6470,6 +6644,8 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
         lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words({**spec, 'label': ''} if note else spec) or 'nothing stated'}"
                    + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
     shown = [l for l in sm.get('labels') or [] if _flat(l) != _flat(note)]
+    used = shot_parts(session, shot)   # design/221 row 1: the approved shared parts of this shot's things, and those of no thing
+    lines += [('Use these parts', PARTS_LINE.format(parts='; '.join(f"{p['id']}: {p['title']}" for p in used)) if used else '')]
     lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in shown) or 'none'}."),   # design/221 (the critic's A1): the labels are in the plan before the first brief
               ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame, in the box from 80 % of the width and 90 % of the height to the edges. '
                                              'Do not draw it, and keep that corner free.' if note else ''),
@@ -6497,10 +6673,10 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     lines = [(k, t) for k, t in lines if t or not k]
     prints = {}
     for k, t in lines:   # design/221 S3: one fingerprint per labelled line, so a later change of the brief can be named
-        if k:
-            prints[k] = hashlib.sha256((prints.get(k, '') + t).encode('utf-8')).hexdigest()[:16]
+        if k:   # design/221 row 1: the parts line also carries the drawings of its parts, so a part drawn again makes the rules be read again
+            prints[k] = hashlib.sha256((prints.get(k, '') + t + (''.join(p['digest'] for p in used) if k == 'Use these parts' else '')).encode('utf-8')).hexdigest()[:16]
     return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs])), 'frames': frames, 'fps': str(fps), 'lines': prints,
-            **({'continues': continues} if continues else {})}
+            **({'continues': continues} if continues else {}), **({'parts_key': session['motion_parts_approved']['key']} if used else {})}
 
 
 def spec_words(spec, known_only=False):

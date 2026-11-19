@@ -25,6 +25,7 @@ RECORDS = ('guard.log', 'manifest.json', '.active')   # design/48 O.4: the tool'
 VW_SKILLS = ('vw:vw', 'vw', 'vw:motion', 'motion', 'vw:guide', 'guide', 'vw:drawing', 'drawing')   # design/130: the motion skill of the drawn-shot helper; integration steps B to D: the guide skill of an AI video shot
 VW_HELPERS = ('vw:vw-scene-review', 'vw-scene-review', 'vw:vw-plan-gaps', 'vw-plan-gaps',   # design/125 O6, O9: the plugin's own helpers; their calls pass this guard too
               'vw:vw-motion-shot', 'vw-motion-shot', 'vw:vw-motion-rules', 'vw-motion-rules', 'vw:vw-motion-check', 'vw-motion-check',   # design/130
+              'vw:vw-motion-parts', 'vw-motion-parts',   # design/221 row 1: the drawer of the film's shared parts
               'vw:vw-guide-scene', 'vw-guide-scene', 'vw:vw-guide-check', 'vw-guide-check',
               'vw:vw-drawing', 'vw-drawing',
               'vw:vw-reference-finder', 'vw-reference-finder', 'vw:vw-set-look', 'vw-set-look')   # design/211: the finder of the footage pictures, the looker at the made sets; design/200: the drawer of one thing's drawing set   # integration steps B to D: the builder and the fresh checker of an AI video shot's guide

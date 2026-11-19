@@ -763,6 +763,8 @@ def _motion_folder(store, request, folder, finish=None, note=True):
     if folder.exists():
         shutil.rmtree(folder)
     out = motion.prepare(folder, motion.unpack(store.get(request['project_key'])), gsap=motion.gsap_bytes(), fonts=fonts, refs=refs, sidecar=request.get('sidecar') or {'assertions': []})
+    if request.get('parts'):   # design/221 row 1: the approved shared parts, hidden at the start of the page, for the check, the snapshots and the render alike
+        motion.apply_parts(out, store.get(request['parts']['key']).decode('utf-8'))
     motion.apply_finish(out, finish, int(request.get('width') or 1920), int(request.get('height') or 1080))   # design/186: the server's layer, never the helper's code
     if note:
         motion.apply_note(out, request.get('note'), int(request.get('width') or 1920), int(request.get('height') or 1080))

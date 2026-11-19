@@ -16,7 +16,7 @@ import pytest
 from app import film, pictures as P, visual_contract as VC, visuals_stage as VS
 from app.errors import Problem
 from test_design130_p1_pure import FakeConn, motion_shot, motion_store, project
-from test_design221_p1_pure import NEW, edit_plan, visuals
+from test_design221_p1_pure import NEW, edit_plan, edit_session, visuals
 from test_design221_p2_pure import EVEN, LEAVES, RULES, SOLID, WARN, Jobs, selectable, two_drawn, upload, verdict
 from test_visuals_stage_pure import USER, g, saved
 
@@ -47,7 +47,7 @@ def test_the_plan_names_labels_and_cues_without_a_sha():
 
 
 def test_the_brief_before_a_build_is_refused_while_a_drawn_shot_with_text_has_no_labels():
-    for over in ({'carries_text': True}, {'message': 'The course spreads the load.'},
+    for over in ({'carries_text': True},   # design/221 phase 3c: a shot's message alone is its point, not text on screen
                  {'drawing_spec': {**motion_shot()['drawing_spec'], 'illustrative': False, 'label': 'Sill course'}}):
         store = motion_store(sh=motion_shot(scene_motion={'labels': [], 'cues': []}, **over))
         with pytest.raises(Problem) as e:
@@ -167,6 +167,7 @@ def continuing():
     store = motion_store()
     two_drawn(store)
     no_sha(store)
+    edit_session(store, lambda s: s.update(motion_parts_approved={'sha256': 'p', 'key': 'k', 'parts': []}, motion_parts={'sha256': 'p'}))   # design/221 phase 3c: two drawn graphics, their parts approved
     return store
 
 

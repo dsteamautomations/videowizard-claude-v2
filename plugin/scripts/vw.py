@@ -951,6 +951,21 @@ def cmd_motion(a):
         out = write(base + '/motion/colour', {'thing': a.thing, 'colour': a.colour, 'words': a.words, 'reason': a.reason,
                                               'shots': [s.strip() for s in a.shot.split(',') if s.strip()], 'quote': a.quote or ''})
         emit(out, 0, out.get('next'))
+    if a.what == 'parts':   # design/221 row 1: the film's shared parts, drawn once by one vw-motion-parts helper and approved in the chat
+        if a.file:
+            p = (ws / a.file) if (ws / a.file).is_file() else Path(a.file)
+            if not p.is_file():
+                emit({'action': 'refused', 'message': f'No file {a.file}: the parts are work/motion/parts/parts.svg.'}, 2)
+            out = write(base + '/motion/parts', {'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
+            emit(out, 0, out.get('next'))
+        out = call('GET', f'{base}/motion/parts')
+        pf = ws / 'work' / 'motion' / 'parts'
+        pf.mkdir(parents=True, exist_ok=True)
+        (pf / 'brief.md').write_text(out['brief'], encoding='utf-8')
+        refs = [_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/parts/refs/{rid}.png') for rid in out.get('refs') or []]
+        emit({'brief': str(pf / 'brief.md'), 'refs': refs, **({'rejected': out['rejected']} if out.get('rejected') else {})}, 0,
+             f"The parts brief is in work/motion/parts/brief.md with {len(refs)} pictures in refs/: start one vw-motion-parts helper; it writes work/motion/parts/parts.svg, "
+             'then upload it with `vw motion parts --file work/motion/parts/parts.svg`.' + (f' The operator rejected the last parts: "{out["rejected"]}": give the helper these words.' if out.get('rejected') else ''))
     if not a.shot:
         emit({'action': 'refused', 'message': f'Give the drawn shot: `vw motion {a.what} --shot S`.'}, 2)
     folder = ws / 'work' / 'motion' / a.shot
@@ -961,6 +976,8 @@ def cmd_motion(a):
         (folder / 'brief.md').write_text(out['brief'], encoding='utf-8')
         save_json(folder / 'brief-lines.json', out.get('lines') or {})   # design/221 (the critic's A1): the brief the rules are written from, sent with the upload
         refs =[_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
+        if out.get('parts_key'):   # design/221 row 1: the film's approved shared parts beside the brief, for the builder to read and preview
+            _download(m, out['parts_key'], f'work/motion/{a.shot}/parts.svg')
         line, c = '', out.get('continues')
         if c:   # design/221 row 2: the earlier drawing's passed project and its last frame, beside the brief
             import zipfile
@@ -3888,7 +3905,7 @@ def build_parser():
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
-    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish', 'colour', 'note'])   # design/130; design/186: finish
+    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish', 'colour', 'note', 'parts'])   # design/130; design/186: finish; design/221 row 1: parts
     for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote', '--thing', '--colour', '--words', '--reason', '--text', '--remove'):   # design/218: four for colour; design/218b: --text and --remove for note
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')

@@ -186,6 +186,92 @@ def apply_note(folder, note, width=1920, height=1080):
     index.write_text(text[:at] + layer + text[at:] if at >= 0 else text + '\n' + layer, encoding='utf-8')
 
 
+MAX_PARTS = 1_000_000   # design/221 row 1: the parts file is small
+PART_ID = re.compile(r'part-[a-z0-9]+(?:-[a-z0-9]+)*')
+SVG_INNER = re.compile(r'<svg\b[^>]*>(.*)</svg>\s*$', re.S)
+
+
+def read_parts(text, elements):
+    """design/221 row 1: the film's shared parts file, one <svg> of <symbol id="part-<name>"> (a <title>, a viewBox, data-element naming a thing of
+    the plan when it draws one), checked like a project: no network, no script, no picture or file, no DOCTYPE. ([{id, title, element, digest}],
+    [each problem in one line])."""
+    import hashlib
+    from xml.etree import ElementTree as ET
+    if re.search(r'<!DOCTYPE|<!ENTITY', text, re.I):
+        return [], ['the parts file has a DOCTYPE or an ENTITY: no DOCTYPE, plain SVG only']
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as exc:
+        return [], [f'the parts file is not an SVG file ({exc})']
+    tag = lambda el: el.tag.rsplit('}', 1)[-1]
+    if tag(root) != 'svg':
+        return [], ['the parts file is not an SVG file (its root is not <svg>)']
+    out = []
+    if re.search(r'<script\b|\son[a-z]+\s*=', text, re.I) or NONDET.search(text):
+        out.append('the parts file runs code: no script, no event handler, nothing that moves by itself')
+    if EXTERNAL.search(text):
+        out.append(f'the parts file loads from the network ({EXTERNAL.search(text).group(0).strip()})')
+    elif any(not str(v).startswith('#') for el in root.iter() for k, v in el.attrib.items() if k.rsplit('}', 1)[-1] in ('href', 'src')):
+        out.append('the parts file places no picture or file: a part is drawn in SVG, and a <use> points only to another part ("#part-…")')
+    if any(tag(el) not in ('symbol', 'defs', 'style', 'title', 'desc') for el in root):
+        out.append('the parts file holds symbols only (one <symbol> per part, with the <defs> and <style> they need), nothing drawn outside them')
+    parts, seen = [], set()
+    for el in root:
+        if tag(el) != 'symbol':
+            continue
+        pid = el.get('id') or ''
+        if not PART_ID.fullmatch(pid):
+            out.append(f"{pid or 'a symbol'}: a part's id is part-<name> (lower case letters, digits and hyphens)")
+            continue
+        if pid in seen:
+            out.append(f'{pid} is defined twice')
+        seen.add(pid)
+        title = next((' '.join((c.text or '').split()) for c in el if tag(c) == 'title'), '')
+        if not title:
+            out.append(f'{pid} has no <title> naming it in plain words')
+        if not el.get('viewBox'):
+            out.append(f'{pid} has no viewBox (its own drawing box, so it can be drawn at any size)')
+        element = el.get('data-element') or ''
+        if element and element not in elements:
+            out.append(f'{pid} draws {element}, which is no thing of the plan (data-element names an element id)')
+        parts.append({'id': pid, 'title': title, 'element': element, 'digest': hashlib.sha256(ET.tostring(el)).hexdigest()[:16]})
+    if not parts and not out:
+        out.append('the parts file has no <symbol id="part-…">: one symbol per shared part')
+    return parts, list(dict.fromkeys(out))
+
+
+def apply_parts(folder, svg):
+    """design/221 row 1: the approved shared parts pasted by the server into the prepared project's index.html, a hidden <svg> at the start of
+    <body>, so a drawing places a part with <use href="#part-<name>">. No parts: nothing is written."""
+    m = SVG_INNER.search(str(svg or '').strip())
+    if not m:
+        return
+    index = Path(folder) / 'index.html'
+    text = index.read_text(encoding='utf-8')
+    if 'id="vw-parts"' in text:
+        return
+    layer = (f'<svg id="vw-parts" xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" '
+             f'aria-hidden="true">{m.group(1)}</svg>\n')
+    body = re.search(r'<body\b[^>]*>', text, re.I)
+    index.write_text(text[:body.end()] + layer + text[body.end():] if body else layer + text, encoding='utf-8')
+
+
+def parts_preview(svg, parts, ground, ink, width=900):
+    """design/221 row 1: one picture of the shared parts for the operator: each part drawn large with its name under it, on the film's ground,
+    three to a row. A self-contained SVG (Chromium makes it a PNG)."""
+    inner = SVG_INNER.search(svg.strip()).group(1)
+    cell, cols = width // 3, 3
+    rows = (len(parts) + cols - 1) // cols
+    cells = []
+    for i, p in enumerate(parts):
+        x, y = (i % cols) * cell, (i // cols) * cell
+        cells.append(f'<use href="#{p["id"]}" x="{x + 20}" y="{y + 20}" width="{cell - 40}" height="{cell - 70}"/>'
+                     f'<text x="{x + cell // 2}" y="{y + cell - 22}" text-anchor="middle" font-family="sans-serif" font-size="20" fill="{ink}">'
+                     f'{html_lib.escape(p["title"] or p["id"])}</text>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{rows * cell}" viewBox="0 0 {width} {rows * cell}">'
+            f'<rect width="100%" height="100%" fill="{ground}"/>{inner}{"".join(cells)}</svg>')
+
+
 def _fraction(v):
     from fractions import Fraction
     return Fraction(str(v))

@@ -1579,6 +1579,23 @@ def visuals_motion_brief(run_id: UUID, shot_id: str, user=User, conn=DB):   # de
     return Response(visuals_stage.guarded(lambda: visuals_stage.motion_brief(storage(), run, outputs, shot_id, build=True, conn=conn)))   # design/221: the gates before a build
 
 
+class MotionParts(Write):   # design/221 row 1: the film's shared parts, one SVG of symbols
+    name: str
+    content_base64: str
+
+
+@app.get('/api/runs/{run_id}/visuals/motion/parts')
+def visuals_motion_parts_brief(run_id: UUID, user=User, conn=DB):   # design/221 row 1: what the vw-motion-parts helper reads
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: visuals_stage.parts_brief(storage(), run, outputs)))
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/parts')
+def visuals_motion_parts(run_id: UUID, body: MotionParts, user=User, conn=DB):
+    import base64 as b64
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_parts(storage(), user, run, outputs, body.name, b64.b64decode(body.content_base64)))
+
+
 @app.get('/api/runs/{run_id}/visuals/motion/jobs/{job_id}')
 def visuals_motion_job(run_id: UUID, job_id: UUID, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)   # design/92: a read never waits for the lock

@@ -1643,6 +1643,16 @@ def _waiting_items(ctx):
                          text=P.chat_text(line), show=[_pic(run, r['id'], f'{group}-step-{i + 1}') for i, r in enumerate(chain)])
             item['_line'] = line
             items.append(item)
+        elif kind == 'shared parts to approve':   # design/221 row 1: the film's shared parts, drawn once: their picture, Approve or Reject with the operator's words
+            up = session['motion_parts']
+            els = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
+
+            def run_(choice, quote, words, sha=up['sha256']):
+                return V.parts_answer(store, user, run, outputs, sha, choice == 'approve', quote, words)
+            items.append(_item(f"parts:{up['sha256'][:10]}", 'parts', where, f"The shared parts of the drawn graphics ({len(up['parts'])}): each is drawn once and every drawing uses it. Are they right?", run_,
+                               [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the parts, in their words.')],
+                               text='\n'.join(f"- {p['id']}: {p['title']}" + (f" ({els.get(p['element'], p['element'])})" if p.get('element') else '') for p in up['parts']),
+                               show=[{'key': up['picture_key'], 'name': 'shared-parts' + ('.svg' if up['picture_key'].endswith('.svg') else '.png')}]))
         elif kind in ('drawing spec to approve', 'material spec to approve'):
             key = V.material_key(group) if kind.startswith('material') else group
             specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once
