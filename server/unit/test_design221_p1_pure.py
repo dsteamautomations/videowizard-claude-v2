@@ -192,12 +192,12 @@ def test_brief_changed_names_changed_added_and_removed_lines_in_order():
 def test_list_lines_under_a_questions_or_notes_heading_are_found():
     text = ('# Rules\n1. The course is solid.\n  the note sits low (a wrapped line, not a heading)\n2. The leaves match.\n\n'
             '## Questions for the operator\n- Is the sill 230 mm?\n**Notes**\n* The client said tiles.\nColours to add:\n- walls #5A524C\n')
-    assert P.notes_in(text) == ['- Is the sill 230 mm?', '* The client said tiles.']
+    assert P.notes_in(text) == ['- Is the sill 230 mm?', '* The client said tiles.', '- walls #5A524C']   # the critic's A3 (test_design221_p1b_pure): "Colours to add" too
     assert P.notes_in(RULES) == [] and P.notes_in('Note: one line\n1. a rule') == []   # a line that is no heading changes nothing
 
 
 def test_an_upload_with_a_question_in_its_rules_is_refused():
-    with pytest.raises((Problem, ValueError), match='A note or a question is not a rule: move it to questions.md.'):
+    with pytest.raises((Problem, ValueError), match='A note or a question is not a rule: move these lines to questions.md'):
         g(lambda: upload(motion_store(), rules=RULES + '\n## Questions\n- Is the sill 230 mm?\n'))
 
 

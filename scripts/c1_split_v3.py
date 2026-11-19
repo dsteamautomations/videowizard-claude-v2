@@ -156,6 +156,8 @@ if __name__ == '__main__':
         prompt = d220(prompt, parts)
         from d221_wording_v3 import apply as d221   # design/221 phase 1: progression in seconds, step 6 and step 7 named apart, the font first, questions.md decided by Claude, a verdict on an older brief refused, the operator's answers logged as theirs
         prompt = d221(prompt, parts)
+        from d221b_wording_v3 import apply as d221b   # design/221 after phase 1: the critic's four points, then phase 2 (must and should, not seen, later rounds, the corner note by the server, the label time)
+        prompt = d221b(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

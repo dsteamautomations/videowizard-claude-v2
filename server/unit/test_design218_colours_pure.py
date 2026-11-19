@@ -133,11 +133,12 @@ def test_the_texts_say_claude_chooses_a_missing_neutral_and_the_operator_only_a_
     sys.path.insert(0, str(root / 'scripts'))
     import d218_wording_v3 as W
     import d221_wording_v3 as D221   # design/221: a later script that moves the rule writer's questions and colours to questions.md
+    import d221b_wording_v3 as D221B   # design/221 after phase 1: rules.md holds rules only, said plainly
     later = next(p['text'] for s in json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'
                  for p in s['parts'] if p['name'] == 'later')
     assert later.count(W.COLOUR) == 1 and '`vw motion colour --shot D1,D2' in later
     for file, old, new in W.HELPERS:
         text = (root / 'plugin' / file).read_text(encoding='utf-8')
-        assert text.count(D221.now(file, new)) == 1, file
+        assert text.count(D221B.now(file, D221.now(file, new))) == 1, file
     assert 'Colours to add' in (root / 'plugin' / 'agents' / 'vw-motion-rules.md').read_text(encoding='utf-8')
     assert 'never stop to ask' in (root / 'plugin' / 'skills' / 'motion' / 'SKILL.md').read_text(encoding='utf-8')

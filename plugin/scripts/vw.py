@@ -959,7 +959,8 @@ def cmd_motion(a):
         out = call('GET', f'{base}/motion/brief/{a.shot}')
         (folder / 'project').mkdir(parents=True, exist_ok=True)
         (folder / 'brief.md').write_text(out['brief'], encoding='utf-8')
-        refs = [_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
+        save_json(folder / 'brief-lines.json', out.get('lines') or {})   # design/221 (the critic's A1): the brief the rules are written from, sent with the upload
+        refs =[_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
         emit({'shot_id': a.shot, 'brief': str(folder / 'brief.md'), 'refs': refs, 'project': str(folder / 'project')}, 0,
              f"Brief for {a.shot} written to work/motion/{a.shot}/brief.md with {len(refs)} pictures in refs/: start vw-motion-rules for {a.shot}, then vw-motion-shot.")   # design/134 14
     if a.what == 'upload':
@@ -968,7 +969,8 @@ def cmd_motion(a):
             emit({'action': 'refused', 'message': f'No index.html in {proj}: the project is work/motion/{a.shot}/project/ with index.html at its root.'}, 2)
         rules = folder / 'rules.md'   # design/217 (C6): the server holds the shot's rules with the project; the fact check answers every one of them
         out = write(base + '/motion/upload', {'shot_id': a.shot, 'name': f'{a.shot}.zip', 'content_base64': _b64.b64encode(motion_zip(proj)).decode('ascii'),
-                                              **({'rules': rules.read_text(encoding='utf-8')} if rules.is_file() else {})})
+                                              **({'rules': rules.read_text(encoding='utf-8')} if rules.is_file() else {}),
+                                              **({'brief_lines': load_json(folder / 'brief-lines.json')} if load_json(folder / 'brief-lines.json') else {})})
         if (load_json(last) or {}).get('sha256') != out['sha256']:   # design/134 5: a corrected project's checker sees only its own snapshots
             shutil.rmtree(folder / 'snapshots', ignore_errors=True)
         save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat()})

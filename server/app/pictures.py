@@ -67,7 +67,7 @@ W = {
     'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
     'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
     'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
-    'fact_none': 'Not fact-checked yet.', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
+    'fact_none': 'Not fact-checked yet.', 'fact_stale': 'Fact check: not passed. The brief changed after its rules were written:', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
     'fact_passed_head': 'All {n} rules of the fact check (round {round})', 'fact_saw': 'What the checker saw', 'passed_rule': 'Passed: {rule}',
     'server_pass': "The server's check: passed.", 'server_fail': "The server's check: not passed. {k} lines are still open:", 'server_none': 'Not checked yet.',
     'alike': 'Steps {a} and {b} look almost the same: the change between them is small.',
@@ -516,23 +516,38 @@ def rules_of(text):
     return list(out.values())
 
 
-NOTE_HEAD = re.compile(r'\b(questions?|notes?)\b', re.I)
+NOTE_HEAD = re.compile(r'(questions?|notes?|colou?rs? to add)\b', re.I)   # the critic's A3: at the start of the heading only ("Corner note and labels:" is a heading of rules)
+LIST_LINE = re.compile(r'(\s*)(?:[-*]|\d+[.)])\s+(\S.*)')
 
 
 def notes_in(text):
-    """design/221 row 15: the list lines of a rules text that stand under a heading saying Question(s) or Note(s) (they belong in questions.md)."""
-    out, under = [], False
+    """design/221 row 15: the lines of a rules text that are not rules (they belong in questions.md): the list lines under a heading that starts with
+    Question(s), Note(s) or Colours to add, and a list line that is such a heading itself ("- Questions for the operator:") with the lines indented under it."""
+    out, under, bullet = [], False, None   # bullet: the indent of a list line that heads a list of questions or notes
+    words = lambda raw: re.sub(r'^[\s#*_>-]+|[\s*_:]+$', '', raw)
     for raw in str(text or '').splitlines():
-        if re.match(r'\s*(?:[-*]|\d+[.)])\s+\S', raw):
-            out += [raw.strip()] if under else []
-        elif re.match(r'\s*(?:#+\s|\*\*|__)', raw) or raw.rstrip().endswith(':'):   # a heading: '# …', '**…**' or a line ending in a colon
-            under = bool(NOTE_HEAD.search(raw))
+        m = LIST_LINE.match(raw)
+        if m:
+            indent = len(m.group(1).expandtabs(4))
+            if bullet is not None and indent > bullet:
+                out.append(raw.strip())
+                continue
+            bullet = None
+            if m.group(2).rstrip().rstrip('*_').endswith(':') and NOTE_HEAD.match(words(m.group(2))):
+                out.append(raw.strip())
+                bullet = indent
+            elif under:
+                out.append(raw.strip())
+        elif re.match(r'\s*(?:#+\s|\*\*|__)', raw) or raw.rstrip().rstrip('*_').endswith(':'):   # a heading: '# …', '**…**' or a line ending in a colon
+            bullet, under = None, bool(NOTE_HEAD.match(words(raw)))
     return out
 
 
-def fact_view(session, store, job, shot_id):
+def fact_view(session, store, job, shot_id, brief_now=None):
     """F3, C6: a motion drawing's fact check, from the verdicts of the project it was rendered from (as `select_take` reads them): passed, not
-    passed with its open rules in full, or none yet. N is the number of rules the server holds for the project (else the verdict's)."""
+    passed with its open rules in full, or none yet. N is the number of rules the server holds for the project (else the verdict's).
+    design/221 (the critic's A2): brief_now(shot_id) gives the shot's brief lines now; a project whose brief changed since its rules were written
+    reads as not passed, in the words of the verdict's refusal."""
     try:
         sha = (V.load_json(store, job['request']['request_key']) or {}).get('sha256')
     except Exception:   # the request file cannot be read: no fact check is known
@@ -546,6 +561,10 @@ def fact_view(session, store, job, shot_id):
     open_ = [str(r.get('rule')) for r in rules if r.get('pass') is False]
     redo = max(int(last.get('round') or 1) - 1, 0)
     r = f"{redo} redo round{'' if redo == 1 else 's'}"
+    changed = V.stale_brief(store, None, None, session, sha, shot_id, now=brief_now) if brief_now else []
+    if changed:
+        return _view('fail', W['fact_stale'], W['fact_by'].format(n=n), [V.MOTION_BRIEF_CHANGED.format(shot=shot_id, names=', '.join(f'"{k}"' for k in changed))],
+                     show='all')
     return _view('fail' if open_ else 'pass', W['fact_fail'].format(k=len(open_), n=n, r=r) if open_ else W['fact_pass'].format(n=n, r=r), W['fact_by'].format(n=n), open_,
                  [W['passed_rule'].format(rule=x.get('rule')) for x in rules if x.get('pass') is True], [str(x) for x in last.get('stranger') or []], 'all',
                  W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'])
@@ -730,11 +749,11 @@ def drawing_notes(session, shot_id, plan=None):
     return [n['text'] for n in session.get('drawing_notes') or [] if shot_id in n['shots']]
 
 
-def drawn_line(store, session, plan, job, check, fin, motion_take):
+def drawn_line(store, session, plan, job, check, fin, motion_take, brief_now=None):
     """Kind `drawn` (contract 3.7): the video (its page copy) with the frame sheet one click away, the fact check with every open rule in full,
     select (with the operator's reason when it is held, F3), reject, and "Take the effect away" when it has a finish (no confirmation, D8)."""
     res, shot_id = job.get('result') or {}, job['unit']
-    view = fact_view(session, store, job, shot_id) if motion_take else server_view(check)
+    view = fact_view(session, store, job, shot_id, brief_now) if motion_take else server_view(check)
     w = where(session, plan, shot_id)
     ev = res.get('evidence') or {}
     held = (W['held_fact'] if view['state'] == 'fail' and motion_take else W['held_none'] if view['state'] == 'none' and motion_take else

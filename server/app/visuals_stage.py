@@ -4434,6 +4434,22 @@ def draws_real_thing(plan, shot):
     return shot.get('graphic_kind') == 'diagram' and any(kinds.get(e) in ('object', 'material') for e in shot.get('element_ids') or [])
 
 
+def known_on_things(plan, shot):
+    """design/221 (the critic's A4): an object or material element of the shot carries a proportion, or a size that is not unknown, on its own spec."""
+    els = {e['id']: e for e in plan.get('elements') or []}
+    specs = [(els.get(e) or {}).get('material_spec') or {} for e in shot.get('element_ids') or [] if (els.get(e) or {}).get('kind') in ('object', 'material')]
+    return any(s.get('proportions') or any(d.get('status') != 'unknown' and d.get('value') is not None for d in s.get('dimensions') or []) for s in specs)
+
+
+def _research_fault(label, spec, **kw):
+    """The refusal `researched` would give, or '' (so every spec of one approval is named at once)."""
+    try:
+        researched(label, spec, **kw)
+    except Problem as exc:
+        return exc.message
+    return ''
+
+
 def approve_spec(store, user, run, outputs, shot_id, quote):
     """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval.
     design/106 D4: no words needed; the operator never types sizes, and a correction goes to the assistant instead."""
@@ -4459,7 +4475,7 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
     need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; approve the revised one.')   # review 27 Oct
-    researched(f'shot {shot_id}', spec, real_thing=draws_real_thing(plan, shot))
+    researched(f'shot {shot_id}', spec, real_thing=draws_real_thing(plan, shot) and not known_on_things(plan, shot))
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     (session.get('spec_corrections') or {}).pop(shot_id, None)
     save_session(store, run, session)
@@ -4518,11 +4534,14 @@ def approve_specs(store, user, run, outputs, quote=''):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     quote = said(quote, 'Approved', user)
-    built = False
+    built, faults = False, {}   # design/221 (the critic's A4): every spec that fails is named in one refusal, before anything is saved
     for e in plan.get('elements') or []:   # design/134 6: each material's not-this list, built as the single approval builds it, before anything is approved
         spec = e.get('material_spec')
         if spec and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), spec) and not (session.get('not_this') or {}).get(e['id']):
-            researched(f"material spec of {e['id']}", spec, material=True)
+            fault = _research_fault(f"material spec of {e['id']}", spec, material=True)
+            if fault:
+                faults[fault] = True
+                continue
             try:
                 not_this(store, user, run, outputs, e['id'])
                 built = True
@@ -4536,7 +4555,10 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, sh['id'], spec):   # review 27 Oct: the assistant's turn, not approved over
             waiting_.append(sh['id'])
         elif spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            researched(f"shot {sh['id']}", spec, real_thing=draws_real_thing(plan, sh))   # design/124 C2: refused before anything is saved
+            fault = _research_fault(f"shot {sh['id']}", spec, real_thing=draws_real_thing(plan, sh) and not known_on_things(plan, sh))   # design/124 C2: refused before anything is saved
+            if fault:
+                faults[fault] = True
+                continue
             session.setdefault('spec_approvals', {})[sh['id']] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(sh['id'], None)
             approved.append({'shot_id': sh['id'], 'table': spec_table(spec)})
@@ -4546,10 +4568,14 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, k, spec):
             waiting_.append(k)
         elif spec and not material_approved(session, e):
-            researched(f"material spec of {e['id']}", spec, material=True)
+            fault = _research_fault(f"material spec of {e['id']}", spec, material=True)
+            if fault:
+                faults[fault] = True
+                continue
             session.setdefault('spec_approvals', {})[k] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(k, None)
             approved.append({'shot_id': k, 'element_id': e['id'], 'table': spec_table(spec)})
+    need(not faults, ' '.join(faults))
     save_session(store, run, session)
     return {'approved': approved, 'waiting': waiting_, 'next': (f"{len(approved)} drawing spec{'s' if len(approved) != 1 else ''} approved." if approved else 'No drawing spec was waiting.')
             + (f" {', '.join(waiting_)}: a correction waits for the assistant; approve the revised spec." if waiting_ else '')}
@@ -5620,6 +5646,9 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
             bad = [r['rule'] for r in (checks[-1]['rules'] if checks else []) if r.get('pass') is False]
             need(checks or str(notes or '').strip(), 'This drawing has no fact check of its project yet: run a vw-motion-check helper and `vw motion verdict`, or select it with --notes saying why not.')
             need(not bad or str(notes or '').strip(), f"This drawing is held: the fact check failed: {'; '.join(bad)}. Select it with --notes saying why it is taken anyway, or redo the shot.")
+            changed = stale_brief(store, run, outputs, session, prep.get('sha256'), job['unit'])   # design/221 (the critic's A2): a pass on an older brief is no pass
+            need(not changed or str(notes or '').strip(), MOTION_BRIEF_CHANGED.format(shot=job['unit'], names=', '.join(f'"{k}"' for k in changed))
+                 + ' Or select it with --notes saying why it is taken anyway.')
         context = prep['plan_digest']
     elif prep.get('kind') == 'guide':   # integration step D: a take made from a guide stands on the plan it was shot for; its checks decide what the operator must say
         need(prep.get('plan_digest') == digest(current_plan(store, session)), f"The plan changed since this take was shot; make the shot again from its guide (`vw guide status --shot {job['unit']}`).")
@@ -5823,9 +5852,10 @@ def _finish_view(session, job, result):
     return {'finish': {'effects': carried, 'words': motion.finish_words(carried), 'left_off': result.get('finish_left_off') or '', 'taken_away': off}}
 
 
-def set_motion(store, user, run, outputs, shot_id, name, content, rules_text=''):
+def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='', brief_lines=None):
     """design/130 §4: a drawn shot's HyperFrames project, one zip kept with the run and named by the plan through its sha256; refused with the reasons
-    when it breaks a rule (never checked or rendered)."""
+    when it breaks a rule (never checked or rendered). design/221 (the critic's A1): brief_lines are the lines `vw motion brief` returned when the
+    rules were written (work/motion/<shot>/brief-lines.json); kept as sent, worked out here only when nothing is sent."""
     from . import motion
     _motion_run(run)
     session = session_of(store, run, outputs)
@@ -5842,8 +5872,12 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='')
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
     from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
-    need(not pictures.notes_in(rules_text), NOT_A_RULE)   # design/221 row 15
-    lines = motion_brief(store, run, outputs, shot_id)['lines']   # design/221 S3: the brief the rules were written from, line by line
+    notes = pictures.notes_in(rules_text)
+    need(not notes, NOT_A_RULE.format(lines='; '.join(f'"{n}"' for n in notes[:12])))   # design/221 row 15
+    need(not brief_lines or (isinstance(brief_lines, dict) and len(brief_lines) <= 80 and all(isinstance(k, str) and isinstance(v, str) and len(k) <= 120 and len(v) <= 64
+                                                                                            for k, v in brief_lines.items())),
+         'brief-lines.json is not the brief\'s lines as `vw motion brief` wrote them: run `vw motion brief --shot ' + shot_id + '` again, read the rules again, then upload.')
+    lines = brief_lines or motion_brief(store, run, outputs, shot_id)['lines']   # design/221 S3: the brief the rules were written from, line by line
     sha = hashlib.sha256(content).hexdigest()
     k = f"{run['id']}/visuals/motion/projects/{sha}.zip"
     store.put(k, content, 'application/zip')
@@ -6129,7 +6163,8 @@ MOTION_RULE_OPEN = ('{shot}: the verdict leaves {n} rule(s) of the project witho
 MOTION_RULE_UNKNOWN = ('{shot}: "{rule}" is not a rule of this project (rules.md as it was uploaded): copy each rule\'s words as they are, or upload the project again '
                        'with its rules (`vw motion upload`).')
 MOTION_RULE_WORDS = '{shot}: the failed rule "{rule}" says nothing of what was seen: give `where` (or `fix`) in one plain sentence and send the verdict again.'
-NOT_A_RULE = 'A note or a question is not a rule: move it to questions.md.'   # design/221 row 15
+NOT_A_RULE = ('A note or a question is not a rule: move these lines to questions.md: {lines}. A builder helper does not edit rules.md or questions.md: '
+              'give these lines back to the main assistant, who moves them and uploads again.')   # design/221 row 15; the critic's A3: the lines named, and who acts
 MOTION_BRIEF_CHANGED = ('{shot}: the brief changed after these rules were written, in the line(s): {names}. Read the rules of this drawing again against the new brief '
                         '(`vw motion brief --shot {shot}`), then upload again with the rules (`vw motion upload --shot {shot}`).')   # design/221 S3
 
@@ -6137,6 +6172,19 @@ MOTION_BRIEF_CHANGED = ('{shot}: the brief changed after these rules were writte
 def brief_changed(was, now):
     """design/221 S3: the labels of the brief's lines that differ between the brief the rules were written from and the brief now, in the brief's order."""
     return [k for k in list(now) + [k for k in was if k not in now] if was.get(k) != now.get(k)]
+
+
+def stale_brief(store, run, outputs, session, sha, shot_id, now=None):
+    """design/221 (the critic's A2): the brief lines changed since the rules of this project were written ([] when it kept no brief, or no brief can
+    be made now). `now`: a function giving a shot's current lines, so a caller works each shot's brief out once."""
+    was = ((session.get('motion_projects') or {}).get(sha or '') or {}).get('brief')
+    if not was:
+        return []
+    try:
+        lines = now(shot_id) if now else motion_brief(store, run, outputs, shot_id, session=session)['lines']
+    except (Problem, ValueError):
+        return []
+    return brief_changed(was, lines)
 
 
 def motion_verdict(store, user, run, outputs, body):
@@ -6179,11 +6227,12 @@ def motion_verdict(store, user, run, outputs, body):
                      if names else f"Clean: name {sha[:12]}… in the plan's scene_motion and `vw motion render --shot {shot['id']}`.")}
 
 
-def motion_brief(store, run, outputs, shot_id):
+def motion_brief(store, run, outputs, shot_id, session=None):
     """design/130 §4 step 1: the designer's brief for one drawn shot, built from the plan (the test bench's prompt.txt shape): the length to the frame,
-    the narration with each word's second, what it shows, the palette, the spec, the claims, the labels, the pictures and the rules. Deterministic."""
+    the narration with each word's second, what it shows, the palette, the spec, the claims, the labels, the pictures and the rules. Deterministic.
+    session: the one the caller already read (design/221, the critic's A2), else read here."""
     _motion_run(run)
-    session = session_of(store, run, outputs)
+    session = session or session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: a brief is for a drawn shot.")
     need_motion_style(run)   # design/221 S1: no brief before its facts: the motion style (asked at the treatment), then the font; a film from before passes as it did

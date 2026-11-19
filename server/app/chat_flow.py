@@ -1573,6 +1573,12 @@ def _waiting_items(ctx):
         return []
     from . import motion
     names = _names(plan)
+    briefs = {}   # design/221 (the critic's A2): each drawn shot's brief lines worked out once in this call
+
+    def brief_now(sid):
+        if sid not in briefs:
+            briefs[sid] = V.motion_brief(store, run, outputs, sid, session=session)['lines']
+        return briefs[sid]
     take_rows = V.take_jobs(conn, run)
     rows = V.waiting(session, plan, run.get('code'), take_rows, V._set_budget(run, session, V.visuals_spend(conn, run)))
     frames = _round_frames(ctx)
@@ -1665,7 +1671,7 @@ def _waiting_items(ctx):
             motion_take = (job.get('request') or {}).get('kind') == 'motion'
             drawn = job.get('provider') == 'drawn'
             ev = res.get('evidence') or {}
-            line = P.drawn_line(store, session, plan, job, check, fin, motion_take) if drawn else None
+            line = P.drawn_line(store, session, plan, job, check, fin, motion_take, brief_now) if drawn else None
             if line:   # design/217 (F3): held as select_take holds it: the fact check of the project it was rendered from, no fact check yet, the server's lines, the timing
                 hold, why_hold = bool(line['held']), line['held'].split(':')[0] if line['held'] else ''
                 text = P.chat_text(line)
