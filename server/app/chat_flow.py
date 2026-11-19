@@ -1653,6 +1653,17 @@ def _waiting_items(ctx):
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the parts, in their words.')],
                                text='\n'.join(f"- {p['id']}: {p['title']}" + (f" ({els.get(p['element'], p['element'])})" if p.get('element') else '') for p in up['parts']),
                                show=[{'key': up['picture_key'], 'name': 'shared-parts' + ('.svg' if up['picture_key'].endswith('.svg') else '.png')}]))
+        elif kind == 'still end-frame to approve':   # design/221 row 3: the drawing as it stands at the end of the shot, before the motion: Approve or Reject with the words
+            ids = it.split(',')
+            sts = [session['motion_stills'][sid] for sid in ids]
+
+            def run_(choice, quote, words, ids=ids):
+                return V.still_answer(store, user, run, outputs, ids, choice == 'approve', quote, words)
+            ask = (f"{ids[0]}: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?" if len(ids) == 1 else
+                   f"{', '.join(ids)}: the drawing as it stands at the end of each of these shots, in order, before any motion is added. Are they right?")
+            items.append(_item(f"still-end:{it}:{hashlib.sha256(''.join(st['png'] for st in sts).encode()).hexdigest()[:10]}", 'still end-frame', where, ask, run_,
+                               [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the still, in their words.')],
+                               show=[{'key': st['frame_key'], 'name': f'{sid}-still-end.png'} for sid, st in zip(ids, sts)]))
         elif kind in ('drawing spec to approve', 'material spec to approve'):
             key = V.material_key(group) if kind.startswith('material') else group
             specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once

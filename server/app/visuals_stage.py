@@ -2783,6 +2783,15 @@ def waiting(session, plan, code, take_rows, budget=None):
     up = session.get('motion_parts') or {}
     if up.get('picture_key') and not up.get('rejected') and not parts_ready(session):   # design/221 row 1: one card in the chat, before any drawn shot's items
         add(-1, f"Shared parts · {len(up.get('parts') or [])} parts", 'pictures', 'parts', up['sha256'], 'shared parts to approve')
+    stills = session.get('motion_stills') or {}   # design/221 row 3: a still end-frame with no failed must; the stills of one diagram in one card when ready together
+    pend = {sid for sid, st in stills.items() if sid in shots and st.get('frame_key') and not st.get('rejected') and not still_approved(st)}
+    gap_of = {sh['id']: g_ for g_, sh in _accepted_shots(plan, session)}
+    for sid in sorted(pend, key=lambda s: shots[s]['start_frame']):
+        mine, linked = diagram_shots(plan, session, gap_of[sid], shots[sid])
+        group = sorted({s['id'] for s in mine + linked} | {sid}, key=lambda s: (shots.get(s) or {}).get('start_frame', 0))
+        ids = group if len(group) > 1 and set(group) <= pend else [sid]
+        add(shots[ids[0]]['start_frame'], 'Still end-frames · ' + ', '.join(ids) if len(ids) > 1 else f'Still end-frame · {sid}{title(shots[sid])}', 'takes', ids[0], ','.join(ids),
+            'still end-frame to approve')
     for e in plan.get('elements') or []:   # design/111 F10: approved once, on the References step, on the material's own card
         if e.get('material_spec') and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), e['material_spec']):
             add(-1, f"Material spec to approve · {e['id']}", 'references', e['id'], 'specs', 'material spec to approve')
@@ -5863,10 +5872,65 @@ def _finish_view(session, job, result):
     return {'finish': {'effects': carried, 'words': motion.finish_words(carried), 'left_off': result.get('finish_left_off') or '', 'taken_away': off}}
 
 
-def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='', brief_lines=None):
+STILL_FIRST = ('{shot}: the still end-frame comes first: build the picture as it stands at the end of the shot, with no motion, upload it with '
+               '`vw motion upload --shot {shot} --still`, snapshot its last frame, check it and send the checker\'s verdict; the operator approves it in the chat. '
+               'Then the animated project.')
+STILL_WAIT = "{shot}: the still end-frame waits for the operator's approval in the chat (`vw visuals next`); the animated project comes after it."
+STILL_REJECTED = ('{shot}: the operator rejected the still end-frame: "{words}". Give these words to a `vw-motion-shot` helper to redo the still, then upload it '
+                  'again with --still.')
+STILL_STALE = ("{shot}: its parts changed since the still end-frame was approved: upload the still again (`vw motion upload --shot {shot} --still`), snapshot "
+               "its last frame and send the checker's verdict; the approval stays when the picture is the same.")
+STILL_FRAME = "{shot}: the still's last frame is not taken yet: run `vw motion snapshot --shot {shot} --sha {sha} --at {last:g}`, give it to the checker, then send the verdict."
+
+
+def last_second(shot, fps):
+    """design/221 rows 2 and 3: the second of a shot's last frame."""
+    return round((shot['end_frame'] - shot['start_frame'] - 1) / float(Fraction(str(fps))), 3)
+
+
+def last_frame_key(conn, run, shot_id, sha, last):
+    """design/221 rows 2 and 3: the key of a ready snapshot of this project at its last frame, else ''."""
+    rows = conn.execute("select id, unit, request, result, status from vw2_jobs where run_id=%s and provider='motion' and unit=%s order by created_at", (run['id'], shot_id)).fetchall()
+    snaps = [s_ for j in rows if j.get('unit') == shot_id and j.get('status') == 'ready' and (j.get('request') or {}).get('kind') == 'motion-snapshot'
+             and (j.get('request') or {}).get('sha256') == sha for s_ in (j.get('result') or {}).get('snapshots') or [] if float(s_['at']) >= last - 0.05]
+    return snaps[-1]['key'] if snaps else ''
+
+
+def still_approved(st):
+    """design/221 row 3: the operator approved this picture of the still (an approval stays for the same picture made again)."""
+    return bool(st.get('png')) and (st.get('approved') or {}).get('png') == st['png']
+
+
+def still_stale(store, session, st):
+    """design/221 row 3: the still was checked with parts that are not the approved ones now (its project gets the new parts pasted)."""
+    from . import motion
+    row = (session.get('motion_projects') or {}).get(st.get('sha256') or '')
+    return bool(row) and (st.get('parts') or {}) != (parts_in_force(session, motion.unpack(store.get(row['key']))).get('used') or {})
+
+
+def still_answer(store, user, run, outputs, shot_ids, ok, quote, words=''):
+    """design/221 row 3: the operator's Approve of the still end-frame(s) of one card, or Reject with their words (the still is redone and asked again)."""
+    session = session_of(store, run, outputs)
+    stills = session.get('motion_stills') or {}
+    for sid in shot_ids:
+        need((stills.get(sid) or {}).get('frame_key'), f'{sid} has no still end-frame waiting.')
+    need(ok or str(words or '').strip(), "Say what to change in the still, in the operator's words.")
+    at = datetime.now(timezone.utc).isoformat()
+    for sid in shot_ids:
+        st = stills[sid]
+        st.pop('rejected', None)
+        st['approved' if ok else 'rejected'] = {'png': st['png'], 'quote': quote, 'by': user['id'], 'at': at, **({} if ok else {'words': str(words).strip()})}
+    save_session(store, run, session)
+    names = ', '.join(shot_ids)
+    return {'recorded': True, 'for_the_assistant': f'The still end-frame of {names} is approved: build its motion now without changing what the still shows, and upload it without --still.'
+            if ok else ' '.join(STILL_REJECTED.format(shot=sid, words=str(words).strip()) for sid in shot_ids)}
+
+
+def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='', brief_lines=None, still=False):
     """design/130 §4: a drawn shot's HyperFrames project, one zip kept with the run and named by the plan through its sha256; refused with the reasons
     when it breaks a rule (never checked or rendered). design/221 (the critic's A1): brief_lines are the lines `vw motion brief` returned when the
-    rules were written (work/motion/<shot>/brief-lines.json); kept as sent, worked out here only when nothing is sent."""
+    rules were written (work/motion/<shot>/brief-lines.json); kept as sent, worked out here only when nothing is sent. design/221 row 3: `still`, the
+    picture at the end of the shot with no motion, comes first; the animated project only after the operator approved it."""
     from . import motion
     _motion_run(run)
     session = session_of(store, run, outputs)
@@ -5882,6 +5946,12 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     names = _motion_fonts(store, session, run)[1]
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    if not still:   # design/221 row 3: the still end-frame first, approved by the operator in the chat, checked with the parts in force
+        st = (session.get('motion_stills') or {}).get(shot_id) or {}
+        need(st, STILL_FIRST.format(shot=shot_id))
+        need(not st.get('rejected'), STILL_REJECTED.format(shot=shot_id, words=(st.get('rejected') or {}).get('words')))
+        need(still_approved(st), STILL_WAIT.format(shot=shot_id))
+        need(not still_stale(store, session, st), STILL_STALE.format(shot=shot_id))
     shared = (session.get('motion_parts_approved') or {}).get('parts') or []   # design/221 row 1: a project uses the shared parts of its things, never its own copy
     text = ' '.join(motion._texts(files).values())
     own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
@@ -5902,9 +5972,15 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     store.put(k, content, 'application/zip')
     held = pictures.rules_of(rules_text)
     session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
-                                                      **({'rules': held, 'brief': lines} if held else {})}
-    (session.get('motion_bound') or {}).pop(shot_id, None)   # design/221 (the critic's A1): a later upload is bound only by its own clean verdict
+                                                      **({'rules': held, 'brief': lines} if held else {}), **({'still': True} if still else {})}
+    if not still:
+        (session.get('motion_bound') or {}).pop(shot_id, None)   # design/221 (the critic's A1): a later upload is bound only by its own clean verdict
     save_session(store, run, session)
+    if still:
+        last = last_second(shot, fps)
+        return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000], 'still': True,
+                'next': f"Still stored. Check it (`vw motion check --shot {shot_id} --sha {sha}`), snapshot its last frame (`vw motion snapshot --shot {shot_id} --sha {sha} --at {last:g}`) "
+                        "and give it to a fresh vw-motion-check helper for the must rules a still can show; a verdict with no failed must brings the still to the operator in the chat."}
     effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
             **({'finish': effects, 'finish_note': motion.finish_note(files, effects) or 'The server adds this finish at snapshot and render; the drawing must be complete without it.'} if effects else {}),
@@ -6515,6 +6591,11 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     rules = [{**r, 'rule': str(r['rule'])[m.end():] if (m := pictures.RULE_CLASS.match(str(r['rule']))) else r['rule']} for r in rules]   # row 11: a class copied into the words is not part of them
     held = ((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []
     was = ((session.get('motion_projects') or {}).get(sha) or {}).get('brief')
+    still = bool(((session.get('motion_projects') or {}).get(sha) or {}).get('still'))   # design/221 row 3: a verdict is the still's by its project's mark
+    frame = ''
+    if still and conn is not None:   # the checker judged the still's last frame: the card shows that frame
+        frame = last_frame_key(conn, run, shot['id'], sha, last_second(shot, session['source']['fps']))
+        need(frame, STILL_FRAME.format(shot=shot['id'], sha=sha, last=last_second(shot, session['source']['fps'])))
     if was:   # design/221 S3: no verdict on rules written from an older brief
         changed = brief_changed(was, motion_brief(store, run, outputs, shot['id'], session=session)['lines'])
         need(not changed, MOTION_BRIEF_CHANGED.format(shot=shot['id'], names=', '.join(f'"{k}"' for k in changed)))
@@ -6537,8 +6618,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
         open_before = [e['rule'] for i, e in earlier.items() if later and e.get('pass') is not True and i not in got]
         need(not open_before, MOTION_RULE_FAILED_BEFORE.format(shot=shot['id'], n=len(open_before), rule=str(open_before[0])[:160] if open_before else ''))
         skipped = [h['rule'] for h in held if h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
-        need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
-        rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held]
+        need(not skipped or still, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))   # row 3: a still answers only the musts a still can show
+        rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held
+                 if not still or h['id'] in got or h['id'] in earlier]
         rules += [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in known and i not in got]
     else:
         rules = [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in got] if same else []
@@ -6554,17 +6636,36 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
            'rules': [{k: (str(r.get(k))[:500] if k not in ('pass', 'carried') else r[k]) for k in ('n', 'group', 'rule', 'pass', 'class', 'kind', 'where', 'fix', 'need', 'carried') if k in r}
                      for r in rules][:80],
            **({'label_musts': labels} if labels else {}), 'answered': answered((session.get('motion_projects') or {}).get(sha)),   # the critic's A1: the rules and brief it answered
-           'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+           **({'still': True} if still else {}), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session.setdefault('motion_checks', {}).setdefault(shot['id'], []).append(rec)
     names = [r['rule'] for r in failed] + labels
     bound = session.setdefault('motion_bound', {})   # the critic's A1: the server notes the passed project for its shot; the render follows with no plan change
-    if not names and not blind:
+    if still:   # design/221 row 3: a still is never the shot's drawing; with no failed must it waits for the operator in the chat
+        if not names and not blind:
+            from . import motion
+            try:
+                png = hashlib.sha256(store.get(frame)).hexdigest() if frame else ''
+            except Problem:
+                png = frame
+            was_st = (session.get('motion_stills') or {}).get(shot['id']) or {}
+            st = {'sha256': sha, 'frame_key': frame, 'png': png, 'parts': parts_in_force(session, motion.unpack(store.get(session['motion_projects'][sha]['key']))).get('used') or {},
+                  'at': rec['at']}
+            if png and (was_st.get('approved') or {}).get('png') == png:   # the same picture made again (the parts changed elsewhere): its approval stays
+                st['approved'] = was_st['approved']
+            session.setdefault('motion_stills', {})[shot['id']] = st
+    elif not names and not blind:
         bound[shot['id']] = sha
     elif bound.get(shot['id']) == sha:
         bound.pop(shot['id'])
     save_session(store, run, session)
     n_notes = f"{len(notes)} note{'' if len(notes) == 1 else 's'}"
-    if names:
+    if still and names:
+        nxt = (f"{len(names)} rules failed on the still: give them to a vw-motion-shot helper for {shot['id']} to redo the still (the still's rounds do not count "
+               "against the animation's three).")
+    elif still and not blind:
+        nxt = (f"The still end-frame passed ({n_notes}): the operator approves it in the chat (`vw visuals next`); build the motion only after the approval, "
+               "without changing what the still shows." + (' Its approval stays: the picture is the same as the one approved.' if still_approved(session['motion_stills'][shot['id']]) else ''))
+    elif names:
         nxt = (f"{len(names)} rules failed: give them to a vw-motion-shot helper for {shot['id']} to redo (round {rnd + 1}; after round 3 the drawing is held)"
                + (f", with the {n_notes} to fix in the same redo." if notes else '.') + (f" {len(blind)} rules not seen are answered in the next round." if blind else ''))
     elif blind:
@@ -6635,11 +6736,9 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
             before = guarded(lambda: locate(store, session, prev))[3]
             sha = passed_project(session, before)
             need(sha, f"{shot['id']} continues from {prev}: build and pass {prev} first (a clean fact check), then brief {shot['id']}: this drawing is built on {prev}'s project.")
-            last = round((before['end_frame'] - before['start_frame'] - 1) / f, 3)
-            rows = conn.execute("select id, unit, request, result, status from vw2_jobs where run_id=%s and provider='motion' and unit=%s order by created_at", (run['id'], prev)).fetchall() if conn is not None else []
-            snaps = [s_ for j in rows if j.get('unit') == prev and j.get('status') == 'ready' and (j.get('request') or {}).get('kind') == 'motion-snapshot'
-                     and (j.get('request') or {}).get('sha256') == sha for s_ in (j.get('result') or {}).get('snapshots') or [] if float(s_['at']) >= last - 0.05]
-            continues = {'shot_id': prev, 'sha256': sha, 'project_key': session['motion_projects'][sha]['key'], 'last_frame_key': snaps[-1]['key'] if snaps else '', 'last_second': last}
+            last = last_second(before, fps)
+            continues = {'shot_id': prev, 'sha256': sha, 'project_key': session['motion_projects'][sha]['key'],
+                         'last_frame_key': last_frame_key(conn, run, prev, sha, last) if conn is not None else '', 'last_second': last}
     if spec:
         lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words({**spec, 'label': ''} if note else spec) or 'nothing stated'}"
                    + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]

@@ -1417,6 +1417,7 @@ class MotionUpload(Write):   # design/130
     content_base64: str
     rules: str = Field(default='', max_length=60000)   # design/217 (C6): work/motion/<shot>/rules.md, held by the server per project
     brief_lines: dict[str, str] = Field(default_factory=dict)   # design/221 (the critic's A1): work/motion/<shot>/brief-lines.json, the brief the rules were written from
+    still: bool = False   # design/221 row 3: the still end-frame, before the animated project
 
 
 class ChatAnswer(Write):   # design/188: the operator's answer to the one decision the server handed out
@@ -1510,7 +1511,7 @@ def visuals_motion_note(run_id: UUID, body: MotionNote, user=User, conn=DB):
 def visuals_motion_upload(run_id: UUID, body: MotionUpload, user=User, conn=DB):   # design/130 §4: the shot's HyperFrames project as one zip
     import base64 as b64
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_motion(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64), body.rules,
-                                                                                                         brief_lines=body.brief_lines))
+                                                                                                         brief_lines=body.brief_lines, still=body.still))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/tool', status_code=201)

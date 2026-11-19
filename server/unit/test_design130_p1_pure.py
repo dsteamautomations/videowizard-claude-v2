@@ -150,6 +150,7 @@ def motion_store(approved=True, sh=None):
                    spec_approvals={'MO1': {'digest': VS.spec_digest(SPEC)}} if approved else {})
     sess['source']['gaps']['G1'] = {**sess['source']['gaps']['G1'], 'timing': {'words': [{'text': 'Providing', 'start_frame': 0, 'end_frame': 10}, {'text': 'solid', 'start_frame': 21, 'end_frame': 30}]}}
     sess['references'] = {'comp-1': {**ref('comp-1', 'approved'), 'kind': 'component', 'element_id': 'E1'}, 'ST1': {**ref('ST1', 'approved'), 'kind': 'style', 'element_id': VS.STYLE}}
+    sess['motion_stills'] = {'MO1': {'sha256': 'e' * 64, 'frame_key': 'k', 'png': 'p', 'parts': {}, 'approved': {'png': 'p'}}}   # design/221 row 3: MO1's still end-frame approved, so its motion may be uploaded
     store = store_with(sess, doc)
     store.files['run-1/visuals/references/comp-1.png'] = b'\x89PNGcomp'
     return store

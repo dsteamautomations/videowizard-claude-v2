@@ -275,3 +275,153 @@ def test_the_parts_helper_and_the_texts():
     assert split.index('d221d(prompt, parts)') < split.index('d221e(prompt, parts)')
     retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     assert all(s in retired for s in W.RETIRED)
+
+
+# ---------- row 3: the still end-frame ----------
+
+END = 'run-1/visuals/motion/tools/s1/0.png'
+STILL_FIRST = ("MO1: the still end-frame comes first: build the picture as it stands at the end of the shot, with no motion, upload it with "
+               "`vw motion upload --shot MO1 --still`, snapshot its last frame, check it and send the checker's verdict; the operator approves it in the "
+               "chat. Then the animated project.")
+
+
+def no_still(store):
+    edit_session(store, lambda s: s.pop('motion_stills', None))   # motion_store holds an approved still for MO1, so the older tests upload as before
+    return store
+
+
+def end_jobs(sha, shot='MO1', at=3.96, key=END, snap=True):
+    rows = [{'id': f'c-{sha[:6]}', 'run_id': 'run-1', 'unit': shot, 'provider': 'motion', 'status': 'ready', 'request': {'kind': 'motion-check', 'sha256': sha},
+             'result': {'ok': True, 'warnings': []}}]
+    rows += [{'id': f's-{sha[:6]}', 'run_id': 'run-1', 'unit': shot, 'provider': 'motion', 'status': 'ready', 'request': {'kind': 'motion-snapshot', 'sha256': sha},
+              'result': {'snapshots': [{'at': at, 'key': key}]}}] if snap else []
+    return Jobs(rows)
+
+
+def still_verdict(store, sha, answers, shot='MO1', key=END, png=b'\x89PNGend', at=3.96, rnd=1):
+    store.files[key] = png
+    return g(lambda: VS.motion_verdict(store, USER, NEW, [], {'shot_id': shot, 'sha256': sha, 'round': rnd, 'rules': [answer(r, s) for r, s in answers.items()]},
+                                       conn=end_jobs(sha, shot, at=at, key=key)))
+
+
+def test_the_animated_project_waits_for_its_still_and_a_film_with_one_drawn_graphic_takes_it_too():
+    store = no_still(motion_store())
+    with pytest.raises(Problem) as e:
+        upload(store)
+    assert STILL_FIRST in str(e.value)
+    sha = upload(store, still=True)
+    assert saved(store)['motion_projects'][sha]['still'] is True and chat(store, 'parts') == []
+    out = VS.set_motion(store, USER, NEW, [], 'MO1', 'shot.zip', zipped(project()), RULES, still=True)
+    assert '`vw motion snapshot --shot MO1 --sha ' + sha + ' --at 3.96`' in out['next'] and 'must rules a still can show' in out['next']
+
+
+def test_the_still_is_checked_on_its_must_rules_alone_and_comes_to_the_chat_as_a_card():
+    store = no_still(motion_store())
+    sha = upload(store, still=True)
+    out = still_verdict(store, sha, {SOLID: True})   # the rules about motion and the shoulds are not answered on a still
+    assert out['next'].startswith('The still end-frame passed') and 'build the motion only after the approval' in out['next']
+    s = saved(store)
+    assert 'MO1' not in (s.get('motion_bound') or {}) and s['motion_checks']['MO1'][-1]['still'] is True   # a still is never the shot's drawing
+    assert s['motion_stills']['MO1']['frame_key'] == END
+    assert [w['label'] for w in VS.waiting(s, VS.current_plan(store, s), 'VW-9', []) if w['kind'] == 'still end-frame to approve'] == ['Still end-frame · MO1']
+    item = chat(store, 'still end-frame')[0]
+    assert item['question'] == 'MO1: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?'
+    assert item['show'] == [{'key': END, 'name': 'MO1-still-end.png'}] and [b['label'] for b in item['buttons']] == ['Approve', 'Reject'] and item['buttons'][1]['needs_words']
+
+
+def test_the_still_verdict_needs_the_last_frame_of_the_still():
+    store = no_still(motion_store())
+    sha = upload(store, still=True)
+    for conn in (end_jobs(sha, snap=False), end_jobs(sha, at=1.0)):
+        with pytest.raises(Problem) as e:
+            g(lambda: VS.motion_verdict(store, USER, NEW, [], {'shot_id': 'MO1', 'sha256': sha, 'round': 1, 'rules': [answer(SOLID, True)]}, conn=conn))
+        assert f"MO1: the still's last frame is not taken yet: run `vw motion snapshot --shot MO1 --sha {sha} --at 3.96`, give it to the checker, then send the verdict." in str(e.value)
+
+
+def test_a_failed_must_on_the_still_sends_it_back_and_its_rounds_are_its_own():
+    store = no_still(motion_store())
+    sha = upload(store, still=True)
+    out = still_verdict(store, sha, {SOLID: False})
+    assert out['next'] == ("1 rules failed on the still: give them to a vw-motion-shot helper for MO1 to redo the still (the still's rounds do not count against "
+                           "the animation's three).")
+    assert chat(store, 'still end-frame') == [] and 'motion_stills' not in saved(store)
+
+
+def test_an_approved_still_lets_the_motion_be_uploaded_and_checked_as_before():
+    store = no_still(motion_store())
+    still_verdict(store, upload(store, still=True), {SOLID: True})
+    said = chat(store, 'still end-frame')[0]['_run']('approve', 'Approve', '')
+    assert said['for_the_assistant'] == 'The still end-frame of MO1 is approved: build its motion now without changing what the still shows, and upload it without --still.'
+    assert chat(store, 'still end-frame') == []
+    sha = upload(store, project(**{'style.css': 'body { margin: 0; }'}))
+    out = VS.motion_verdict(store, USER, NEW, [], {'shot_id': 'MO1', 'sha256': sha, 'round': 1, 'rules': [answer(r, True) for r in ALL]})
+    assert out['next'].startswith('Passed') and saved(store)['motion_bound'] == {'MO1': sha}
+
+
+def test_a_rejected_still_is_redone_with_the_words_and_its_card_comes_again():
+    store = no_still(motion_store())
+    still_verdict(store, upload(store, still=True), {SOLID: True})
+    said = chat(store, 'still end-frame')[0]['_run']('reject', 'Reject', 'The slab is missing.')
+    words = ('MO1: the operator rejected the still end-frame: "The slab is missing.". Give these words to a `vw-motion-shot` helper to redo the still, then '
+             'upload it again with --still.')
+    assert said['for_the_assistant'] == words and chat(store, 'still end-frame') == []
+    with pytest.raises(Problem) as e:
+        upload(store)
+    assert words in str(e.value)
+    sha2 = upload(store, project(**{'style.css': 'body { margin: 0; }'}), still=True)
+    still_verdict(store, sha2, {SOLID: True}, key='run-1/visuals/motion/tools/s2/0.png', png=b'\x89PNGend2')
+    assert chat(store, 'still end-frame')[0]['show'] == [{'key': 'run-1/visuals/motion/tools/s2/0.png', 'name': 'MO1-still-end.png'}]
+
+
+def test_the_stills_of_one_diagram_are_one_card_when_ready_together_else_one_each():
+    store = two()
+    entry = lambda n: {'sha256': str(n) * 64, 'frame_key': f'k{n}', 'png': f'p{n}', 'parts': {}}
+    edit_session(store, lambda s: s.update(motion_stills={'MO1': entry(1)}))
+    one = chat(store, 'still end-frame')
+    assert len(one) == 1 and one[0]['show'] == [{'key': 'k1', 'name': 'MO1-still-end.png'}]
+    edit_session(store, lambda s: s.update(motion_stills={'MO2': entry(2), 'MO1': entry(1)}))
+    both = chat(store, 'still end-frame')
+    assert len(both) == 1 and both[0]['question'] == ('MO1, MO2: the drawing as it stands at the end of each of these shots, in order, before any motion is added. '
+                                                     'Are they right?')
+    assert both[0]['show'] == [{'key': 'k1', 'name': 'MO1-still-end.png'}, {'key': 'k2', 'name': 'MO2-still-end.png'}]
+    both[0]['_run']('approve', 'Approve', '')
+    assert chat(store, 'still end-frame') == [] and all(st['approved']['png'] == st['png'] for st in saved(store)['motion_stills'].values())
+
+
+def test_a_parts_change_makes_an_approved_still_stale_and_the_same_picture_keeps_its_approval():
+    store = no_still(two())
+    parts(store)
+    still = upload(store, project(**{'compositions/wall.html': USES}), still=True)
+    still_verdict(store, still, {SOLID: True})
+    chat(store, 'still end-frame')[0]['_run']('approve', 'Approve', '')
+    assert upload(store, project(**{'compositions/wall.html': USES, 'style.css': 'b {}'}))
+    parts(store, PARTS.replace('height="100" fill', 'height="80" fill'))
+    with pytest.raises(Problem) as e:
+        upload(store, project(**{'compositions/wall.html': USES, 'style.css': 'b {}'}))
+    assert ("MO1: its parts changed since the still end-frame was approved: upload the still again (`vw motion upload --shot MO1 --still`), snapshot its last "
+            "frame and send the checker's verdict; the approval stays when the picture is the same.") in str(e.value)
+    assert upload(store, project(**{'compositions/wall.html': USES}), still=True) == still   # the same still, uploaded again with the new parts
+    still_verdict(store, still, {SOLID: True}, key='run-1/visuals/motion/tools/s3/0.png')   # the same picture: no new approval
+    assert chat(store, 'still end-frame') == [] and upload(store, project(**{'compositions/wall.html': USES, 'style.css': 'b {}'}))
+    parts(store, PARTS.replace('height="100" fill', 'height="60" fill'))
+    upload(store, project(**{'compositions/wall.html': USES}), still=True)
+    still_verdict(store, still, {SOLID: True}, key='run-1/visuals/motion/tools/s4/0.png', png=b'\x89PNGshorter')   # the picture changed: asked again
+    assert len(chat(store, 'still end-frame')) == 1
+
+
+def test_the_texts_say_the_still_first_and_the_motion_after():
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    import d221e_wording_v3 as W
+    later = next(p['text'] for p in visuals()['parts'] if p['name'] == 'later')
+    assert '`vw motion upload --shot S --still`' in later and 'only the must rules a still can show' in later and 'the end framing' in later
+    assert 'with no pictures it stops at a still key frame first' not in later and "The still's rounds do not count against the animation's three" in later
+    skill = (ROOT / 'plugin' / 'skills' / 'motion' / 'SKILL.md').read_text(encoding='utf-8')
+    assert '`vw motion upload --shot <shot> --still`' in skill and 'without changing what the still shows' in skill and 'the end framing' in skill
+    assert 'answer "key frame ready"' not in skill
+    check = (ROOT / 'plugin' / 'agents' / 'vw-motion-check.md').read_text(encoding='utf-8')
+    assert 'a rule about motion or timing is not answered on the still' in check
+    vw = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
+    assert "s.add_argument('--still', action='store_true'" in vw and "'still': True" in vw
+    assert 'still: bool = False' in (ROOT / 'server' / 'app' / 'main.py').read_text(encoding='utf-8')
+    retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
+    assert W.RETIRED and all(s in retired for s in W.RETIRED)

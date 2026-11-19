@@ -155,6 +155,9 @@
     "Put `scene_motion: {sha256, labels, cues}` on the shot",
     "propose the revision, then `vw motion render --shot S`",
     "and in \"kind\" that kind in one line",
-    "the main assistant puts that shot's last frame in `refs/continues-from.png`"
+    "the main assistant puts that shot's last frame in `refs/continues-from.png`",
+    "with no pictures it stops at a still key frame first",
+    "first build the key frame as a still (everything in place, nothing moving)",
+    "answer \"key frame ready\" with its sha256, so it is checked before you animate"
   ]
 }

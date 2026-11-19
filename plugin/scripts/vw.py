@@ -1003,10 +1003,11 @@ def cmd_motion(a):
         rules = folder / 'rules.md'   # design/217 (C6): the server holds the shot's rules with the project; the fact check answers every one of them
         out = write(base + '/motion/upload', {'shot_id': a.shot, 'name': f'{a.shot}.zip', 'content_base64': _b64.b64encode(motion_zip(proj)).decode('ascii'),
                                               **({'rules': rules.read_text(encoding='utf-8')} if rules.is_file() else {}),
-                                              **({'brief_lines': load_json(folder / 'brief-lines.json')} if load_json(folder / 'brief-lines.json') else {})})
+                                              **({'brief_lines': load_json(folder / 'brief-lines.json')} if load_json(folder / 'brief-lines.json') else {}),
+                                              **({'still': True} if getattr(a, 'still', False) else {})})   # design/221 row 3: the still end-frame, before the motion
         if (load_json(last) or {}).get('sha256') != out['sha256']:   # design/134 5: a corrected project's checker sees only its own snapshots
             shutil.rmtree(folder / 'snapshots', ignore_errors=True)
-        save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat()})
+        save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat(), **({'still': True} if getattr(a, 'still', False) else {})})   # the checker reads whether it judges a still
         emit(out, 0, out.get('next'))
     if a.what in ('check', 'snapshot'):
         sha = a.sha or (json.loads(last.read_text(encoding='utf-8')).get('sha256') if last.is_file() else '')
@@ -3910,6 +3911,7 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.add_argument('--off', action='store_true', help="finish: take the drawing's finish away (design/186)"); s.add_argument('--on', action='store_true', help='finish: put it back')
+    s.add_argument('--still', action='store_true', help='upload: the still end-frame, the picture at the end of the shot with no motion, approved before the motion (design/221 row 3)')
     s.set_defaults(fn=cmd_motion)
     s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'drawing', 'drawing-approve', 'drawing-reject', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
     for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix'):
