@@ -199,8 +199,8 @@ def test_the_route_gives_the_picture_as_base64_json_and_never_raises(monkeypatch
 
 def test_the_versions():
     from app.config import Settings
-    assert Settings.model_fields['SERVER_VERSION'].default == '0.116.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.100.0'
-    assert json.loads((ROOT / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.100.0'
+    assert Settings.model_fields['SERVER_VERSION'].default == '0.117.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.101.0'   # design/221; design/218: 0.116.0 / 0.100.0
+    assert json.loads((ROOT / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.101.0'
 
 
 @pytest.mark.skipif(not CHROMIUM, reason='Playwright Chromium is not installed on this machine (playwright install chromium)')

@@ -44,4 +44,4 @@ def test_the_helper_answers_every_line_from_the_picture_and_the_plugin_is_0_95_0
         assert said in helper, said
     assert "program's check" not in helper and 'Gemini' not in helper
     assert 'answer every line of every picture' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert json.loads((PLUGIN / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.100.0'   # design/218; design/217: 0.99.0; design/216b: 0.98.0; design/216: 0.97.0; design/215: 0.96.0
+    assert json.loads((PLUGIN / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.101.0'   # design/221; design/218: 0.100.0; design/217: 0.99.0; design/216b: 0.98.0; design/216: 0.97.0; design/215: 0.96.0
