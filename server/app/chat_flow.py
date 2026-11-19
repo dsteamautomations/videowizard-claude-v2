@@ -1567,6 +1567,15 @@ def _round_frames(ctx):
     return {r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'candidate' and r.get('element_id') in things}
 
 
+def _decided(conn, run, user, about, rule, entry, words):
+    """design/221 (A6): the operator's answer on a step-6 card (the shared parts, a still end-frame, a held drawing) is a line of the run's log, as
+    their decision with their words (as the other answers that decide a thing are written)."""
+    if conn is not None:
+        from . import runlog
+        runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': about, 'rule': rule, 'entry': entry,
+                            'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': words, 'request_id': None})
+
+
 def _waiting_items(ctx):
     session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
     if not plan:
@@ -1648,7 +1657,10 @@ def _waiting_items(ctx):
             els = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
 
             def run_(choice, quote, words, sha=up['sha256']):
-                return V.parts_answer(store, user, run, outputs, sha, choice == 'approve', quote, words)
+                out = V.parts_answer(store, user, run, outputs, sha, choice == 'approve', quote, words)
+                _decided(conn, run, user, 'the shared parts', 'design/221 row 1 (the shared parts, approved in the chat)',
+                         'the shared parts approved' if choice == 'approve' else f'the shared parts rejected: "{words}"', words or quote)
+                return out
             items.append(_item(f"parts:{up['sha256'][:10]}", 'parts', where, f"The shared parts of the drawn graphics ({len(up['parts'])}): each is drawn once and every drawing uses it. Are they right?", run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the parts, in their words.')],
                                text='\n'.join(f"- {p['id']}: {p['title']}" + (f" ({els.get(p['element'], p['element'])})" if p.get('element') else '') for p in up['parts']),
@@ -1658,7 +1670,10 @@ def _waiting_items(ctx):
             sts = [session['motion_stills'][sid] for sid in ids]
 
             def run_(choice, quote, words, ids=ids):
-                return V.still_answer(store, user, run, outputs, ids, choice == 'approve', quote, words)
+                out = V.still_answer(store, user, run, outputs, ids, choice == 'approve', quote, words)
+                _decided(conn, run, user, 'shot ' + ', '.join(ids), 'design/221 row 3 (the still end-frame, approved in the chat)',
+                         'the still end-frame approved' if choice == 'approve' else f'the still end-frame rejected: "{words}"', words or quote)
+                return out
             ask = (f"{ids[0]}: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?" if len(ids) == 1 else
                    f"{', '.join(ids)}: the drawing as it stands at the end of each of these shots, in order, before any motion is added. Are they right?")
             items.append(_item(f"still-end:{it}:{hashlib.sha256(''.join(st['png'] for st in sts).encode()).hexdigest()[:10]}", 'still end-frame', where, ask, run_,
@@ -1671,7 +1686,11 @@ def _waiting_items(ctx):
             musts, res = V.held_rules(rec), job.get('result') or {}
 
             def run_(choice, quote, words, job=job, group=group):
-                return V.held_answer(conn, store, user, run, outputs, group, str(job['id']), choice, quote, words)
+                out = V.held_answer(conn, store, user, run, outputs, group, str(job['id']), choice, quote, words)
+                _decided(conn, run, user, f'shot {group}', 'design/221 row 18 (a held drawing, decided in the chat)',
+                         f'the held drawing selected anyway: "{words}"' if choice == 'select' else "one more round, at the operator's word" if choice == 'more'
+                         else 'the held drawing rejected' + (f': "{words}"' if words else ''), words or quote)
+                return out
             buttons = [_button('Select it anyway', 'select', words=True, tell='The drawing is held: ask the operator why it is right for the film all the same.'),
                        _button('Reject it', 'reject')] + ([] if (session.get('motion_more') or {}).get(group) else [_button('One more round', 'more')])
             items.append(_item(f"held:{group}:{str(rec.get('sha256'))[:10]}:{rec.get('round')}", 'held drawing', where,
@@ -2096,7 +2115,8 @@ def next_item(conn, store, user, run, outputs, one=False):
         looks = P.waits_words(session, plan)
         if looks:
             out['then'] = looks + (' ' + out['then'] if out.get('then') else '')
-        due = P.stills_due(P.expected(session, plan, V.take_jobs(conn, run)))   # design/221 row 19: the stills are ordered at the start of step 6
+        six = P.expected(session, plan, V.take_jobs(conn, run))
+        due = ' '.join(x for x in (P.drawn_due(six), P.stills_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
     return out

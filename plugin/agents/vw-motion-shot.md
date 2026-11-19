@@ -12,4 +12,4 @@ Work only in `work/motion/<shot>/` inside the run folder: read `rules.md` (the r
 
 If you were given a list of failed rules from a fact check (the musts, and the shoulds as notes to fix in the same go), change only what those rules name, keep everything else as it is, upload, check and snapshot again, and add a "Fixes" section to `REVIEW.md` saying what each rule asked and what you changed.
 
-Finish with a short answer: the sha256 of your last upload, whether `vw motion check` was clean, and the weakest point. The main assistant names your upload in the plan and renders it.
+Finish with a short answer: the sha256 of your last upload, whether `vw motion check` was clean, and the weakest point. You never name your upload in the plan: the server binds the project that passes its fact check; the main assistant renders it.

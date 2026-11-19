@@ -6185,7 +6185,8 @@ def _motion_request(store, session, run, shot_id, sha=None):
          f"(`vw motion verdict --shot {shot['id']}`); the render takes the project that passed.")
     fps, W, H = _film_frame(session)
     words = ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words')
-    cues = sm.get('cues') if sha == own else []   # the plan's labels and cues count for the plan's project, or the bound one
+    plans = sha == own or not sm.get('sha256')   # the plan's labels and cues count for the plan's project, the bound one, or any project while the plan names none (the critic's point 2)
+    cues = sm.get('cues') if plans else []
     seconds = guarded(lambda: drawn.cue_seconds({'actions': cues or []}, shot, words, fps))
     images = {}
     files = motion.unpack(store.get(row['key']))
@@ -6197,7 +6198,7 @@ def _motion_request(store, session, run, shot_id, sha=None):
     spec = shot.get('drawing_spec')
     frames = shot['end_frame'] - shot['start_frame']
     exact = Fraction(frames) / Fraction(str(fps))
-    labels = sm.get('labels') or [] if sha == own else []
+    labels = sm.get('labels') or [] if plans else []
     finish = motion.finish_in_force(motion.finish_of(files)[0], off=bool((session.get('motion_finish_off') or {}).get(shot['id'])))   # design/186: only when there is one, so an older shot's request is unchanged
     note = corner_note(spec)   # design/221 row 9: from the spec, so a project not yet named in the plan gets it too
     note_fonts = list(dict.fromkeys(list(film_font_files(run)) + ([Path(session['font']['name']).name] if session.get('font') else []) + ['NotoSans-Variable.ttf']))
@@ -6260,7 +6261,9 @@ def render_motion(conn, store, user, run, outputs, body):
         save_session(store, run, session)
         return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this project (nothing changed): it is on the Pictures and drawn graphics step (`vw visuals page`).'}
     row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
-                        (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact}))).fetchone()
+                        (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact,
+                                                       'sha256': request['sha256'], 'plan_digest': request['plan_digest'],   # design/221 (the critic's points 3, 4): the step-6 count reads
+                                                       'parts': (request.get('parts') or {}).get('used') or {}}))).fetchone()   # which project it rendered and whether it went stale
     save_session(store, run, session)
     return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames, **({'finish': request['finish'], 'tell_the_operator': motion.finish_words(request['finish'])} if request.get('finish') else {}),
             'next': f'Rendering {frames} frames on the server: HyperFrames checks the project and the timing, renders, and the drawing and its sheet come to the Pictures and drawn graphics step '
@@ -6608,6 +6611,9 @@ def held_answer(conn, store, user, run, outputs, shot_id, job_id, choice, quote,
 def passed_project(session, shot):
     """design/221 row 2: the sha of the shot's project that passed its fact check (the bound one, else the plan's with a clean verdict), else ''."""
     sha = (session.get('motion_bound') or {}).get(shot['id']) or ((shot.get('scene_motion') or {}).get('sha256') or '')
+    took = (session.get('motion_held') or {}).get(shot['id']) or {}
+    if sha and ((took.get('answer') == 'select' and took.get('sha256') == sha) or shot['id'] in (session.get('selections') or {})):
+        return sha   # design/221 (the critic's point 1, phases 3-4): a held drawing the operator selected anyway, or a selected shot, is passed for the drawing after it
     rounds = motion_rounds(session, shot['id'], sha) if sha else []
     return sha if rounds and not open_rules(rounds[-1]) else ''
 MOTION_RULE_NEED = ('{shot}: the rule "{rule}" is not seen: say in `need` the frame or crop that would show it (a snapshot at 2.4 s, a crop of the joint) '
@@ -6811,6 +6817,9 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
               ('Length', f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\"."),
               ('Narration', f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\""),
               ('Each word\'s start', f"Each word's start, seconds from the shot's start: {timed}."),
+              ('Cues', 'Cues from the plan (each part has this id and starts to move at its word or second): '   # design/221 (the critic's point 2): the builder sees the cues the render checks
+               + '; '.join(f"{c.get('selector')} at " + (f"{float(c['at_s']):g} s" if c.get('at_s') is not None else f"the word \"{c.get('word')}\"") for c in sm.get('cues') or []) + '.'
+               if sm.get('cues') else ''),
               ('Progression', piece('Progression', shot.get('information_progression'))),
               ('Look at', 'Look at these before you draw (in refs/): ' + '; '.join(f"{els.get(e, {}).get('name') or e}: " + ', '.join(f'refs/{rid}.png ({_shows(r)})' for rid, r in rs)
                                                                          for e, rs in look.items()) + '.' if look else ''),   # design/221 row 5: each thing's footage picture and approved pictures, opened first
@@ -7242,7 +7251,7 @@ def status(conn, store, run, outputs, repair=True):
             for r in session['references'].values()]
     take_rows = take_jobs(conn, run)
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
-    step6 = ' '.join(x for x in (pictures.status_line(six), pictures.stills_due(six)) if x)
+    step6 = ' '.join(x for x in (pictures.status_line(six), pictures.drawn_due(six), pictures.stills_due(six)) if x)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3

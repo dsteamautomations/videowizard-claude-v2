@@ -89,4 +89,4 @@ A finish is a layer of effects the **server** adds on top of your drawing at sna
 4. `vw motion snapshot --shot <shot> --at <t1,t2,…>`: PNGs saved to `snapshots/`, always the same set: the first frame, each cue, the middle of each move, the last frame, and a close-up of each labelled part (`--crop`). Look at every one as a stranger would: does it read as what it is, is every label whole and spelled as the brief says, does anything collide or leave the frame?
 5. Fix, upload, check, snapshot again until clean. Then write `work/motion/<shot>/REVIEW.md`: what you built, what you checked, the weakest point, the warnings you kept and why, and the sha256 of the last upload.
 
-You never render the delivery and never edit the plan: the main assistant names your upload in the plan and renders it.
+You never render the delivery and never edit the plan: the server binds the project that passes its fact check; the main assistant renders it.

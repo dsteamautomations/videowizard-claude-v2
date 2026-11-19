@@ -160,6 +160,8 @@
     "first build the key frame as a still (everything in place, nothing moving)",
     "answer \"key frame ready\" with its sha256, so it is checked before you animate",
     "as they become ready; a failed line is shown with its words",
-    "then show the operator the open musts"
+    "then show the operator the open musts",
+    "The main assistant names your upload in the plan and renders it.",
+    "the main assistant names your upload in the plan and renders it."
   ]
 }

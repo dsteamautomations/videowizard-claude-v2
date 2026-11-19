@@ -84,7 +84,7 @@ def check(rnd, failed=(), sha='a' * 64, still=False):
     (lambda s: s.update(motion_checks={'MO1': [check(1)]}), [], 'being made'),   # its render comes next
     (lambda s: None, [drawn_job(status='queued')], 'being made'),
     (lambda s: None, [drawn_job()], 'made and checked'),   # only once its render is ready
-    (lambda s: None, [drawn_job(status='failed')], 'could not be made'),
+    (lambda s: None, [drawn_job(status='failed')], 'being redone'),   # design/221 (the critic's point 3): one failed render is asked again; twice on one project: test_design221_p5
     (lambda s: s.update(motion_checks={'MO1': [check(3, [SOLID])]}), [], 'held (needs a decision)'),
     (lambda s: s.update(motion_checks={'MO1': [check(3, [SOLID])]}, motion_held={'MO1': {'sha256': 'a' * 64, 'round': 3, 'answer': 'reject'}}), [], 'being redone'),
     (lambda s: s.update(motion_checks={'MO1': [check(3, [SOLID])]}, motion_more={'MO1': True}), [], 'being redone'),   # one more round: round 4 comes

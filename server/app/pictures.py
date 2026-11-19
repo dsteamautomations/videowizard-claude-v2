@@ -92,6 +92,12 @@ W = {
                    '--kind keyframe --prompt "…"`); they need nothing from the drawings.'),
     'stills_due_one': ('1 still shot has no picture asked for yet ({ids}): order it now, beside the drawn graphics (`vw visuals image --shot S --element E '
                        '--kind keyframe --prompt "…"`); it needs nothing from the drawings.'),
+    # design/221 (the critic's points 3, 4): a failed or stale render, said in the next step
+    'render_failed': '{shot}: its render failed ({error}): render it again (`vw motion render --shot {shot}`).',
+    'render_failed_twice': ('{shot}: its render failed twice on the same project ({error}): fix that fault in the project with a `vw-motion-shot` helper, '
+                            'upload it, check it and render it again (`vw motion render --shot {shot}`).'),
+    'render_stale_one': '1 drawn graphic must be rendered again (the plan or the shared parts changed): `vw motion render --shot {shot}`.',
+    'render_stale': '{n} drawn graphics must be rendered again (the plan or the shared parts changed): `vw motion render --shot S` for each ({ids}).',
     'later_step': 'Made from a step that was corrected.',
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
@@ -821,8 +827,9 @@ def chat_text(line):
 # ---------- design/221 phase 4: what step 6 must make, and each thing's state ----------
 
 STATE = {'none': 'not started', 'making': 'being made', 'checking': 'being checked by Claude', 'redo': 'being redone', 'done': 'made and checked',
-         'held': 'held (needs a decision)', 'answered': 'answered', 'failed': 'could not be made'}
-ORDER = ('done', 'answered', 'checking', 'making', 'redo', 'held', 'failed', 'none')   # the order of the counts in the line
+         'held': 'held (needs a decision)', 'answered': 'answered', 'failed': 'could not be made',
+         'stale': 'must be rendered again (the plan or the shared parts changed)'}   # design/221 (the critic's point 4)
+ORDER = ('done', 'answered', 'checking', 'making', 'stale', 'redo', 'held', 'failed', 'none')   # the order of the counts in the line
 GROUPS = (('drawn', 'Drawn graphics'), ('still', 'Stills'), ('steps', 'Graphics in steps'), ('component', 'Components'))
 COMPLETE = (STATE['done'], STATE['answered'], STATE['failed'])   # a thing that could not be made never keeps the page closed
 KIND_WORDS = {'drawn': 'kind_drawn', 'still': 'kind_still', 'steps': 'kind_steps', 'component': 'kind_component'}
@@ -854,27 +861,66 @@ def _component_state(rs):
     return 'redo' if look and (look.get('not_checked') or _failed_lines(live[-1])) else 'checking'   # a failed one is made again by the assistant
 
 
-def _drawn_state(session, sh, take_rows):
-    """(state, the render job shown) of a drawn shot, from what the server knows: the render jobs, the held verdict, the verdicts, the uploads,
-    the still end-frame. 'made and checked' only once its render is ready."""
+def _ts(v):
+    """A time from the database (datetime) or the session (ISO text), else None."""
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(str(v))
+    except (TypeError, ValueError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def _stale(session, plan, job):
+    """design/221 (the critic's point 4): a render made on another plan, or with shared parts that are not the approved ones now; a render row from
+    before 0.117.0 names neither and is read as before. ponytail: compares the parts the render placed; a part the project starts to place only
+    because a new upload added its id is caught by select_take."""
+    req = job.get('request') or {}
+    if req.get('plan_digest') and req['plan_digest'] != V.digest(plan):
+        return True
+    now = {p['id']: p.get('digest') for p in (session.get('motion_parts_approved') or {}).get('parts') or []}
+    return any(now.get(pid) != dg for pid, dg in (req.get('parts') or {}).items())
+
+
+def _failed_render(session, sid, rows, last):
+    """design/221 (the critic's point 3): a failed render is redone while it can be asked again or anything newer of the shot exists (a project,
+    a verdict, a still); it could not be made when the same project's render failed twice and nothing newer exists. (state, the next step)."""
+    at = _ts(last.get('created_at'))
+    seen = [p.get('at') for p in (session.get('motion_projects') or {}).values() if p.get('shot_id') == sid] \
+        + [c.get('at') for c in (session.get('motion_checks') or {}).get(sid) or []] + [((session.get('motion_stills') or {}).get(sid) or {}).get('at')]
+    if at and any(t and t > at for t in map(_ts, seen)):
+        return 'redo', ''
+    mark = lambda j: (j.get('request') or {}).get('sha256') or (j.get('request') or {}).get('preparation_id')
+    err = str(last.get('error') or 'no reason given')[:300]
+    if mark(last) and sum(1 for j in rows if j['status'] == 'failed' and mark(j) == mark(last)) >= 2:
+        return 'failed', W['render_failed_twice'].format(shot=sid, error=err)
+    return 'redo', W['render_failed'].format(shot=sid, error=err)
+
+
+def _drawn_state(session, sh, take_rows, plan=None):
+    """(state, the render job shown, the next step) of a drawn shot, from what the server knows: the render jobs, the held verdict, the verdicts,
+    the uploads, the still end-frame. 'made and checked' only once its render is ready and not stale."""
     sid = sh['id']
-    last = next((j for j in reversed(take_rows or []) if j.get('provider') == 'drawn' and j.get('unit') == sid
-                 and ((session.get('reviews') or {}).get(str(j['id'])) or [{}])[-1].get('decision') != 'rejected'), None)
+    rows = [j for j in take_rows or [] if j.get('provider') == 'drawn' and j.get('unit') == sid
+            and ((session.get('reviews') or {}).get(str(j['id'])) or [{}])[-1].get('decision') != 'rejected']
+    last = rows[-1] if rows else None
     if V.held_drawing(session, sid):
-        return 'held', last
+        return 'held', last, ''
     if last and last['status'] == 'ready':
-        return 'done', last
+        return ('stale', None, '') if plan and _stale(session, plan, last) else ('done', last, '')
     if last and last['status'] in ('queued', 'running', 'storage_pending'):
-        return 'making', None
+        return 'making', None, ''
     if last:
-        return 'failed', None   # the render failed: another render is the assistant's
+        state, due = _failed_render(session, sid, rows, last)
+        return state, None, due
     checks = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still')]
     if checks:
-        return ('redo' if V.held_rules(checks[-1]) else 'checking' if V.open_rules(checks[-1]) else 'making'), None   # clean: its render comes next
+        return ('redo' if V.held_rules(checks[-1]) else 'checking' if V.open_rules(checks[-1]) else 'making'), None, ''   # clean: its render comes next
     if any(p.get('shot_id') == sid and not p.get('still') for p in (session.get('motion_projects') or {}).values()):
-        return 'checking', None
+        return 'checking', None, ''
     started = (session.get('motion_stills') or {}).get(sid) or (session.get('motion_checks') or {}).get(sid) or any(p.get('shot_id') == sid for p in (session.get('motion_projects') or {}).values())
-    return ('making' if started else 'none'), None
+    return ('making' if started else 'none'), None, ''
 
 
 def expected(session, plan, take_rows, now=None):
@@ -885,15 +931,15 @@ def expected(session, plan, take_rows, now=None):
         kind = {'still': 'still', 'graphic_sequence': 'steps', 'drawn': 'drawn'}.get(V.route_of(sh))
         if not kind:
             continue
-        sid, job = sh['id'], None
+        sid, job, due = sh['id'], None, ''
         if sid in (session.get('selections') or {}) or sid in (session.get('assets') or {}):
             state = 'answered'
         elif kind == 'drawn':
-            state, job = _drawn_state(session, sh, take_rows)
+            state, job, due = _drawn_state(session, sh, take_rows, plan)
         else:
             mine = [r for r in refs if r.get('kind') == ('keyframe' if kind == 'still' else 'state') and V.made_for(session, r) == sid and not r.get('set')]
             state = _pictures_state(session, plan, mine, now, len(sh.get('states') or []) if kind == 'steps' else 1)
-        out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {})})
+        out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {})})
     names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
     by = {}
     for r in refs:
@@ -925,6 +971,13 @@ def stills_due(items):
     """design/221 row 19: the still shots with no picture asked for yet, said in the tool's next-step line until each is ordered."""
     ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none']]
     return (W['stills_due_one'] if len(ids) == 1 else W['stills_due']).format(n=len(ids), ids=', '.join(ids)) if ids else ''
+
+
+def drawn_due(items):
+    """design/221 (the critic's points 3, 4): what the assistant does next for the drawn graphics whose render went stale or failed."""
+    stale = [i['id'] for i in items if i['kind'] == 'drawn' and i['state'] == STATE['stale']]
+    out = [W['render_stale_one'].format(shot=stale[0]) if len(stale) == 1 else W['render_stale'].format(n=len(stale), ids=', '.join(stale))] if stale else []
+    return ' '.join(out + [i['due'] for i in items if i['kind'] == 'drawn' and i.get('due')])
 
 
 def coming(items):

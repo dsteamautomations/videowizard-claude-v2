@@ -960,7 +960,7 @@ def _pictures_page(ctx, base, lines, six):
     if lines is None:
         count = P.status_line(six)
         return {**base, 'step': P.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': P.W['page_later'],
-                'then': ' '.join(x for x in (count, P.W['page_later']) if x), 'how': PICTURES_CLOSED}
+                'then': ' '.join(x for x in (count, P.drawn_due(six), P.W['page_later']) if x), 'how': PICTURES_CLOSED}   # design/221: a failed or stale render is said
     rows = P.coming(six)
     refused = ctx['session'].get('page_refused') or {}
     lines = [{'line': f'l{n:02d}', **l, **({'refused': refused[l['key']]} if l['key'] in refused else {})} for n, l in enumerate(lines, 1)]
