@@ -5643,7 +5643,9 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
         need(not failed or str(notes or '').strip(), f"This drawing is held: {', '.join(failed)} still failed after the server's passes. Select it with --notes saying why it is taken anyway, or reject it with what to change.")
         if prep.get('kind') == 'motion':   # design/130 §4 step 6: a motion drawing is selected after a clean fact check of the project it was rendered from
             checks = [c for c in (session.get('motion_checks') or {}).get(job['unit']) or [] if c.get('sha256') == prep.get('sha256')]
-            bad = [r['rule'] for r in (checks[-1]['rules'] if checks else []) if r.get('pass') is False]
+            last = checks[-1] if checks else {}   # design/221 rows 11, 12, 17: a failed must, a rule not seen yet, a short label of this shot only; a failed should is a note
+            bad = ([r['rule'] for r in last.get('rules') or [] if (r.get('pass') is False and r.get('class') != 'should') or r.get('pass') == NOT_SEEN]
+                   + list(last.get('label_musts') or []))
             need(checks or str(notes or '').strip(), 'This drawing has no fact check of its project yet: run a vw-motion-check helper and `vw motion verdict`, or select it with --notes saying why not.')
             need(not bad or str(notes or '').strip(), f"This drawing is held: the fact check failed: {'; '.join(bad)}. Select it with --notes saying why it is taken anyway, or redo the shot.")
             changed = stale_brief(store, run, outputs, session, prep.get('sha256'), job['unit'])   # design/221 (the critic's A2): a pass on an older brief is no pass
@@ -5892,6 +5894,26 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
                     f"on {shot_id} in the plan, then `vw motion render --shot {shot_id}`."}
 
 
+NOTE_DARK, NOTE_LIGHT = '#2B2B2B', '#F2EFE8'   # design/221 row 9: charcoal on a light ground, off-white on a dark one
+GROUND_WORDS = re.compile(r'\b(back)?ground\b|\bpaper\b|\bcanvas\b|\bpage\b|\bbackdrop\b', re.I)
+
+
+def corner_note(spec):
+    """design/221 row 9: the words the server draws in the corner: the label of a spec that carries "not to scale" (illustrative), else ''."""
+    return str((spec or {}).get('label') or '').strip() if (spec or {}).get('illustrative') else ''
+
+
+def note_colour(plan, run):
+    """design/221 row 9: the corner note's colour on the film's ground: the colour the plan's palette, then the film record's colours, names for the
+    ground (background, paper, canvas, page); charcoal on a light ground, off-white on a dark one; no ground named: a light ground is taken."""
+    for text in (str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''), str(film.colours(run) or '')):
+        for m in re.finditer(r'([^,;#]*?)\s*(#[0-9A-Fa-f]{6})\b', text):
+            if GROUND_WORDS.search(m.group(1)):
+                r, g_, b = (int(m.group(2)[i:i + 2], 16) / 255 for i in (1, 3, 5))
+                return NOTE_DARK if 0.2126 * r + 0.7152 * g_ + 0.0722 * b >= 0.5 else NOTE_LIGHT
+    return NOTE_DARK
+
+
 def _motion_request(store, session, run, shot_id, sha=None):
     """The request a check, snapshot or render reads: the project, the server's files, the film's frame, the plan's labels and cues as a timing sidecar."""
     from . import drawn, motion
@@ -5918,8 +5940,11 @@ def _motion_request(store, session, run, shot_id, sha=None):
     exact = Fraction(frames) / Fraction(str(fps))
     labels = sm.get('labels') or [] if sha == sm.get('sha256') else []
     finish = motion.finish_in_force(motion.finish_of(files)[0], off=bool((session.get('motion_finish_off') or {}).get(shot['id'])))   # design/186: only when there is one, so an older shot's request is unchanged
+    note = corner_note(spec)   # design/221 row 9: from the spec, so a project not yet named in the plan gets it too
+    note_fonts = list(dict.fromkeys(list(film_font_files(run)) + ([Path(session['font']['name']).name] if session.get('font') else []) + ['NotoSans-Variable.ttf']))
     return shot, spec, files, {
         **({'finish': finish} if finish else {}),
+        **({'note': {'text': note, 'fonts': note_fonts, 'colour': note_colour(plan, run)}} if note else {}),
         'kind': 'motion', 'shot_id': shot['id'], 'sha256': sha, 'project_key': row['key'], 'width': W, 'height': H, 'fps': str(fps), 'frames': frames,
         'images': images, 'fonts': fonts, 'labels': labels, 'sidecar': motion.sidecar(seconds, [c['selector'] for c in cues or []]),
         'plan_digest': digest(plan), 'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
@@ -5945,7 +5970,7 @@ def motion_tool(conn, store, user, run, outputs, body):
     key_ = key(run, f"motion/tools/{digest({**request, 'n': uuid.uuid4().hex})}.json")
     save_json(store, key_, request)
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'motion',%s, gen_random_uuid()) returning id",
-                       (run['id'], body['shot_id'], Jsonb({'kind': request['kind'], 'request_key': key_, 'shot_id': body['shot_id']}))).fetchone()
+                       (run['id'], body['shot_id'], Jsonb({'kind': request['kind'], 'request_key': key_, 'shot_id': body['shot_id'], 'sha256': request['sha256']}))).fetchone()   # design/221 row 17: the project it checked
     return {'job_id': str(row['id']), 'request_key': key_, 'next': f'{op} queued: `vw motion status --job {row["id"]}` shows the findings' + (' and saves the PNGs.' if op == 'snapshot' else '.')}
 
 
@@ -5960,7 +5985,7 @@ def render_motion(conn, store, user, run, outputs, body):
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
              f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the sizes, materials and graphic specs on the page (`vw visuals page`), before the drawing is rendered.")
-    missing = motion.missing_labels(files, request['labels'])
+    missing = motion.missing_labels(files, [l for l in request['labels'] if _flat(l) != _flat(corner_note(spec))])   # design/221 row 9: the server draws the note
     need(not missing, '; '.join(f'the project does not show the label "{l}" word for word' for l in missing) + ': fix the text in the project or the label in the plan.')
     lost = motion.missing_selectors(files, [c['selector'] for c in (shot.get('scene_motion') or {}).get('cues') or []])
     need(not lost, f"the plan's cues name {', '.join(lost)}, which the project does not have (an element id).")
@@ -6187,44 +6212,144 @@ def stale_brief(store, run, outputs, session, sha, shot_id, now=None):
     return brief_changed(was, lines)
 
 
-def motion_verdict(store, user, run, outputs, body):
+def _flat(text):
+    return ' '.join(str(text or '').split()).lower()
+
+
+def diagram_shots(plan, session, gap, shot):
+    """design/221 rows 12 and 17: the drawn shots of the same diagram, from the plan: (the gap's drawn shots in order, this one included; the drawn
+    shots linked to this one by return_of, either way)."""
+    pick = lambda g_: [s for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots']]
+    mine = [s for s in pick(gap) if s.get('visual_type') == 'drawn']
+    linked = [s for g_ in plan['gaps'] for s in pick(g_) if s.get('visual_type') == 'drawn' and s['id'] != shot['id']
+              and (s['id'] == shot.get('return_of') or s.get('return_of') == shot['id'])]
+    return mine, linked
+
+
+def continues_from(plan, session, gap, shot):
+    """design/221 row 12: the drawn shot this one continues: the previous drawn shot of its gap, else the drawn shot it returns to; '' for none."""
+    mine, linked = diagram_shots(plan, session, gap, shot)
+    before = [s for s in mine if s['start_frame'] < shot['start_frame']]
+    if before:
+        return max(before, key=lambda s: s['start_frame'])['id']
+    return next((s['id'] for s in linked if s['id'] == shot.get('return_of')), '')
+
+
+LABEL_MUST = '{message}. It is a label of this shot only, so this is a must: keep it on screen at least its floor, then upload and check again.'   # design/221 row 17
+
+
+def short_labels(report, own, shared):
+    """design/221 row 17 (SK's revised ruling): the HyperFrames check's `line_unread` warnings (each starts with the label's own words in quotes) for a
+    label among this shot's labels and not among a neighbouring shot's of the same diagram, as plain sentences; a label shared with a neighbour is not counted."""
+    out = []
+    for w in (report or {}).get('warnings') or []:
+        m = re.match(r'\s*"([^"]+)"', str(w.get('message') or '')) if w.get('code') == 'line_unread' else None
+        said = _flat(m.group(1)) if m else ''
+        if said and any(said in _flat(l) for l in own) and not any(said in _flat(l) for l in shared):
+            out.append(LABEL_MUST.format(message=str(w['message']).strip().rstrip('.')))
+    return out
+
+
+def own_short_labels(plan, session, gap, shot, report):
+    """design/221 row 17: short_labels with this shot's plan labels against the labels of the other drawn shots of the same diagram."""
+    mine, linked = diagram_shots(plan, session, gap, shot)
+    labels = lambda s: (s.get('scene_motion') or {}).get('labels') or []
+    return short_labels(report, labels(shot), [l for s in mine + linked if s['id'] != shot['id'] for l in labels(s)])
+
+
+def label_musts(conn, store, session, run, plan, gap, shot, sha):
+    """design/221 row 17: the musts of the latest HyperFrames check of this project (a check job names its project since design/221)."""
+    rows = conn.execute("select id, unit, request, result, status from vw2_jobs where run_id=%s and provider='motion' and unit=%s order by created_at", (run['id'], shot['id'])).fetchall()
+    checks = [j for j in rows if j.get('unit') == shot['id'] and j.get('status') == 'ready' and (j.get('request') or {}).get('kind') == 'motion-check'
+              and (j.get('request') or {}).get('sha256') == sha]
+    return own_short_labels(plan, session, gap, shot, checks[-1].get('result')) if checks else []
+
+
+NOT_SEEN = 'not seen'   # design/221 row 12: the third answer to a rule: the checker could not judge it from its frames
+MOTION_RULE_NEED = ('{shot}: the rule "{rule}" is not seen: say in `need` the frame or crop that would show it (a snapshot at 2.4 s, a crop of the joint) '
+                    'and send the verdict again.')
+MOTION_RULE_FAILED_BEFORE = ('{shot}: in round 2 or 3 a verdict may leave out a rule that passed before, but every rule that failed before is answered: '
+                             '{n} left out, first: "{rule}". Add it and send the verdict again.')   # design/221 row 13
+
+
+def _rule_class(r):
+    """design/221 rows 11 and 13: a held rule's class (none: a must); a rule the checker adds itself (group "seen") is a should unless it says must
+    and names its kind in one line (a wrong count, a wrong fact, a part that reads as something else, a label that cannot be read)."""
+    if r.get('group') == 'seen' and not r.get('held'):
+        return 'must' if str(r.get('class') or '').lower() == 'must' and str(r.get('kind') or '').strip() else 'should'
+    return 'should' if str(r.get('class') or '').lower() == 'should' else 'must'
+
+
+def motion_verdict(store, user, run, outputs, body, conn=None):
     """design/130 §4 step 5: a fresh checker's verdict on one uploaded project of a shot, kept per shot by round; the failed rules go back to a builder
-    helper, at most two redo rounds; select holds a drawing whose project has no clean verdict."""
+    helper, at most two redo rounds; select holds a drawing whose project has no clean verdict. design/221 phase 2: only a failed must sends it back
+    (failed shoulds are notes); a rule "not seen" waits for its frames, answered by the same checker in the same round; in a later round a rule that
+    passed before may be left out (it keeps its pass); with `conn`, a label of this shot only that the latest check finds too short is a must."""
+    from . import pictures
     _motion_run(run)
     session = session_of(store, run, outputs)
-    shot = guarded(lambda: locate(store, session, body.get('shot_id') or ''))[3]
+    plan, gap, _scene, shot = guarded(lambda: locate(store, session, body.get('shot_id') or ''))
     sha = body.get('sha256') or ''
     need(sha in (session.get('motion_projects') or {}), f"{shot['id']}: {sha[:12]}… is no uploaded project of this film.")
     rules = body.get('rules') or []
-    need(rules and all(isinstance(r, dict) and isinstance(r.get('pass'), bool) and str(r.get('rule') or '').strip() for r in rules),
-         'The verdict lists the rules checked; every rule has pass true or false and its words (`rule`).')
+    need(rules and all(isinstance(r, dict) and (r.get('pass') is True or r.get('pass') is False or r.get('pass') == NOT_SEEN) and str(r.get('rule') or '').strip() for r in rules),
+         'The verdict lists the rules checked; every rule has pass true or false (or "not seen", with the frame it needs in `need`) and its words (`rule`).')
+    rules = [{**r, 'rule': str(r['rule'])[m.end():] if (m := pictures.RULE_CLASS.match(str(r['rule']))) else r['rule']} for r in rules]   # row 11: a class copied into the words is not part of them
     held = ((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []
     was = ((session.get('motion_projects') or {}).get(sha) or {}).get('brief')
     if was:   # design/221 S3: no verdict on rules written from an older brief
-        changed = brief_changed(was, motion_brief(store, run, outputs, shot['id'])['lines'])
+        changed = brief_changed(was, motion_brief(store, run, outputs, shot['id'], session=session)['lines'])
         need(not changed, MOTION_BRIEF_CHANGED.format(shot=shot['id'], names=', '.join(f'"{k}"' for k in changed)))
+    mute = [r['rule'] for r in rules if r['pass'] is False and not str(r.get('where') or r.get('fix') or r.get('seen') or '').strip()]
+    need(not mute, MOTION_RULE_WORDS.format(shot=shot['id'], rule=str(mute[0])[:160] if mute else ''))
+    blind = [r['rule'] for r in rules if r['pass'] == NOT_SEEN and not str(r.get('need') or '').strip()]
+    need(not blind, MOTION_RULE_NEED.format(shot=shot['id'], rule=str(blind[0])[:160] if blind else ''))
+    rnd = int(body.get('round') or 1)
+    prev = ((session.get('motion_checks') or {}).get(shot['id']) or [None])[-1]
+    same = (bool(prev) and prev.get('sha256') == sha and int(prev.get('round') or 1) == rnd
+            and any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []))   # row 12: the frames a "not seen" asked for, answered in the same round
+    later = bool(prev) and not same and rnd >= 2 and rnd > int(prev.get('round') or 1)   # row 13: round 2 or 3 answers what failed and what the fix touched
+    earlier = {pictures.rule_id(r.get('rule')): r for r in (prev or {}).get('rules') or []} if same or later else {}
+    got = {pictures.rule_id(r.get('rule')): r for r in rules}
     if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)
-        from . import pictures
         known = {h['id']: h for h in held}
-        got = {pictures.rule_id(r.get('rule')): r for r in rules}
-        unknown = [r['rule'] for i, r in got.items() if i not in known and r.get('group') != 'seen']   # a fault the checker adds of its own is a new rule, group "seen"
+        unknown = [r['rule'] for i, r in got.items() if i not in known and i not in earlier and r.get('group') != 'seen']   # a fault the checker adds of its own is a new rule, group "seen"
         need(not unknown, MOTION_RULE_UNKNOWN.format(shot=shot['id'], rule=str(unknown[0])[:160] if unknown else ''))
-        skipped = [h['rule'] for h in held if h['id'] not in got]
+        open_before = [e['rule'] for i, e in earlier.items() if later and e.get('pass') is not True and i not in got]
+        need(not open_before, MOTION_RULE_FAILED_BEFORE.format(shot=shot['id'], n=len(open_before), rule=str(open_before[0])[:160] if open_before else ''))
+        skipped = [h['rule'] for h in held if h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
         need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
-        mute = [r['rule'] for r in rules if r['pass'] is False and not str(r.get('where') or r.get('fix') or r.get('seen') or '').strip()]
-        need(not mute, MOTION_RULE_WORDS.format(shot=shot['id'], rule=str(mute[0])[:160] if mute else ''))
-        rules = [got[h['id']] for h in held] + [r for i, r in got.items() if i not in known]
-    failed = [r for r in rules if r['pass'] is False]
-    rec = {'sha256': sha, 'round': int(body.get('round') or 1), 'stranger': [str(x)[:500] for x in body.get('stranger') or []][:20],
-           'rules': [{k: (str(r.get(k))[:500] if k != 'pass' else r[k]) for k in ('n', 'group', 'rule', 'pass', 'where', 'fix') if k in r} for r in rules][:80],
-           'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+        rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held]
+        rules += [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in known and i not in got]
+    else:
+        rules = [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in got] if same else []
+    rules += [{**r, 'class': earlier[i]['class']} if i in earlier and earlier[i].get('class') else {**r, 'class': _rule_class(r)}
+              for i, r in got.items() if not held or i not in {h['id'] for h in held}]
+    labels = label_musts(conn, store, session, run, plan, gap, shot, sha) if conn is not None else []   # row 17
+    failed = [r for r in rules if r['pass'] is False and r['class'] == 'must']
+    notes = [r['rule'] for r in rules if r['pass'] is False and r['class'] == 'should']
+    blind = [{'rule': r['rule'], 'need': str(r.get('need') or '')} for r in rules if r['pass'] == NOT_SEEN]
+    rec = {'sha256': sha, 'round': rnd, 'stranger': [str(x)[:500] for x in body.get('stranger') or []][:20] or list((prev or {}).get('stranger') or []) * same,
+           'rules': [{k: (str(r.get(k))[:500] if k not in ('pass', 'carried') else r[k]) for k in ('n', 'group', 'rule', 'pass', 'class', 'kind', 'where', 'fix', 'need', 'carried') if k in r}
+                     for r in rules][:80],
+           **({'label_musts': labels} if labels else {}), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session.setdefault('motion_checks', {}).setdefault(shot['id'], []).append(rec)
     save_session(store, run, session)
-    names = [r['rule'] for r in failed]
-    return {'shot_id': shot['id'], 'round': rec['round'], 'failed': names,
-            'log': f"round {rec['round']}: {len(names)} of {len(rules)} rules failed" + (': ' + '; '.join(f'"{n}"' for n in names) if names else ''),   # design/221 row 22: the log line says what failed
-            'next': (f"{len(names)} rules failed: give them to a vw-motion-shot helper for {shot['id']} to redo (round {rec['round'] + 1}; after round 3 the drawing is held)."
-                     if names else f"Clean: name {sha[:12]}… in the plan's scene_motion and `vw motion render --shot {shot['id']}`.")}
+    names = [r['rule'] for r in failed] + labels
+    n_notes = f"{len(notes)} note{'' if len(notes) == 1 else 's'}"
+    if names:
+        nxt = (f"{len(names)} rules failed: give them to a vw-motion-shot helper for {shot['id']} to redo (round {rnd + 1}; after round 3 the drawing is held)"
+               + (f", with the {n_notes} to fix in the same redo." if notes else '.') + (f" {len(blind)} rules not seen are answered in the next round." if blind else ''))
+    elif blind:
+        nxt = (f"{len(blind)} rules not seen: take these frames (`vw motion snapshot --shot {shot['id']} --at … --crop …`) and give them to the same checker for these rules "
+               f"only, then send its verdict with the same round ({rnd}); nothing is rebuilt: " + '; '.join(f"\"{b['rule']}\": {b['need']}" for b in blind))
+    else:
+        nxt = (f"Passed, {n_notes}: name {sha[:12]}… in the plan's scene_motion and `vw motion render --shot {shot['id']}`."
+               + (' The notes are shown with the drawing: ' + '; '.join(f'"{n}"' for n in notes) + '.' if notes else ''))
+    return {'shot_id': shot['id'], 'round': rnd, 'failed': names, 'notes': notes, 'not_seen': blind,
+            'log': f"round {rnd}: {len(names)} of {len(rules)} rules failed" + (': ' + '; '.join(f'"{n}"' for n in names) if names else '')   # design/221 row 22: the log line says what failed
+                   + (f'; {n_notes}' if notes else '') + (f'; {len(blind)} not seen' if blind else ''),
+            'next': nxt}
 
 
 def motion_brief(store, run, outputs, shot_id, session=None):
@@ -6260,14 +6385,20 @@ def motion_brief(store, run, outputs, shot_id, session=None):
              ('Claims', f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."),
              ('Framing', said_(piece('Framing', shot.get('framing')), piece('Appearance', shot.get('appearance') or (plan.get('foundation') or {}).get('appearance')))),
              ('Confirmed for the things in this shot', f"Confirmed for the things in this shot: {'; '.join(known)}" if known else '')]
+    note = corner_note(spec)   # design/221 row 9: drawn by the server, so it is neither the spec's label nor a text on screen here
+    prev = continues_from(plan, session, gap, shot)   # design/221 row 12
     if spec:
-        lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words(spec) or 'nothing stated'}" + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
-    lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in sm.get('labels') or []) or 'name them in the plan (scene_motion.labels) and use them exactly'}."),
+        lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words({**spec, 'label': ''} if note else spec) or 'nothing stated'}"
+                   + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
+    shown = [l for l in sm.get('labels') or [] if _flat(l) != _flat(note)]
+    lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in shown) or 'name them in the plan (scene_motion.labels) and use them exactly'}."),
+              ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame. Do not draw it, and keep that corner free.' if note else ''),
               ('Length', f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\"."),
               ('Narration', f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\""),
               ('Each word\'s start', f"Each word's start, seconds from the shot's start: {timed}."),
               ('Progression', piece('Progression', shot.get('information_progression'))),
               ('Pictures', 'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.'),
+              ('Continues from', f"Continues from {prev}: you are given {prev}'s last frame; this drawing starts where it ends." if prev else ''),
               ('Palette', palette_line(plan, session)),   # design/218: the plan's palette and the colours added since, the same for every drawing
               ('Fonts', f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
                + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "
@@ -6315,6 +6446,14 @@ def motion_job(conn, store, run, job_id):
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('motion', 'drawn')", (job_id, run['id'])).fetchone()
     need(job, f'{job_id} is no motion job of this film.')
     res = dict(job.get('result') or {})
+    if (job.get('request') or {}).get('kind') == 'motion-check' and job['status'] == 'ready':   # design/221 row 17: the check's answer says which short label is a must
+        try:
+            session = session_of(store, run, None)
+            plan, gap, _scene, shot = locate(store, session, job['unit'])
+            musts = own_short_labels(plan, session, gap, shot, res)
+        except (Problem, ValueError):
+            musts = []
+        res.update({'label_musts': musts} if musts else {})
     if res.get('snapshots'):
         res['snapshots'] = [{'at': s['at'], 'png_base64': base64.b64encode(store.get(s['key'])).decode(),
                              'crops': [{'box': c['box'], 'png_base64': base64.b64encode(store.get(c['key'])).decode()} for c in s.get('crops') or []]} for s in res['snapshots']]

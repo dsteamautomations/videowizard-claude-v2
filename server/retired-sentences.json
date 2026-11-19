@@ -134,6 +134,10 @@
     "when the brief leaves a fact open, show the operator rules.md and ask them to tick, strike or add, once",
     "list it at the end under \"Questions for the operator\"",
     "Leave out what the server checks itself and no still frame can show",
-    "every label word for word and that no other text appears"
+    "every label word for word and that no other text appears",
+    "Snapshot each shot at its beats with crops of the parts its rules name",
+    "Failed rules go to a new `vw-motion-shot` helper with only those rules; at most two redo rounds, then show the operator the open rules.",
+    "A rule you cannot judge from these frames fails",
+    "PNGs of the moments that matter (each build step, each label landing, the end)"
   ]
 }

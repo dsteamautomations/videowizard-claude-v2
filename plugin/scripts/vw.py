@@ -1007,6 +1007,7 @@ def cmd_motion(a):
             errs = res.get('errors') or []
             line = (f"Check clean ({len(res.get('warnings') or [])} warnings) for {sha[:12]}." if out.get('status') == 'ready' and not errs
                     else f"Check found {len(errs)} errors (work/motion/{a.shot}/check.json): fix each, upload, check again." if out.get('status') == 'ready' else f"Check failed: {out.get('error')}")
+            line += ''.join(' ' + m for m in res.get('label_musts') or [])   # design/221 row 17: a label of this shot only, on screen too short, is a must
         emit({'job_id': job['job_id'], 'sha256': sha, 'status': out.get('status'), 'error': out.get('error'), **res}, 0 if out.get('status') == 'ready' else 2, line)
     if a.what == 'verdict':   # design/130 §4 step 5: the fact checker's check-<round>.json, kept with the run
         p = (ws / a.file) if a.file and (ws / a.file).is_file() else Path(a.file or '')

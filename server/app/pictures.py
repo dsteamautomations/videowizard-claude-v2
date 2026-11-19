@@ -67,7 +67,8 @@ W = {
     'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
     'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
     'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
-    'fact_none': 'Not fact-checked yet.', 'fact_stale': 'Fact check: not passed. The brief changed after its rules were written:', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
+    'fact_none': 'Not fact-checked yet.', 'fact_stale': 'Fact check: not passed. The brief changed after its rules were written:',
+    'fact_pass_notes': 'Fact check: passed, {k}. Every must rule held, after {r}; a note is a should rule that did not hold.', 'not_seen': 'Not seen yet ({need}): {rule}', 'fact_by': 'A Claude checker that never saw the build judged {n} rules on snapshots of the video.',
     'fact_passed_head': 'All {n} rules of the fact check (round {round})', 'fact_saw': 'What the checker saw', 'passed_rule': 'Passed: {rule}',
     'server_pass': "The server's check: passed.", 'server_fail': "The server's check: not passed. {k} lines are still open:", 'server_none': 'Not checked yet.',
     'alike': 'Steps {a} and {b} look almost the same: the change between them is small.',
@@ -505,14 +506,19 @@ def rule_id(text):
     return hashlib.sha1(' '.join(str(text or '').split()).lower().encode('utf-8')).hexdigest()[:8]
 
 
+RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*:\s*[*_]*\s*', re.I)
+
+
 def rules_of(text):
-    """C6: the rules of a drawing (`work/motion/<shot>/rules.md`) as the server keeps them: every list line, numbered or bulleted, with its id."""
+    """C6: the rules of a drawing (`work/motion/<shot>/rules.md`) as the server keeps them: every list line, numbered or bulleted, with its id.
+    design/221 row 11: a rule starts with `must:` or `should:`; the class is kept beside the rule, never in its words or its id; no class is a must."""
     out = {}
     for raw in str(text or '').splitlines():
         m = re.match(r'\s*(?:[-*]|\d+[.)])\s+(.*\S)', raw)
         if m:
-            words = ' '.join(m.group(1).split())
-            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words})
+            c = RULE_CLASS.match(m.group(1))
+            words = ' '.join(m.group(1)[c.end() if c else 0:].split())
+            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must'})
     return list(out.values())
 
 
@@ -558,16 +564,21 @@ def fact_view(session, store, job, shot_id, brief_now=None):
     last = rounds[-1]
     rules = last.get('rules') or []
     n = len(((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []) or len(rules)
-    open_ = [str(r.get('rule')) for r in rules if r.get('pass') is False]
+    open_ = ([str(r.get('rule')) for r in rules if r.get('pass') is False and r.get('class') != 'should']   # design/221 row 11: a failed must; no class is a must
+             + [W['not_seen'].format(need=r.get('need'), rule=r.get('rule')) for r in rules if r.get('pass') == V.NOT_SEEN] + [str(x) for x in last.get('label_musts') or []])   # rows 12, 17
+    notes = [str(r.get('rule')) for r in rules if r.get('pass') is False and r.get('class') == 'should']
     redo = max(int(last.get('round') or 1) - 1, 0)
     r = f"{redo} redo round{'' if redo == 1 else 's'}"
     changed = V.stale_brief(store, None, None, session, sha, shot_id, now=brief_now) if brief_now else []
     if changed:
         return _view('fail', W['fact_stale'], W['fact_by'].format(n=n), [V.MOTION_BRIEF_CHANGED.format(shot=shot_id, names=', '.join(f'"{k}"' for k in changed))],
                      show='all')
-    return _view('fail' if open_ else 'pass', W['fact_fail'].format(k=len(open_), n=n, r=r) if open_ else W['fact_pass'].format(n=n, r=r), W['fact_by'].format(n=n), open_,
+    head = (W['fact_fail'].format(k=len(open_), n=n, r=r) if open_ else
+            W['fact_pass_notes'].format(k=f"{len(notes)} note{'' if len(notes) == 1 else 's'}", r=r) if notes else W['fact_pass'].format(n=n, r=r))
+    view = _view('fail' if open_ else 'pass', head, W['fact_by'].format(n=n), open_,
                  [W['passed_rule'].format(rule=x.get('rule')) for x in rules if x.get('pass') is True], [str(x) for x in last.get('stranger') or []], 'all',
                  W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'])
+    return {**view, 'notes': notes} if notes else view   # design/221 row 11: the notes, as data for the page (its layout is a later phase)
 
 
 def server_view(check):

@@ -753,8 +753,10 @@ def process_drawn(job):
         return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
 
 
-def _motion_folder(store, request, folder, finish=None):
-    """design/130: the project unpacked into the job's spool folder with GSAP, the fonts, the approved pictures and the timing sidecar beside it."""
+def _motion_folder(store, request, folder, finish=None, note=True):
+    """design/130: the project unpacked into the job's spool folder with GSAP, the fonts, the approved pictures and the timing sidecar beside it.
+    design/221 row 9: the corner note is the server's own layer, written every time (not tied to the finish, so it stays when the finish is left off);
+    note=False only for HyperFrames' check, which judges the helper's drawing alone."""
     from . import drawn, motion
     fonts = {n: ((drawn.FONTS / n).read_bytes() if k in (None, 'server') else store.get(k)) for n, k in (request.get('fonts') or {'NotoSans-Variable.ttf': None}).items()}   # design/139 R13: 'server', a file under server/fonts
     refs = {rid: store.get(k) for rid, k in (request.get('images') or {}).items()}
@@ -762,6 +764,8 @@ def _motion_folder(store, request, folder, finish=None):
         shutil.rmtree(folder)
     out = motion.prepare(folder, motion.unpack(store.get(request['project_key'])), gsap=motion.gsap_bytes(), fonts=fonts, refs=refs, sidecar=request.get('sidecar') or {'assertions': []})
     motion.apply_finish(out, finish, int(request.get('width') or 1920), int(request.get('height') or 1080))   # design/186: the server's layer, never the helper's code
+    if note:
+        motion.apply_note(out, request.get('note'), int(request.get('width') or 1920), int(request.get('height') or 1080))
     return out
 
 
@@ -799,7 +803,7 @@ def process_motion(job):
     store = storage()
     try:
         request = json.loads(store.get(req['request_key']).decode('utf-8'))
-        project = _motion_folder(store, request, SPOOL / jid / 'project')
+        project = _motion_folder(store, request, SPOOL / jid / 'project', note=False)
         report = motion.check(project)
         if report.get('errors'):
             lines = '; '.join(f"{e['code']}: {e['message']}" + (f" (fix: {e['fix']})" if e.get('fix') else '') for e in report['errors'][:4])
@@ -840,9 +844,9 @@ def process_motion_tool(job):
     request = {}
     try:
         request = json.loads(store.get(req['request_key']).decode('utf-8'))
+        if request['kind'] == 'motion-check':   # design/221 row 9: the check judges the helper's drawing without the server's note
+            return 'ready', motion.check(_motion_folder(store, request, SPOOL / jid / 'project', note=False)), None, {'provider': 'motion', 'inr': 0}, None
         project = _motion_folder(store, request, SPOOL / jid / 'project')
-        if request['kind'] == 'motion-check':
-            return 'ready', motion.check(project), None, {'provider': 'motion', 'inr': 0}, None
         shots, out_dir = [], SPOOL / jid / 'snapshots'
         out_dir.mkdir(parents=True, exist_ok=True)
         if request.get('finish'):   # design/186: the helper and the fact checker look at the frames as the film will show them; a finish that cannot be drawn is left off here too

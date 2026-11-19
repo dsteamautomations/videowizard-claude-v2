@@ -21,7 +21,7 @@ The server places these at check and render; refer to them, never create them:
 - A note on the view or a colour the brief lists as added is below the spec: the spec wins where they differ.
 - The root's `data-duration`, `data-fps`, `data-width`, `data-height` are exactly the brief's. The length is to the frame.
 - A part another drawing shows from another direction or at another scale is the same part: draw it as this drawing's spec and view say, and make the change of view readable (the view visibly turns or cuts; a label such as "section" only where the brief lists it); never a part that morphs into another shape.
-- Every text on screen is one of the brief's labels, word for word, and nothing else. Put each label in an element with a stable `id`.
+- Every text on screen is one of the brief's labels, word for word, and nothing else. Put each label in an element with a stable `id`. The corner note the brief names is drawn by the server in the lower right corner: never draw it, and keep that corner free.
 - What appears when follows the narration: an element named by a word appears at that word's second (the brief lists each word's start). The plan's cues (`#id` at a word) are checked by the server against the render.
 - The claims and the drawing spec are facts: draw the parts, sizes, relationships and proportions as the spec says, and only those. A real object is drawn as it is built (a wall shows its bond; an opening has a lintel); when unsure, draw less, never something false.
 - Colours are the brief's palette, with the colours it lists as added for every drawing. A thing the palette gives no colour: choose a neutral (a grey, an off-white or a near-black) that keeps it apart from what touches it and name it in `REVIEW.md` under "Colours added" (the thing, #RRGGBB, its words, one reason); never stop to ask. A real hue is the operator's: name it in `REVIEW.md` as a question.
@@ -56,10 +56,10 @@ A finish is a layer of effects the **server** adds on top of your drawing at sna
 
 ## The loop
 
-1. Read `brief.md` and `rules.md`, look at `refs/`, read the two references. With no pictures in `refs/`, first build the key frame as a still (everything in place, nothing moving), upload and snapshot it, and stop: answer "key frame ready" with its sha256, so it is checked before you animate.
+1. Read `brief.md` and `rules.md`, look at `refs/`, read the two references. When the brief says "Continues from <shot>", the main assistant puts that shot's last frame in `refs/continues-from.png`: start your drawing where it ends. With no pictures in `refs/`, first build the key frame as a still (everything in place, nothing moving), upload and snapshot it, and stop: answer "key frame ready" with its sha256, so it is checked before you animate.
 2. Write the project. Then `vw motion upload --shot <shot>` (it zips `project/` and checks the rules; a refusal names each rule broken: fix and upload again).
 3. `vw motion check --shot <shot>`: HyperFrames' own check on the server (lint, layout, contrast, timing). Fix every error; weigh every warning.
-4. `vw motion snapshot --shot <shot> --at <t1,t2,…>`: PNGs of the moments that matter (each build step, each label landing, the end) saved to `snapshots/`. Look at every one as a stranger would: does it read as what it is, is every label whole and spelled as the brief says, does anything collide or leave the frame?
+4. `vw motion snapshot --shot <shot> --at <t1,t2,…>`: PNGs saved to `snapshots/`, always the same set: the first frame, each cue, the middle of each move, the last frame, and a close-up of each labelled part (`--crop`). Look at every one as a stranger would: does it read as what it is, is every label whole and spelled as the brief says, does anything collide or leave the frame?
 5. Fix, upload, check, snapshot again until clean. Then write `work/motion/<shot>/REVIEW.md`: what you built, what you checked, the weakest point, the warnings you kept and why, and the sha256 of the last upload.
 
 You never render the delivery and never edit the plan: the main assistant names your upload in the plan and renders it.

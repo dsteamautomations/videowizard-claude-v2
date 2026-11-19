@@ -1473,7 +1473,7 @@ class SubjectRule(Write):   # design/130 §4 step 8
 
 @app.post('/api/runs/{run_id}/visuals/motion/verdict')
 def visuals_motion_verdict(run_id: UUID, body: MotionVerdict, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.motion_verdict(storage(), user, run, outputs, body_dict(body)))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.motion_verdict(storage(), user, run, outputs, body_dict(body), conn=conn))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/rule')

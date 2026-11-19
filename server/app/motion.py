@@ -160,6 +160,32 @@ def apply_finish(folder, effects, width=1920, height=1080):
     index.write_text(text[:at] + layer + text[at:] if at >= 0 else text + '\n' + layer, encoding='utf-8')
 
 
+NOTE_SIZE = 0.022   # design/221 row 9: one size for the film, about 2.2 % of the frame height
+NOTE_INSET = 0.05   # lower right, inside the inner 90 % of the frame
+
+
+def apply_note(folder, note, width=1920, height=1080):
+    """design/221 row 9: the corner note ("Illustrative, not to scale") written by the server into the prepared project's index.html as its own layer,
+    above the drawing and the finish: the film's fonts by @font-face from assets/fonts, lower right inside the inner 90 %, one size, the given colour.
+    No note: nothing is written. The helper never draws it."""
+    if not note or not str(note.get('text') or '').strip():
+        return
+    index = Path(folder) / 'index.html'
+    text = index.read_text(encoding='utf-8')
+    if 'id="vw-note"' in text:
+        return
+    fonts = [f for f in note.get('fonts') or [] if re.fullmatch(r'[\w .-]+', str(f))]
+    faces = ' '.join(f'@font-face {{ font-family: "vw-note-{i}"; src: url("assets/fonts/{f}"); }}' for i, f in enumerate(fonts))
+    families = ','.join([f"'vw-note-{i}'" for i in range(len(fonts))] + ['sans-serif'])
+    colour = note['colour'] if re.fullmatch(r'#[0-9A-Fa-f]{6}', str(note.get('colour') or '')) else '#2B2B2B'
+    W, H = int(width), int(height)
+    layer = (f'<style>{faces}</style>\n<div id="vw-note" style="position:absolute;left:0;top:0;width:{W}px;height:{H}px;pointer-events:none;overflow:hidden">'
+             f'<div style="position:absolute;right:{round(W * NOTE_INSET)}px;bottom:{round(H * NOTE_INSET)}px;font-family:{families};font-size:{round(H * NOTE_SIZE)}px;'
+             f'line-height:1.2;color:{colour};white-space:nowrap">{html_lib.escape(str(note["text"]).strip())}</div></div>\n')
+    at = text.rfind('</body>')
+    index.write_text(text[:at] + layer + text[at:] if at >= 0 else text + '\n' + layer, encoding='utf-8')
+
+
 def _fraction(v):
     from fractions import Fraction
     return Fraction(str(v))
