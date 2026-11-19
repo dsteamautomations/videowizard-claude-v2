@@ -6667,6 +6667,8 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     need(not mute, MOTION_RULE_WORDS.format(shot=shot['id'], rule=str(mute[0])[:160] if mute else ''))
     blind = [r['rule'] for r in rules if r['pass'] == NOT_SEEN and not str(r.get('need') or '').strip()]
     need(not blind, MOTION_RULE_NEED.format(shot=shot['id'], rule=str(blind[0])[:160] if blind else ''))
+    if still:   # hotfix (VW-24, 19 Nov 2026): a still shows no motion, so a rule answered "not seen" on a still is a rule left out, not a frame to fetch:
+        rules = [r for r in rules if r['pass'] != NOT_SEEN]   # it never holds the still and never becomes "not seen twice"
     rnd = int(body.get('round') or 1)
     top = HELD_ROUNDS + bool((session.get('motion_more') or {}).get(shot['id']))   # design/221 row 18: round 4 only after "One more round"
     need(still or rnd <= top, HELD_LIMIT.format(shot=shot['id'], rnd=rnd, top=top))
@@ -6675,6 +6677,8 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
             and any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []))   # row 12: the frames a "not seen" asked for, answered in the same round
     later = bool(prev) and not same and rnd >= 2 and rnd > int(prev.get('round') or 1)   # row 13: round 2 or 3 answers what failed and what the fix touched
     earlier = {pictures.rule_id(r.get('rule')): r for r in (prev or {}).get('rules') or []} if same or later else {}
+    if still:   # the same for what an earlier verdict of the still recorded as not seen, or as failed for being not seen twice
+        earlier = {i: e for i, e in earlier.items() if e.get('pass') != NOT_SEEN and not str(e.get('where') or '').startswith('not seen twice')}
     got = {i: ({**r, 'pass': False, 'twice': True, 'where': f"not seen twice in round {rnd} ({r.get('need')})"} if same and r['pass'] == NOT_SEEN and earlier.get(i, {}).get('pass') == NOT_SEEN else r)
            for i, r in ((pictures.rule_id(r.get('rule')), r) for r in rules)}   # design/221 (the critic's A4): not seen twice in a round is a failed must
     if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)

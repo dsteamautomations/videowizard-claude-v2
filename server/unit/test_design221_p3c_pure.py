@@ -341,6 +341,24 @@ def test_the_still_is_checked_on_its_must_rules_alone_and_comes_to_the_chat_as_a
     assert item['show'] == [{'key': END, 'name': 'MO1-still-end.png'}] and [b['label'] for b in item['buttons']] == ['Approve', 'Reject'] and item['buttons'][1]['needs_words']
 
 
+def test_hotfix_a_rule_a_still_cannot_show_answered_not_seen_does_not_hold_the_still():
+    store = no_still(motion_store())
+    sha = upload(store, still=True)
+    out = still_verdict(store, sha, {SOLID: True, LEAVES: 'not seen'})   # a checker answers a rule about motion "not seen" on the still
+    assert out['next'].startswith('The still end-frame passed')
+    assert chat(store, 'still end-frame')   # the card comes; no frame is asked for and nothing is "not seen twice"
+
+
+def test_hotfix_a_still_held_as_not_seen_twice_passes_when_it_is_judged_again():
+    store = no_still(motion_store())
+    sha = upload(store, still=True)
+    edit_session(store, lambda s: s.setdefault('motion_checks', {}).setdefault('MO1', []).append(
+        {'sha256': sha, 'round': 1, 'still': True, 'rules': [{'rule': SOLID, 'pass': True, 'class': 'must'},
+                                                             {'rule': LEAVES, 'pass': False, 'class': 'must', 'where': 'not seen twice in round 1 (a crop of the sill)'}]}))
+    out = still_verdict(store, sha, {SOLID: True}, rnd=2)   # the state two stills of VW-24 were in: the rule a still cannot show is left out now
+    assert out['next'].startswith('The still end-frame passed')
+
+
 def test_the_still_verdict_needs_the_last_frame_of_the_still():
     store = no_still(motion_store())
     sha = upload(store, still=True)
