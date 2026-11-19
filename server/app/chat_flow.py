@@ -546,7 +546,9 @@ WORDS = {
     'go_set': 'Make a set with these words',       # the button of the words box
     'go_fix': 'Make it again with these words',
     'set_hint': 'Picture not good? Make a set instead.',   # beside "Make a set", only where a footage picture exists and may be used as it is
-    'goes': ' Up to {m} sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most {x} times.',
+    # design/220 (SK, 19 Nov 2026): the check decides whether the others follow; before: 'Up to {m} sets are made first, to check the method; after you judge them, any others are made in one go.'
+    'goes': ' Up to {m} sets are made and checked first; when the check passes them all, the others are made at once, and when it does not, you see that set first and the others wait for your word. '
+            'A set you ask to change is made again, at most {x} times.',
     # design/212: the buttons of step 1, short and plain; which of them a thing gets follows its case
     'approve': 'Approve',
     'fix': 'Minor corrections',
@@ -566,7 +568,8 @@ WORDS = {
     'aside': 'not ticked by the operator: not used',
     'help': 'Choose a thing in the list. Tick the pictures to keep, then choose an answer under them; you can undo it. Nothing is made until you say done in the chat. '
             'A set is three pictures of one thing, which become its reference; for a person, their three views; a place gets one picture. '
-            'Up to 3 sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most 3 times.',
+            'Up to 3 sets are made and checked first; when the check passes them all, the others are made at once, and when it does not, you see that set first and the others wait for your word. '
+            'A set you ask to change is made again, at most 3 times.',
     'not_this': 'Not this picture',
     'that_is_it': 'That is it',
     'ask_footage': 'Use the footage picture as the reference?',
@@ -691,6 +694,10 @@ WORDS = {
     'words_hint': 'What must the picture show?',
     'rest_head': '{sets} for your word',
     'rest_why': 'Judge the first sets first: a fault here would repeat in all of them.',
+    # design/220: why the others were not made by themselves, said on the line of the other sets
+    'rest_held_fault': "Claude's check did not pass {names}: look at {it} first. A fault here would repeat in the others, so they wait for your word.",
+    'rest_held_unmade': '{names} could not be made, so the others wait for your word.',
+    'rest_held_unchecked': '{names} could not be checked, so the others wait for your word.',
     'rest_show': 'Show the {n}',
     'rest_list': 'The {sets} waiting to be made',
     'rest_list_note': 'None of these is made yet. They are made together, in one go, when you choose to make them.',   # design/216: no button is named here (A12)
@@ -949,6 +956,16 @@ def round_accept(ctx, quote):
     s['chat_round'] = {**(s.get('chat_round') or {}), **{i['_eid']: {'verdict': i['_routine'], 'quote': quote, 'frames': i['_stamp'], 'words': '', 'pics': {r: 'off' for r in i['_off']}} for i in todo}}   # the pictures the proposal does not use stay unused
     V.save_session(ctx['store'], ctx['run'], s)
     return {'accepted': [i['_eid'] for i in todo]}
+
+
+def _rest_held_why(rd, names):
+    """design/220: why the other sets wait for the operator's word, from what the check found of the first sets (`ref_sets.rest_by_check`); '' when it kept nothing."""
+    from . import ref_sets
+    held, out = rd.get('rest_held') or {}, []
+    for k in ('fault', 'unmade', 'unchecked'):
+        if held.get(k):
+            out.append(WORDS['rest_held_' + k].format(names=_and(names.get(e, e) for e in held[k]), it='it' if len(held[k]) == 1 else 'them'))
+    return ' '.join(out) or (ref_sets.LIMIT_PLAIN if held.get('limit') else '')
 
 
 def _round_v2(ctx, every, step):
@@ -1377,7 +1394,7 @@ def _round_v2(ctx, every, step):
         line = {'text': '\n'.join(x for x in (
                     WORDS['rest_text'].format(k=_n(len([r for r in rows.values() if r.get('set')]), 'set'), r=f"{len(waiting)} more {'are' if many else 'is'}", names=', '.join(names[e] for e in waiting)), said_people) if x),   # design/212: no money is named here
                 **({'cost': WORDS['rest_cost'].format(them=them, things='; '.join(lose)) if lose else WORDS['rest_cost_none'].format(them=them)} if out_ else {}),
-                'head': WORDS['rest_head'].format(sets=f"{len(waiting)} more set{'s wait' if many else ' waits'}"), 'why': WORDS['rest_why'], 'show': WORDS['rest_show'].format(n=len(waiting)),
+                'head': WORDS['rest_head'].format(sets=f"{len(waiting)} more set{'s wait' if many else ' waits'}"), 'why': _rest_held_why(rd, names) or WORDS['rest_why'], 'show': WORDS['rest_show'].format(n=len(waiting)),
                 'name': WORDS['rest_name'].format(sets=sets_n(len(waiting))),   # design/216 (A10): the last row of the list
                 'list_head': WORDS['rest_list'].format(sets=sets_n(len(waiting))), 'list_note': WORDS['rest_list_note'], 'covers': [f'set:{e}' for e in waiting],
                 'waits': {f'set:{e}': {'note': WORDS['wait_person'] if e in people else WORDS['wait_loss'].format(shots=_n(len(_made_shots(wf[e], where)), 'shot')) if _made_shots(wf[e], where) else WORDS['wait_none'],
@@ -1395,7 +1412,8 @@ def _round_v2(ctx, every, step):
                 V.set_aside(store, user, run, outputs, eid, words or quote)
             return {'aside': out_, **(ref_sets.round_rest(conn, store, user, run, outputs, quote) if people else {})}   # the people are made on the same word; the limit refuses it in its plain sentence
         rest = _v2_item(f"rest:{rd.get('at')}", 'reference set to make', '', WORDS['rest_title'], WORDS['rest_ask'], run_, chat, line, _key='sets:rest', _title=WORDS['rest_title'])
-        items = [rest] + items if every else items + [rest]   # the page shows it first; the chat asks it once the first sets are answered
+        # the page shows it first; the chat asks it once the first sets are answered. design/220: held by the check, it comes after the sets on the page too: the set that did not pass is seen first
+        items = [rest] + items if every and not rd.get('rest_held') else items + [rest]
     for n, i in enumerate(items, 1):
         i['position'] = f'Reference sets, {n} of {len(items)}'
     return items

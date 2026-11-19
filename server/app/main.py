@@ -1939,7 +1939,9 @@ def visuals_round_looks_due(run_id: UUID, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round/looks')
 def visuals_round_looks(run_id: UUID, body: RoundLooks, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_looks(storage(), user, run, outputs, body.sets, body.by))
+    # design/220: when the looks of the first sets all say use, the server orders the other sets in the same call (ref_sets.rest_by_check)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.rest_by_check(
+        conn, storage(), user, run, outputs, ref_sets.round_looks(storage(), user, run, outputs, body.sets, body.by)))
 
 
 class PictureLooks(Write):   # design/217 (C2): `vw visuals pictures --looks <file>`

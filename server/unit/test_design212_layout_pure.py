@@ -304,7 +304,7 @@ def test_the_proposals_line_lists_the_routine_things_for_show_the_n(monkeypatch)
         assert l[key]['group'] == G[0] and l[key]['rec']['reason'] and l[key]['rec']['label'] and l[key]['name'] and l[key]['kind']
     assert [p['label'] for p in l['ref:TILE']['pics']] == ['underside']                                             # its footage pictures, for the list
     assert prop['text'] == ('7 things have a proposal from Claude. Accepting the 4 routine ones asks for 4 sets, takes the footage pictures of 0 things as they are, and makes no reference for 0. '
-                            'Up to 3 sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most 3 times. '
+                            'Up to 3 sets are made and checked first; when the check passes them all, the others are made at once, and when it does not, you see that set first and the others wait for your word. A set you ask to change is made again, at most 3 times. '
                             'A thing you answer yourself keeps your answer.')
 
 

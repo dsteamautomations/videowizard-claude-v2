@@ -152,6 +152,8 @@ if __name__ == '__main__':
         prompt = d218(prompt, parts)
         from d218b_wording_v3 import apply as d218b   # design/218b: a part seen from another direction is the same part; never asked; `vw motion note`
         prompt = d218b(prompt, parts)
+        from d220_wording_v3 import apply as d220   # design/220: the look decides whether the other sets follow the first three (the server orders them when every first set passed)
+        prompt = d220(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

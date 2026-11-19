@@ -97,8 +97,8 @@ def test_what_the_chat_says_under_each_button():
 
 @pytest.mark.parametrize('n, said', [
     (0, ''), (1, 'The set is made now.'), (2, 'All 2 sets are made now.'), (3, 'All 3 sets are made now.'),
-    (4, 'The first 3 sets are made to check the method. After you judge them, the other 1 is made in one go. A set you ask to change is made again, at most 3 times.'),
-    (18, 'The first 3 sets are made to check the method. After you judge them, the other 15 are made in one go. A set you ask to change is made again, at most 3 times.')])
+    (4, 'The first 3 sets are made and checked first. When the check passes them all, the other 1 is made at once; when it does not, you see that set first and the others wait for your word. A set you ask to change is made again, at most 3 times.'),
+    (18, 'The first 3 sets are made and checked first. When the check passes them all, the other 15 are made at once; when it does not, you see that set first and the others wait for your word. A set you ask to change is made again, at most 3 times.')])
 def test_how_many_sets_are_made_first_by_count(n, said):
     assert RS.goes_said(n) == said
 
@@ -107,7 +107,7 @@ def test_the_server_says_it_when_step_4_is_recorded_and_again_at_make_them():
     store, conn = film()
     post(store, conn)
     out = done(store, conn)   # five sets asked: three now, two wait
-    assert out['then'].startswith('The first 3 sets are made to check the method. After you judge them, the other 2 are made in one go.') and 'cost_inr' not in out
+    assert out['then'].startswith('The first 3 sets are made and checked first. When the check passes them all, the other 2 are made at once; when it does not, you see that set first and the others wait for your word.') and 'cost_inr' not in out
     back(store)
     look(store)
     out = VS.guarded(lambda: RS.round_rest(conn, store, USER, RUN, [], 'Make them'))
@@ -123,8 +123,8 @@ def test_the_server_says_it_when_step_4_is_recorded_and_again_at_make_them():
 
 
 def test_the_page_and_the_accept_all_line_say_it_too():
-    assert 'Up to 3 sets are made first, to check the method' in W['help'] and 'at most 3 times' in W['help'] and 'The first 3' not in W['help']
-    assert 'Up to 3 sets are made first, to check the method' in W['goes'].format(m=3, x=3)
+    assert 'Up to 3 sets are made and checked first' in W['help'] and 'at most 3 times' in W['help'] and 'The first 3' not in W['help']
+    assert 'Up to 3 sets are made and checked first' in W['goes'].format(m=3, x=3)
 
 
 def test_no_sentence_of_the_references_steps_names_an_amount():

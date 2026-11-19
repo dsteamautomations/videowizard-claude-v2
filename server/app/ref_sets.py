@@ -29,11 +29,19 @@ STATES = (1, 'making', 'looking', 'rewrite', 2, 'complete')   # what visuals_sta
 ROUND_POSTED = ('The round is posted for {n} things, {d} of them doubtful. Run `vw visuals page`: the operator answers step 1 there, in one visit; in the chat '
                 '(`vw visuals next`) only where the page cannot be shown.')
 # design/215 (change 7): how many sets are made first, said to the operator by the server, when step 1 is recorded and again at "Make them"; no amount (W3)
-SAID_FIRST = ('The first {k} sets are made to check the method. After you judge them, the other {n} made in one go. '
+# design/220 (SK, 19 Nov 2026): the check decides whether the others follow; before: 'The first {k} sets are made to check the method. After you judge them, the other {n} made in one go.'
+SAID_FIRST = ('The first {k} sets are made and checked first. When the check passes them all, the other {n} made at once; when it does not, you see that set first and the others wait for your word. '
               'A set you ask to change is made again, at most {m} times.')
 SAID_ALL, SAID_ONE = 'All {n} sets are made now.', 'The set is made now.'
 SAID_REST = 'The other {n} made now, in one go. A set you ask to change is made again, at most {m} times.'
-GO1_MAKING = "Step 1 is recorded; {r} more wait for the operator's word. Wait: `vw visuals status --wait 900`."   # said after `goes_said`
+GO1_MAKING = ("Step 1 is recorded; {r} more are ordered by the server when your look says use for every first set, and wait for the operator's word when it does not. "
+              'Wait: `vw visuals status --wait 900`.')   # said after `goes_said`; design/220
+# design/220: the second go by the rule. `REST_RULE` is the log's rule and the stored word; `REST_BY_RULE` is what the assistant is told
+REST_RULE = "design/220: every first set passed Claude's check, so the other sets are ordered with no question"
+REST_BY_RULE = 'Every first set passed your look: the other {n} ordered by the server, with no question to the operator.'
+REST_HELD = "The other sets wait for the operator's word: {why}."
+HELD_WHY = {'fault': 'your look did not say use for {names}', 'unmade': '{names} could not be made', 'unchecked': '{names} could not be checked',
+            'limit': 'the film has reached the limit its owner set'}
 ALL_MAKING = '{k} set(s) are being made. Wait: `vw visuals status --wait 900`.'
 SETS_LOOK = ('The sets are back. Look at them before the operator does: `vw visuals round --looks` lists them, fetches the pictures and says how to judge them and the '
              "shape of the file to send (`how`, in work/visuals/sets/looks.json); every line of every picture's check list gets its answer. "
@@ -1225,6 +1233,67 @@ def _order(conn, store, user, run, outputs, eids):
         session['round']['pass'] = 'making'
         V.save_session(store, run, session)
     return session, queued, errors
+
+
+def first_sets(session, rd):
+    """design/220: the sets of the first go, as the check finds them: {'use': [eid], 'fault': [eid], 'unmade': [eid], 'unchecked': [eid]}. A set of the first go is a
+    thing that was ordered then (it holds a set or the reason it was not made): never one that waits for the second go, one the operator set aside, one whose
+    footage picture is the reference, or a place that waits for its things. 'unmade': no picture came back; 'unchecked': a picture could not be opened;
+    'fault': the look says make again or doubtful, or there is no look of this set."""
+    out = {'use': [], 'fault': [], 'unmade': [], 'unchecked': []}
+    for eid, r in rd['elements'].items():
+        if r.get('ignored') or r.get('from_footage') or eid in (rd.get('rest') or []) or not (r.get('set') or r.get('error')):
+            continue
+        pics = _pictures(session, eid, r, ('candidate', 'approved')) if r.get('set') else []
+        look = r.get('set_look') or {}
+        out['unmade' if not pics else 'unchecked' if any((p.get('look') or {}).get('not_checked') for p in pics) else
+            'use' if look.get('set') == r.get('set') and look.get('recommend') == 'use' else 'fault'].append(eid)
+    return out
+
+
+def rest_by_check(conn, store, user, run, outputs, out):
+    """design/220 (SK, 19 Nov 2026): called with the answer of `round_looks`. Once every made set of the first go has its look: when each says use, the
+    others are ordered here, once, by the rule (the same order as the operator's "Make the other N": the limit, a place held for its things, three makes;
+    the log says the rule ordered them); when one does not (make again, doubtful, not checked, not made) or the limit has no room, nothing is ordered and
+    the round keeps why (`rest_held`): the others then wait for the operator's word, as before, and the rule never orders them later. Returns `out` with
+    `rest_ordered`, `errors` and `then` when it ordered."""
+    session = V.session_of(store, run, outputs)
+    rd = session.get('round') or {}
+    if not V.round_v2(session) or rd.get('go', 1) != 1 or rd.get('rest_held') or not rest_of(rd) or state(session, rd) != 2:
+        return out
+    first, rest = first_sets(session, rd), rest_of(rd)
+    held = {k: first[k] for k in ('fault', 'unmade', 'unchecked') if first[k]}
+    if not held and not first['use']:
+        return out   # no set of the first go was tried (a place waiting for its things): nothing to judge the method by
+    if not held:
+        spent, cap, one = V._set_budget(run, session, V.visuals_spend(conn, run))
+        if spent + one * len(rest) > cap + 1e-9:
+            held = {'limit': True}
+    if held:
+        rd['rest_held'] = {**held, 'at': _now()}
+        V.save_session(store, run, session)
+        why = '; '.join(HELD_WHY[k].format(names=', '.join(v)) if k != 'limit' else HELD_WHY[k] for k, v in held.items())
+        return {**out, 'then': ' '.join(x for x in (REST_HELD.format(why=why), out.get('then')) if x)}
+    rd.update(go=2, rest=[], rest_word={'by': 'rule', 'at': _now(), 'quote': REST_RULE})
+    V.save_session(store, run, session)
+    session, queued, errors = _order(conn, store, user, run, outputs, rest)
+    waiting = [eid for eid in rest if eid not in queued and eid not in errors]   # a place that waits for its things, or for Claude's list of them
+    try:   # the log is a record: it never stops the order, and a failed insert stays inside its own savepoint
+        from contextlib import nullcontext
+        from . import runlog
+        with (conn.transaction() if hasattr(conn, 'transaction') else nullcontext()):
+            runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'reference sets, the second go', 'rule': REST_RULE,
+                                'entry': ('ordered by the rule, not by the operator: ' + (', '.join(queued) or 'none') + f"; the first sets that passed: {', '.join(first['use'])}"
+                                          + (f"; waiting for their things: {', '.join(waiting)}" if waiting else '')
+                                          + (f"; not ordered: {', '.join(errors)}" if errors else '')),
+                                'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
+    except Exception as exc:   # noqa: BLE001
+        import logging
+        logging.getLogger('vw2.visuals').warning('decision log not written for run %s: %s', run.get('id'), exc)
+    then = ' '.join(x for x in (REST_BY_RULE.format(n=f'{len(rest)} sets are' if len(rest) != 1 else 'set is'), ALL_MAKING.format(k=len(queued)) if queued else '',
+                                things_due_words(session), '' if queued else then_of(session) or '') if x)
+    then += NOT_ORDERED.format(things='; '.join(f"{eid}: {V._plain(msg).rstrip('.')}." for eid, msg in errors.items()).rstrip('.')) if errors else ''
+    return {**out, 'rest_ordered': queued, 'errors': errors, 'pass': V._round_pass(session, session['round']), 'then': then}
 
 
 def round_rest(conn, store, user, run, outputs, quote):

@@ -152,7 +152,7 @@ def test_accept_the_proposals_names_what_it_does_and_no_price(monkeypatch):
     assert l['title'] == "Claude's proposals" and l['item'] == 'round1:all' and l['ask'] == 'Accept the proposals for the routine things?'
     # design/211 review (C4): the truth about the sets: three are made first, the others are asked after. design/212: no cost is named
     assert l['text'] == ('7 things have a proposal from Claude. Accepting the 4 routine ones asks for 4 sets, takes the footage pictures of 0 things as they are, and makes no reference for 0. '
-                         'Up to 3 sets are made first, to check the method; after you judge them, any others are made in one go. A set you ask to change is made again, at most 3 times. '
+                         'Up to 3 sets are made and checked first; when the check passes them all, the others are made at once, and when it does not, you see that set first and the others wait for your word. A set you ask to change is made again, at most 3 times. '
                          'A thing you answer yourself keeps your answer.')
     assert l['buttons'] == [{'label': 'Accept all 4', 'choice': 'accept_all', 'needs_words': False}] and 'own' not in l and 'pics' not in l
 
@@ -416,7 +416,7 @@ def test_the_chat_accepts_the_proposals_through_the_same_function_and_closes_the
     verdicts, quote = film.called('round_done')[0]
     assert verdicts == {'MASON': {'verdict': 'approve', 'words': ''}, 'TROWEL': {'verdict': 'clean', 'words': 'show the blade clean'}, 'FAN': {'verdict': 'ignore', 'words': ''},
                         'BRICK': {'verdict': 'approve', 'words': ''}, 'STREET': {'verdict': 'approve', 'words': ''}, 'T_LAY': {'verdict': 'approve', 'words': ''}, 'TILE': {'verdict': 'approve', 'words': ''}}
-    assert out['then'].startswith('Step 1 is recorded; 2 more wait')   # the server's own sentence
+    assert out['then'].startswith('Step 1 is recorded; 2 more are ordered by the server')   # the server's own sentence
 
 
 def test_in_the_chat_make_the_rest_is_asked_after_the_first_sets(monkeypatch):
