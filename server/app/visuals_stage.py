@@ -6097,7 +6097,7 @@ def parts_brief(store, run, outputs):
     twice = '; '.join(f"{e} {els[e].get('name') or e} ({', '.join(s)})" for e, s in twice if len(s) >= 2)
     head = ['# Shared parts of the drawn graphics', '', f"Things shown by two or more drawings (each is a part to draw once): {twice or 'none'}.",
             'Things of the plan (data-element names the id): ' + '; '.join(f"{e} {x.get('name') or e}" for e, x in els.items()) + '.']
-    return {'brief': '\n'.join(head + [f"\n## {b['shot_id']}\n\n{b['brief']}" for b in briefs]), 'refs': list(dict.fromkeys(r for b in briefs for r in b['refs'])),
+    return {'brief': '\n'.join(head + [f"\n## {b['shot_id']}\n\n{b['brief']}" for b in briefs]), 'refs': refs_fetchable(store, run, session, list(dict.fromkeys(r for b in briefs for r in b['refs']))),
             **({'rejected': (session.get('motion_parts') or {})['rejected']['words']} if (session.get('motion_parts') or {}).get('rejected') else {})}
 
 
@@ -6843,7 +6843,8 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     for k, t in lines:   # design/221 S3: one fingerprint per labelled line, so a later change of the brief can be named
         if k:   # design/221 row 1: the parts line also carries the drawings of its parts, so a part drawn again makes the rules be read again
             prints[k] = hashlib.sha256((prints.get(k, '') + t + (''.join(p['digest'] for p in used) if k == 'Use these parts' else '')).encode('utf-8')).hexdigest()[:16]
-    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs])), 'frames': frames, 'fps': str(fps), 'lines': prints,
+    refs = list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs]))
+    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': refs_fetchable(store, run, session, refs) if build else refs, 'frames': frames, 'fps': str(fps), 'lines': prints,
             **({'continues': continues} if continues else {}), **({'parts_key': session['motion_parts_approved']['key']} if used else {})}
 
 
@@ -6868,6 +6869,17 @@ def brief_pictures(session, shot):
     gold = {golden_of(session, e) for e in els} - {None}
     return [(rid, r) for rid, r in session['references'].items() if r.get('status') == 'approved' and r.get('key')
             and (r.get('kind') == 'style' or rid in gold or (r.get('kind') in ('component', 'sheet') and r.get('element_id') in els))]
+
+
+def refs_fetchable(store, run, session, ids):
+    """Defect 55 (VW-24, 19 Nov 2026): the plugin fetches a brief's pictures as <run>/visuals/references/<id>.png. A picture kept under another
+    name (an approved drawing of a thing) is copied there once, so the fetch finds it. The ids, unchanged."""
+    for rid in ids:
+        r = (session.get('references') or {}).get(rid) or {}
+        at = f"{run['id']}/visuals/references/{rid}.png"
+        if r.get('key') and r['key'] != at and not store.exists(at):
+            store.put(at, store.get(r['key']), 'image/png')
+    return ids
 
 
 def look_pictures(session, shot):

@@ -230,3 +230,32 @@ def test_the_parts_and_still_answers_are_the_operators_decision_in_the_log():
     item['_run']('approve', 'Approve', '')
     (row,) = logged(conn)
     assert row[2:9] == ('decision', 'shot MO1', 'design/221 row 3 (the still end-frame, approved in the chat)', 'the still end-frame approved', 'operator', 'SK', 'Approve')
+
+
+# ---------- defect 55 (VW-24): a brief's picture kept under another name is fetchable ----------
+
+def test_defect55_a_picture_kept_under_another_name_is_copied_to_where_the_plugin_fetches_it():
+    from app import visuals_stage as V
+
+    class Store:
+        def __init__(self):
+            self.d = {'R/visuals/drawings/abc/a-plain.png': b'PNG-A', 'R/visuals/references/f1.png': b'PNG-F'}
+            self.puts = []
+
+        def exists(self, k):
+            return k in self.d
+
+        def get(self, k):
+            return self.d[k]
+
+        def put(self, k, data, mime=None, **kw):
+            self.d[k] = data
+            self.puts.append(k)
+
+    st = Store()
+    session = {'references': {'drawing-TILE-a-1': {'key': 'R/visuals/drawings/abc/a-plain.png'}, 'f1': {'key': 'R/visuals/references/f1.png'}, 'gone': {}}}
+    ids = ['drawing-TILE-a-1', 'f1', 'gone', 'unknown']
+    assert V.refs_fetchable(st, {'id': 'R'}, session, ids) == ids
+    assert st.d['R/visuals/references/drawing-TILE-a-1.png'] == b'PNG-A' and st.puts == ['R/visuals/references/drawing-TILE-a-1.png']
+    V.refs_fetchable(st, {'id': 'R'}, session, ids)   # a second brief copies nothing again
+    assert st.puts == ['R/visuals/references/drawing-TILE-a-1.png']
