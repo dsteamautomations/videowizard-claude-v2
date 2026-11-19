@@ -2803,7 +2803,8 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
             add(-1, f"Reference sheet · {r['element_id']} · sources changed", 'references', r['element_id'], r['id'], 'sheet to approve')
     for j in take_rows:   # design/207 (D2): a reuse no longer waits for the operator (the older way, retired: "Reuse · <shot>", reuse to approve)
         sh, reviews = shots.get(j['unit']), session['reviews'].get(str(j['id'])) or []
-        if sh and j['status'] == 'ready' and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected'):
+        if sh and j['status'] == 'ready' and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected') \
+                and not (j.get('provider') == 'video' and j['unit'] in session['selections']):   # design/222: an AI video shot with a take selected is not asked about again
             if held_drawing(session, j['unit']):   # design/221 row 18: a drawing held after its rounds is an early decision, a card in the chat
                 add(sh['start_frame'], f"Held drawing · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'held drawing')
             else:
@@ -2813,8 +2814,12 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
                                                    or (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'drawn'))]
     if gate and round_v2(session) and any(i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video' for _, i in items):
         from . import takes   # design/222: step 7 is shown at the end, on the page: a ready AI video take is not asked one by one (gate False: an answer given on the page that opened)
+        video = lambda i: i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video'
+        by_id = {str(j['id']): j for j in take_rows}
         if not takes.complete(takes.expected(session, plan, take_rows, now)) or not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # the critic's S1: nor while step 6 is still being made
-            items = [(a, i) for a, i in items if not (i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video')]
+            items = [(a, i) for a, i in items if not video(i)]
+        else:   # the second critic's points 1, 9: the page is open: each take only with its check (a remake too), and none of a shot with an open question
+            items = [(a, i) for a, i in items if not video(i) or takes.answerable(session, i['group'], by_id[i['item']], now)]
     return [i for _, i in sorted(items, key=lambda x: x[0])]
 
 
@@ -5694,6 +5699,7 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id'],
                                           **take_in_point(prep, job, in_s)}
     _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
+    ((session.get('guides') or {}).get(job['unit']) or {}).pop('again', None)   # design/222: the shot is resolved: a take ordered on the page ("Make another") is no longer made
     if prep.get('kind') == 'guide':
         failed = [r['line'] for r in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('scorecard') or [] if r['state'] == 'Fail']
         generations.closed(conn, run['id'], job['unit'], 'guide', 'accepted', {'kind': 'take accepted', 'job_id': str(job_id), 'departs_on': failed, 'notes': notes or '', 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
@@ -7273,7 +7279,9 @@ def status(conn, store, run, outputs, repair=True):
             for r in session['references'].values()]
     take_rows = take_jobs(conn, run)
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
-    step6 = ' '.join(x for x in (pictures.status_line(six), pictures.drawn_due(six), pictures.stills_due(six)) if x)
+    from . import takes
+    seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
+    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.stills_due(six)) if x)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3

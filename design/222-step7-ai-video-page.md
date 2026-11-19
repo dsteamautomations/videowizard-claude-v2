@@ -62,6 +62,22 @@ Tests: `server/unit/test_design222_takes_pure.py` (the server, the served text, 
 
 Left as it is, and said: the cost limit is tested per line when the page is built, and again when each ordered take is sent (several orders in one visit are refused one by one, in the order the assistant sends them, each said in the chat).
 
+## The second critic's points on cfabf4d (20 Nov), each fixed with a test that failed first
+
+`server/unit/test_design222_critic2_pure.py` (the answers go through the page's own route, `page_flow._pictures_answer`, with nothing mocked) and two tests in `test_design222_browser_pure.py`.
+
+| Point | Fault | Fix |
+|---|---|---|
+| 1 | One Reject or Make another closed the page and hid every other unanswered take | `takes._state` marks a shot one of whose takes was already answered as `aside`: `complete` does not wait for it. A remake is offered only with its check (`takes.answerable` in `visuals_stage.waiting`). A first take still being made keeps the page closed (D9) |
+| 2 | A take shown as "not checked" could be selected after a failing look arrived, against faults never shown | `takes.item_id`: the item's id carries a mark of the check as shown; an answer to an older view is stale |
+| 3 | An order given on the page outlived the shot's selection | `select_take` drops it; `guide.shoot` refuses a take for a shot with a take selected |
+| 4, 5 | "Use take n after all" wrote a rejection on the newer take and could leave the earlier take accepted after a refusal | only the earlier take is selected; a shot with a selection is not asked about again (`visuals_stage.waiting`); a refusal restores the earlier take's reviews |
+| 8 | A take whose page video could not be made had nothing to look at | the line carries each take's frame sheet (`pics`, role `sheet`); the page shows it in the player's place with "The take cannot be played here: these are its frames, in order." |
+| 9 | E18: an open question on the shot was ignored | `takes.question_open`: the take is not offered and the shot reads "waiting for you in the chat" |
+| 10 | "Make another" on a take with no guide entry saved the rejection and then failed | refused before anything is saved; the button is not offered |
+| 6 | No test through the page's route; requirement tests 16, 17, 21, 22 missing | added |
+| 7, 11 | E36 a long caption; `vw visuals status` without step 7's counts; E30; the decisions in the log | the caption follows the word being spoken within two lines; `visuals_stage.status` carries the line; a remake whose still or layout card waits reads "waiting for you in the chat"; Select, Reject, "Use take n after all" and a withdrawn order are decisions in the run's log |
+
 ## The real page against the approved trial
 
 Checked with VW-12's 17 real takes on the real page file at page areas of 1536 x 510 and 1900 x 830 (no scroll of the page or the main area, no console error; the player's picture is 620 x 349 and 970 x 546). Screenshots and the scripts are outside the repository (`ux1-mockup/step7-trial/real-page/`). The differences from the trial:

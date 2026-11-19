@@ -121,16 +121,18 @@ def _with_videos(store, page):
     (`zoom_uploads`); a line whose copy cannot be made shows its frame sheet with `video.none`."""
     videos = {}
     for line in page['lines']:
-        for v in [line.get('video')] + [t.get('video') for t in line.get('takes') or []]:   # design/222: every take of an AI video line
+        mine = [t.get('video') for t in line.get('takes') or []]   # design/222: every take of an AI video line
+        for v in [line.get('video')] + mine:
             if not isinstance(v, dict) or '_key' not in v:
                 continue
+            none = T.W['video_none'] if any(v is x for x in mine) else P.W['video_none']   # a take's own sentence: its frames stand in (the sheet at four a second)
             key, mark = v.pop('_key'), v.pop('_mark', '')
             code = 'v' + pic_code(key, mark)[1:]
             try:
                 videos.setdefault(code, {'code': code, 'key': video_copy(store, key, mark)}) if key else None
             except Exception:   # no copy: the frames stand in for it
                 key = ''
-            v.update(code=code if key else '', none='' if key else P.W['video_none'])
+            v.update(code=code if key else '', none='' if key else none)
     if videos:
         page['videos'] = list(videos.values())
     return page

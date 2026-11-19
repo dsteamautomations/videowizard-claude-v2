@@ -1703,7 +1703,7 @@ def visuals_guide_cause(run_id: UUID, body: GuideCause, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/guide/shoot', status_code=201)
 def visuals_guide_shoot(run_id: UUID, body: GuideShoot, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.cancel_order(storage(), user, run, outputs, body.shot_id, body.quote) if body.cancel
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.cancel_order(conn, storage(), user, run, outputs, body.shot_id, body.quote) if body.cancel
                          else guide.shoot(conn, storage(), user, run, outputs, body.shot_id, body.quote, body.again), 201)
 
 

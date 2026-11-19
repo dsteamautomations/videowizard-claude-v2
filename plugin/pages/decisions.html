@@ -375,7 +375,8 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .sstage.kstage{grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:20px} .kstage .sviewer{gap:6px;min-width:0}
 .kstage .pvbox{flex:1 1 auto;height:auto;min-height:150px} .pvbox.kbad{display:grid;place-items:center;padding:16px} .kbad .pnone{color:#e6edf3;font-size:13px}
 .khd{margin:0 0 8px}
-.kwords{margin-top:3px;font-size:15px;line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.kwords{margin-top:3px;font-size:15px;line-height:1.45;max-height:2.9em;overflow:hidden}   /* at most two lines; a longer caption follows the word being spoken (kWords) */
+.pvbox.ksheet{background:var(--line)}
 .kwords .ctx{color:var(--muted);opacity:.75} .kwords .w{border-radius:4px;padding:0 1px} .kwords .w.now{background:var(--accent);color:var(--surface)} .kwords .w.next{color:var(--muted)}
 .ktabs{flex:none;display:flex;gap:6px}
 #sets .ktab{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 12px;font-weight:600;font-size:13px}
@@ -1260,7 +1261,9 @@ function kWords(l,k,v){   // the words spoken during the shot, the one being spo
   if(!v) return p;
   const mark=()=>{ const at=v.currentTime-(+k.in_s||0); let now=-1; c.words.forEach((x,i)=>{ if(at>=x.s) now=i; });
     if(now===c.words.length-1&&at>c.words[now].e+0.4) now=c.words.length;   // past the last word: nothing is marked
-    spans.forEach((s,i)=>{ s.className='w '+(i===now?'now':i<now?'said':'next'); }); p.dataset.now=String(now); };
+    spans.forEach((s,i)=>{ s.className='w '+(i===now?'now':i<now?'said':'next'); }); p.dataset.now=String(now);
+    const at_=spans[Math.min(Math.max(now,0),spans.length-1)], lh=parseFloat(getComputedStyle(p).lineHeight)||22;   // E36: the line of the word being spoken stays in view, as the second line
+    if(at_&&p.scrollHeight>p.clientHeight+2) p.scrollTop=Math.max(0,Math.round((at_.offsetTop-p.offsetTop)/lh)-1)*lh; };
   if(!v.kw){ v.kw=1; let raf=0; const run=()=>v.kmark&&v.kmark(), loop=()=>{ run(); raf=v.paused||!v.isConnected?0:requestAnimationFrame(loop); };   // the video is kept per take (PV): its listeners once
     ['play','playing'].forEach(e=>v.addEventListener(e,()=>{ if(!raf) raf=requestAnimationFrame(loop); })); ['seeked','timeupdate','pause','loadedmetadata'].forEach(e=>v.addEventListener(e,run)); }
   v.kmark=mark; mark(); return p; }
@@ -1289,9 +1292,11 @@ function kThing(l){
   if(!k) return [mk('h2',{class:'sname'},l.name)];
   const vb=pVideo(k,()=>{ if(S.cur===l.line) sMainDraw(); }), v=vb&&PV[k.video.code];
   if(v&&S.kplay!==l.line+'|'+k.n){ S.kplay=l.line+'|'+k.n; if(v.src&&v.paused){ const p=v.play(); if(p&&p.catch) p.catch(()=>{}); } }   // a take shown again plays again
-  const box=vb||mk('div',{class:'pvbox kbad'},mk('p',{class:'pnone',id:'pnone'},(k.video||{}).code?w.video_bad:(k.video||{}).none||w.video_bad)); box.id='sbig';
+  const sheet=!vb&&(l.pics||[]).find(p=>p.role==='sheet'&&p.take===k.n), why=(k.video||{}).code?w.video_bad:(k.video||{}).none||w.video_bad;   // design/222: no video here: its frames, with the round's sentence
+  const box=vb||(sheet?mk('div',{class:'pvbox ksheet'},sBig(sheet,[sheet],()=>{})):mk('div',{class:'pvbox kbad'},mk('p',{class:'pnone',id:'pnone'},why))); box.id='sbig';
   const tabs=ts.length>1?mk('div',{class:'ktabs',id:'ptabs',role:'tablist'},ts.map(t=>mk('button',{class:'ktab',type:'button',role:'tab','aria-selected':String(t===k),'data-take':String(t.n),on:{click:()=>{ S.view[l.line]=t.n; S.panel=null; S.msg=''; sMainDraw(); }}},t.tab))):null;
   side.push(kCheck(k));
+  if(sheet) side.push(mk('p',{class:'kshort',id:'pnone'},why));
   if(k.short) side.push(mk('p',{class:'kshort',id:'pshort'},k.short));
   if(k.rejected) side.push(mk('p',{class:'kwas',id:'pwas'},k.rejected));
   if(!rec){ const pass=(k.check||{}).state==='pass';

@@ -32,7 +32,6 @@ W = {
     'hint_why_short': 'It is shorter than its place in the film. Why is it right for the film all the same?',
     'hint_why_old': 'You rejected take {n} earlier, and its check did not pass. Why use it after all?', 'old_ask': 'You rejected take {n} earlier. Use it in the film after all?',
     'go_why': 'Select it with this reason', 'need_why': 'Write your reason first. It is kept with the film.', 'back': 'Go back',
-    'old_used': "the earlier take was used instead, at the operator's word",
     'rejected': 'Rejected. You said: {words}', 'rejected_bare': 'Rejected. You said no, with no words.',
     'short': 'The take is {s} s; its place in the film is {slot} s.',
     'stale': 'This take was made for an earlier plan of the film and cannot be used: make another, or reject it.',
@@ -73,6 +72,10 @@ W = {
                     'cut it into shorter shots, another angle, or leave it out; a new take after that is asked with its card.'),
     'rejected_cap': ' (the cost limit refused the take ordered on the page: tell the operator the spend; only the owner can change the limit)',
     'order_log': 'another take ordered on the page: {secs} s, about ₹{inr}',
+    'log_select': 'take {n} selected', 'log_reject': 'take {n} rejected, no new take ordered', 'log_old': 'take {n} selected after all', 'log_cancel': 'the take ordered on the page withdrawn',
+    'no_guide': '{shot} has no guide: another take cannot be ordered here. Reject it, and Claude asks you in the chat what happens to the shot.',
+    'video_none': 'The take cannot be played here: these are its frames, in order.',
+    'sheet': 'Take {n}: its frames, four a second',
     # "Make another": what the assistant does after done, and the one line it says
     'again_do': ('{name} ({shot}): the operator ordered another take on the page with these words: "{words}". Say what caused the fault, in the server\'s order '
                  '(`vw guide cause --shot {shot} --cause still|guide|words|model --notes "…" --fix "…"`), change that one thing, then `vw guide shoot --shot {shot}`: '
@@ -262,45 +265,65 @@ def _ready_to_shoot(g):
     return bool((g.get('render') or {}).get('status') == 'ready' and still and still.get('overlay_key') and g.get('take_prompt'))
 
 
+def _card_waits(g):
+    """A card of this shot waits in the chat: its layout drawing, or a still to approve."""
+    d = g.get('drawing') or {}
+    return (d.get('status') == 'proposed' and d.get('sha256') == g.get('sha256')) \
+        or any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') for s in g.get('stills') or [])
+
+
+def question_open(session, shot_id):
+    """E18: an open question on the shot: nothing is made from it, and its take is not selected, until the operator answers it in the chat."""
+    return bool((session.get('questions') or {}).get(shot_id))
+
+
+def answerable(session, shot_id, job, now=None):
+    """A take the operator can be asked about now: offered (its check is there, or timed out) and no question open on its shot."""
+    return offered(session, job, now) and not question_open(session, shot_id)
+
+
 def _state(session, plan, sh, take_rows, now):
+    """(state, the take shown, aside). `aside`: the shot does not keep the page closed for the others: one of its takes was already answered by the
+    operator (a rejection: its remake, its cards and what happens to it go on beside the page), or a question on it waits in the chat."""
     sid = sh['id']
     if sid in (session.get('selections') or {}):
-        return 'answered', None
+        return 'answered', None, False
     js, g = jobs_of(take_rows, sid), (session.get('guides') or {}).get(sid) or {}
     if js:
-        j = js[-1]
+        j, seen = js[-1], any(_rejected(session, x) for x in js)
         if j['status'] in OPEN:
-            return ('redo' if any(_rejected(session, x) for x in js[:-1]) else 'making'), None
+            return ('redo' if seen else 'making'), None, seen
         if j['status'] != 'ready':
-            return 'failed', None
+            return 'failed', None, seen
         if _rec(session, j).get('blocked'):
-            return 'chat', None   # "send the same request once more?" is asked in the chat
+            return 'chat', None, seen   # "send the same request once more?" is asked in the chat
         if _rejected(session, j):
-            return ('redo' if again_pending(g) else 'chat'), None
+            return ('redo' if again_pending(g) and not _card_waits(g) else 'chat'), None, True   # E30: a remake whose still or layout card waits reads "waiting for you in the chat"
+        if question_open(session, sid):
+            return 'chat', None, True
         if _stale(plan, j):
-            return 'stale', j
-        return ('done' if offered(session, j, now) else 'checking'), j
+            return 'stale', j, seen
+        return ('done' if offered(session, j, now) else 'checking'), j, seen
     if not g:
-        return 'none', None
-    d = g.get('drawing') or {}
-    if (d.get('status') == 'proposed' and d.get('sha256') == g.get('sha256')) or _ready_to_shoot(g) \
-            or any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') for s in g.get('stills') or []):
-        return 'chat', None   # a card waits in the chat: the layout drawing, the still, or the word to make the take
-    return 'making', None
+        return 'none', None, False
+    if _card_waits(g) or _ready_to_shoot(g):
+        return 'chat', None, False   # a card waits in the chat: the layout drawing, the still, or the word to make the take
+    return 'making', None, False
 
 
 def expected(session, plan, take_rows, now=None):
     """Every AI video shot of the accepted plan, in film order, with its state in plain words: [{kind 'take', id, name, state, job?}]."""
     out = []
     for g, sh, n, of in video_shots(plan, session):
-        state, job = _state(session, plan, sh, take_rows, now)
-        out.append({'kind': 'take', 'id': sh['id'], 'name': name_of(g, sh, n, of), 'state': STATE[state], **({'job': job} if job else {})})
+        state, job, aside = _state(session, plan, sh, take_rows, now)
+        out.append({'kind': 'take', 'id': sh['id'], 'name': name_of(g, sh, n, of), 'state': STATE[state], **({'job': job} if job else {}), **({'aside': True} if aside else {})})
     return out
 
 
 def complete(items):
-    """The page of step 7 opens: every take is made and checked, answered, or could not be made."""
-    return all(i['state'] in COMPLETE for i in items)
+    """The page of step 7 opens: every take is made and checked, answered, or could not be made. The second critic's point 1: a shot one of whose
+    takes the operator already answered (a rejection, its remake under way) does not close the page for the takes still unanswered."""
+    return all(i['state'] in COMPLETE or i.get('aside') for i in items)
 
 
 def status_line(items):
@@ -342,6 +365,14 @@ def check_view(session, job, now=None):
             else W['no_frames'] if rec and not checkable(rec) else W['late'].format(m=LOOK_MINUTES) if late else W['none'])
     return {'state': state, 'head': head, 'faults': faults, 'by': W['by'].format(n=len(rec.get('frames') or []), k=len(read)) if read else '',
             'not_judged': W['not_judged'] if rec.get('guide') else '', 'passed': passed}
+
+
+def item_id(session, job):
+    """The id of a take's item and line: the job and a mark of its check as it is shown (its state, its faults). The second critic's point 2: an answer
+    given to the take as it was shown before its check arrived, or changed, is stale."""
+    import hashlib
+    v = check_view(session, job)
+    return f"take:{job['id']}:" + hashlib.sha1('|'.join([v['state'], v['head']] + [f['text'] for f in v['faults']]).encode('utf-8')).hexdigest()[:8]
 
 
 def chat_text(line):
@@ -444,7 +475,7 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None, left_inr=Non
     faults = ' '.join(f['text'] for f in cur['check']['faults'])
     why = W['hint_why'] if cur['check']['state'] == 'fail' else W['hint_why_none'] if cur['check']['state'] != 'pass' else W['hint_why_short'] if cur['short'] else ''
     cap = left_inr is not None and float(g.get('seconds') or 0) * price_inr_per_s > left_inr + 1e-9
-    more = _can_again(session, g, cur_job) and not cap
+    more = bool(g) and _can_again(session, g, cur_job) and not cap   # no guide entry: no take can be ordered
     buttons = [] if _stale(plan, cur_job) else [   # a take made for an earlier plan cannot be selected
         {'label': W['select'], 'choice': 'select', 'act': 'select', 'take': cur['n'], 'needs_words': bool(why), 'hint': why, 'go': W['go_why'] if why else '', 'prefill': '',
          'need': W['need_why'], 'note': '', 'say': W['say_select_why' if why else 'say_select'].format(n=cur['n'], at=at, words='{words}'), 'end': W['end_select'].format(n=cur['n'], at=at)}]
@@ -452,7 +483,7 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None, left_inr=Non
         buttons.append({'label': W['again'], 'choice': 'again', 'act': 'again', 'take': cur['n'], 'needs_words': True, 'hint': W['hint_again'], 'go': W['go_again'], 'prefill': faults,
                         'need': W['need_again'], 'note': W['again_paid'], 'say': W['say_again'].format(n=cur['n'], words='{words}'), 'end': W['end_again'].format(n=cur['n'], words='{words}')})
     buttons.append({'label': W['reject'], 'choice': 'reject', 'act': 'reject', 'take': cur['n'], 'needs_words': True, 'hint': W['hint_reject'], 'go': W['go_reject'], 'prefill': faults,
-                    'need': W['need_words'], 'note': '' if more else W['no_more_cap'] if cap and _can_again(session, g, cur_job) else W['no_more'], 'say': W['say_reject'].format(n=cur['n'], words='{words}'), 'end': W['end_reject'].format(n=cur['n'], words='{words}')})
+                    'need': W['need_words'], 'note': '' if more or not g else W['no_more_cap'] if cap and _can_again(session, g, cur_job) else W['no_more'], 'say': W['say_reject'].format(n=cur['n'], words='{words}'), 'end': W['end_reject'].format(n=cur['n'], words='{words}')})
     for t in takes[:-1]:   # an earlier, rejected take may be used after all: asked once when its check passed, with a typed reason when it did not
         ok = t['check']['state'] == 'pass' and not t['short']
         label = W['select_old'].format(n=t['n'])
@@ -462,7 +493,8 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None, left_inr=Non
     before, after = _beside(session, plan, gap, sh, take_rows)
     still = next((s for s in g.get('stills') or [] if s.get('status') == 'approved' and s.get('key')), None)
     pics = before + [{'_key': (_rec(session, j).get('frames') or [{}])[0].get('key'), '_mark': str((j.get('result') or {}).get('sha256') or ''), 'label': W['frame'].format(n=k), 'role': 'frame', 'take': k}
-                     for k, j in enumerate(js, 1)] + after + ([{'_key': still['key'], '_mark': str(still.get('sha256') or ''), 'label': W['still'], 'role': 'still'}] if still else [])
+                     for k, j in enumerate(js, 1)] + after \
+        + [{'_key': _rec(session, j).get('sheet_key'), '_mark': str((j.get('result') or {}).get('sha256') or ''), 'label': W['sheet'].format(n=k), 'role': 'sheet', 'take': k} for k, j in enumerate(js, 1)] + ([{'_key': still['key'], '_mark': str(still.get('sha256') or ''), 'label': W['still'], 'role': 'still'}] if still else [])
     return {'kind': 'take', 'name': name_of(gap, sh, n, of), 'kind_words': W['kind'], 'ask': W['ask'], 'where': where, 'film_at': at, 'words': str(sh.get('narration') or ''),
             'caption': caption(session, gap, sh), 'takes': takes, 'pics': [p for p in pics if p.get('_key')], 'buttons': buttons, 'details': []}
 
@@ -498,16 +530,25 @@ def answer(conn, store, user, run, outputs, shot_id, take_rows, choice, quote, w
     ev = (job.get('result') or {}).get('evidence') or {}
     short = ev.get('timing_matches_placement') is False
     plan = V.current_plan(store, session)
+    def decided(entry, said):   # requirement 4.13: each answer to a take is a decision of the operator in the run's log
+        if conn is not None:
+            runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'shot {shot_id}', 'rule': 'design/222 (step 7, a take answered)',
+                                'entry': entry, 'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': said or quote, 'request_id': None})
     if choice == 'select':
         V.need(not _stale(plan, job), W['stale_refuse'])
         held = check_view(session, job)['state'] != 'pass' or short
         if not held:   # nothing holds it: the accepted review carries the operator's click, no words
             V.review_take(conn, store, user, run, outputs, jid, 'accepted', '', '', quote)
-        return V.select_take(conn, store, user, run, outputs, jid, quote, words if held else '', words if held and short else '', None)
+        out = V.select_take(conn, store, user, run, outputs, jid, quote, words if held else '', words if held and short else '', None)
+        decided(W['log_select'].format(n=len(js)), words)
+        return out
     if choice == 'reject':
-        return V.review_take(conn, store, user, run, outputs, jid, 'rejected', words, '', quote)
+        out = V.review_take(conn, store, user, run, outputs, jid, 'rejected', words, '', quote)
+        decided(W['log_reject'].format(n=len(js)), words)
+        return out
     if choice == 'again':
         g = (session.get('guides') or {}).get(shot_id) or {}
+        V.need(g, W['no_guide'].format(shot=shot_id))   # the second critic's point 10: before anything is saved
         V.need(_can_again(session, g, job), W['no_more'])
         out = V.review_take(conn, store, user, run, outputs, jid, 'rejected', words, '', quote)
         s = V.session_of(store, run, outputs)
@@ -527,10 +568,19 @@ def answer(conn, store, user, run, outputs, shot_id, take_rows, choice, quote, w
         old = js[k - 1]
         V.need(not _stale(plan, old), W['stale_refuse'])
         old_short = ((old.get('result') or {}).get('evidence') or {}).get('timing_matches_placement') is False
-        if not words:
-            V.review_take(conn, store, user, run, outputs, str(old['id']), 'accepted', '', '', quote)
-        out = V.select_take(conn, store, user, run, outputs, str(old['id']), quote, words, words if old_short else '', None)   # the critic's S2: selected first: a refusal leaves the newer take as it was
-        V.review_take(conn, store, user, run, outputs, jid, 'rejected', W['old_used'], '', quote)   # then the newer take is not asked about again
+        oid, was = str(old['id']), list(_reviews(session, old))
+        try:   # the second critic's points 4 and 5: the earlier take is selected and nothing else is written: the newer take gets no review (a shot with a
+            # selection is not asked about again), and a refusal leaves the earlier take's reviews as they were
+            if not words:
+                V.review_take(conn, store, user, run, outputs, oid, 'accepted', '', '', quote)
+            out = V.select_take(conn, store, user, run, outputs, oid, quote, words, words if old_short else '', None)
+        except Exception:
+            s = V.session_of(store, run, outputs)
+            if (s.get('reviews') or {}).get(oid) != was:
+                s['reviews'][oid] = was
+                V.save_session(store, run, s)
+            raise
+        decided(W['log_old'].format(n=k), words)
         return out
     raise ValueError(f'Not an answer to a take: {choice!r}.')
 
@@ -540,7 +590,7 @@ def again_due(session, plan, take_rows):
     out = []
     for g, sh, n, of in video_shots(plan, session):
         a = again_pending((session.get('guides') or {}).get(sh['id']))
-        if a and not any(j['status'] in OPEN for j in jobs_of(take_rows, sh['id'])):
+        if a and sh['id'] not in (session.get('selections') or {}) and not any(j['status'] in OPEN for j in jobs_of(take_rows, sh['id'])):
             out.append(W['again_do'].format(name=name_of(g, sh, n, of), shot=sh['id'], words=a['words']))
     return ' '.join(out)
 

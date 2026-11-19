@@ -407,14 +407,18 @@ def cap_or_drop(conn, store, run, session, shot_id, ordered, amount, what):
         raise
 
 
-def cancel_order(store, user, run, outputs, shot_id, quote):
-    """The critic's S6: the operator withdraws, in the chat, the take they ordered on the page. Nothing is made."""
+def cancel_order(conn, store, user, run, outputs, shot_id, quote):
+    """The critic's S6: the operator withdraws, in the chat, the take they ordered on the page. Nothing is made. A decision in the run's log."""
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     need(g.get('again') and not g['again'].get('sent'), f'No take of {shot_id} is ordered from the page: nothing to withdraw.')
     need(str(quote or '').strip(), "Give the operator's words (--quote).")
     g.pop('again')
     VS.save_session(store, run, session)
+    if conn is not None:
+        from . import runlog, takes
+        runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'shot {shot_id}', 'rule': 'design/222 (Make another, withdrawn)', 'entry': takes.W['log_cancel'],
+                            'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': str(quote).strip(), 'request_id': None})
     return {'shot_id': shot_id, 'next': f'The order for another take of {shot_id} is withdrawn: nothing is made. Ask the operator what happens to the shot: cut it into shorter shots, another angle, or leave it out.'}
 
 
@@ -425,6 +429,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     plan, gap, scene, shot = VS.guarded(lambda: VS.locate(store, session, shot_id))
     VS._no_question(session, shot_id)
     g = entry_of(session, shot_id)
+    need(shot_id not in (session.get('selections') or {}), f'{shot_id} has a take selected: no new take is made while it stands. To make another, the operator rejects the selected take first.')   # design/222, the second critic's point 3
     card = ready_card(session, shot_id, VS.prices()['video_inr_per_s'])
     need(card['ready'], 'Not ready to shoot; still missing: ' + ', '.join(card['missing']) + '.')
     ordered, quote = word_for(g, quote)

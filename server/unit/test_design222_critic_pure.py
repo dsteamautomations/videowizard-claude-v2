@@ -43,7 +43,7 @@ def test_s2_the_earlier_take_is_selected_before_the_newer_is_rejected(held, monk
         T.answer(None, None, USER, RUN, {}, 'S1', rows, 'old:1', 'Use take 1 after all', 'refuse this')
     assert seen == []                                                    # nothing was rejected: the newer take still waits for its answer
     T.answer(None, None, USER, RUN, {}, 'S1', rows, 'old:1', 'Use take 1 after all', 'The first one reads better.')
-    assert seen == [('select', 'j1', 'The first one reads better.', 'The first one reads better.'), ('review', 'j2', 'rejected', T.W['old_used'])]
+    assert seen == [('select', 'j1', 'The first one reads better.', 'The first one reads better.')]   # the second critic's point 4: the newer take gets no review at all
 
 
 # S3: a take rejected with no new one ordered: the server says what the assistant asks
@@ -97,10 +97,10 @@ def test_s6_a_refused_or_withdrawn_order_does_not_stay_pending(held, monkeypatch
     assert 'again' not in s['guides']['S1'] and s['guides']['S1']['again_refused'] == 'the limit' and states(s, p, [job('j1')]) == [('S1', 'waiting for you in the chat')]
     assert 'the cost limit' in T.rejected_due(s, p, [job('j1')])
     s['guides']['S1']['again'] = {'job_id': 'j1', 'words': 'x'}
-    out = G.cancel_order(None, USER, RUN, {}, 'S1', 'Do not make another.')
+    out = G.cancel_order(None, None, USER, RUN, {}, 'S1', 'Do not make another.')
     assert 'again' not in s['guides']['S1'] and out['next'].startswith('The order for another take of S1 is withdrawn')
     with pytest.raises(ValueError):
-        G.cancel_order(None, USER, RUN, {}, 'S1', 'x')                    # nothing to withdraw
+        G.cancel_order(None, None, USER, RUN, {}, 'S1', 'x')                    # nothing to withdraw
 
 
 # S7: the price line is said once per order, on both paths

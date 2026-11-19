@@ -20,12 +20,12 @@ New: the layout `layout.kind = "takes"`, its line kind `take`, its words `layout
 
 | Field | Meaning |
 |---|---|
-| `line`, `key`, `item`, `state` | `l01`…; `pic:take:<job>` (open) or `pic:take-done:<shot>` (recorded); the chat item's id; `open` or `recorded` |
+| `line`, `key`, `item`, `state` | `l01`…; `pic:take:<job>:<mark>` (open; the mark is of the take's check as shown: an answer given to an older view of the check is stale) or `pic:take-done:<shot>` (recorded); the chat item's id; `open` or `recorded` |
 | `kind`, `name`, `kind_words`, `ask` | `take`; the shot's title, else its gap's title and its number in the gap (never an id) |
 | `where`, `film_at`, `words` | "In the film at 0:00.0 to 0:05.2 (5.2 s) · <gap>"; the shot's start; the narration as a plain line (shown only when `caption` is null) |
 | `caption` | `{pre, post, words: [{t, s, e}]}` or null: the words spoken during the shot with their start and end in seconds from the shot's start; `pre` and `post` are the rest of the sentence, shown in grey and never marked |
 | `takes` | every take of the shot, oldest first; the last is the one to answer (3.1) |
-| `pics` | `{code, label, role}`: `before` / `after` (what sits directly before and after the shot, only to compare), `frame` with `take: n` (the take's first frame), `still` (the picture the take started from) |
+| `pics` | `{code, label, role}`: `before` / `after` (what sits directly before and after the shot, only to compare), `frame` with `take: n` (the take's first frame), `sheet` with `take: n` (its frames at four a second: shown in the player's place, with `video.none`, when the take's video cannot be shown), `still` (the picture the take started from) |
 | `buttons` | the answers, each with `take: n`, the tab it belongs to (3.2); empty on a recorded line |
 | `answer` | on a recorded line only: `{say, against, act}` |
 | `details` | `[]` (a take's details are on the take) |

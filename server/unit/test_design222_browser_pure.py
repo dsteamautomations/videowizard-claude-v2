@@ -503,3 +503,41 @@ def test_every_text_on_the_screen_comes_from_the_round(browser):
                   and not re.fullmatch(r'[.:·()\s]*', t.replace(ROUND['step'], ''))})
     assert not odd, odd
     pg.close()
+
+
+# ---------- the second critic's points 8 and 7 (E3, F1, F6; E36) ----------
+
+def test_a_take_with_no_page_video_shows_its_frames_and_its_buttons_stay(browser):
+    said = 'The take cannot be played here: these are its frames, in order.'
+
+    def none(lines, d):
+        lines['l02']['takes'][0]['video'].update(code='', none=said)
+    pg = page(browser, doc(none))
+    go(pg, ONE)
+    pg.wait_for_selector('#sbig img')                                     # the sheet of its frames stands in the player's place
+    assert pg.locator('#sbig video').count() == 0 and pg.locator('#pnone').text_content() == said
+    assert pg.locator('#pbar button').count() == 3 and pg.locator('#pbar button:disabled').count() == 0
+    assert not pg.errors
+    pg.close()
+
+
+def test_a_long_caption_keeps_the_word_being_spoken_in_view_in_two_lines(browser):
+    def long(lines, d):
+        lines['l02']['caption'] = {'pre': '', 'post': '', 'words': [{'t': f'word{i}', 's': round(i * 0.02, 2), 'e': round(i * 0.02 + 0.01, 2)} for i in range(160)]}
+    pg = page(browser, doc(long), size='fit-small')
+    go(pg, ONE)
+    playing(pg)
+    k = ONE['takes'][0]
+
+    def at(s):
+        return pg.evaluate("""s => { const v = document.querySelector('#pvideo'), p = document.querySelector('#pwords'); v.pause();
+          Object.defineProperty(v, 'currentTime', {get: () => s, configurable: true}); v.dispatchEvent(new Event('timeupdate'));
+          const m = p.querySelector('.w.now'), a = p.getBoundingClientRect(), b = m && m.getBoundingClientRect();
+          return {word: m && m.textContent, inside: !!b && b.top >= a.top - 1 && b.bottom <= a.bottom + 1, lines: Math.round(a.height / parseFloat(getComputedStyle(p).lineHeight))}; }""", s)
+    late = at(k['in_s'] + 150 * 0.02 + 0.005)
+    assert late == {'word': 'word150', 'inside': True, 'lines': 2}        # far beyond two lines of text: the caption followed the word
+    early = at(k['in_s'] + 2 * 0.02 + 0.005)
+    assert early == {'word': 'word2', 'inside': True, 'lines': 2}         # and back
+    fits = pg.evaluate("(() => { const m = document.querySelector('#smain'); return m.scrollHeight <= m.clientHeight + 1; })()")
+    assert fits and not pg.errors
+    pg.close()

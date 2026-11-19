@@ -1731,7 +1731,7 @@ def _waiting_items(ctx):
             drawn = job.get('provider') == 'drawn'
             if not drawn and V.round_v2(session):   # design/222: an AI video take: one item per shot (its newest take), the page's own line, words and answers
                 found = next(((g_, sh, k, of) for g_, sh, k, of in T.video_shots(plan, session) if sh['id'] == group), None)
-                if not found or any(i['id'] == f'take:{job["id"]}' for i in items):
+                if not found:
                     continue
                 left = V.cap_of(session) - V.visuals_spend(conn, run)['spent_inr']
                 line = T.line(store, session, plan, *found, take_rows, left_inr=left, price_inr_per_s=V.prices()['video_inr_per_s'])
@@ -1747,7 +1747,7 @@ def _waiting_items(ctx):
                         return {**(out or {}), 'tell': said}
                     return out
                 buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell=b.get('hint') or '') for b in line['buttons']]
-                item = _item(f"take:{job['id']}", 'take', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:], text=T.chat_text(line),
+                item = _item(T.item_id(session, job), 'take', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:], text=T.chat_text(line),   # the id carries the check as shown: an answer to an older view is stale
                              show=[{'key': res['key'], 'name': f'{group}-take.mp4'}] if res.get('key') else [])
                 item['_line'] = line
                 items.append(item)

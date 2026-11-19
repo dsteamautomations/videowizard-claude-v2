@@ -30,8 +30,8 @@
  "lines": [
   {
    "line": "l01",
-   "key": "pic:take:j2",
-   "item": "take:j2",
+   "key": "pic:take:j2:dbbc4099",
+   "item": "take:j2:dbbc4099",
    "state": "open",
    "kind": "take",
    "name": "Housing construction at work, shot 1",
@@ -249,6 +249,18 @@
      "role": "after"
     },
     {
+     "code": "p00029324e23b",
+     "label": "Take 1: its frames, four a second",
+     "role": "sheet",
+     "take": 1
+    },
+    {
+     "code": "p1f2fcc616439",
+     "label": "Take 2: its frames, four a second",
+     "role": "sheet",
+     "take": 2
+    },
+    {
      "code": "pcaa6d716520b",
      "label": "The picture the take started from",
      "role": "still"
@@ -307,8 +319,8 @@
   },
   {
    "line": "l02",
-   "key": "pic:take:j3",
-   "item": "take:j3",
+   "key": "pic:take:j3:8da83604",
+   "item": "take:j3:8da83604",
    "state": "open",
    "kind": "take",
    "name": "Wire-cut bricks",
@@ -455,6 +467,12 @@
      "code": "p73e90f163b2a",
      "label": "Take 1",
      "role": "frame",
+     "take": 1
+    },
+    {
+     "code": "p91e44427b652",
+     "label": "Take 1: its frames, four a second",
+     "role": "sheet",
      "take": 1
     },
     {
@@ -649,6 +667,12 @@
      "code": "p41ca5fab3f31",
      "label": "Take 1",
      "role": "frame",
+     "take": 1
+    },
+    {
+     "code": "p2e164797fca9",
+     "label": "Take 1: its frames, four a second",
+     "role": "sheet",
      "take": 1
     },
     {

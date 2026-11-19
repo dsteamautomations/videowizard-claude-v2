@@ -316,7 +316,7 @@ def test_select_reject_and_use_the_earlier_take_call_the_chats_own_functions(hel
     assert calls == [('review', 'j2', 'rejected', 'A second helper appears.')] and 'again' not in s['guides']['S1']
     del calls[:]
     T.answer(None, None, USER, RUN, {}, 'S1', rows, 'old:1', 'Use take 1 after all', '')
-    assert calls == [('review', 'j1', 'accepted', ''), ('select', 'j1', ''), ('review', 'j2', 'rejected', T.W['old_used'])]   # the critic's S2: the earlier take is selected first
+    assert calls == [('review', 'j1', 'accepted', ''), ('select', 'j1', '')]   # the earlier take is selected; the newer one gets no review (the second critic's point 4)
     with pytest.raises(ValueError):
         T.answer(None, None, USER, RUN, {}, 'S1', rows, 'old:7', 'x', '')
 
