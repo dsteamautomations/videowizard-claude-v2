@@ -153,6 +153,7 @@ def motion_store(approved=True, sh=None):
     sess['motion_stills'] = {'MO1': {'sha256': 'e' * 64, 'frame_key': 'k', 'png': 'p', 'parts': {}, 'approved': {'png': 'p'}}}   # design/221 row 3: MO1's still end-frame approved, so its motion may be uploaded
     store = store_with(sess, doc)
     store.files['run-1/visuals/references/comp-1.png'] = b'\x89PNGcomp'
+    store.files['run-1/visuals/references/ST1.png'] = b'\x89PNGstyle'   # fix set B1: a brief lists only pictures whose file is with the run
     return store
 
 

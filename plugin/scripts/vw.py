@@ -1006,6 +1006,10 @@ def cmd_motion(a):
         if (load_json(last) or {}).get('sha256') != out['sha256']:   # design/134 5: a corrected project's checker sees only its own snapshots
             shutil.rmtree(folder / 'snapshots', ignore_errors=True)
         save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat(), **({'still': True} if getattr(a, 'still', False) else {})})   # the checker reads whether it judges a still
+        if out.get('still_rules') is not None:   # fix set B3: the musts a still can show, as the server holds them: what the still's checker reads in place of rules.md
+            (folder / 'rules-still.md').write_text(''.join(f'{n}. {r}\n' for n, r in enumerate(out['still_rules'], 1)), encoding='utf-8')
+        else:
+            (folder / 'rules-still.md').unlink(missing_ok=True)
         emit(out, 0, out.get('next'))
     if a.what in ('check', 'snapshot'):
         sha = a.sha or (json.loads(last.read_text(encoding='utf-8')).get('sha256') if last.is_file() else '')

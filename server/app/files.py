@@ -57,8 +57,11 @@ def download(run_id: UUID, key: str, user=User):
         run = core.load_run(conn, user, run_id)
         row = conn.execute('select * from vw2_files where run_id=%s and key=%s', (run['id'], key)).fetchone()
     store = storage()
-    if not row and not (key.startswith(f"{run['id']}/") and store.exists(key)):  # working files (planning package, ledger…) live under the run prefix without a receipt row
-        raise Problem(404, 'FILE_MISSING', 'No such retained file.')
+    if not row:  # working files (planning package, ledger…) live under the run prefix without a receipt row
+        from . import visuals_stage   # fix set B1 (defect 55): a brief's picture kept under another name is served from where its file is
+        key = visuals_stage.fetch_key(store, run, key) if key.startswith(f"{run['id']}/") else ''
+        if not key:
+            raise Problem(404, 'FILE_MISSING', 'No such retained file.')
     return file_redirect(store.signed_download(key))
 
 

@@ -166,8 +166,9 @@ def test_once_approved_the_brief_lists_the_parts_and_vw_saves_the_file_beside_it
     store = two()
     out = parts(store)
     b = build(store)
-    assert ('Use these parts (drawn once for the whole film; do not redraw them): part-wall: Wall section; part-arrow: Load arrow. Place each with '
-            '<use href="#part-<name>">: the server puts them in the page, and parts.svg beside this brief shows them.') in b['brief']
+    assert ('Use these parts (drawn once for the whole film; do not redraw them): part-wall: Wall section; part-arrow: Load arrow. Place the view this '   # fix set A3.2: was "Place each with"
+            'drawing shows with <use href="#part-<name>"> (one view of a thing is enough): the server puts them in the page, and parts.svg beside this brief '
+            'shows them.') in b['brief']
     assert b['brief'].index('Drawing spec') < b['brief'].index('Use these parts') < b['brief'].index('Text on screen')
     assert b['parts_key'] == f"run-1/visuals/motion/parts/{out['sha256']}.svg"
     vw = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')

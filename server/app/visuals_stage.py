@@ -5971,10 +5971,14 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
     need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
     els = {e['id']: e for e in (guarded(lambda: current_plan(store, session)).get('elements') or [])}
-    for e in shot.get('element_ids') or []:   # defect 56 (VW-24, 19 Nov 2026): a thing may have several views among the parts (cut across, from above); a drawing places the view it shows, so one of them is enough
+    placed = lambda ids: any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in ids)
+    mine = view_parts(session, shot)
+    for e in shot.get('element_ids') or []:   # defect 56 (VW-24, 19 Nov 2026): a thing may have several views among the parts (cut across, from above); a drawing places the view it shows
         views = [p['id'] for p in shared if p.get('element') == e]
-        if views and not any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in views):
-            thing = (els.get(e) or {}).get('name') or e
+        thing = (els.get(e) or {}).get('name') or e
+        if len(views) > 1 and mine.get(e) and not placed(mine[e]):   # fix set B2: the view the shot's spec states, when the thing has a part drawn in it
+            need(False, PARTS_USE_VIEW.format(shot=shot_id, thing=thing, view=shot['drawing_spec']['view'], ids=', '.join(mine[e])))
+        if views and not placed(views):   # no stated view, or no part drawn in it: one of the thing's views is enough (defect 56's fix, kept)
             need(False, PARTS_USE.format(shot=shot_id, thing=thing, id=views[0]) if len(views) == 1 else PARTS_USE_ONE.format(shot=shot_id, thing=thing, ids=', '.join(views)))
     from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
     notes = pictures.notes_in(rules_text)
@@ -5994,14 +5998,25 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     save_session(store, run, session)
     if still:
         last = last_second(shot, fps)
+        mine = still_rules(held)   # fix set B3: the still's checker is given the musts a still can show and no other rule
         return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000], 'still': True,
+                **({'still_rules': mine} if mine is not None else {}),
                 'next': f"Still stored. Check it (`vw motion check --shot {shot_id} --sha {sha}`), snapshot its last frame (`vw motion snapshot --shot {shot_id} --sha {sha} --at {last:g}`) "
-                        "and give it to a fresh vw-motion-check helper for the must rules a still can show; a verdict with no failed must brings the still to the operator in the chat."}
+                        "and give it to a fresh vw-motion-check helper for the must rules a still can show; a verdict with no failed must brings the still to the operator in the chat."
+                        + (f" Those rules ({len(mine)}) are in work/motion/{shot_id}/rules-still.md: the checker answers each of them and no other." if mine is not None else '')}
     effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
             **({'finish': effects, 'finish_note': motion.finish_note(files, effects) or 'The server adds this finish at snapshot and render; the drawing must be complete without it.'} if effects else {}),
             'next': f"Project stored. Check it with `vw motion check --shot {shot_id} --sha {sha}`, then snapshot it for the fact check; a clean verdict binds it to {shot_id} "
                     f"(nothing goes in the plan), then `vw motion render --shot {shot_id}`."}
+
+
+def still_rules(held):
+    """Fix set B3 (19 Nov 2026): the rules a still end-frame is checked on, as lines for the checker: the musts of a marked list that a still can
+    show (every must not marked `motion`). None for a list with no mark (written before the marks): the checker reads rules.md as before."""
+    if not any(h.get('shows') for h in held or []):
+        return None
+    return [f"must: {h['rule']}" for h in held if h.get('class') != 'should' and h.get('shows') != 'motion']
 
 
 NOTE_DARK, NOTE_LIGHT = '#2B2B2B', '#F2EFE8'   # design/221 row 9: charcoal on a light ground, off-white on a dark one
@@ -6048,10 +6063,12 @@ PARTS_ONE = 'This film has one drawn graphic: it has no shared parts. Brief it d
 PARTS_USE_ONE = ('{shot} shows {thing} but uses none of its shared parts: place the view this drawing shows, one of {ids}, with <use href="#part-…"> '
                  '(drawn once for the whole film; do not redraw it).')
 PARTS_USE = '{shot} shows {thing} but does not use its shared part: place {id} with <use href="#{id}"> (drawn once for the whole film; do not redraw it).'
+PARTS_USE_VIEW = ('{shot} shows {thing} in the view {view} but does not place its part of that view: place {ids} with <use href="#part-…"> '
+                  '(drawn once for the whole film; do not redraw it).')   # fix set B2
 PARTS_OWN_ID = ('{shot} defines {ids}, the id of a shared part: the server puts the shared parts in the page; place them with <use href="#…"> and give your '
                 'own elements other ids.')
-PARTS_LINE = ('Use these parts (drawn once for the whole film; do not redraw them): {parts}. Place each with <use href="#part-<name>">: the server puts them '
-              'in the page, and parts.svg beside this brief shows them.')
+PARTS_LINE = ('Use these parts (drawn once for the whole film; do not redraw them): {parts}. Place the view this drawing shows{view} with '
+              '<use href="#part-<name>"> (one view of a thing is enough): the server puts them in the page, and parts.svg beside this brief shows them.')   # fix set A3.2: was "Place each"
 MOTION_PARTS_CHANGED = 'Its parts changed since this drawing was rendered: render it again (`vw motion render --shot {shot}`); nothing is rebuilt.'
 
 
@@ -6076,6 +6093,17 @@ def shot_parts(session, shot):
     """design/221 row 1: the approved parts a shot uses: those drawing one of its things, and those that draw no thing of the plan."""
     els = set(shot.get('element_ids') or [])
     return [p for p in (session.get('motion_parts_approved') or {}).get('parts') or [] if not p.get('element') or p['element'] in els]
+
+
+def view_parts(session, shot):
+    """Fix set B2 (19 Nov 2026): {thing: its approved parts drawn in the view this shot's spec states}, for the brief and the upload. {} when the
+    spec states no view; a thing with no part drawn in that view is left out (then one of its views is enough, as defect 56's fix)."""
+    view = (shot.get('drawing_spec') or {}).get('view') or ''
+    out = {}
+    for p in (session.get('motion_parts_approved') or {}).get('parts') or []:
+        if view and p.get('view') == view and p.get('element') in (shot.get('element_ids') or []):
+            out.setdefault(p['element'], []).append(p['id'])
+    return out
 
 
 def parts_in_force(session, files):
@@ -6109,7 +6137,7 @@ def parts_brief(store, run, outputs):
     twice = '; '.join(f"{e} {els[e].get('name') or e} ({', '.join(s)})" for e, s in twice if len(s) >= 2)
     head = ['# Shared parts of the drawn graphics', '', f"Things shown by two or more drawings (each is a part to draw once): {twice or 'none'}.",
             'Things of the plan (data-element names the id): ' + '; '.join(f"{e} {x.get('name') or e}" for e, x in els.items()) + '.']
-    return {'brief': '\n'.join(head + [f"\n## {b['shot_id']}\n\n{b['brief']}" for b in briefs]), 'refs': refs_fetchable(store, run, session, list(dict.fromkeys(r for b in briefs for r in b['refs']))),
+    return {'brief': '\n'.join(head + [f"\n## {b['shot_id']}\n\n{b['brief']}" for b in briefs]), 'refs': need_pictures(store, run, session, list(dict.fromkeys(r for b in briefs for r in b['refs'])), 'The shared parts'),
             **({'rejected': (session.get('motion_parts') or {})['rejected']['words']} if (session.get('motion_parts') or {}).get('rejected') else {})}
 
 
@@ -6675,8 +6703,10 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     need(not mute, MOTION_RULE_WORDS.format(shot=shot['id'], rule=str(mute[0])[:160] if mute else ''))
     blind = [r['rule'] for r in rules if r['pass'] == NOT_SEEN and not str(r.get('need') or '').strip()]
     need(not blind, MOTION_RULE_NEED.format(shot=shot['id'], rule=str(blind[0])[:160] if blind else ''))
-    if still:   # hotfix (VW-24, 19 Nov 2026): a still shows no motion, so a rule answered "not seen" on a still is a rule left out, not a frame to fetch:
-        rules = [r for r in rules if r['pass'] != NOT_SEEN]   # it never holds the still and never becomes "not seen twice"
+    marks = {h['id']: h.get('shows') for h in held}   # fix set B3: each rule is marked when it is written: a still can show it, or only motion shows it
+    if still:   # a still shows no motion: an answer to a rule only motion shows is not the still's, whatever it says. A rule with no mark (a list written
+        # before the marks) keeps the hotfix of 19 Nov (VW-24): answered "not seen" on a still it is a rule left out, never a frame to fetch or "not seen twice"
+        rules = [r for r in rules if marks.get(pictures.rule_id(r['rule'])) != 'motion' and (r['pass'] != NOT_SEEN or marks.get(pictures.rule_id(r['rule'])) == 'still')]
     rnd = int(body.get('round') or 1)
     top = HELD_ROUNDS + bool((session.get('motion_more') or {}).get(shot['id']))   # design/221 row 18: round 4 only after "One more round"
     need(still or rnd <= top, HELD_LIMIT.format(shot=shot['id'], rnd=rnd, top=top))
@@ -6685,8 +6715,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
             and any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []))   # row 12: the frames a "not seen" asked for, answered in the same round
     later = bool(prev) and not same and rnd >= 2 and rnd > int(prev.get('round') or 1)   # row 13: round 2 or 3 answers what failed and what the fix touched
     earlier = {pictures.rule_id(r.get('rule')): r for r in (prev or {}).get('rules') or []} if same or later else {}
-    if still:   # the same for what an earlier verdict of the still recorded as not seen, or as failed for being not seen twice
-        earlier = {i: e for i, e in earlier.items() if e.get('pass') != NOT_SEEN and not str(e.get('where') or '').startswith('not seen twice')}
+    if still:   # the same for what an earlier verdict of the still recorded: a motion rule's answer, or an unmarked rule's not seen or "not seen twice"
+        earlier = {i: e for i, e in earlier.items() if marks.get(i) != 'motion'
+                   and (marks.get(i) == 'still' or (e.get('pass') != NOT_SEEN and not str(e.get('where') or '').startswith('not seen twice')))}
     got = {i: ({**r, 'pass': False, 'twice': True, 'where': f"not seen twice in round {rnd} ({r.get('need')})"} if same and r['pass'] == NOT_SEEN and earlier.get(i, {}).get('pass') == NOT_SEEN else r)
            for i, r in ((pictures.rule_id(r.get('rule')), r) for r in rules)}   # design/221 (the critic's A4): not seen twice in a round is a failed must
     if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)
@@ -6695,8 +6726,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
         need(not unknown, MOTION_RULE_UNKNOWN.format(shot=shot['id'], rule=str(unknown[0])[:160] if unknown else ''))
         open_before = [e['rule'] for i, e in earlier.items() if later and e.get('pass') is not True and i not in got]
         need(not open_before, MOTION_RULE_FAILED_BEFORE.format(shot=shot['id'], n=len(open_before), rule=str(open_before[0])[:160] if open_before else ''))
-        skipped = [h['rule'] for h in held if h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
-        need(not skipped or still, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))   # row 3: a still answers only the musts a still can show
+        skipped = [h['rule'] for h in held if (not still or (h.get('shows') == 'still' and h.get('class') != 'should'))   # row 3, fix set B3: a still answers the musts marked as ones a still can show; an unmarked list, any of them
+                   and h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
+        need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
         rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held
                  if not still or h['id'] in got or h['id'] in earlier]
         rules += [{**e, 'class': e.get('class') or _rule_class(e), 'carried': True} for i, e in earlier.items() if i not in known and i not in got]
@@ -6826,7 +6858,9 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
                    + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
     shown = [l for l in sm.get('labels') or [] if _flat(l) != _flat(note)]
     used = shot_parts(session, shot)   # design/221 row 1: the approved shared parts of this shot's things, and those of no thing
-    lines += [('Use these parts', PARTS_LINE.format(parts='; '.join(f"{p['id']}: {p['title']}" for p in used)) if used else '')]
+    mine = {i for ids in view_parts(session, shot).values() for i in ids}   # fix set B2, A3.2: the view this drawing shows, named with its parts
+    lines += [('Use these parts', PARTS_LINE.format(parts='; '.join(f"{p['id']}: {p['title']}" + (f" (view {p['view']})" if p.get('view') else '') for p in used),
+                                                    view=f", {spec['view']} ({', '.join(p['id'] for p in used if p['id'] in mine)})," if mine else '') if used else '')]
     lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in shown) or 'none'}."),   # design/221 (the critic's A1): the labels are in the plan before the first brief
               ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame, in the box from 80 % of the width and 90 % of the height to the edges. '
                                              'Do not draw it, and keep that corner free.' if note else ''),
@@ -6860,7 +6894,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
         if k:   # design/221 row 1: the parts line also carries the drawings of its parts, so a part drawn again makes the rules be read again
             prints[k] = hashlib.sha256((prints.get(k, '') + t + (''.join(p['digest'] for p in used) if k == 'Use these parts' else '')).encode('utf-8')).hexdigest()[:16]
     refs = list(dict.fromkeys([rid for rid, _ in pictures] + [rid for rs in look.values() for rid, _ in rs]))
-    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': refs_fetchable(store, run, session, refs) if build else refs, 'frames': frames, 'fps': str(fps), 'lines': prints,
+    return {'shot_id': shot['id'], 'brief': '\n'.join(t for _, t in lines) + '\n', 'refs': need_pictures(store, run, session, refs, shot['id']) if build else refs, 'frames': frames, 'fps': str(fps), 'lines': prints,
             **({'continues': continues} if continues else {}), **({'parts_key': session['motion_parts_approved']['key']} if used else {})}
 
 
@@ -6887,14 +6921,35 @@ def brief_pictures(session, shot):
             and (r.get('kind') == 'style' or rid in gold or (r.get('kind') in ('component', 'sheet') and r.get('element_id') in els))]
 
 
-def refs_fetchable(store, run, session, ids):
-    """Defect 55 (VW-24, 19 Nov 2026): the plugin fetches a brief's pictures as <run>/visuals/references/<id>.png. A picture kept under another
-    name (an approved drawing of a thing) is copied there once, so the fetch finds it. The ids, unchanged."""
-    for rid in ids:
-        r = (session.get('references') or {}).get(rid) or {}
-        at = f"{run['id']}/visuals/references/{rid}.png"
-        if r.get('key') and r['key'] != at and not store.exists(at):
-            store.put(at, store.get(r['key']), 'image/png')
+def picture_file(store, run, session, rid):
+    """Fix set B1 (defect 55, 19 Nov 2026): where this picture's file is: the key its record names (an approved drawing is kept under
+    visuals/drawings/), else <run>/visuals/references/<id>.png; '' when no file is there. The brief and the fetch both ask this."""
+    for k in (((session.get('references') or {}).get(rid) or {}).get('key'), key(run, f'references/{rid}.png')):
+        if k and store.exists(k):
+            return k
+    return ''
+
+
+def fetch_key(store, run, k):
+    """Fix set B1: the key the download route serves for `k`: `k` itself when a file is there; for <run>/visuals/references/<id>.png (the name the
+    plugin asks a brief's picture by) with no file there, where that picture's file is; '' when there is none."""
+    if store.exists(k):
+        return k
+    m = re.fullmatch(re.escape(key(run, 'references/')) + r'([^/]+)\.png', k)
+    try:
+        return picture_file(store, run, session_of(store, run, None), m.group(1)) if m else ''
+    except Problem:   # a run with no visuals session holds no such picture
+        return ''
+
+
+PICTURE_MISSING = ('{what}: the file of an approved picture of this brief is not with the run: {ids}. It cannot be fetched: file a defect (`vw defect`) '
+                   'that names it; do not build from the brief without it.')
+
+
+def need_pictures(store, run, session, ids, what):
+    """Fix set B1: a brief lists only pictures whose file can be fetched; a missing one is named here, not as a 404 at the fetch. The ids, unchanged."""
+    gone = [rid for rid in ids if not picture_file(store, run, session, rid)]
+    need(not gone, PICTURE_MISSING.format(what=what, ids=', '.join(gone)))
     return ids
 
 

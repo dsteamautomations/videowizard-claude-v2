@@ -287,8 +287,9 @@ def test_the_texts_say_must_and_should_not_seen_the_frames_later_rounds_and_the_
     olds = {'common': before['prompt'], **{p['name']: p['text'] for p in before['parts']}}
     for where, old, new in W.PAIRS:
         assert texts[where].count(new) == 1 and olds[where].count(old) == 1, old[:50]
+    import fixset1_wording as FIX1   # fix set phase 1: the marks (still) and (motion) come after "Start every rule with `must:` or `should:`."
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(D221D.now(file, new)) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX1.now(file, D221D.now(file, new))) == 1, file
     later = texts['later']
     frames = 'the first frame, each cue, the middle of each move, the last frame, and a close-up of each labelled part'
     assert frames in later and 'Only a failed must sends the drawing back' in later and '"not seen"' in later and 'keeps its pass' in later

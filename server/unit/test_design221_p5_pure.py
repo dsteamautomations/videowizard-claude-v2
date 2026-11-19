@@ -234,7 +234,8 @@ def test_the_parts_and_still_answers_are_the_operators_decision_in_the_log():
 
 # ---------- defect 55 (VW-24): a brief's picture kept under another name is fetchable ----------
 
-def test_defect55_a_picture_kept_under_another_name_is_copied_to_where_the_plugin_fetches_it():
+def test_defect55_a_picture_kept_under_another_name_is_found_where_it_is_and_nothing_is_copied():
+    """Fix set phase 1 (B1): the hotfix copied the picture to where the plugin fetches it; now one function says where a picture's file is."""
     from app import visuals_stage as V
 
     class Store:
@@ -255,8 +256,8 @@ def test_defect55_a_picture_kept_under_another_name_is_copied_to_where_the_plugi
     st = Store()
     session = {'references': {'drawing-TILE-a-1': {'key': 'R/visuals/drawings/abc/a-plain.png'}, 'f1': {'key': 'R/visuals/references/f1.png'}, 'gone': {}}}
     ids = ['drawing-TILE-a-1', 'f1', 'gone', 'unknown']
-    assert V.refs_fetchable(st, {'id': 'R'}, session, ids) == ids
-    assert st.d['R/visuals/references/drawing-TILE-a-1.png'] == b'PNG-A' and st.puts == ['R/visuals/references/drawing-TILE-a-1.png']
-    V.refs_fetchable(st, {'id': 'R'}, session, ids)   # a second brief copies nothing again
-    assert st.puts == ['R/visuals/references/drawing-TILE-a-1.png']
+    assert [V.picture_file(st, {'id': 'R'}, session, i) for i in ids] == ['R/visuals/drawings/abc/a-plain.png', 'R/visuals/references/f1.png', '', '']
+    assert V.need_pictures(st, {'id': 'R'}, session, ids[:2], 'MO1') == ids[:2] and st.puts == []
+    with pytest.raises(ValueError, match='MO1: the file of an approved picture of this brief is not with the run: gone, unknown'):
+        V.need_pictures(st, {'id': 'R'}, session, ids, 'MO1')
 

@@ -188,13 +188,14 @@ def apply_note(folder, note, width=1920, height=1080):
 
 MAX_PARTS = 1_000_000   # design/221 row 1: the parts file is small
 PART_ID = re.compile(r'part-[a-z0-9]+(?:-[a-z0-9]+)*')
+PART_VIEWS = ('cutaway', 'plan', 'side', 'elevation')   # the views a drawing spec can state (visual_contract.DrawingSpec.view)
 SVG_INNER = re.compile(r'<svg\b[^>]*>(.*)</svg>\s*$', re.S)
 
 
 def read_parts(text, elements):
     """design/221 row 1: the film's shared parts file, one <svg> of <symbol id="part-<name>"> (a <title>, a viewBox, data-element naming a thing of
-    the plan when it draws one), checked like a project: no network, no script, no picture or file, no DOCTYPE. ([{id, title, element, digest}],
-    [each problem in one line])."""
+    the plan when it draws one, data-view naming the view it is drawn in when the thing has several), checked like a project: no network, no script,
+    no picture or file, no DOCTYPE. ([{id, title, element, view, digest}], [each problem in one line])."""
     import hashlib
     from xml.etree import ElementTree as ET
     if re.search(r'<!DOCTYPE|<!ENTITY', text, re.I):
@@ -234,7 +235,10 @@ def read_parts(text, elements):
         element = el.get('data-element') or ''
         if element and element not in elements:
             out.append(f'{pid} draws {element}, which is no thing of the plan (data-element names an element id)')
-        parts.append({'id': pid, 'title': title, 'element': element, 'digest': hashlib.sha256(ET.tostring(el)).hexdigest()[:16]})
+        view = el.get('data-view') or ''   # fix set B2: the view the part is drawn in, in the spec's own words, so a drawing can be told which view to place
+        if view not in ('', *PART_VIEWS):
+            out.append(f"{pid}: data-view is the view the part is drawn in, one of {', '.join(PART_VIEWS)}, or left out")
+        parts.append({'id': pid, 'title': title, 'element': element, 'view': view, 'digest': hashlib.sha256(ET.tostring(el)).hexdigest()[:16]})
     if not parts and not out:
         out.append('the parts file has no <symbol id="part-…">: one symbol per shared part')
     return parts, list(dict.fromkeys(out))

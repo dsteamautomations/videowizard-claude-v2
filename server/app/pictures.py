@@ -549,19 +549,21 @@ def rule_id(text):
     return hashlib.sha1(' '.join(str(text or '').split()).lower().encode('utf-8')).hexdigest()[:8]
 
 
-RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*:\s*[*_]*\s*', re.I)
+RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*(?:\(\s*(still|motion)\s*\))?[*_]*\s*:\s*[*_]*\s*', re.I)
 
 
 def rules_of(text):
     """C6: the rules of a drawing (`work/motion/<shot>/rules.md`) as the server keeps them: every list line, numbered or bulleted, with its id.
-    design/221 row 11: a rule starts with `must:` or `should:`; the class is kept beside the rule, never in its words or its id; no class is a must."""
+    design/221 row 11: a rule starts with `must:` or `should:`; the class is kept beside the rule, never in its words or its id; no class is a must.
+    Fix set B3 (19 Nov 2026): after the class the rule writer marks what shows the rule, `must (still):` (the finished picture, standing still) or
+    `must (motion):` (only the moving drawing); kept as `shows`. A rule with no mark (a list written before) has no `shows`."""
     out = {}
     for raw in str(text or '').splitlines():
         m = re.match(r'\s*(?:[-*]|\d+[.)])\s+(.*\S)', raw)
         if m:
             c = RULE_CLASS.match(m.group(1))
             words = ' '.join(m.group(1)[c.end() if c else 0:].split())
-            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must'})
+            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must', **({'shows': c.group(2).lower()} if c and c.group(2) else {})})
     return list(out.values())
 
 

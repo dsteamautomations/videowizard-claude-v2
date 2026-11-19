@@ -1,0 +1,56 @@
+{
+  "about": "The shape of a real step 6 session (drawn graphics), for tests: shapes and ids only, no picture and no film's own text. Things with several views among the shared parts; pictures kept in both places a run keeps them; a chain of drawings that continue one another; a still round and an animated round of verdicts on one drawing; rules a still can show and rules only motion shows. Loaded by step6_shape.load().",
+  "elements": [
+    {"id": "E1", "name": "Block", "kind": "object", "identity": "representative", "requirements": "a block"},
+    {"id": "E2", "name": "Rod", "kind": "object", "identity": "representative", "requirements": "a rod"},
+    {"id": "E3", "name": "Base", "kind": "object", "identity": "representative", "requirements": "a base"}
+  ],
+  "shots": [
+    {"id": "D1", "gap": "G1", "start_frame": 0, "end_frame": 100, "view": "cutaway", "element_ids": ["E1", "E2"], "labels": ["Block", "Rod"]},
+    {"id": "D2", "gap": "G1", "start_frame": 100, "end_frame": 200, "view": "cutaway", "element_ids": ["E1", "E2"], "labels": ["Block"]},
+    {"id": "D3", "gap": "G1", "start_frame": 200, "end_frame": 300, "view": "", "element_ids": ["E1", "E3"], "labels": ["Base"]},
+    {"id": "D4", "gap": "G2", "start_frame": 900, "end_frame": 1000, "view": "plan", "element_ids": ["E2", "E3"], "labels": ["Rod"], "return_of": "D1"}
+  ],
+  "continues": {"D2": "D1", "D3": "D2", "D4": "D1"},
+  "parts": [
+    {"id": "part-block-section", "element": "E1", "view": "cutaway", "title": "Block, cut across"},
+    {"id": "part-block-top", "element": "E1", "view": "plan", "title": "Block from above"},
+    {"id": "part-block-under", "element": "E1", "view": "", "title": "Block from below"},
+    {"id": "part-rod-end", "element": "E2", "view": "cutaway", "title": "Rod, its cut end"},
+    {"id": "part-rod-grid", "element": "E2", "view": "plan", "title": "Rods from above"},
+    {"id": "part-base", "element": "E3", "view": "", "title": "Base"},
+    {"id": "part-arrow", "element": "", "view": "", "title": "Arrow"}
+  ],
+  "references": {
+    "f-block": {"id": "f-block", "name": "Block", "kind": "frame", "element_id": "E1", "status": "approved", "key": "run-1/visuals/references/f-block.png", "sha256": "sha-f-block", "subject": "the block"},
+    "drawing-E1-a-0a1b2c3d": {"id": "drawing-E1-a-0a1b2c3d", "name": "Block: from the side", "kind": "drawing", "element_id": "E1", "status": "approved", "key": "run-1/visuals/drawings/0a1b2c3d4e5f/a-plain.png", "sha256": "sha-a", "width": 1200, "height": 900, "view": "a", "view_kind": "side", "drawing_sha256": "0a1b2c3d4e5f"},
+    "drawing-E1-b-0a1b2c3d": {"id": "drawing-E1-b-0a1b2c3d", "name": "Block: from above", "kind": "drawing", "element_id": "E1", "status": "approved", "key": "run-1/visuals/drawings/0a1b2c3d4e5f/b-plain.png", "sha256": "sha-b", "width": 1200, "height": 900, "view": "b", "view_kind": "top", "drawing_sha256": "0a1b2c3d4e5f"},
+    "comp-rod": {"id": "comp-rod", "name": "Rod", "kind": "component", "element_id": "E2", "status": "approved", "key": "run-1/visuals/references/comp-rod.png", "sha256": "sha-comp-rod", "subject": "the rod"},
+    "sheet-base": {"id": "sheet-base", "name": "Base", "kind": "sheet", "element_id": "E3", "status": "approved", "key": "run-1/visuals/references/sheet-base.png", "sha256": "sha-sheet-base", "subject": "the base"},
+    "style-1": {"id": "style-1", "name": "Style", "kind": "style", "element_id": "", "status": "approved", "key": "run-1/visuals/references/style-1.png", "sha256": "sha-style-1", "subject": "the look"},
+    "cand-1": {"id": "cand-1", "name": "Base, a candidate", "kind": "keyframe", "element_id": "E3", "status": "candidate", "key": "run-1/visuals/references/cand-1.png", "sha256": "sha-cand-1", "subject": "the base"}
+  },
+  "files": [
+    "run-1/visuals/references/f-block.png",
+    "run-1/visuals/drawings/0a1b2c3d4e5f/a-plain.png",
+    "run-1/visuals/drawings/0a1b2c3d4e5f/b-plain.png",
+    "run-1/visuals/references/comp-rod.png",
+    "run-1/visuals/references/sheet-base.png",
+    "run-1/visuals/references/style-1.png",
+    "run-1/visuals/references/cand-1.png"
+  ],
+  "rules": [
+    {"class": "must", "shows": "still", "rule": "The block rests on the rods with no gap between them."},
+    {"class": "must", "shows": "still", "rule": "There are four rods, evenly spaced."},
+    {"class": "should", "shows": "still", "rule": "The leader lines do not cross one another."},
+    {"class": "must", "shows": "motion", "rule": "The rods appear before the block is lowered onto them."},
+    {"class": "must", "shows": "motion", "rule": "The whole picture keeps its framing from the first frame to the last: nothing scales or pans the frame."},
+    {"class": "should", "shows": "motion", "rule": "The arrow travels from left to right."}
+  ],
+  "rounds": {
+    "D1": {
+      "still": {"0": true, "1": true, "3": "not seen", "4": "not seen"},
+      "animated": {"0": true, "1": true, "2": false, "3": true, "4": true, "5": true}
+    }
+  }
+}
