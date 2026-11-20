@@ -949,7 +949,7 @@ def cmd_motion(a):
     if a.what == 'status':
         if not a.job:
             emit({'action': 'refused', 'message': 'Give the job: `vw motion status --job J`.'}, 2)
-        emit(call('GET', f'{base}/motion/jobs/{a.job}'), 0)
+        emit(motion_wait(base, a.job) if getattr(a, 'wait', False) else call('GET', f'{base}/motion/jobs/{a.job}'), 0)   # release 3, E2: --wait waits here for that job
     if a.what == 'rule':   # design/130 §4 step 8: a correction kept for every later film on the subject, with the operator's words
         if not (a.subject and a.add and a.quote):
             emit({'action': 'refused', 'message': 'Give the subject, the rule and the operator\'s words: `vw motion rule --subject rat-trap-bond --add "…" --quote "<their yes>"`.'}, 2)
@@ -1094,6 +1094,12 @@ def cmd_motion(a):
         emit(out, 0, out.get('next'))
     if a.what == 'render':
         out = write(base + '/motion/render', {'shot_id': a.shot})
+        if getattr(a, 'wait', False) and out.get('job_id') and not out.get('cached'):   # release 3, E2: one call that returns when the render is ready, as the check and the snapshot do
+            job = motion_wait(base, out['job_id'])
+            done = job.get('status') == 'ready'
+            emit({**out, 'status': job.get('status'), 'error': job.get('error')}, 0 if done or job.get('status') in ('queued', 'running') else 2,
+                 f"The render of {a.shot} is ready (job {out['job_id']})." if done else f"The render of {a.shot} {'failed' if job.get('status') == 'failed' else 'is ' + str(job.get('status'))} (job {out['job_id']})"
+                 + (f": {job['error']}" if job.get('error') else f": still being made after {MOTION_WAIT_S // 60} minutes; `vw motion status --job {out['job_id']} --wait`."))
         emit(out, 0, ' '.join(x for x in (out.get('next'), ('Tell the operator: ' + out['tell_the_operator']) if out.get('tell_the_operator') else '') if x))
     if a.what == 'finish':   # design/186: the operator's word takes a drawing's finish away, or puts it back; the same server function as the page's button
         if not a.shot or a.off == a.on:
@@ -4084,6 +4090,7 @@ def build_parser():
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.add_argument('--off', action='store_true', help="finish: take the drawing's finish away (design/186)"); s.add_argument('--on', action='store_true', help='finish: put it back')
     s.add_argument('--still', action='store_true', help='upload: the still end-frame, the picture at the end of the shot with no motion, approved before the motion (design/221 row 3)')
+    s.add_argument('--wait', action='store_true', help='render, status: wait inside the tool until that job is ready (release 3; check and snapshot always wait)')
     s.set_defaults(fn=cmd_motion)
     s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'drawing', 'drawing-approve', 'drawing-reject', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
     for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix'):
