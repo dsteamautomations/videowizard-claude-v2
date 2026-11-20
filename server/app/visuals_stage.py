@@ -2850,9 +2850,17 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
     for r in session['references'].values():
         if r.get('kind') == 'sheet' and r.get('sources_changed') and r.get('status') != 'rejected':
             add(-1, f"Reference sheet · {r['element_id']} · sources changed", 'references', r['element_id'], r['id'], 'sheet to approve')
+    counted = {}   # fix set (SK, 20 Nov 2026): a drawn shot offers only the render pictures._drawn_state counts or holds (its newest, of the bound project and this plan); one made before it is never offered
+
+    def superseded(j, sh):
+        if j.get('provider') != 'drawn':
+            return False   # design/222: an AI video shot's takes are all read, on purpose
+        if j['unit'] not in counted:
+            counted[j['unit']] = pictures._drawn_state(session, sh, take_rows, plan)[1]
+        return not counted[j['unit']] or str(counted[j['unit']]['id']) != str(j['id'])
     for j in take_rows:   # design/207 (D2): a reuse no longer waits for the operator (the older way, retired: "Reuse · <shot>", reuse to approve)
         sh, reviews = shots.get(j['unit']), session['reviews'].get(str(j['id'])) or []
-        if sh and j['status'] == 'ready' and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected') \
+        if sh and j['status'] == 'ready' and not superseded(j, sh) and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected') \
                 and not (j.get('provider') == 'video' and j['unit'] in session['selections']):   # design/222: an AI video shot with a take selected is not asked about again
             if held_drawing(session, j['unit']):   # design/221 row 18: a drawing held after its rounds is an early decision, a card in the chat
                 add(sh['start_frame'], f"Held drawing · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'held drawing')

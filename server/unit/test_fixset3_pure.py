@@ -320,8 +320,7 @@ def test_m6_the_refusals_seen_on_the_run_end_with_the_next_step():
 
 # ---------- the investigation (report only): which render of a drawn shot the page offers ----------
 
-@pytest.mark.xfail(strict=True, reason='not fixed in this phase (SK decides): visuals_stage.waiting lists one take per shot label and take_jobs is oldest first, so after a '
-                                       're-render the page and the chat offer the shot\'s oldest ready render, while pictures.expected counts the newest as made and checked')
+# Fixed on SK's word of 20 Nov 2026 (test_fixset5_pure.py): visuals_stage.waiting offered the shot's oldest ready render; it offers the one pictures.expected counts.
 def test_investigation_after_a_render_is_made_again_the_page_offers_the_render_that_is_counted():
     store = finished()
     old, new = {**drawn_job('job-7'), 'created_at': '2026-01-01T00:00:00+00:00'}, {**drawn_job('job-8'), 'created_at': '2026-01-02T00:00:00+00:00'}
@@ -330,7 +329,7 @@ def test_investigation_after_a_render_is_made_again_the_page_offers_the_render_t
     counted = next(i for i in P.expected(s, plan, [old, new]) if i['id'] == 'MO1')
     assert counted['state'] == 'made and checked' and counted['job']['id'] == 'job-8'   # the newest render is the one counted
     offered = [w['item'] for w in VS.waiting(s, plan, 'VW-1', [old, new], gate=False) if w['kind'] == 'take to select']
-    assert offered == ['job-8']   # today: ['job-7'], the older render (made on the plan of before)
+    assert offered == ['job-8']   # before: ['job-7'], the older render (made on the plan of before)
 
 
 # ---------- the texts ----------
