@@ -132,6 +132,11 @@ W = {
     'start_checks': 'the checkers of {ids} ({n})',
     'motion_after': 'The motion of {ids} comes after the still end-frames.',
     'waits_on': 'Waiting on another drawing: {pairs}.',
+    # release 2, section F (20 Nov 2026): F15, a clean drawing whose render the operator rejects; F12, a selected drawing a later comparison fails on
+    'take_rejected': ('{shot}: the operator rejected this drawing{words}. Give these words to a new `vw-motion-shot` helper to build its motion again '
+                      '(a new project, not a new render of this one), upload it and check it again from round 1.'),
+    'selected_failed': ('{shot} was selected, and a comparison with another drawing failed on it afterwards: it is being redone. Tell the operator; the new drawing is '
+                        'asked on the page when it is made.'),
     'later_step': 'Made from a step that was corrected.',
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
@@ -1170,6 +1175,37 @@ def _by_other(rows):
     return out
 
 
+def _compare_said(sid, cmp):
+    """Fix set A1.2: what stands with a drawing's comparisons (`visuals_stage.compared`), as the sentences of the next-step line."""
+    return ' '.join(W['compare_' + k].format(shot=sid, other=o, n=len(rs), s='' if len(rs) == 1 else 's', rule=rs[0], round=cmp['round']) for k in ('due', 'waits', 'closed')
+                    for o, rs in _by_other(cmp.get(k) or []).items())
+
+
+def _rejected_take(session, sid, take_rows):
+    """Release 2, F15 (20 Nov 2026): the operator's review of the shot's newest render when it rejects it and no project of the shot was uploaded
+    since: the drawing itself is refused, so it is built again with their words (a new render of the same project would be the same drawing).
+    None when a newer render exists (made again without the effect) or a rebuild is already uploaded."""
+    rows = [j for j in take_rows or [] if j.get('provider') == 'drawn' and j.get('unit') == sid]
+    review = ((session.get('reviews') or {}).get(str(rows[-1]['id'])) or [{}])[-1] if rows else {}
+    made = _ts(rows[-1].get('created_at')) if rows else None
+    newer = any(t and made and t > made for t in (_ts(p.get('at')) for p in (session.get('motion_projects') or {}).values() if p.get('shot_id') == sid))
+    return review if review.get('decision') == 'rejected' and not newer else None
+
+
+def _selected_state(session, plan, sid, take_rows):
+    """Release 2, F12: (state, the next step) of a drawn shot the operator selected. 'answered', unless a comparison with another drawing came due
+    afterwards (that drawing's still end-frame was approved or replaced): then it is being checked until the comparison is judged, and a comparison
+    that fails on it after the selected render reopens it: being redone, said for the operator."""
+    cmp = V.compared(session, plan, sid)
+    if cmp.get('due'):
+        return 'checking', _compare_said(sid, cmp)
+    job = next((j for j in take_rows or [] if str(j['id']) == str(session['selections'][sid].get('job_id'))), None)
+    made = _ts((job or {}).get('created_at'))
+    after = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still') and made and (_ts(c.get('at')) or made) > made]   # the verdicts since the selected render
+    failed = any(r.get('with_png') and r.get('pass') is False and r.get('class') != 'should' for c in after for r in c.get('rules') or [])
+    return ('redo', W['selected_failed'].format(shot=sid)) if failed and V.open_rules(after[-1]) else ('answered', '')   # until a verdict of the redone drawing is clean
+
+
 def _drawn_state(session, sh, take_rows, plan=None):
     """(state, the render job shown, the next step) of a drawn shot, from what the server knows: the render jobs, the held verdict, the verdicts,
     the uploads, the still end-frame. 'made and checked' only once its render is ready and not stale."""
@@ -1181,17 +1217,16 @@ def _drawn_state(session, sh, take_rows, plan=None):
         return 'held', last, ''
     checks = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still')]
     cmp = V.compared(session, plan, sid) if plan else {}   # fix set A1.2: its rules that compare with another drawing
-    said = ' '.join(W['compare_' + k].format(shot=sid, other=o, n=len(rs), s='' if len(rs) == 1 else 's', rule=rs[0], round=cmp['round']) for k in ('due', 'waits', 'closed')
-                    for o, rs in _by_other(cmp.get(k) or []).items())
+    said = _compare_said(sid, cmp)
     if cmp.get('due'):
         return 'checking', None, said   # a comparison that came due is a must not yet judged: never dropped, and the page waits for it
     if last and last['status'] == 'ready':
         made, judged = _ts(last.get('created_at')), _ts(checks[-1].get('at')) if checks else None
         if made and judged and judged > made and V.held_rules(checks[-1]):
             return 'redo', None, said   # a verdict after the render failed a must (a comparison that came due): the old render is not the drawing any more
-        redrawn = [t for t in (_ts(p.get('at')) for p in (session.get('motion_projects') or {}).values() if p.get('shot_id') == sid and p.get('still')) if t]
+        redrawn = [t for t in (_ts(p.get('at')) for p in (session.get('motion_projects') or {}).values() if p.get('shot_id') == sid) if t]
         if made and sid not in (session.get('motion_bound') or {}) and any(t > made for t in redrawn):
-            return 'redo', None, said   # fix set A3.5: a new still uploaded after the render (set_motion unbound the shot): being redone at once
+            return 'redo', None, said   # fix set A3.5: a new still uploaded after the render (set_motion unbound the shot): being redone at once. Release 2, F8: a new animated project too
         was = (last.get('request') or {}).get('sha256')
         if was and (session.get('motion_bound') or {}).get(sid) not in (None, was):
             return 'making', None, said   # the redrawn project passed and is the bound one: this render is of the project before; its own render comes next
@@ -1220,7 +1255,7 @@ def expected(session, plan, take_rows, now=None):
             continue
         sid, job, due, turn = sh['id'], None, '', ('', '')
         if sid in (session.get('selections') or {}) or sid in (session.get('assets') or {}):
-            state = 'answered'
+            state, due = _selected_state(session, plan, sid, take_rows) if kind == 'drawn' and sid in (session.get('selections') or {}) else ('answered', '')   # F12
         elif kind == 'drawn':
             state, job, due = _drawn_state(session, sh, take_rows, plan)
             if state in ('none', 'making', 'checking', 'redo'):

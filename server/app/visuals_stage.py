@@ -6127,8 +6127,8 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
                                                       **({'rules': held, 'brief': lines} if held else {}), **({'still': True} if still else {}),
                                                       **({'left_out': sorted(idle)} if idle else {}),   # the critic's point 1: the comparisons this upload's checker was not given
                                                       **({'opens_on': on['png'], 'opens_from': prev} if on else {})}   # the critic's point 7: the picture of the earlier drawing this still opens on
-    if not still or sha != st.get('sha256'):   # fix set A3.5: a new still of a bound shot is a redraw: its old project is no longer
-        (session.get('motion_bound') or {}).pop(shot_id, None)   # the drawing (the count says "being redone"; a drawing that continues it waits). design/221 (the critic's A1): a later upload is bound only by its own clean verdict
+    if sha != (st.get('sha256') if still else (session.get('motion_bound') or {}).get(shot_id)):   # fix set A3.5: a new still of a bound shot is a redraw: its old project is no longer
+        (session.get('motion_bound') or {}).pop(shot_id, None)   # the drawing (the count says "being redone"; a drawing that continues it waits). design/221 (the critic's A1): a later upload is bound only by its own clean verdict. Release 2, F3: the bound project uploaded again (for a frame to compare with) stays bound
     save_session(store, run, session)
     held = [h for h in held if h['id'] not in idle]   # fix set A1.2: a comparison with nothing to compare with yet waits as a note: no checker is asked for it
     frames = compare_frames(cmp)
@@ -6173,7 +6173,7 @@ def comparing(session, plan, held):
         other = h.get('with')
         if other and other not in parts:
             st = (session.get('motion_stills') or {}).get(other) or {}
-            out[h['id']] = {'with': other, 'rule': h['rule'], **({'state': 'closed'} if other not in drawn else
+            out[h['id']] = {'with': other, 'rule': h['rule'], **({'state': 'closed'} if other not in drawn or other in (session.get('assets') or {}) else   # release 2 (c): nor one the operator's own file replaced: it gets no still
                                                                 {'state': 'ready', 'png': st['png'], 'key': st['frame_key']} if still_approved(st) and st.get('frame_key') else {'state': 'waits'})}
     return out
 
