@@ -104,7 +104,9 @@ class SupabaseStorage:
         try:
             self._call('HEAD', f'/storage/v1/object/{self.bucket}/{quote(key, safe="/")}')
             return True
-        except Problem:
+        except Problem as exc:
+            if exc.status == 503:   # release 2 (b): storage that cannot be reached is not a missing file (a brief would name an approved picture as lost)
+                raise
             return False
 
     def signed_upload(self, key):
