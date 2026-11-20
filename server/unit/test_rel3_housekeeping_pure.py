@@ -29,4 +29,7 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert 'guide-frame1' in rows['302'] and 'release 4' in rows['302']
     for n, words in (('303', 'C6'), ('304', 'C1'), ('305', 'C2'), ('306', 'E2')):
         assert words in rows[n] and 'release 3' in rows[n], n
-    assert '307' not in rows
+    # the critic's points on releases 3 and 4 (commit 74f4d7a) are rows 307 to 309
+    for n in ('307', '308', '309'):
+        assert n in rows, n
+    assert '310' not in rows
