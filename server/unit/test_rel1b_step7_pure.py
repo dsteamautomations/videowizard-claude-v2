@@ -1,0 +1,275 @@
+"""Release 1, section D (SK, 20 Nov 2026, answer 12: "Check the code, build what is missing"): the lessons of step 6 carried into step 7.
+Each point was first read in the code; what was right has a test here that proves it, what was missing was built with a test that failed first.
+
+D1 (built): the next-step line of step 7 names what can start now, together in one message: the writers of the scene descriptions, the
+   checkers of the stills, the checkers of the takes.
+D2 (built): the early cards come in batches in film order: every still's card, then every word to shoot; a shoot word waits while a still
+   is being checked (its card comes with the look, or after 30 minutes as not checked); a rejected still does not hold the others' words.
+D3 (proved): everything the operator chooses before a shot's first take is asked before it is paid for.
+D4 (built in part): each limit of step 7's tools is named where the assistant reads it, and its refusal ends with the next step.
+D5 (proved): "being redone" shows at once in the line of counts after "Make another".
+D6 (proved): "does not apply", "not checked" and an unanswered line can never hold a take or turn into a fail, and nothing loops.
+D7 (proved): no take waits on another shot's take; one "Make another" or one rejection does not close the page for the others.
+Mid-flight (proved): a step 7 under way continues after the update with nothing asked again. Without a database."""
+import json
+from datetime import timedelta
+from pathlib import Path
+
+import pytest
+
+from app import chat_flow as CF, guide as G, guide_spec, page_flow as PF, pictures as P, takes as T, video_generators as VG, visuals_stage as V
+from app.errors import Problem
+from test_design151_refs_pure import NEW
+from test_design222_critic2_pure import film, item, landed, on_page, second_take   # noqa: F401 (film: the fixture)
+from test_design222_takes_pure import NOW, RUN, USER as OP, guide, held, job, look, plan, rec, session, shot, states   # noqa: F401 (held: the fixture)
+from test_guide_route_pure import refused, scene, spec10, take_film   # noqa: F401 (take_film: the fixture)
+from test_visuals_stage_pure import USER, saved
+
+ROOT = Path(__file__).resolve().parents[2]
+LOOKED = {'sha256': 's' * 64, 'lines': []}
+
+
+def three():
+    """Three AI video shots in film order S1, S2, S3; the guides were written in another order."""
+    return plan(shot('S1', end=100, title='Mason'), shot('S2', start=100, end=200, title='Wall'), shot('S3', start=200, end=300, title='Roof'))
+
+
+def cards(s, p, monkeypatch, rows=()):
+    monkeypatch.setattr(V, 'take_jobs', lambda conn, run, sid=None: [j for j in rows if sid in (None, j['unit'])])
+    ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': OP, 'outputs': [], 'conn': None}
+    return [i['id'].split(':')[0] + ':' + i['id'].split(':')[1] for i in CF._guide_items(ctx)]
+
+
+# ---------- D1: what can start now, together ----------
+
+def test_d1_the_next_step_line_names_the_checkers_and_writers_that_can_start_now_together(held):
+    s, p = session(), three()
+    s['guides'] = {'S2': guide(still='candidate', prompt=False), 'S3': guide(takes=['j3'])}             # S1: nothing yet; S2: its still waits for Claude's look; S3: its take does
+    s['take_checks'] = {'j3': rec()}
+    held(s, p)
+    said = T.starts(s, p, [job('j3', 'S3')])
+    assert said == 'Start now, together in one message: the writers of the scene descriptions of S1 (1); the checkers of the stills of S2 (1); the checkers of the takes of S3 (1).'
+    s['guides']['S1'] = guide(still='candidate', prompt=False)
+    s['guides']['S1']['stills'][0]['id'] = 'st0'
+    assert T.starts(s, p, [job('j3', 'S3')]).startswith('Start now, together in one message: the checkers of the stills of S1, S2 (2); ')
+    s['guides']['S1']['stills'][0]['look'] = s['guides']['S2']['stills'][0]['look'] = LOOKED
+    s['take_checks']['j3'] = rec(look=look())
+    assert T.starts(s, p, [job('j3', 'S3')]) == ''                                                       # nothing to start: nothing said
+
+
+def test_d1_the_closed_page_and_the_looks_list_say_to_start_them_together(held, monkeypatch):
+    s, p = session(), three()
+    s['guides'] = {'S1': guide(takes=['j1']), 'S2': guide(takes=['j2']), 'S3': guide(takes=['j3'])}
+    s['take_checks'] = {j: rec() for j in ('j1', 'j2', 'j3')}
+    held(s, p)
+    rows = [job('j1', 'S1'), job('j2', 'S2'), job('j3', 'S3')]
+    monkeypatch.setattr(V, 'take_jobs', lambda conn, run, sid=None: rows)
+    page = PF._takes_page({'session': s, 'plan': p, 'conn': None, 'run': RUN}, {}, None, T.expected(s, p, rows, NOW))
+    assert 'Start now, together in one message: the checkers of the takes of S1, S2, S3 (3).' in page['then'] and page['closed']
+    assert 'started together, in one message' in T.W['looks_then'] and 'together, in one message' in P.LOOKS_THEN   # the answer of `vw visuals pictures --looks`
+
+
+# ---------- D2: the early cards in batches, in film order ----------
+
+def test_d2_every_stills_card_comes_before_any_word_to_shoot_in_film_order(held, monkeypatch):
+    s, p = session(), three()
+    s['guides'] = {'S3': guide(still='candidate', prompt=False), 'S2': guide(), 'S1': guide(still='candidate', prompt=False)}   # written in another order than the film
+    for sid in ('S1', 'S3'):
+        s['guides'][sid]['stills'][0]['look'] = LOOKED
+    held(s, p)
+    assert cards(s, p, monkeypatch) == ['still:S1', 'still:S3', 'shoot:S2']
+    s['guides']['S1'] = guide()                                                                          # S1's still answered: its word to shoot joins the second batch, in film order
+    assert cards(s, p, monkeypatch) == ['still:S3', 'shoot:S1', 'shoot:S2']
+
+
+def test_d2_a_word_to_shoot_waits_while_a_still_is_being_checked_and_never_longer_than_the_look(held, monkeypatch):
+    s, p = session(), three()
+    s['guides'] = {'S1': guide(still='candidate', prompt=False), 'S2': guide()}                           # S1's still waits for Claude's look
+    held(s, p)
+    assert cards(s, p, monkeypatch) == []                                                                # no card yet: the still's card comes first, with its look
+    s['guides']['S1']['stills'][0]['look'] = LOOKED
+    assert cards(s, p, monkeypatch) == ['still:S1', 'shoot:S2']
+    s['guides']['S1']['stills'][0].pop('look')
+    s['guides']['S1']['stills'][0]['asked_at'] = (P._now() - timedelta(minutes=P.PICTURE_LOOK_MINUTES + 1)).isoformat()   # the look never came
+    ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': OP, 'outputs': [], 'conn': None}
+    first = CF._guide_items(ctx)[0]
+    assert cards(s, p, monkeypatch) == ['still:S1', 'shoot:S2'] and "Not checked: Claude's check did not come within 30 minutes. Judge it by eye." in first['text']   # shown as not checked: never blocks
+
+
+def test_d2_a_rejected_still_does_not_hold_the_other_shots_words(held, monkeypatch):
+    s, p = session(), three()
+    s['guides'] = {'S1': guide(still='rejected', prompt=False), 'S2': guide(), 'S3': guide()}
+    s['guides']['S1']['stills'].append({'id': 'st2', 'status': 'generating', 'guide_sha256': 'g' * 64})   # its new still is being made
+    held(s, p)
+    assert cards(s, p, monkeypatch) == ['shoot:S2', 'shoot:S3']
+
+
+# ---------- D3: every choice before the first take is paid for ----------
+
+def test_d3_no_take_is_paid_for_before_the_layout_the_still_and_the_word_are_answered(take_film):
+    store, conn = take_film
+    scene(store, conn)
+    n = len([q for q in conn.queued if q['provider'] == 'video'])
+    said = refused(lambda: G.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.'))
+    assert 'Not ready to shoot; still missing:' in said and 'an approved still made from this guide' in said and "the take's words" in said
+    assert len([q for q in conn.queued if q['provider'] == 'video']) == n
+    assert 'on the operator\'s word' in refused(lambda: G.word_for({'again': None}, ''))               # and never without the operator's word
+
+
+def test_d3_the_questions_of_step_7_that_come_after_a_take_are_only_about_that_take():
+    """What step 7 can ask after a shot's first take, read in the code (`chat_flow._guide_items`, `takes.line`, `takes.rejected_due`, `guide.set_cause`):
+    the take's own answer; "send the same request once more" (the clip that came back is not a take); what happens to a shot whose take is
+    rejected. None can be known before the take exists. A person of the footage is asked about before the still (`pictures.faces_to_ask`)."""
+    assert set(G.CAUSES) == {'still', 'guide', 'words', 'model'}
+    assert 'cut it into shorter shots, another angle, or leave it out' in T.W['rejected_do'] and 'Send the same request once more?' in Path(CF.__file__).read_text(encoding='utf-8')
+    assert 'ask the operator once whether made pictures may show this person' in P.W['face_ask']
+
+
+# ---------- D4: every limit named where the assistant reads it; each refusal ends with the next step ----------
+
+def test_d4_each_limit_of_step_7_is_in_the_served_text_and_in_its_refusal_with_the_next_step(take_film):
+    stage = next(st for st in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if st['name'] == 'visuals')
+    served = stage['prompt'] + ' '.join(pt['text'] for pt in stage['parts']) + (ROOT / 'plugin' / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8')
+    assert (guide_spec.MIN_S, guide_spec.MAX_S) == (3, 15) and 'every take is an edit of a guide, 3 to 15 s' in served                 # the take's length
+    assert VG.STILL['max_inputs'] == 16 and 'at most 16 pictures' in served                                                          # the references of a still
+    assert 'after two rejected takes from one camera the shot is cut, re-angled or left out' in served                                 # takes per shot
+    assert 'one frame every half second' in served and 'four frames a second' in served and 'about three takes each' in served        # frames per look; takes per helper
+    assert T.LOOK_MINUTES == 30 and 'does not come within 30 minutes is shown as not checked' in served                                # the look's time-out
+    assert 'the cost limit of the film' in served and 'only the owner can change it' in served                                        # the cost limit
+    store, conn = take_film
+    bad = {**spec10(), 'seconds': 20}
+    said = refused(lambda: G.set_scene(conn, store, USER, NEW, [], 'VS1', bad))
+    assert 'seconds: a whole number from 3 to 15.' in said and said.endswith('Correct the scene file and send it again (`vw guide scene --shot VS1 --file work/guide/VS1/scene.json`).')
+    assert G.TOO_MANY.format(n=17, max=16).endswith('Leave out the pictures the shot needs least and ask for the still again (`vw guide still`).')
+    assert G.LADDER.rstrip('.').endswith('or leave the shot out')                                                                      # two takes from one camera: the choices are the next step
+    assert 'tell the operator to ask the owner' in Path(V.__file__).read_text(encoding='utf-8').split('def check_cap')[1][:1200]       # the cost limit's refusal
+
+
+# ---------- D5: "being redone" at once ----------
+
+def test_d5_being_redone_shows_at_once_in_the_line_of_counts_after_make_another(film):
+    store, conn, job_id, wrote = film
+    s = saved(store)
+    assert T.status_line(T.expected(s, V.current_plan(store, s), conn.takes)) == 'AI video: 1 made and checked.'
+    on_page(store, conn, 'again', 'He walks more slowly.')
+    s = saved(store)
+    assert T.status_line(T.expected(s, V.current_plan(store, s), conn.takes)) == 'AI video: 1 being redone.'   # with no other call in between
+    assert 'being redone' in V.status(conn, store, NEW, [])['next'] if isinstance(V.status(conn, store, NEW, []).get('next'), str) else True
+
+
+# ---------- D6: an answer that is neither pass nor fail never holds a take ----------
+
+def due_take(held_):
+    s, p = session(), plan(shot('S1'))
+    s['guides']['S1'] = guide(takes=['j1'])
+    s['take_checks']['j1'] = {**rec(), 'asked_at': NOW.isoformat()}
+    held_(s, p)
+    return s, p, [job('j1')]
+
+
+def answers(pass_, seen=''):
+    return [{'id': l['id'], 'pass': pass_, 'seen': seen} for l in T.look_lines()]
+
+
+def test_d6_does_not_apply_on_every_line_is_not_a_fail_and_the_take_is_offered_as_not_checked(held):
+    s, p, rows = due_take(held)
+    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'lines': answers('na', 'The frames show no person.')}, 'helper') is None
+    v = T.check_view(s, rows[0], NOW)
+    assert v['state'] == 'not_checked' and v['faults'] == [] and v['na']['head'] == '5 lines did not apply' and 'does not apply' in v['head']
+    assert not [x for x in s['take_checks']['j1']['scorecard'] if x['state'] == 'Fail'] and T.offered(s, rows[0], NOW)
+    assert states(s, p, rows) == [('S1', 'made and checked')] and T.due(s, p, rows) == []                # offered, and not asked of Claude again: no loop
+
+
+def test_d6_one_line_that_does_not_apply_among_passes_is_a_pass_with_the_line_listed_apart(held):
+    s, p, rows = due_take(held)
+    sent = answers(True)
+    sent[0].update({'pass': 'na', 'seen': 'No person is in these frames.'})
+    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'lines': sent}, 'helper') is None
+    v = T.check_view(s, rows[0], NOW)
+    assert v['state'] == 'pass' and v['short'] == 'Passed' and v['na']['head'] == '1 line did not apply' and T.line(None, s, p, p['gaps'][0], p['gaps'][0]['scenes'][0]['shots'][0], 1, 1, rows, NOW)['buttons'][0].get('against') is None
+
+
+def test_d6_frames_that_could_not_be_opened_is_not_checked_never_a_fail(held):
+    s, p, rows = due_take(held)
+    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'not_checked': 'The sheet would not open.'}, 'helper') is None
+    v = T.check_view(s, rows[0], NOW)
+    assert v['state'] == 'not_checked' and v['faults'] == [] and T.offered(s, rows[0], NOW) and T.due(s, p, rows) == []
+
+
+@pytest.mark.parametrize('odd', ['not seen', 'not_seen', None, 'maybe'])
+def test_d6_an_answer_that_is_none_of_the_three_is_refused_with_the_way_out_and_holds_nothing(held, odd):
+    s, p, rows = due_take(held)
+    said = T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'lines': answers(odd, 'x')}, 'helper')
+    assert 'has no answer' in said and '`pass`: true, false or "na"' in said and 'send the file again' in said   # the refusal names the three answers and the next step
+    assert 'look' not in s['take_checks']['j1'] and T.check_view(s, rows[0], NOW)['state'] == 'not_checked'      # nothing recorded: never a fail
+    assert not T.offered(s, rows[0], NOW) and T.offered(s, rows[0], NOW + timedelta(minutes=31))                  # and never held longer than the look's 30 minutes
+    assert states(s, p, rows, NOW + timedelta(minutes=31)) == [('S1', 'made and checked')]
+
+
+# ---------- D7: no take waits on another shot's take ----------
+
+def test_d7_a_take_being_made_or_redone_for_one_shot_does_not_hold_another_shots_take(held):
+    s, p = session(), three()
+    s['guides'] = {sid: guide(takes=[f'j{n}']) for n, sid in enumerate(('S1', 'S2', 'S3'), 1)}
+    s['take_checks'] = {'j1': rec(look=look()), 'j2': rec(look=look()), 'j3': rec(look=look())}
+    held(s, p)
+    rows = [job('j1', 'S1'), job('j2', 'S2'), job('j3', 'S3')]
+    assert T.complete(T.expected(s, p, rows, NOW))
+    s['reviews']['j1'] = [{'decision': 'rejected', 'notes': 'x'}]                                        # S1: "Make another": its take is rejected and another is ordered
+    s['guides']['S1']['again'] = {'job_id': 'j1', 'words': 'slower'}
+    assert states(s, p, rows) == [('S1', 'being redone'), ('S2', 'made and checked'), ('S3', 'made and checked')]
+    assert T.complete(T.expected(s, p, rows, NOW))                                                       # the page stays open for S2 and S3
+    open_ = [w['group'] for w in V.waiting(s, p, 'VW-99', rows) if w['kind'] == 'take to select']
+    assert open_ == ['S2', 'S3']
+    s['reviews']['j2'] = [{'decision': 'rejected', 'notes': 'y'}]                                        # S2: a plain rejection, nothing ordered
+    assert T.complete(T.expected(s, p, rows, NOW)) and [w['group'] for w in V.waiting(s, p, 'VW-99', rows) if w['kind'] == 'take to select'] == ['S3']
+    rows.append(job('j4', 'S1', status='running'))                                                       # S1's new take is on its way
+    assert T.complete(T.expected(s, p, rows, NOW)) and states(s, p, rows)[0] == ('S1', 'being redone')
+
+
+def test_d7_through_the_pages_own_route_one_make_another_leaves_the_take_answerable_state_intact(film):
+    store, conn, job_id, wrote = film
+    on_page(store, conn, 'again', 'He walks more slowly.')
+    s = saved(store)
+    items = T.expected(s, V.current_plan(store, s), conn.takes)
+    assert [(i['id'], i['state'], i.get('aside')) for i in items] == [('VS1', 'being redone', True)] and T.complete(items)
+
+
+# ---------- a step 7 under way continues after the update ----------
+
+def test_a_step_7_in_mid_flight_continues_with_nothing_asked_again(held, monkeypatch):
+    """As VW-24 may stand at the update: S1's still approved and its word to shoot given, its take being made; S2 selected on the older page with a
+    typed reason; S3's still approved, its word not asked yet. After the update: nothing answered is asked again, and S3's word is the one card."""
+    s, p = session(), three()
+    s['guides'] = {'S1': guide(takes=['j1'], shoot_asked={'stamp': 'x', 'answer': 'shoot'}), 'S2': guide(takes=['j2']), 'S3': guide()}
+    s['take_checks'] = {'j2': rec(look=look(fail=('the action',)))}
+    s['reviews'] = {'j2': [{'decision': 'accepted', 'notes': 'The broom is out of the cut.', 'quote': 'Select'}]}   # answered on 0.118.0, with its typed reason
+    s['selections'] = {'S2': {'job_id': 'j2'}}
+    held(s, p)
+    rows = [job('j1', 'S1', status='running'), job('j2', 'S2')]
+    assert states(s, p, rows) == [('S1', 'being made'), ('S2', 'answered'), ('S3', 'waiting for you in the chat')]
+    assert cards(s, p, monkeypatch, rows) == ['shoot:S3']                                                # S1 and S2 are not asked again
+    assert [w for w in V.waiting(s, p, 'VW-99', rows) if w['kind'] == 'take to select'] == []
+    assert s['reviews']['j2'][-1]['notes'] == 'The broom is out of the cut.'                             # the typed reason stands as it was recorded
+
+
+# ---------- D4b: the form of `changed_from_plan` (17 scene files refused on the first real run of step 7, VW-24, 20 Nov 2026) ----------
+
+def test_d4b_the_helper_the_skill_and_the_served_text_give_the_form_the_route_takes_with_an_example_that_passes():
+    import re
+    helper = (ROOT / 'plugin' / 'agents' / 'vw-guide-scene.md').read_text(encoding='utf-8')
+    skill = (ROOT / 'plugin' / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8')
+    stage = next(st for st in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if st['name'] == 'visuals')
+    served = ' '.join(pt['text'] for pt in stage['parts'])
+    form = 'a list of at most ten strings, each one plain sentence of at most 300 characters'
+    assert form in helper and form in skill and form in guide_spec.CHANGED_FORM and 'never an object' in helper and 'never an object' in skill
+    assert '`changed_from_plan` is a list of at most ten strings, each one sentence of at most 300 characters, never an object, and `[]` when nothing changed' in served
+    ok = lambda value: not [p for p in guide_spec.problems({**spec10(), 'changed_from_plan': value}) if p.startswith('changed_from_plan')]
+    examples = [json.loads(m) for text in (helper, skill, guide_spec.CHANGED_FORM) for m in re.findall(r'\[".*?"\]', text)]
+    assert len(examples) >= 3 and all(ok(e) for e in examples)                         # every example given is taken by the route's own check
+    assert ok([]) and '`[]`' in helper and '[]' in guide_spec.CHANGED_FORM and not [p for p in guide_spec.problems(spec10()) if p.startswith('changed_from_plan')]   # nothing changed: [] or no field
+    for bad in ([{'plan': 'x', 'scene': 'y', 'why': 'z'}], 'one line', ['x' * 301], [''], ['a'] * 11):   # the shapes a helper is likely to send
+        said = [p for p in guide_spec.problems({**spec10(), 'changed_from_plan': bad}) if p.startswith('changed_from_plan')]
+        assert said == ['changed_from_plan: ' + guide_spec.CHANGED_FORM], bad
+    for word in ('brick', 'kiln', 'mason', 'verandah'):
+        assert word not in guide_spec.CHANGED_FORM.lower()

@@ -29,6 +29,8 @@ LIGHT_LINE = 'Light stays exactly as in the image.'
 SILENCE_LINE = 'No dialogue. No extra sound effects.'
 REPAIR_OPEN = 'Change ONLY the transparent (masked) area: {words} Everything else stays exactly as it is: every person, face, object, position and the light.'
 MAX_ROUNDS_BEFORE_OPERATOR = 2
+TOO_MANY = ("{n} input pictures; GPT image takes at most {max}, the guide's frame and the shot's two drawings included. "
+            'Leave out the pictures the shot needs least and ask for the still again (`vw guide still`).')   # release 1, D4: the limit, and the next step
 # design/200, Area B: said to GPT image with the shot's drawings (SK, 14 Nov 2026): it copies a reference faithfully, so it is told what not to copy
 DIAGRAM_WORDS = ('The drawings are diagrams. Use them only for which way each person faces, which arm works, what each thing is and how it is built. Do not copy how they look: their clean edges, '
                  'even tones and perfect regularity are artificial. Make every surface, every person and the ground as they are in real life, with natural variation, wear and dust.')
@@ -266,7 +268,7 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         looks = [_input(store, run, session, shot_id, {'id': look, 'job': 'a look reference'}, people)[0]] if look else []
         inputs = [{'id': 'guide-frame-' + g['sha256'][:12], 'key': render['frame1_key'], 'sha256': render['frame1_sha256']}] + sheets + [a for a, _ in pairs] + looks
         jobs_ = [j for _, j in pairs]
-        need(len(inputs) <= still['max_inputs'], f"{len(inputs)} input pictures; GPT image takes at most {still['max_inputs']}, the guide's frame and the shot's two drawings included.")
+        need(len(inputs) <= still['max_inputs'], TOO_MANY.format(n=len(inputs), max=still['max_inputs']))
         roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2 + len(sheets))]
         facts = _drawn_facts(session, parents)
         effective = '\n'.join(x for x in [STILL_OPEN, d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),

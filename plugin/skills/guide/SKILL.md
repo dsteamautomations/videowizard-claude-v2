@@ -190,7 +190,7 @@ These rules are for every shot with a person, of any kind. The server refuses a 
 3. **Head and body agree.** Give `"watches": [x, y, z]` on a person who watches something: it must lie within 45 degrees of the way the body faces.
 4. **Right side to the camera.** A person who faces left has the right side away from the camera, so the working hand is hidden. A person who works with the right hand faces right, or the camera stands over the right shoulder.
 5. **The layout gives way, not the body.** Where the plan's layout makes the job impossible to stage, move the person, the thing or the camera by the least that makes it possible; mirror the layout if that is what it takes. The plan's meaning stays (who does what to what); its left and right may change.
-6. **Say every such change.** List it in the scene: `"changed_from_plan": ["The plan had the man at the right of the machine; he stands at its left, facing right, so his right hand is toward the camera."]`. The operator sees these lines with the shot's drawing.
+6. **Say every such change.** List it in the scene: `"changed_from_plan": ["The plan had the man at the right of the machine; he stands at its left, facing right, so his right hand is toward the camera."]`. The operator sees these lines with the shot's drawing. Its exact form: a list of at most ten strings, each one plain sentence of at most 300 characters, never an object; `"changed_from_plan": []` when nothing changed.
 
 ## The shot's drawing
 

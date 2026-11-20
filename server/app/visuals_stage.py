@@ -7697,7 +7697,8 @@ def status(conn, store, run, outputs, repair=True):
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
-    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six)) if x)
+    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six),
+                                 takes.starts(session, plan, take_rows) if seven else '') if x)   # release 1, D1: what of step 7 can start now, together
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3

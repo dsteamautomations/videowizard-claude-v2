@@ -1821,13 +1821,15 @@ def _guide_items(ctx):
     if not plan or not session.get('guides'):
         return []
     from . import guide
-    shots, items = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, []
-    for sid, g in session['guides'].items():
-        if sid not in shots:
-            continue
+    # release 1, D2 (SK, 20 Nov 2026): the early cards in batches, in film order: every still's card first (`items`), then every word to shoot (`words`).
+    # (Until this release: per shot, in the order the guides were written: a still, a word to shoot, the next shot's still; design/35 row 277.)
+    shots, items, words, checking = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, [], [], False
+    for sid in [sid for sid in shots if sid in session['guides']]:
+        g = session['guides'][sid]
         title = shots[sid].get('title') or sid
         still = next((s for s in g.get('stills') or [] if s.get('status') == 'candidate' and s.get('guide_sha256') == g['sha256'] and s.get('key')), None)
         if still and not P.start_offered(session, still):
+            checking = True   # a still is with Claude's look: its card comes first, so the words to shoot wait for it (30 minutes at most: then it is shown as not checked)
             continue   # release 1, A1: step 7's still is checked by Claude's look first; its card comes with the look, or after 30 minutes as not checked
         if still:
             def run_(choice, quote, words, sid=sid, still=still):
@@ -1861,12 +1863,12 @@ def _guide_items(ctx):
                 return {**out, **({'tell': 'The take is being made. ' + NOTHING} if choice == 'shoot' else {})}
             show = [{'key': k, 'name': n} for k, n in ((card.get('guide_key'), f'{sid}-guide.mp4'), ((card.get('still') or {}).get('overlay_key'), f'{sid}-still-on-the-guide.png')) if k]
             why = str((checks.get(str(last['id'])) or {}).get('blocked')) if again else ''
-            items.append(_item(f"shoot:{sid}:{hashlib.sha256(stamp.encode()).hexdigest()[:10]}", 'shoot', 'Step 7, AI video: the take',
+            words.append(_item(f"shoot:{sid}:{hashlib.sha256(stamp.encode()).hexdigest()[:10]}", 'shoot', 'Step 7, AI video: the take',
                                (f"{title}: the clip that came back cannot be used ({why}). Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
                                 else f"{title}: make the take now? It is {card['seconds']} s and costs about ₹{card['cost_inr']:g}."), run_,
                                [_button('Send it again' if again else 'Shoot', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
                                text=str(card.get('look_for') or ''), show=show))
-    return items
+    return items + ([] if checking else words)
 
 
 def _record_items(ctx):
@@ -2173,7 +2175,7 @@ def next_item(conn, store, user, run, outputs, one=False):
         rows = V.take_jobs(conn, run)
         if T.asked(session, plan, rows):   # design/222: Claude is asked to check the takes from now
             V.save_session(store, run, session)
-        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows)) if x)   # the takes that wait for Claude's check; a take ordered on the page; a shot left with no take
+        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.starts(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows)) if x)   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)

@@ -165,7 +165,7 @@ PIC_LOOK_GONE = ('{name}: it is not a picture waiting for its check now (made ag
 PIC_LOOK_NONE = 'No picture of this film waits for Claude\'s check: its reference round is not of the new kind, so its pictures keep the check of before.'
 LOOKS_DUE = "{n} picture(s) wait for Claude's check: run `vw visuals pictures --looks`."
 LOOKS_THEN = ("Look at each picture against its lines, as `how` says, write work/visuals/pictures/looks.json and send it (`vw visuals pictures --looks work/visuals/pictures/looks.json`). "
-              'Above 5 pictures, give them to vw-picture-look helpers, about 5 each.')
+              'Above 5 pictures, give them to vw-picture-look helpers, about 5 each, all started together, in one message.')
 LOOKS_NONE = 'No picture waits for Claude\'s check now.'
 COMPONENT_APPROVED = "Approved by Claude's check: a component is a part of a drawn graphic and is judged with it (design/217 D4)."
 LOOK_HOW = {

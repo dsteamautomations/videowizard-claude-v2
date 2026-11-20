@@ -90,7 +90,27 @@ Checked with VW-12's 17 real takes on the real page file at page areas of 1536 x
 6. The take's video is kept while its line is open: opening a box or answering does not start it again from 0:00 (the trial did).
 7. The end card's rows read across in a grid and the list scrolls inside the card when it is long; the trial's read down in columns.
 
+## Release 1, rows B1, B3, C5 and D (20 Nov 2026), built on the branch `rel1`
+
+SK's answers 3, 5, 11 and 12 (`design/35-decision-log.md` rows 275 to 279). Tests: `server/unit/test_rel1b_*.py`.
+
+| Row | What step 7 did | Now |
+|---|---|---|
+| B1 | D6: Select against a failed or missing check, or on a short take, needed a typed reason | one click: `takes.line`, `takes.answer`; the log says what it went against; a reason typed on an older page is kept |
+| B3 | the check as "Check:" with its first fault and "See all N" | the closed box of step 6: one short line from the server (`check.short`), a click opens the rest |
+| C5 | a shot on a vertical film was taken, and a 16:9 still and take made for it | refused at the plan and at `guide.set_scene` (`visuals_stage.vertical_video`) |
+| D1 | "N take(s) wait for Claude's check…", nothing on starting together | `takes.starts`: "Start now, together in one message: …" (scene writers, still checkers, take checkers), in `vw visuals next`, `vw visuals status` and the closed page's `then` |
+| D2 | a still or a word to shoot per shot, in the order the guides were written | `chat_flow._guide_items`: every still's card, then every word to shoot, in film order; a word waits while a still is with Claude's look |
+| D3 | right already: no take is paid for before the layout, the still and the word are answered; what is asked after a take is about that take | a test |
+| D4 | the take's length, two takes a camera, the frames, the 30 minutes were served; a still's 16 pictures and the cost limit were not; two refusals had no next step | the served text names both; `guide.set_scene` and `guide.TOO_MANY` end with the next step |
+| D4b | on the first real run (VW-24, 20 Nov) 17 scene files were refused for the form of `changed_from_plan`: the helper's text gave no form and the refusal ("plain lines, each saying what the plan said, what the scene has and why") read like three fields | `guide_spec.CHANGED_FORM`: the refusal gives the form in one line with an example and the empty case; the same form in `vw-guide-scene`, the guide skill and the served text; a test checks every example against `guide_spec.problems` |
+| D5 | right already: "being redone" at once after "Make another" | a test |
+| D6 | right already: "does not apply" and "not checked" never fail or hold a take; an answer that is none of the three is refused with the way out; nothing waits longer than 30 minutes | tests through `takes.record`, `takes.check_view` |
+| D7 | right already (the second critic's point 1) | tests through the real functions |
+
 ## Not covered, not verified
+
+- **D8 (release 1): the real-shape fixture of a guide take is owed.** No take made from a guide exists yet, so none is invented here: after the first real run of step 7 a fixture is frozen from that run's own session and job rows (as `step6_real_shape.json` was for step 6), and the tests of this note are run against it.
 
 - **Nothing has run on a real film.** No take made from a guide exists in the application, so the frames, the measured jump, the helper's check, the page with a guide take's own lines and "Make another" have only run in tests, and the page only with VW-12's takes (made the older way). The first real run must show: frames and the sheet stored for a take; the take listed by `vw visuals pictures --looks` and a look recorded; the page closed until all are checked, then open; a selection recorded from the page; a take ordered with "Make another" sent without a second card, with the one line said.
 - The frames Claude gets are not marked with the planned action's seconds; the take's words (`request`) carry them.

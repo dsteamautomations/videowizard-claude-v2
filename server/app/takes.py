@@ -70,7 +70,10 @@ W = {
     # Claude's check: the refusals and the duty
     'look_gone': '{name}: it is not a take waiting for its check now (made again, answered, or set aside): list them again (`vw visuals pictures --looks`).',
     'looks_due': '{n} take(s) wait for Claude\'s check: run `vw visuals pictures --looks`; a `vw-take-look` helper judges about three takes.',
-    'looks_then': 'The rows of kind `take` are video takes: give them to `vw-take-look` helpers, about three takes each (`how_take` says how a take is judged from its frames); they send their own files.',
+    'looks_then': ('The rows of kind `take` are video takes: give them to `vw-take-look` helpers, about three takes each, all started together, in one message '
+                   '(`how_take` says how a take is judged from its frames); they send their own files.'),
+    # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
+    'start_scenes': 'the writers of the scene descriptions of {ids} ({n})', 'start_stills': 'the checkers of the stills of {ids} ({n})', 'start_takes': 'the checkers of the takes of {ids} ({n})',
     'rejected_do': ('{name} ({shot}): its take was rejected ("{words}") and no new take is ordered{why}: ask the operator what happens to the shot: '
                     'cut it into shorter shots, another angle, or leave it out; a new take after that is asked with its card.'),
     'rejected_cap': ' (the cost limit refused the take ordered on the page: tell the operator the spend; only the owner can change the limit)',
@@ -213,6 +216,20 @@ def asked(session, plan, take_rows, now=None):
 def waits_words(session, plan, take_rows):
     n = len(due(session, plan, take_rows))
     return W['looks_due'].format(n=n) if n else ''
+
+
+def starts(session, plan, take_rows):
+    """Release 1, D1 (SK, 20 Nov 2026): the helpers of step 7 that can start now, to be started together in one message, in film order: the writers
+    of the scene descriptions (a shot with no guide yet), the checkers of the stills and of the takes that wait for Claude's look. '' when none.
+    ponytail: the guide's own checker (`vw-guide-check`) is not named here; its turn is said by `vw guide status`."""
+    if not plan or not V.round_v2(session):
+        return ''
+    shots = [sh['id'] for _, sh, _, _ in video_shots(plan, session)]
+    none = [sid for sid in shots if sid not in (session.get('guides') or {}) and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)]
+    stills = {x[1]['id'] for x in P.starts_due(session, plan)}
+    looks = {row[1]['id'] for row in due(session, plan, take_rows)}
+    what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_scenes', none), ('start_stills', [x for x in shots if x in stills]), ('start_takes', [x for x in shots if x in looks])) if ids]
+    return P.W['start_now'].format(what='; '.join(what)) if what else ''
 
 
 def listed(session, plan, take_rows):

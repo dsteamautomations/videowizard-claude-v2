@@ -1033,8 +1033,9 @@ def _takes_page(ctx, base, lines, seven):
     counts. A round over the document's size loses the details and the passed lines of its last lines first; a line is never cut."""
     if lines is None:
         count = T.status_line(seven)
+        start = T.starts(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run'])) if ctx.get('plan') else ''   # release 1, D1: what can start now, together in one message
         return {**base, 'step': T.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': T.W['page_later'],
-                'then': ' '.join(x for x in (count, T.W['page_later']) if x), 'how': TAKES_CLOSED}
+                'then': ' '.join(x for x in (count, start, T.W['page_later']) if x), 'how': TAKES_CLOSED}
     rows = T.coming(seven)
     refused = ctx['session'].get('page_refused') or {}
     lines = [{'line': f'l{n:02d}', **l, **({'refused': refused[l['key']]} if l['key'] in refused else {})} for n, l in enumerate(lines, 1)]

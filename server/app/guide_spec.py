@@ -13,7 +13,11 @@ import math
 FPS = 30                                    # the guide's frame rate (the consultant's film and all our runs); Gemini returns 24
 SIZE = (1280, 720)                          # the guide; frame 1 is rendered again at full quality for the still
 SENSOR = 36.0                               # mm, horizontal fit
-MIN_S, MAX_S = 3, 15                        # one take (SK, 10 Nov 2026: up to 15 s)
+# release 1, D4b (20 Nov 2026): the first real run of step 7 had 17 scene files refused for this field's form (objects, or lines too long): the refusal gives the form in one line
+CHANGED_FORM = ('a list of at most ten strings, each one plain sentence of at most 300 characters saying what the plan had, what the scene has and why, never an object: '
+                '["The plan had the person at the right of the table; the scene has them at its left, facing right, so the working hand is toward the camera."]; '
+                'with nothing changed send [] or leave the field out.')
+MIN_S, MAX_S = 3, 15                       # one take (SK, 10 Nov 2026: up to 15 s)
 REACH = 0.62                                # m, shoulder to hand; SK's instruction (rule 102); set on close hand shots, not a tested limit
 TOP_SPEED = 2.5                             # m/s for a person's box (rule 45); set on street walks
 BODY_W, BODY_D, HEAD = 0.44, 0.26, 0.22     # the consultant's box person
@@ -402,7 +406,7 @@ def problems(spec):
         out.append('action: {"start": seconds, "end": seconds}, when the one action of the shot begins and ends.')
     changed = spec.get('changed_from_plan')
     if changed is not None and not (isinstance(changed, list) and len(changed) <= 10 and all(isinstance(c, str) and 0 < len(c.strip()) <= 300 for c in changed)):
-        out.append('changed_from_plan: a list of at most ten plain lines, each saying what the plan said, what the scene has and why (design/200).')
+        out.append('changed_from_plan: ' + CHANGED_FORM)
     marks = spec.get('marks')
     if marks is not None and not (isinstance(marks, dict) and set(marks) <= {'band', 'stripes'}):
         out.append('marks: {"band": id of the set piece that marks the walking line, or null; "stripes": true or false}.')
