@@ -73,7 +73,7 @@ def test_4_every_group_of_what_can_start_is_named_exactly_when_its_gate_lets_it_
     sha = saved(store)['guides']['VS1']['sha256']
     assert said() == '' and 'The check frames are not ready yet' in refused(lambda: G.verdict(conn, store, USER, NEW, [], 'VS1', sha, True, [{'look': 'x', 'pass': True}]))
     frames_back(store, conn)
-    assert said() == 'Start now, together in one message: the checkers of the guides of VS1 (1) (a fresh `vw-guide-check` helper each).'
+    assert said() == ''                                                                          # the layout drawing's card waits for the operator: nothing to start (see the test of the live film's state below)
     passed(store, conn)                                                                          # the real gate takes the verdict
     assert said() == '' and 'The guide is not rendered yet' in refused(lambda: still_made(store, conn))   # being rendered: no still can be ordered, and none is named
     s = saved(store)
@@ -90,6 +90,51 @@ def test_4_every_group_of_what_can_start_is_named_exactly_when_its_gate_lets_it_
     assert said() == "Start now, together in one message: the writers of the take's words of VS1 (1) (`vw guide prompt --shot S --file take.txt`)."
     G.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS)
     assert said() == ''
+
+
+# ---------- the start line on the live film's state (VW-24 on 0.118.0, 20 Nov 2026): 19 guides with their check frames, no verdict, no still ----------
+
+GUIDE_CHECK = ('the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: a guide is rendered, and its still can be ordered, only after its check passes)')
+
+
+def test_the_gate_that_waits_for_a_guides_check_and_the_line_for_a_shot_whose_layout_is_approved(take_film):
+    """Read in the code and proved on the gates: 0.118.0 records a guide's verdict (`guides[shot].verdicts`), the guide is rendered only when a fresh
+    checker's verdict passes (`guide.verdict` queues the render), and no still can be ordered before the render (`guide.request_still`). So for a shot
+    whose layout the operator approved and whose guide has no verdict, the checker is what starts; "order the stills" would be refused."""
+    from test_design151_refs_pure import NEW
+    from test_guide_route_pure import OTHER, frames_back, refused, scene, still_made
+    from test_visuals_stage_pure import USER, saved
+    store, conn = take_film
+    s = saved(store)
+    s['round'] = {'v': 2, 'kept': True, 'pass': 'complete', 'elements': {}}
+    V.save_session(store, NEW, s)
+    said = lambda: T.starts(saved(store), V.current_plan(store, saved(store)), [])
+    scene(store, conn)
+    sha = frames_back(store, conn)
+    assert said() == ''                                                                          # its layout card waits: "waiting for you in the chat", nothing to start
+    assert [(i['id'], i['state']) for i in T.expected(saved(store), V.current_plan(store, saved(store)), [])] == [('VS1', 'waiting for you in the chat')]
+    G.drawing_verdict(conn, store, USER, NEW, [], 'VS1', sha, True, 'Yes.')                     # the operator approves the layout
+    assert said() == 'Start now, together in one message: ' + GUIDE_CHECK.format(ids='VS1', n=1) + '.'
+    assert 'The guide is not rendered yet: it is rendered after a fresh checker passes its check frames' in refused(lambda: still_made(store, conn))   # the gate: no still yet
+    assert saved(store)['guides']['VS1'].get('render') is None
+    G.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, True, [{'look': 'everyone reads as a person', 'pass': True}])
+    assert saved(store)['guides']['VS1']['render']['status'] == 'queued' and said() == ''       # the verdict is what queues the render; the checker is not named again
+
+
+def test_the_start_line_for_a_film_shaped_like_the_live_one(held):
+    ids = [f'S{n:02d}' for n in range(1, 20)]
+    s, p = session(), plan(*[shot(sid, start=100 * n, end=100 * n + 100) for n, sid in enumerate(ids)])
+    live = lambda drawing: {'sha256': 'g' * 64, 'key': 'k', 'seconds': 6, 'frames': {'job_id': 'f', 'status': 'ready', 'frames': [], 'strip_key': 'strip'}, 'verdicts': [], 'rounds_before': 0,
+                            'drawing': {'status': drawing, 'sha256': 'g' * 64}, 'stills': [], 'takes': [], 'checks': []}
+    s['guides'] = {sid: live('proposed' if sid in ('S18', 'S19') else 'approved') for sid in ids}   # 17 layouts approved by the operator, 2 cards waiting; no verdict, no render, no still
+    held(s, p)
+    assert T.status_line(T.expected(s, p, [], NOW)) == 'AI video: 17 being made, 2 waiting for you in the chat.'
+    assert T.starts(s, p, []) == 'Start now, together in one message: ' + GUIDE_CHECK.format(ids=', '.join(ids[:17]), n=17) + '.'   # never S18, S19: their cards wait
+    for sid in ids[:5]:                                                                          # five checks passed and their guides rendered: their stills can be ordered
+        s['guides'][sid].update(verdicts=[{'sha256': 'g' * 64, 'pass': True}], render={'job_id': 'r', 'status': 'ready', 'frame1_key': 'f1.png'})
+    s['guides']['S06'].update(verdicts=[{'sha256': 'g' * 64, 'pass': True}], render={'job_id': 'r', 'status': 'queued'})   # being rendered: nothing to start for it
+    assert T.starts(s, p, []) == ('Start now, together in one message: ' + GUIDE_CHECK.format(ids=', '.join(ids[6:17]), n=11)
+                                  + '; the stills of S01, S02, S03, S04, S05 (5), each ordered with `vw guide still --shot S --file still.json`.')
 
 
 # ---------- point 5: "does not apply" never clears a line that already failed, and never approves a component by itself ----------

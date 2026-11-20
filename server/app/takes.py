@@ -73,7 +73,7 @@ W = {
     'looks_then': ('The rows of kind `take` are video takes: give them to `vw-take-look` helpers, about three takes each, all started together, in one message '
                    '(`how_take` says how a take is judged from its frames); they send their own files.'),
     # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
-    'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
+    'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: a guide is rendered, and its still can be ordered, only after its check passes)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
     'start_words': "the writers of the take's words of {ids} ({n}) (`vw guide prompt --shot S --file take.txt`)",
     'start_scenes': 'the writers of the scene descriptions of {ids} ({n})', 'start_stills': 'the checkers of the stills of {ids} ({n})', 'start_takes': 'the checkers of the takes of {ids} ({n})',
     'rejected_do': ('{name} ({shot}): its take was rejected ("{words}") and no new take is ordered{why}: ask the operator what happens to the shot: '
@@ -233,7 +233,11 @@ def starts(session, plan, take_rows):
     shots, guides, open_ = [sh['id'] for _, sh, _, _ in rows], session.get('guides') or {}, lambda sid: sid not in (session.get('selections') or {}) and not question_open(session, sid)
     none = [sid for sid in shots if sid not in guides and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)]
     mine = lambda g, st: st.get('guide_sha256') == g.get('sha256')
-    check = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('frames') or {}).get('status') == 'ready' and not (guides[sid].get('render') or {}).get('job_id')
+    # A guide's checker is named only when a gate waits for its verdict: the guide is rendered when a fresh checker's verdict passes (`guide.verdict`), and
+    # no still is ordered before the render (`guide.request_still`). Never while the shot's layout card waits for the operator (a No changes the scene:
+    # the shot reads "waiting for you in the chat"); only once they approved this layout.
+    approved = lambda g: (g.get('drawing') or {}).get('status') == 'approved' and (g.get('drawing') or {}).get('sha256') == g.get('sha256')
+    check = [sid for sid in shots if sid in guides and open_(sid) and approved(guides[sid]) and (guides[sid].get('frames') or {}).get('status') == 'ready' and not (guides[sid].get('render') or {}).get('job_id')
              and not any(v.get('sha256') == guides[sid].get('sha256') for v in guides[sid].get('verdicts') or [])]   # a verdict of this scene exists: passed (rendering) or failed (the scene changes first)
     order = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('render') or {}).get('status') == 'ready' and (guides[sid].get('render') or {}).get('frame1_key')
              and (guides[sid].get('drawing') or {}).get('status') == 'approved' and (guides[sid].get('drawing') or {}).get('sha256') == guides[sid].get('sha256')
