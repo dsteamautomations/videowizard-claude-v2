@@ -144,10 +144,10 @@ def test_step_7s_still_is_listed_for_claudes_look_with_a_list_of_its_own_and_its
     assert 'red outlines' in row['lines'][0]['pass_when'] and out['then'].startswith('Look at each picture against its lines')
     assert s['guides']['S1']['stills'][0]['asked_at']
     assert CF._guide_items(ctx) == [] and [(i['id'], i['state']) for i in T.expected(s, p, [], NOW)] == [('S1', 'being checked by Claude')]   # no card before the look
-    bad = [{'id': l['id'], 'pass': l['check'] != 'on the layout', 'seen': '' if l['check'] != 'on the layout' else 'The mason stands a step left of his outline.'} for l in row['lines']]
+    bad = [{'id': l['id'], 'pass': l['check'] != 'on the layout', 'seen': ('As the parents show.' if l.get('say') else '') if l['check'] != 'on the layout' else 'The mason stands a step left of his outline.'} for l in row['lines']]
     assert P.record_looks(None, USER, RUN, [], [{'ref': 'st1', 'sha10': 'x' * 10, 'lines': bad}], 'helper')['refused']['st1'] == P.PIC_LOOK_GONE.format(name='Mason')
     done = P.record_looks(None, USER, RUN, [], [{'ref': 'st1', 'sha10': 's' * 10, 'lines': bad}], 'helper')
-    assert done['recorded'] == ['st1'] and done['left'] == [] and s['guides']['S1']['stills'][0]['look']['who'] == 'helper'
+    assert done['recorded'] == ['st1'] and done['left'] == [] and s['guides']['S1']['stills'][0]['check_look']['who'] == 'helper'
     item = CF._guide_items(ctx)[0]
     assert item['kind'] == 'still' and item['text'] == '- 1 warning: on the layout\n- on the layout: The mason stands a step left of his outline.'   # release 1, B3: the short line, the warning in full
     assert [b['choice'] for b in item['buttons']] == ['approve', 'reject'] and not item['buttons'][0].get('needs_words')   # a warning: the operator may approve against it

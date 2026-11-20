@@ -180,6 +180,8 @@ if __name__ == '__main__':
         prompt = rel1a(prompt, parts)
         from rel1b_wording import apply as rel1b   # release 1, B1 and D, 20 Nov 2026: one click against the check (no second question, no typed reason); step 7: the checkers together, the cards in two batches, its limits
         prompt = rel1b(prompt, parts)
+        from rel1c_wording import apply as rel1c   # release 1, the critic's point 10: a held drawing and `select` are one click (no reason asked); "No finished take is asked one by one"
+        prompt = rel1c(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

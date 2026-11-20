@@ -146,7 +146,7 @@ def test_the_held_drawing_is_one_chat_card_with_its_open_musts_in_full_and_three
     item = items[0]
     assert item['question'] == 'MO1: held after round 3: 1 must rule still fails. What do you decide?'
     assert item['text'] == f'- {SOLID}'
-    assert [b['label'] for b in item['buttons']] == ['Select it anyway', 'Reject it', 'One more round'] and item['buttons'][0]['needs_words']
+    assert [b['label'] for b in item['buttons']] == ['Select it anyway', 'Reject it', 'One more round'] and not item['buttons'][0].get('needs_words')   # release 1, B1 (the critic's point 10a): one click, no reason asked
     assert item['show'] == [{'key': 'run-1/takes/job-7.mp4', 'name': 'MO1-drawing.mp4'}, {'key': 'run-1/takes/job-7-sheet.jpg', 'name': 'MO1-frames.jpg'}]
     s, plan = plan_of(store)
     assert [w['kind'] for w in VS.waiting(s, plan, 'VW-9', [drawn_job()])] == ['held drawing']
@@ -175,9 +175,7 @@ def test_select_it_anyway_needs_the_reason_and_selects_with_it(monkeypatch):
     store = motion_store()
     held(store)
     calls = recorders(monkeypatch, store)
-    with pytest.raises(Problem, match="Say why it is right for the film all the same, in the operator's words."):
-        g(lambda: VS.held_answer(FakeConn([drawn_job()]), store, USER, NEW, [], 'MO1', 'job-7', 'select', 'Select it anyway', ''))
-    card(store, [drawn_job()])[0]['_run']('select', 'Select it anyway', 'The joint reads well enough.')
+    card(store, [drawn_job()])[0]['_run']('select', 'Select it anyway', 'The joint reads well enough.')   # a reason given is kept; with none the fixed note is recorded (release 1, B1: test_rel1c_critic_pure)
     assert calls == [('select', 'job-7', 'The joint reads well enough.')]
     assert saved(store)['motion_held']['MO1']['answer'] == 'select' and ('drawn', 'MO1', 'answered') in states(P.expected(*plan_of(store), [drawn_job()]))
 
@@ -342,7 +340,8 @@ def test_the_texts_say_the_page_at_the_end_the_counts_the_held_card_and_the_stil
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221f_wording_v3 as W
     import fixset3_wording as FIX3   # fix set phase 3: the stills sentence of this script names the batch command now
-    stage = FIX3.before(visuals())
+    import rel1c_wording as REL1C   # release 1, the critic's point 10: the held card's "with their reason" is replaced inside this script's sentence
+    stage = FIX3.before(REL1C.before(visuals()))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

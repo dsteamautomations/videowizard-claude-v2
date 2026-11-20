@@ -1820,7 +1820,7 @@ def visuals_review(run_id: UUID, body: TakeReview, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/select-take')
 def visuals_select_take(run_id: UUID, body: TakeSelect, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_take(conn, storage(), user, run, outputs, body.job_id, body.quote, body.notes, body.timing_notes, body.in_s))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_by_tool(conn, storage(), user, run, outputs, body.job_id, body.quote, body.notes, body.timing_notes, body.in_s))   # the critic's point 10a: a held item needs no --notes
 
 
 @app.post('/api/runs/{run_id}/visuals/asset')

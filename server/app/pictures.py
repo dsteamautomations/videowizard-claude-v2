@@ -18,7 +18,7 @@ from fractions import Fraction
 from . import image_check, ref_find, visuals_stage as V
 
 PICTURE_LOOK_MINUTES = 30   # C3: a picture whose look never comes is offered as "not checked" after this long; ponytail: one number, tune it on the first film
-LOOK_KINDS = ('style', 'keyframe', 'state', 'component')
+LOOK_KINDS = ('style', 'keyframe', 'state', 'component', 'isolated')   # the critic's point 7: an isolated picture is a made picture too: no made picture of steps 6 and 7 goes to the model
 LOOK_SAY = 300   # a look's sentence, at most (ref_find.SEEN_CHARS)
 
 # ---------- the words: the page and the chat say these ----------
@@ -136,7 +136,8 @@ W = {
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
     'comp_unopened': 'Claude could not open it ({why}).',
-    'comp_all_na': 'Claude answered every line of its list "does not apply": it is not checked.',
+    'comp_na': 'Claude answered "does not apply" on: {lines} A component is approved by the check alone, so every line must be judged.',
+    'comp_all_na':'Claude answered every line of its list "does not apply": it is not checked.',
 }
 PAGE = {   # layout.words.pictures: the page's chrome
     'todo': 'Needs your answer', 'coming': 'Could not be made', 'recorded': 'Answered earlier', 'nothing': W['nothing'], 'against': 'Against the check',
@@ -156,7 +157,9 @@ PIC_LOOK_OPEN = ('{name}: the line "{check}" ({id}) has no answer: every line of
 # release 1, A3: "does not apply" with no reason
 PIC_LOOK_NA = ('{name}: the line "{check}" ({id}) is answered "does not apply" with no reason: say in `seen`, in one sentence of at most {max} characters, why this view '
                'cannot show it or what other thing the line is about; or answer it pass or fail. Then send the file again (`vw visuals pictures --looks <file>`).')
-PIC_LOOK_UNKNOWN = '{name}: {id} is not a line of this picture now: list the pictures again (`vw visuals pictures --looks`), answer the lines it gives and send the file again.'
+PIC_LOOK_NA_JUDGED = ('{name}: the line "{check}" ({id}) failed on the picture this one was made again from, or is the line it was made again for, so this picture shows it: '
+                      'answer it pass or fail, not "na", and send the file again (`vw visuals pictures --looks <file>`).')
+PIC_LOOK_UNKNOWN ='{name}: {id} is not a line of this picture now: list the pictures again (`vw visuals pictures --looks`), answer the lines it gives and send the file again.'
 PIC_LOOK_WORDS = ('{name}: the line "{check}" ({id}) needs one plain sentence of what was seen (`seen`, at most {max} characters): a fail always, and a pass of a line marked '
                   '`say`. Add it and send the file again (`vw visuals pictures --looks <file>`).')
 PIC_LOOK_NOT_CHECKED = ('{name}: `not_checked` is only for a picture that could not be opened, and then it carries no `lines`. This one carries both: take `not_checked` out if '
@@ -246,7 +249,8 @@ def claude_checks(session, ref, plan=None):
 
 
 def _line(check, pass_when, say=False):
-    lid = hashlib.sha1(f'{check}|{pass_when}'.encode('utf-8')).hexdigest()[:8]
+    # the critic's point 9: "a real face" changes its words when a person's permission is recorded (`face_line`): its id is of its name alone, so a look in progress is not refused
+    lid = hashlib.sha1((check if check == 'a real face' else f'{check}|{pass_when}').encode('utf-8')).hexdigest()[:8]
     return {'id': lid, 'check': check, 'pass_when': pass_when, **({'say': True} if say else {})}
 
 
@@ -295,11 +299,23 @@ def face_line(session, plan, shot):
 def faces_to_ask(session, plan):
     """Release 1, A7: the people of the footage whom a picture now waiting for its look shows and about whom the operator was never asked (a face
     frame is kept, and neither the permission nor a stand-in is recorded: `ref_sets.footage_person`): said in the next step, each once, with
-    the command that records the answer. Normally none: step 1 of the references asks it before any picture is made."""
+    the command that records the answer. Normally none: step 1 of the references asks it before any picture is made.
+    The critic's point 10c: asked before the picture is paid for: for every still and AI video shot of the plan, from the step's first next-step
+    line; the stills of those shots are not named for ordering until it is answered (`ask_shots`), the other shots are not held."""
     from . import ref_sets
-    shots = [_scene_of(plan, session, r)[1] for r in due(session, plan)] + [x[1] for x in starts_due(session, plan)]
-    people = {eid: name for sh in shots for eid, name in _people(plan, sh).items()}
+    people = {eid: name for sh in _made_shots(session, plan) for eid, name in _people(plan, sh).items()}
     return [W['face_ask'].format(name=name, eid=eid) for eid, name in people.items() if ref_sets.footage_person(session, plan, eid).get('state') == 'ask']
+
+
+def _made_shots(session, plan):
+    """The accepted shots a picture is made for: the still shots and the AI video shots."""
+    return [sh for _, sh in V._accepted_shots(plan, session) if V.route_of(sh) in ('still', 'video')] if plan else []
+
+
+def ask_shots(session, plan):
+    """The critic's point 10c: the shots that show a person of the footage about whom the operator was never asked: their stills wait for the answer."""
+    from . import ref_sets
+    return {sh['id'] for sh in _made_shots(session, plan) if any(ref_sets.footage_person(session, plan, eid).get('state') == 'ask' for eid in _people(plan, sh))}
 
 
 def lines(session, plan, ref):
@@ -327,7 +343,7 @@ def lines(session, plan, ref):
             _scene, shot = _scene_of(plan, session, ref)
             what = str((((shot or {}).get('states') or [{}] * n)[n - 1] or {}).get('what_appears') or '').strip() if shot and len(shot.get('states') or []) >= n else ''
             out.append(_line(f'step {n} adds its part', f"it adds what the plan's step {n} names" + (f' ({what})' if what else '') + f'; the rest is as step {n - 1}'))
-    elif kind == 'keyframe' and scene_pictures(session, plan, ref):
+    elif kind in ('keyframe', 'isolated') and scene_pictures(session, plan, ref):
         _scene, shot = _scene_of(plan, session, ref)
         if shot and V._has_figures(plan, shot):
             out.append(_line('no background figure repeated', 'no person or animal in it is the same individual as one in the approved pictures of this scene sent with it'))
@@ -335,6 +351,8 @@ def lines(session, plan, ref):
         if ref.get('fix_for'):
             out.append(_line('the line it was made for', f"the line \"{ref['fix_for']}\" now passes"))
         out.append(_line('nothing else changed', 'nothing else changed against the earlier picture sent with it'))
+        failed = {l.get('check') for l in (looked(orig) or {}).get('lines') or [] if l.get('pass') is False} | {ref.get('fix_for'), 'the line it was made for'}
+        out = [{**l, 'judged': True} if l['check'] in failed else l for l in out]   # the critic's point 5a: a line the original failed, or the one the picture was made again for, is in view: never "na"
     seen = {}
     for l in out:
         seen.setdefault(l['id'], l)
@@ -350,9 +368,12 @@ def _at(ref, field):
         return None
 
 
+START_LOOK = 'check_look'   # the critic's point 1: Claude's look of step 7's still has its own field: a guide's still keeps the id of its look reference in `look` (design/200, a string)
+
+
 def looked(ref):
-    """Claude's look of this picture as it is now (the same sha256), or None."""
-    look = ref.get('look') or {}
+    """Claude's look of this picture as it is now (the same sha256), or None. A still of a guide (it carries `guide_sha256`) keeps it under `check_look`."""
+    look = ref.get(START_LOOK if 'guide_sha256' in ref else 'look') or {}
     return look if look and look.get('sha256') == ref.get('sha256') else None
 
 
@@ -398,12 +419,15 @@ def stamp(session, plan):
 START_ON_LAYOUT = ('on the layout', "every person and thing sits where the layout puts it: on the overlay sent with it, on the red outlines of the guide's first frame")
 
 
+START_WHO = ('who and what', 'each person, thing and place in it is the one of the pictures sent as `parent`: the same face, build and clothes, the same object, the same place')   # the critic's point 6
+
+
 def start_lines(session, plan, shot, still):
     """Release 1, A1 (SK, 20 Nov 2026): the check list of step 7's still (the start picture of an AI video shot) for Claude's look. What it was
     judged on until now, by the operator alone on its overlay: every person and thing on the red outlines of the layout; the facts of the drawn
     things among its inputs (the request's "What must be true", guide._drawn_facts); then the fixed lines of every made picture."""
     from . import guide
-    return ([_line(*START_ON_LAYOUT)] + [_line('drawn fact: ' + f, f'the picture shows it as the approved drawings do: {f}', True) for f in guide._drawn_facts(session, still.get('inputs') or [])]
+    return ([_line(*START_ON_LAYOUT), _line(*START_WHO, True)] + [_line('drawn fact: ' + f, f'the picture shows it as the approved drawings do: {f}', True) for f in guide._drawn_facts(session, still.get('inputs') or [])]
             + [_line(l['check'], l['pass_when']) for l in (face_line(session, plan, shot) if l['check'] == 'a real face' else l for l in image_check.FIXED)])   # A7: the same face line as a still's
 
 
@@ -420,7 +444,7 @@ def starts_due(session, plan):
 def start_offered(session, still, now=None):
     """Release 1, A1: step 7's still is shown to the operator with its look recorded, or PICTURE_LOOK_MINUTES after Claude was asked (as not
     checked): as a picture of step 6 (`offered`). On a film of the older round: at once, as before."""
-    return not V.round_v2(session) or bool(looked(still)) or late(still, now)
+    return not V.round_v2(session) or not still.get('sha256') or bool(looked(still)) or late(still, now)   # the critic's point 3: a still that `starts_due` can never list (no content mark) is never waited for
 
 
 def asked(session, plan):
@@ -439,6 +463,10 @@ def _failed_lines(ref):
         [_say(c.get('check'), c.get('seen')) for c in (ref.get('check') or {}).get('code') or [] if c.get('pass') is False and not c.get('advice')]
 
 
+def _na_lines(ref):
+    return [_say(l['check'], l.get('seen')) for l in (looked(ref) or {}).get('lines') or [] if l.get('pass') == V.NA]
+
+
 def components_failed(session, plan):
     """The critic's review (5): a component Claude's check failed (or could not open) stays a candidate and is never asked of the operator, so
     the assistant is told plainly, with what failed, to make it again: never silent."""
@@ -447,7 +475,7 @@ def components_failed(session, plan):
         look = looked(r)
         if r.get('kind') == 'component' and r.get('status') == 'candidate' and look and claude_checks(session, r, plan):
             why = W['comp_unopened'].format(why=look['not_checked']) if look.get('not_checked') else W['comp_all_na'] if all_na(look) else ''
-            fails = _failed_lines(r)
+            fails = _failed_lines(r) or ([W['comp_na'].format(lines=' '.join(_na_lines(r)))] if _na_lines(r) else [])   # the critic's point 5b
             if why or fails:
                 out.append(W['comp_failed'].format(name=name_of(session, plan, r), ref=r['id'], lines=why or ' '.join(fails), element=r.get('element_id') or 'E'))
     return out
@@ -502,10 +530,12 @@ def looks_due(store, run, outputs, take_rows=None):
         out.append({'ref': r['id'], 'sha10': str(r['sha256'])[:10], 'kind': r.get('kind'), 'name': name_of(session, plan, r), 'shot_id': V.made_for(session, r),
                     **({'n': step_of(session, r)} if r.get('kind') == 'state' else {}), 'key': _big(store, session, r['id']),
                     'inputs': [{**i, 'key': _big(store, session, i['ref'])} for i in inputs], 'request': (r.get('generation') or {}).get('prompt') or '', 'lines': lines(session, plan, r)})
+    made = {x['id']: x['key'] for gd in (session.get('guides') or {}).values() for x in gd.get('stills') or [] if x.get('status') == 'approved' and x.get('key')}   # the critic's point 6: a later still of a scene is made from the scene's approved stills, which are not references
     for name, sh, g, st in starts_due(session, plan):   # release 1, A1: step 7's still: the picture, its overlay on the layout, the layout alone, the pictures it was made from
         out.append({'ref': st['id'], 'sha10': str(st['sha256'])[:10], 'kind': 'start', 'name': name, 'shot_id': sh['id'], 'key': st['key'],
                     'inputs': [{'ref': role, 'role': role, 'key': k} for role, k in (('overlay', st.get('overlay_key')), ('layout', (g.get('render') or {}).get('frame1_key'))) if k]
-                              + [{'ref': i['id'], 'role': 'parent', 'key': _big(store, session, i['id'])} for i in st.get('inputs') or [] if i.get('id') in session['references']],
+                              + [{'ref': i['id'], 'role': 'parent', 'key': _big(store, session, i['id']) if i['id'] in session['references'] else made[i['id']]}
+                                 for i in st.get('inputs') or [] if i.get('id') in session['references'] or i.get('id') in made],
                     'request': st.get('prompt') or '', 'lines': start_lines(session, plan, sh, st)})
     some =any(p['kind'] == 'take' for p in out)   # the critic's S8: the takes have their own helper, named in this answer
     then = ' '.join(x for x in (LOOKS_THEN if any(p['kind'] != 'take' for p in out) else '', takes.W['looks_then'] if some else '') if x) or LOOKS_NONE
@@ -527,6 +557,8 @@ def _fault(name, want, sent):
         if not a or not (isinstance(a.get('pass'), bool) or a.get('pass') == V.NA):
             return PIC_LOOK_OPEN.format(name=name, check=w['check'], id=w['id'])
         words = one(a.get('seen'))
+        if a['pass'] == V.NA and w.get('judged'):   # the critic's point 5a
+            return PIC_LOOK_NA_JUDGED.format(name=name, check=w['check'], id=w['id'])
         if a['pass'] == V.NA and not words:   # release 1, A3: "does not apply" always says why
             return PIC_LOOK_NA.format(name=name, check=w['check'], id=w['id'], max=LOOK_SAY)
         if len(words) > LOOK_SAY or (not words and (a['pass'] is False or w.get('say'))):
@@ -593,9 +625,9 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             if fault:
                 refused[rid] = fault
             else:
-                st['look'] = _look(st['sha256'], want, p, who, at)
+                st[START_LOOK] = _look(st['sha256'], want, p, who, at)
                 recorded.append(rid)
-                na += na_said(name, st['look'])
+                na += na_said(name, st[START_LOOK])
             continue
         r = session['references'].get(rid) or {}
         name = name_of(session, plan, r) if r else rid
@@ -611,7 +643,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
         r['look'] = _look(r['sha256'], want, p, who, at)
         recorded.append(rid)
         na += na_said(name, r['look'])
-        if r.get('kind') == 'component' and not why and not _failed_lines(r) and not all_na(r['look']):   # the program's advice lines (transparency, light) never decide it; release 1, A5: nor a list where nothing applied
+        if r.get('kind') == 'component' and not why and not _failed_lines(r) and not _na_lines(r):   # the critic's point 5b: any "does not apply" keeps it out of the approval nobody sees   # the program's advice lines (transparency, light) never decide it; release 1, A5: nor a list where nothing applied
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
@@ -658,6 +690,15 @@ def short(state, head, faults=(), notes=(), names=None):
     if state == 'pass':
         return W['short_pass'] if not notes else W['short_note'] if len(notes) == 1 else W['short_notes'].format(n=len(notes))
     return head
+
+
+def marked(base, check, held=''):
+    """The critic's point 2: an item's id with a mark of its check as shown (state, head, faults, why it is held), as `takes.item_id` does for a
+    take: an answer given to an older view of the check is stale and asked again. Returns (the id, the id without the mark, whether an answer
+    goes against the check): an id of a round written before the mark is taken only while nothing goes against the check."""
+    check = check or {}
+    mark = hashlib.sha1('|'.join([str(check.get('state')), str(check.get('head'))] + [str(f) for f in check.get('faults') or []] + [held]).encode('utf-8')).hexdigest()[:8]
+    return f'{base}:{mark}', base, check.get('state') == 'fail' or bool(held)
 
 
 def _view(state, head, by='', faults=(), passed=(), adv=(), show='first', passed_head=None, advice_head=None, na=(), notes=(), names=None):
@@ -1078,7 +1119,7 @@ def _component_state(rs):
     if any(r['status'] == 'approved' for r in live):
         return 'done'
     look = looked(live[-1])
-    return 'redo' if look and (look.get('not_checked') or _failed_lines(live[-1]) or all_na(look)) else 'checking'   # a failed one is made again by the assistant
+    return 'redo' if look and (look.get('not_checked') or _failed_lines(live[-1]) or _na_lines(live[-1])) else 'checking'   # a failed one is made again by the assistant
 
 
 def _ts(v):
@@ -1182,7 +1223,7 @@ def expected(session, plan, take_rows, now=None):
             if state in ('none', 'making', 'checking', 'redo'):
                 turn = V.drawn_turn(session, plan, gap, sh, shots)   # fix set A1.4: whose turn it is
         else:
-            mine = [r for r in refs if r.get('kind') == ('keyframe' if kind == 'still' else 'state') and V.made_for(session, r) == sid and not r.get('set')]
+            mine = [r for r in refs if r.get('kind') in (('keyframe', 'isolated') if kind == 'still' else ('state',)) and V.made_for(session, r) == sid and not r.get('set')]
             state = _pictures_state(session, plan, mine, now, len(sh.get('states') or []) if kind == 'steps' else 1)
         out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
                     **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
@@ -1213,9 +1254,10 @@ def status_line(items):
     return ' '.join(out)
 
 
-def stills_due(items):
-    """design/221 row 19: the still shots with no picture asked for yet, said in the tool's next-step line until each is ordered."""
-    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none']]
+def stills_due(items, hold=()):
+    """design/221 row 19: the still shots with no picture asked for yet, said in the tool's next-step line until each is ordered.
+    The critic's point 10c: `hold` (`ask_shots`): the shots whose person the operator must be asked about first are not named."""
+    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i['id'] not in hold]
     return (W['stills_due_one'] if len(ids) == 1 else W['stills_due']).format(n=len(ids), ids=', '.join(ids)) if ids else ''
 
 

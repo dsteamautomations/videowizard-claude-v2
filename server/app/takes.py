@@ -73,6 +73,8 @@ W = {
     'looks_then': ('The rows of kind `take` are video takes: give them to `vw-take-look` helpers, about three takes each, all started together, in one message '
                    '(`how_take` says how a take is judged from its frames); they send their own files.'),
     # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
+    'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
+    'start_words': "the writers of the take's words of {ids} ({n}) (`vw guide prompt --shot S --file take.txt`)",
     'start_scenes': 'the writers of the scene descriptions of {ids} ({n})', 'start_stills': 'the checkers of the stills of {ids} ({n})', 'start_takes': 'the checkers of the takes of {ids} ({n})',
     'rejected_do': ('{name} ({shot}): its take was rejected ("{words}") and no new take is ordered{why}: ask the operator what happens to the shot: '
                     'cut it into shorter shots, another angle, or leave it out; a new take after that is asked with its card.'),
@@ -221,14 +223,29 @@ def waits_words(session, plan, take_rows):
 def starts(session, plan, take_rows):
     """Release 1, D1 (SK, 20 Nov 2026): the helpers of step 7 that can start now, to be started together in one message, in film order: the writers
     of the scene descriptions (a shot with no guide yet), the checkers of the stills and of the takes that wait for Claude's look. '' when none.
-    ponytail: the guide's own checker (`vw-guide-check`) is not named here; its turn is said by `vw guide status`."""
+    The critic's point 4: the line is complete: also the guides whose check frames wait for their fresh checker, the stills that can be ordered
+    (the layout approved, the guide rendered, no still yet) and the takes' words that can be written (the still approved); each group is named
+    only when the server's own gate takes it (`guide.verdict`, `guide.request_still`, `guide.set_prompt`). Point 10c: a shot that shows a
+    person of the footage about whom the operator was never asked is not named for its still: that question is said first, in the same line."""
     if not plan or not V.round_v2(session):
         return ''
-    shots = [sh['id'] for _, sh, _, _ in video_shots(plan, session)]
-    none = [sid for sid in shots if sid not in (session.get('guides') or {}) and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)]
+    rows = video_shots(plan, session)
+    shots, guides, open_ = [sh['id'] for _, sh, _, _ in rows], session.get('guides') or {}, lambda sid: sid not in (session.get('selections') or {}) and not question_open(session, sid)
+    none = [sid for sid in shots if sid not in guides and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)]
+    mine = lambda g, st: st.get('guide_sha256') == g.get('sha256')
+    check = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('frames') or {}).get('status') == 'ready' and not (guides[sid].get('render') or {}).get('job_id')
+             and not any(v.get('sha256') == guides[sid].get('sha256') for v in guides[sid].get('verdicts') or [])]   # a verdict of this scene exists: passed (rendering) or failed (the scene changes first)
+    order = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('render') or {}).get('status') == 'ready' and (guides[sid].get('render') or {}).get('frame1_key')
+             and (guides[sid].get('drawing') or {}).get('status') == 'approved' and (guides[sid].get('drawing') or {}).get('sha256') == guides[sid].get('sha256')
+             and not any(st.get('status') == 'generating' or (mine(guides[sid], st) and st.get('status') in ('candidate', 'approved')) for st in guides[sid].get('stills') or [])
+             and not jobs_of(take_rows, sid)]
+    hold = P.ask_shots(session, plan) if order else ()   # point 10c: the question is said by `pictures.waits_words` (`faces_to_ask`), first in the same next-step line
+    order = [sid for sid in order if sid not in hold]
+    words = [sid for sid in shots if sid in guides and open_(sid) and not guides[sid].get('take_prompt') and any(mine(guides[sid], st) and st.get('status') == 'approved' for st in guides[sid].get('stills') or [])]
     stills = {x[1]['id'] for x in P.starts_due(session, plan)}
     looks = {row[1]['id'] for row in due(session, plan, take_rows)}
-    what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_scenes', none), ('start_stills', [x for x in shots if x in stills]), ('start_takes', [x for x in shots if x in looks])) if ids]
+    what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_scenes', none), ('start_guides', check), ('start_order', order), ('start_words', words),
+                                                                         ('start_stills', [x for x in shots if x in stills]), ('start_takes', [x for x in shots if x in looks])) if ids]
     return P.W['start_now'].format(what='; '.join(what)) if what else ''
 
 

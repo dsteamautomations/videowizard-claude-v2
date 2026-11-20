@@ -1009,9 +1009,9 @@ def _counted(session, page, things, words, quiet):
         elif kind == 'take-done':
             on.add(rest)
         elif kind == 'graphics':
-            on.add(rest.rsplit(':', 1)[0])
+            on.add(rest.split(':')[0])   # the id's later parts: the number of steps, the check's mark
         elif kind == 'picture':
-            ref = (session.get('references') or {}).get(rest.rsplit(':', 1)[0])
+            ref = (session.get('references') or {}).get(rest.split(':')[0])
             on.add(V.made_for(session, ref) if ref else None)
         elif kind == 'question':   # the critic's point 6a: a question about a made picture stands in its place: by its picture, or by its shot
             ref = (session.get('references') or {}).get(rest)
@@ -1077,7 +1077,9 @@ def _pictures_page(ctx, base, lines, six):
 def _pictures_answer(ctx, a, choice, words):
     """design/217 (contract 3.11): one answer of step 6, through the chat item's own run function. None when the item no longer waits with
     that content (stale). A choice not on the line, or words missing where the button needs them, is refused with the line's own sentence."""
-    item = next((i for i in CF._waiting_items({**ctx, 'page': True}) if i['id'] == a.get('item') and i.get('_line')), None)   # design/221: an answer on the page that opened is taken while a redo is made
+    # design/221: an answer on the page that opened is taken while a redo is made. The critic's point 2: the id carries the check as shown; an id of
+    # a round written before the mark (0.118.0) is taken only while nothing of the item goes against its check, else it is stale and asked again
+    item = next((i for i in CF._waiting_items({**ctx, 'page': True}) if i.get('_line') and (i['id'] == a.get('item') or (i.get('_bare') == a.get('item') and not i.get('_against')))), None)
     if not item:
         return None
     buttons = item['_line']['buttons']

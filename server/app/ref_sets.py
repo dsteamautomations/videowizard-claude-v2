@@ -1257,7 +1257,8 @@ def first_sets(session, rd):
             continue
         pics = _pictures(session, eid, r, ('candidate', 'approved')) if r.get('set') else []
         look = r.get('set_look') or {}
-        out['unmade' if not pics else 'unchecked' if any((p.get('look') or {}).get('not_checked') for p in pics) else
+        nothing = lambda p: bool((p.get('look') or {}).get('lines')) and all(l.get('pass') == V.NA for l in p['look']['lines'])   # the critic's point 8: every line "does not apply": the picture was judged on nothing
+        out['unmade' if not pics else 'unchecked' if any((p.get('look') or {}).get('not_checked') or nothing(p) for p in pics) else
             'use' if look.get('set') == r.get('set') and look.get('recommend') == 'use' else 'fault'].append(eid)
     return out
 

@@ -177,6 +177,9 @@
     "publish the page again to the same link first, as it says.",
     "VideoWizard's checker of the pictures of step 6 (a still, a step of a graphic, the style sheet, a component).",
     "Select (with their reason when the check did not pass it)",
-    "list each change in `changed_from_plan`."
+    "list each change in `changed_from_plan`.",
+    "select it anyway with their reason",
+    "`select` needs `--notes` saying why it is taken",
+    "Nothing of step 7 is asked one by one"
   ]
 }

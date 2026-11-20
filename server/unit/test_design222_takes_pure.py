@@ -92,7 +92,7 @@ def test_a_film_with_no_ai_video_has_no_step_7(held):
 @pytest.mark.parametrize('change, rows, state', [
     (lambda s: None, [], 'not started'),
     (lambda s: s['guides'].update(S1=guide(drawing='proposed', still=None, prompt=False)), [], 'waiting for you in the chat'),        # the layout drawing's card
-    (lambda s: (s['guides'].update(S1=guide(still='candidate', prompt=False)), s['guides']['S1']['stills'][0].update(look={'sha256': 's' * 64, 'lines': []})), [], 'waiting for you in the chat'),   # the still's card, once Claude looked at it (release 1, A1)
+    (lambda s: (s['guides'].update(S1=guide(still='candidate', prompt=False)), s['guides']['S1']['stills'][0].update(check_look={'sha256': 's' * 64, 'lines': []})), [], 'waiting for you in the chat'),   # the still's card, once Claude looked at it (release 1, A1)
     (lambda s: s['guides'].update(S1=guide()), [], 'waiting for you in the chat'),                                                  # the word to make the take
     (lambda s: s['guides'].update(S1=guide(still=None, prompt=False)), [], 'being made'),
     (lambda s: s['guides'].update(S1=guide()), [job('j1', status='running')], 'being made'),
@@ -433,7 +433,8 @@ def test_the_served_text_says_the_new_order_and_the_replaced_sentences_are_retir
     import rel1a_wording as REL1A   # release 1, section A: step 7's still and the answer "na" come inside this script's sentences on a take's check
     v3 = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
     import rel1b_wording as REL1B   # release 1, B1 and D: "Select" loses its typed reason inside this script's sentence, and sentences are added after its two
-    st = REL1A.before(REL1B.before(next(s for s in v3['stages'] if s['name'] == 'visuals')))
+    import rel1c_wording as REL1C   # release 1, the critic's point 10: "Nothing of step 7 is asked one by one" becomes "No finished take …"
+    st = REL1A.before(REL1B.before(REL1C.before(next(s for s in v3['stages'] if s['name'] == 'visuals'))))
     later = next(p for p in st['parts'] if p['name'] == 'later')['text']
     assert D.CHECK_NEW in later and D.SHOOT_NEW in later and 'Gemini reads every ready take' not in later
     old = next(p for p in D.before(st)['parts'] if p['name'] == 'later')['text']

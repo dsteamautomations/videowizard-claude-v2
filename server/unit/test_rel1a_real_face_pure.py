@@ -91,4 +91,4 @@ def test_a_person_of_the_footage_nobody_was_asked_about_is_asked_once_when_their
     assert 'GIRL' not in P.waits_words(s, p)
     state['GIRL'] = 'ask'
     s['references']['k1']['look'] = {'sha256': 'a' * 64, 'lines': []}
-    assert P.waits_words(s, p) == ''                                                              # no picture of her waits for its look: nothing is said
+    assert 'GIRL' in P.waits_words(s, p)                                                          # the critic's point 10c: asked until answered, also with no picture waiting: before the next one is paid for

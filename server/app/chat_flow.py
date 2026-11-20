@@ -1643,14 +1643,18 @@ def _waiting_items(ctx):
             if line:   # design/217: the style sheet and a still say the page's words in the chat too (F1: the check from Claude's look and the program's lines)
                 faults = line['check']['faults'] if ref.get('parent_wanted') else None   # fix set A2.2: the card says plainly what its Yes carries
                 early = '' if faults is None else '- ' + (P._named(P.W['parent_card_failed'].format(lines=' '.join(faults)), line['check'].get('who')) if faults else P.W['parent_card']) + '\n'
-                item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_,
+                iid, bare, against = P.marked(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", line['check'])   # the critic's point 2: the id carries the check as shown
+                item = _item(iid, 'picture', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_,
                              [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct.' if b['needs_words'] else '') for b in line['buttons']],
                              text=early + P.chat_text(line), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
                 item['_line'] = line
             else:
-                item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f'{what}: is this picture right?', run_,
+                view = P.check_view(session, ref, plan)
+                iid, bare, against = P.marked(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", view)
+                item = _item(iid, 'picture', where, f'{what}: is this picture right?', run_,
                              [_button('Yes', 'yes'), _button('No', 'no'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')],
-                             text=P.chat_text({'check': P.check_view(session, ref, plan)}), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
+                             text=P.chat_text({'check': view}), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
+            item.update(_bare=bare, _against=against)
             items.append(item)
         elif kind == 'graphics to approve':
             chain = V.state_chain(session, group) or []
@@ -1673,9 +1677,10 @@ def _waiting_items(ctx):
                         V.save_session(store, run, s_)
                 return out
             buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct in this step.' if b['needs_words'] else '') for b in line['buttons']]
-            item = _item(f'graphics:{group}:{len(chain)}', 'graphics', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:],
+            iid, bare, against = P.marked(f'graphics:{group}:{len(chain)}', line['check'])   # the critic's point 2
+            item = _item(iid, 'graphics', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:],
                          text=P.chat_text(line), show=[_pic(run, r['id'], f'{group}-step-{i + 1}') for i, r in enumerate(chain)])
-            item['_line'] = line
+            item.update(_line=line, _bare=bare, _against=against)
             items.append(item)
         elif kind == 'shared parts to approve':   # design/221 row 1: the film's shared parts, drawn once: their picture, Approve or Reject with the operator's words
             up = session['motion_parts']
@@ -1716,7 +1721,7 @@ def _waiting_items(ctx):
                          f'the held drawing selected anyway: "{words}"' if choice == 'select' else "one more round, at the operator's word" if choice == 'more'
                          else 'the held drawing rejected' + (f': "{words}"' if words else ''), words or quote)
                 return out
-            buttons = [_button('Select it anyway', 'select', words=True, tell='The drawing is held: ask the operator why it is right for the film all the same.'),
+            buttons = [_button('Select it anyway', 'select'),   # the critic's point 10a (release 1, B1): one click, the open musts are listed on the card
                        _button('Reject it', 'reject')] + ([] if (session.get('motion_more') or {}).get(group) else [_button('One more round', 'more')])
             items.append(_item(f"held:{group}:{str(rec.get('sha256'))[:10]}:{rec.get('round')}", 'held drawing', where,
                                f"{title(group)}: held after round {rec.get('round')}: {len(musts)} must rule{' still fails' if len(musts) == 1 else 's still fail'}. What do you decide?",
@@ -1808,9 +1813,10 @@ def _waiting_items(ctx):
             else:
                 buttons = [_button('Select', 'select', words=hold, tell=why_hold + ': ask the operator why it is right for the film all the same.'),
                            _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with it.')] + ([_button('Take the effect away', 'no-effect')] if fin else [])
-            item = _item(f"take:{job['id']}", 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show)
+            iid, bare, against = P.marked(f"take:{job['id']}", line['check'], line['held']) if line else (f"take:{job['id']}", None, False)   # the critic's point 2: a drawn graphic of step 6
+            item = _item(iid, 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show)
             if line:
-                item['_line'] = line
+                item.update(_line=line, _bare=bare, _against=against)
             items.append(item)
     return items
 
@@ -1824,7 +1830,7 @@ def _guide_items(ctx):
     # release 1, D2 (SK, 20 Nov 2026): the early cards in batches, in film order: every still's card first (`items`), then every word to shoot (`words`).
     # (Until this release: per shot, in the order the guides were written: a still, a word to shoot, the next shot's still; design/35 row 277.)
     shots, items, words, checking = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, [], [], False
-    for sid in [sid for sid in shots if sid in session['guides']]:
+    for sid in [sid for sid in shots if sid in session['guides'] and V.route_of(shots[sid]) == 'video']:   # the critic's point 3: only the shots that are AI video today
         g = session['guides'][sid]
         title = shots[sid].get('title') or sid
         still = next((s for s in g.get('stills') or [] if s.get('status') == 'candidate' and s.get('guide_sha256') == g['sha256'] and s.get('key')), None)
@@ -1837,7 +1843,7 @@ def _guide_items(ctx):
                     return guide.approve_still(conn, store, user, run, outputs, sid, still['id'], still['sha256'], quote)
                 return guide.reject_still(conn, store, user, run, outputs, sid, still['id'], words, quote)
             show = ([{'key': still['overlay_key'], 'name': f'{sid}-still-on-the-guide.png'}] if still.get('overlay_key') else []) + [{'key': still['key'], 'name': f'{sid}-still.png'}]
-            items.append(_item(f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',
+            items.append(_item(P.marked(f"still:{sid}:{still['id']}", P.look_view(still))[0] if V.round_v2(session) else f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',   # the critic's point 2
                                f'{title}: this still starts the shot. On the first picture, does every person and thing sit on the red outlines?', run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show,
                                text=P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else ''))   # the check's line and its warnings: the operator may approve against them
@@ -1990,7 +1996,7 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
         'Correct every picture of it': 'The set is made again with your words, and they go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
         'Make it': 'Make the set now (paid)', 'Yes, use it': 'Use the footage picture', 'Yes, make one': 'Have a set made (paid)',
         'Take the effect away': 'Make the drawing again without the added effect',
-        'Select it anyway': 'Use it in the film; I will ask you why', 'Reject it': 'It is rebuilt from the start', 'One more round': 'The helpers try once more (allowed once)',
+        'Select it anyway': 'Use it in the film as it is', 'Reject it': 'It is rebuilt from the start', 'One more round': 'The helpers try once more (allowed once)',
         'Use it as the reference': 'Take the footage picture; nothing is made', 'Make a clean set from it': 'A set is made from the footage picture', 'Have a set made': 'A set of three pictures is made',
         'No set needed': 'Its words carry it; nothing is made', 'Ask me each one': 'I ask you every thing in turn',
         'Make a set': 'A set is made of it; it comes back to you to judge', 'Minor corrections': 'The set is made again with your words', 'Leave out': 'This thing gets no reference',
@@ -2179,7 +2185,7 @@ def next_item(conn, store, user, run, outputs, one=False):
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)
-        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
+        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan))) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
         show = _finished({'session': session, 'store': store}, six) if out.get('item') or out.get('card') else []   # fix set A3.4: a finished drawing is shown with the next answer too (with nothing waiting: `_next_item`), once

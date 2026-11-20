@@ -283,7 +283,8 @@ def test_the_texts_say_must_and_should_not_seen_the_frames_later_rounds_and_the_
     import fixset3_wording as FIX3   # fix set phase 3: the frame limit comes after this script's sentence on the frames, and inside its sentences of the checker and the builder
     import fixset4_wording as FIX4   # fix set, the critic's points: the passed musts of the round's list come after this script's sentence on later rounds; the frame a continuing still opens on inside its sentence of the checker
     import rel1a_wording as REL1A   # release 1, section A: the answer "na" comes after this script's sentence on "not seen", and inside its sentence of the checker
-    stage = D221D.before(D221F.before(FIX2.before(FIX3.before(FIX4.before(REL1A.before(visuals()))))))
+    import rel1c_wording as REL1C   # release 1, the critic's point 10: design/221f's sentence of the held card is changed after it
+    stage = D221D.before(D221F.before(FIX2.before(FIX3.before(FIX4.before(REL1A.before(REL1C.before(visuals())))))))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

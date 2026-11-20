@@ -5732,6 +5732,34 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     return review
 
 
+def take_held(store, run, outputs, session, job):
+    """What `select_take` asks notes for: a drawing whose musts or fact check failed, that has no fact check, or whose brief changed; a take made from
+    a guide whose scorecard fails or that was not read."""
+    prep, check = load_json(store, job['request']['request_key']), (session.get('take_checks') or {}).get(str(job['id'])) or {}
+    if prep.get('kind') in ('drawn', 'motion'):
+        if check.get('must_failed'):
+            return True
+        if prep.get('kind') != 'motion':
+            return False
+        checks = motion_rounds(session, job['unit'], prep.get('sha256'))
+        return not checks or bool(open_rules(checks[-1])) or bool(stale_brief(store, run, outputs, session, prep.get('sha256'), job['unit']))
+    return prep.get('kind') == 'guide' and (any(r['state'] == 'Fail' for r in check.get('scorecard') or []) or bool(check.get('not_read')))
+
+
+def select_by_tool(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes='', in_s=None):
+    """The critic's point 10a (release 1, B1): `vw visuals select --job J`. The page and the chat ask no reason for a held take or drawing, so the tool
+    asks none either: with no `--notes` such a selection carries the fixed note (`pictures.W['against_note']`), and the record keeps what it departs
+    on, as `select_take` writes it. (`select_take` itself still refuses a held item with no note: every front end gives it one.)"""
+    if not str(notes or '').strip():
+        session = session_of(store, run, outputs)
+        job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('video', 'drawn')", (job_id, run['id'])).fetchone()
+        if job and job['status'] == 'ready' and take_held(store, run, outputs, session, job):
+            from . import pictures
+            notes = pictures.W['against_note']
+            timing_notes = timing_notes or ('' if job['result']['evidence'].get('timing_matches_placement') else notes)
+    return select_take(conn, store, user, run, outputs, job_id, quote, notes, timing_notes, in_s)
+
+
 def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes='', in_s=None):
     """design/45 10.4: with notes, the accepted review and the selection are one call; without, the latest review must be accepted."""
     need(not re.search(r'\breject', f'{quote or ""} {notes or ""}', re.I),   # design/106 T3: select places a take; words that reject it never do
@@ -6921,7 +6949,9 @@ def held_answer(conn, store, user, run, outputs, shot_id, job_id, choice, quote,
     need(choice in ('select', 'reject', 'more'), f'Not an answer to a held drawing: {choice!r} (select, reject or more).')
     need(choice != 'more' or not (session.get('motion_more') or {}).get(shot_id), HELD_MORE_USED.format(shot=shot_id))
     words = str(words or '').strip()
-    need(choice != 'select' or words, "Say why it is right for the film all the same, in the operator's words.")
+    if choice == 'select' and not words:   # the critic's point 10a (release 1, B1): one click, as on the page: no reason is asked; the fixed note says so
+        from . import pictures
+        words = pictures.W['against_note']
     out = select_take(conn, store, user, run, outputs, job_id, quote, words) if choice == 'select' else {}   # refused there, nothing is recorded here
     session = session_of(store, run, outputs)
     session.setdefault('motion_held', {})[shot_id] = {'sha256': rec.get('sha256'), 'round': rec.get('round'), 'answer': choice, 'words': words, 'quote': quote,
@@ -7697,7 +7727,7 @@ def status(conn, store, run, outputs, repair=True):
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
-    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six),
+    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()),
                                  takes.starts(session, plan, take_rows) if seven else '') if x)   # release 1, D1: what of step 7 can start now, together
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
