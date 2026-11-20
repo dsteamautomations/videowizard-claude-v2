@@ -209,13 +209,19 @@ def test_a_pass_queues_the_render_once_and_a_fail_does_not(film):
     sha = frames_back(store, conn)
     out = GD.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, False, [{'look': 'the door reads as a door', 'pass': False, 'fix': 'make it taller'}], 'the door is a slit')
     assert out['round'] == 1 and out['failed'] == ['the door reads as a door'] and len(conn.queued) == 1
+    # release 2, the critic's point 8: a scene gets one verdict (until then a second verdict on the same scene was taken, here a pass after the fail)
+    assert 'already judged (round 1: failed)' in refused(lambda: GD.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, True, [{'look': 'the door reads as a door', 'pass': True}]))
+    changed = spec10()
+    changed['people'][2]['at'] = [4.0, 1.2, 0.3]
+    scene(store, conn, changed)
+    sha = frames_back(store, conn)
     out = GD.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, True, [{'look': 'the door reads as a door', 'pass': True}])
     assert out['round'] == 2 and conn.queued[-1]['request']['kind'] == 'guide-render' and saved(store)['guides']['VS1']['render']['status'] == 'queued'
-    GD.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, True, [{'look': 'again', 'pass': True}])
+    assert 'already judged (round 2: passed)' in refused(lambda: GD.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, True, [{'look': 'again', 'pass': True}]))
     assert sum(1 for q in conn.queued if q['request']['kind'] == 'guide-render') == 1
 
 
-def test_the_rounds_are_counted_across_changed_scenes_and_the_operator_is_brought_in_after_two(film):
+def test_the_rounds_are_counted_across_changed_scenes_and_the_shot_is_held_at_the_third_failure_in_a_row(film):
     store, conn = film
     scene(store, conn)
     sha = frames_back(store, conn)
@@ -225,7 +231,13 @@ def test_the_rounds_are_counted_across_changed_scenes_and_the_operator_is_brough
     scene(store, conn, changed)
     sha2 = frames_back(store, conn)
     out = GD.verdict(conn, store, OTHER, NEW, [], 'VS1', sha2, False, [{'look': 'a', 'pass': False}])
-    assert out['round'] == 2 and 'Show the operator what is still open' in out['next']
+    # release 2, the critic's point 2: rounds 1 and 2 are rebuilt with no word of the operator; the third failure in a row holds the shot
+    # (until then: "Show the operator what is still open before another round" at round 2, with no card and no gate)
+    assert out['round'] == 2 and out['next'] == 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.'
+    changed['people'][2]['at'] = [4.0, 1.4, 0.3]
+    scene(store, conn, changed)
+    out = GD.verdict(conn, store, OTHER, NEW, [], 'VS1', frames_back(store, conn), False, [{'look': 'a', 'pass': False}])
+    assert out['round'] == 3 and out['next'].startswith('Round 3 failed, the third check in a row: the shot is held') and GD.held(saved(store)['guides']['VS1'])
 
 
 def test_a_result_for_a_scene_that_changed_meanwhile_is_ignored(film):

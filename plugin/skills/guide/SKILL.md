@@ -25,7 +25,7 @@ You write data and words. You never run Blender, never call a picture or video m
 | 9. Claude's check | `vw visuals pictures --looks`: a `vw-take-look` helper judges the take from its frames (one every half second, the sheet at four a second, the still); the server measures real footage, the length, the first frame and one continuous shot | free |
 | 10. Review | on the page (`vw visuals page`), all takes together, once every take is made and checked: Select, Make another, or Reject. Until then say step 7's line of counts as it is and ask nothing | free |
 
-One helper builds one shot. The checker is always a different, fresh helper. After two failed rounds, show the operator what is still open before another round.
+One helper builds one shot. The checker is always a different, fresh helper. A scene gets one verdict. After the third failed check in a row the server holds the shot and asks the operator in the chat (`vw visuals next`): build nothing more for it until they answer.
 
 ## Any kind of shot may be an AI video
 

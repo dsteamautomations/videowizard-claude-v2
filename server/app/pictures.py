@@ -135,8 +135,10 @@ W = {
     # release 2, section F (20 Nov 2026): F15, a clean drawing whose render the operator rejects; F12, a selected drawing a later comparison fails on
     'take_rejected': ('{shot}: the operator rejected this drawing{words}. Give these words to a new `vw-motion-shot` helper to build its motion again '
                       '(a new project, not a new render of this one), upload it and check it again from round 1.'),
-    'selected_failed': ('{shot} was selected, and a comparison with another drawing failed on it afterwards: it is being redone. Tell the operator; the new drawing is '
-                        'asked on the page when it is made.'),
+    # release 2, the critic's point 5: the selection stands; one sentence for the operator, no "being redone", no promise (until then: "it is being redone … the new
+    # drawing is asked on the page when it is made", which nothing did; design/35 row 295)
+    'selected_failed': ('{shot}: its comparison with {other} failed after {shot} was selected: {words}. Tell the operator: they reject {shot} on the page or in the chat '
+                        'to have it redrawn, or leave it as it is.'),
     'later_step': 'Made from a step that was corrected.',
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
@@ -786,7 +788,9 @@ def rule_id(text):
 
 _MARK = r'(?:(still|motion)|with\s+([A-Za-z0-9_-]+))?'   # release 2, F13: the two pieces of a mark, in either order, with a comma or a semicolon
 RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*(?:\(\s*' + _MARK + r'\s*[,;]?\s*' + _MARK + r'\s*\))?[*_]*\s*:\s*[*_]*\s*', re.I)
-RULE_MARKED = re.compile(r'[*_]*(must|should)[*_]*\s*\([^)]*\)[*_]*\s*:', re.I)   # F13: a class, brackets and a colon left at the start of a rule's words: a mark that was not read
+# F13: a class, brackets and a colon left at the start of a rule's words: a mark that was not read. The critic's point 7: only when the brackets hold a
+# mark word (`still`, `motion`, `with`); other words in brackets ("must (per the spec): …") are the rule's own words, as before F13.
+RULE_MARKED = re.compile(r'[*_]*(must|should)[*_]*\s*\([^)]*\b(still|motion|with)\b[^)]*\)[*_]*\s*:', re.I)
 
 
 def rules_of(text):
@@ -800,6 +804,8 @@ def rules_of(text):
         m = re.match(r'\s*(?:[-*]|\d+[.)])\s+(.*\S)', raw)
         if m:
             c = RULE_CLASS.match(m.group(1))
+            if c and ((c.group(2) and c.group(4)) or (c.group(3) and c.group(5))):
+                c = None   # the critic's point 7: both `still` and `motion` (or two drawings) in one mark is no mark the server reads: left in the words, refused at the upload
             words = ' '.join(m.group(1)[c.end() if c else 0:].split())
             shows, other = (c.group(2) or c.group(4), c.group(3) or c.group(5)) if c else (None, None)
             out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must', **({'shows': shows.lower()} if shows else {}),
@@ -1194,16 +1200,21 @@ def _rejected_take(session, sid, take_rows):
 
 def _selected_state(session, plan, sid, take_rows):
     """Release 2, F12: (state, the next step) of a drawn shot the operator selected. 'answered', unless a comparison with another drawing came due
-    afterwards (that drawing's still end-frame was approved or replaced): then it is being checked until the comparison is judged, and a comparison
-    that fails on it after the selected render reopens it: being redone, said for the operator."""
+    afterwards (that drawing's still end-frame was approved or replaced): then it is being checked until the comparison is judged. A comparison
+    that fails on it after the selected render leaves it answered, with one sentence for the operator (the critic's point 5: the selection is
+    theirs; only their Reject has it redrawn)."""
     cmp = V.compared(session, plan, sid)
     if cmp.get('due'):
         return 'checking', _compare_said(sid, cmp)
     job = next((j for j in take_rows or [] if str(j['id']) == str(session['selections'][sid].get('job_id'))), None)
     made = _ts((job or {}).get('created_at'))
     after = [c for c in (session.get('motion_checks') or {}).get(sid) or [] if not c.get('still') and made and (_ts(c.get('at')) or made) > made]   # the verdicts since the selected render
-    failed = any(r.get('with_png') and r.get('pass') is False and r.get('class') != 'should' for c in after for r in c.get('rules') or [])
-    return ('redo', W['selected_failed'].format(shot=sid)) if failed and V.open_rules(after[-1]) else ('answered', '')   # until a verdict of the redone drawing is clean
+    bad = next((r for c in after for r in c.get('rules') or [] if r.get('with_png') and r.get('pass') is False and r.get('class') != 'should'), None)
+    if not bad or not V.open_rules(after[-1]):   # until a later verdict of the drawing is clean
+        return 'answered', ''
+    held = ((session.get('motion_projects') or {}).get(after[-1].get('sha256') or '') or {}).get('rules') or []
+    other = next((x['with'] for x in held if x.get('with') and rule_id(x.get('rule')) == rule_id(bad.get('rule'))), 'another drawing')
+    return 'answered', W['selected_failed'].format(shot=sid, other=other, words=str(bad.get('where') or bad.get('fix') or bad.get('rule') or '').rstrip('.'))
 
 
 def _drawn_state(session, sh, take_rows, plan=None):

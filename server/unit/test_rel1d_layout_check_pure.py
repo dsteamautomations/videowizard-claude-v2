@@ -16,7 +16,9 @@ from test_visuals_stage_pure import USER, saved
 ROOT = Path(__file__).resolve().parents[2]
 START = 'Start now, together in one message: '
 CHECK = 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: a layout is shown to the operator, and its guide is rendered, only after its check passes)'
-SCENES = 'the writers of the scene descriptions of {ids} ({n})'
+# release 2, the critic's point 3: a shot to rebuild is named apart from a shot with no guide yet (until then both read "the writers of the scene descriptions of {ids} ({n})")
+SCENES = ("the writers of the scene descriptions of {ids} ({n}), each rebuilt after its check or the operator's correction: read `vw guide status --shot S` first, "
+          'it holds what must change')
 STILLS = 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`'
 AGAIN = 'This drawing replaces an earlier one of this shot: the layout was rebuilt after its check.'
 

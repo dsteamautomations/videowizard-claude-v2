@@ -1548,6 +1548,20 @@ def _drawing_items(ctx):
         for sid in [sid for sid in shots if sid in session['guides']]:   # release 1: in film order (release 2, B4b: the order a group of them keeps; design/35 row 291)
             g = session['guides'][sid]
             d = g.get('drawing') or {}
+            if guide.held(g):   # release 2, the critic's point 2: the third check in a row failed: one card, the latest layout drawing, the finding, three answers
+                def run_(choice, quote, words, sid=sid, sha=g['sha256'], found=guide.finding(g, 99)):
+                    out = guide.held_answer(conn, store, user, run, outputs, sid, sha, choice, quote, words)
+                    _decided(conn, run, user, 'shot ' + sid, f'a layout held after {guide.MAX_ROUNDS} failed checks in a row (answered in the chat)',
+                             {'use': f'the layout used as it is, against its check: {found}', 'again': 'the layout tried once more: three more rounds',
+                              'change': f'the shot is to change: "{words}"'}[choice], words or quote)
+                    return out
+                items.append(_item(f"layout-held:{sid}:{g['sha256'][:10]}", 'held layout', 'Step 7, AI video: a layout that did not pass its check',
+                                   f"{shots[sid].get('title') or sid}: the layout of this shot failed its check {guide.MAX_ROUNDS} times in a row. What should happen to it?", run_,
+                                   [_button('Use this layout as it is', 'use'), _button('Try once more', 'again'),
+                                    _button('Change the shot', 'change', words=True, tell='Ask the operator what the shot should become: cut into shorter shots, another angle, or left out.')],
+                                   text=f'The checker still finds: {guide.finding(g)}.',
+                                   show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in (d.get('views') or []) if d.get('sha256') == g['sha256']]))
+                continue
             # release 1 (SK, 20 Nov 2026): the fresh checker first, the operator second: the card is offered only when this scene's check passed.
             # (Until this release: as soon as the scene was sent, before its check; 13 of 15 approved layouts were then rebuilt; design/35 row 281.)
             if d.get('status') != 'proposed' or d.get('sha256') != g['sha256'] or not guide.checked(g):
@@ -2007,7 +2021,9 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
         'Use it as the reference': 'Take the footage picture; nothing is made', 'Make a clean set from it': 'A set is made from the footage picture', 'Have a set made': 'A set of three pictures is made',
         'No set needed': 'Its words carry it; nothing is made', 'Ask me each one': 'I ask you every thing in turn',
         'Make a set': 'A set is made of it; it comes back to you to judge', 'Minor corrections': 'The set is made again with your words', 'Leave out': 'This thing gets no reference',
-        'Add words for the picture': 'A set is made with your words'}
+        'Add words for the picture': 'A set is made with your words',
+        'Use this layout as it is': 'The shot goes on with this layout, against its check', 'Try once more': 'The layout is rebuilt and checked again, three more times at most',
+        'Change the shot': 'I will ask you what the shot becomes'}
 
 
 def _says(label):
@@ -2217,7 +2233,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         rows = V.take_jobs(conn, run)
         if T.asked(session, plan, rows):   # design/222: Claude is asked to check the takes from now
             V.save_session(store, run, session)
-        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.starts(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows)) if x)   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
+        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.starts(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows), T.held_due(session, plan)) if x)   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)
@@ -2312,7 +2328,11 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     handed = ctx['session'].get('chat_item') or {}
     open_ids = handed.get('group') or [handed.get('id')]   # a session of the older server holds the one id
     now = _together(items, len(open_ids) > 1)
-    current = next((i for i in now if i['id'] == item_id and item_id in open_ids), None)
+    # the critic's point 4: an item of the handed-out group is looked up among all that wait, not only among the first four now (an earlier one
+    # that became ready meanwhile pushed the last one out and its answer was refused); the kind in front must still be the group's
+    kind = lambda i: next((p for p in TOGETHER if i['id'].startswith(p)), None)
+    pool = [i for i in items if kind(i) == kind(now[0])] if now and len(open_ids) > 1 and kind(now[0]) else now
+    current = next((i for i in pool if i['id'] == item_id and item_id in open_ids), None)
     V.need(items, 'Nothing waits for an answer now: run `vw visuals next`.')
     V.need(current,
            f"{item_id} is not the decision that is open. The open one is {now[0]['id']} ({now[0]['position']}): show it with `vw visuals next` and record the operator's answer to it. One decision at a time, in the server's order.")

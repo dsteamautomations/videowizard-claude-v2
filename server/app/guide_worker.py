@@ -177,7 +177,9 @@ def guide_running(conn, kind):
 # hotfix (VW-24, 20 Nov 2026): a scene sent again for a shot replaces the one before it (`guide.apply_result` ignores the older result), so the
 # older scene's check frames are not rendered at all. Said on the job; nothing is written to the run's log.
 SUPERSEDED = 'superseded: a newer scene of this shot was sent; nothing to do'
-SUPERSEDE = ("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' and j.request->>'kind'='guide-frames' "
+# Release 2, the critic's point 1: the older scene's queued guide render too (16 minutes, one lane). A job is replaced when a guide-frames job of the
+# same run and shot was created after it (a newer scene was sent); a scene sent again later gets a fresh render at its pass, newer than every frames job.
+SUPERSEDE = ("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' and j.request->>'kind' in ('guide-frames','guide-render') "
              "and exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frames' and n.created_at > j.created_at)")
 
 
@@ -203,6 +205,7 @@ def tick():
     if worker.STOP:
         return busy
     with connect() as conn:
+        conn.execute(SUPERSEDE, (SUPERSEDED,))   # again: a scene sent while the check frames above were rendered
         job = jobs.claim(conn, 'guide', 'guide-render') if not guide_running(conn, 'guide-render') and renders_free(conn, settings().MOTION_CAP) else None
     if job:
         finish(job, *process(job, renew=lambda: worker.renew_lease(job['id'])))

@@ -186,6 +186,8 @@ if __name__ == '__main__':
         prompt = rel1d(prompt, parts)
         from rel2b_wording import apply as rel2b   # release 2, B4 and B4b, 20 Nov 2026: several end-frames or layout drawings ready together come as a group, one question for each
         prompt = rel2b(prompt, parts)
+        from rel2c_wording import apply as rel2c   # release 2, the critic's points 2 and 8, 20 Nov 2026: one verdict for each scene; a layout held after its third failed check in a row
+        prompt = rel2c(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

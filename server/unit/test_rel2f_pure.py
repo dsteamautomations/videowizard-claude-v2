@@ -321,7 +321,7 @@ def test_f13_a_mark_that_cannot_be_read_is_refused_at_the_upload():
 
 # ---------- F12: a comparison that comes due on a drawing already selected ----------
 
-def test_f12_a_comparison_that_comes_due_on_a_selected_drawing_is_said_and_a_failure_reopens_it():
+def test_f12_a_comparison_that_comes_due_on_a_selected_drawing_is_said_and_a_failure_is_one_sentence_for_the_operator():
     store = alone(load())
     d1, _ = bound(store, 'D1', SECTION, comparing('D4'))
     j = job('D1', d1)
@@ -336,16 +336,17 @@ def test_f12_a_comparison_that_comes_due_on_a_selected_drawing_is_said_and_a_fai
     still(store, 'D4', ABOVE, png=b'\x89PNG-4b', more='wider {}')   # replaced again; this time the comparison fails
     approve(store, 'D4')
     assert verdict(store, 'D1', d1, {SAME: False})['failed'] == [SAME]
+    # Release 2, the critic's point 5: the selection stands. The drawing stays answered, with one sentence for the operator; it is not "being
+    # redone" (nothing clears the selection or asks the page again), nothing is named to build and the page is not reopened by it.
     item = drawn(store, [j])['D1']
-    assert item['state'] == 'being redone' and item['turn'] == 'motion'
-    assert item['due'] == ('D1 was selected, and a comparison with another drawing failed on it afterwards: it is being redone. Tell the operator; the new drawing is '
-                           'asked on the page when it is made.')
+    assert item['state'] == 'answered' and 'turn' not in item and P.complete([item])   # D1 does not keep the page closed, nor open it again
+    assert item['due'].startswith('D1: its comparison with D4 failed after D1 was selected: ')
+    assert item['due'].endswith('. Tell the operator: they reject D1 on the page or in the chat to have it redrawn, or leave it as it is.')
+    assert 'redone' not in item['due'] and 'asked on the page' not in item['due'] and item['due'] in line(store, [j])
+    assert 'D1' not in P.starts(P.expected(*plan_of(store), [j]))   # no builder of D1 is named
     new = upload(store, 'D1', *SECTION, rules=comparing('D4'), more='c {}')['sha256']
-    verdict(store, 'D1', new, {**ALL_OK, SAME: True, '0': False}, rnd=2)   # the redo fails another rule: still being redone
-    assert drawn(store, [j])['D1']['state'] == 'being redone'
-    last = upload(store, 'D1', *SECTION, rules=comparing('D4'), more='d {}')['sha256']
-    verdict(store, 'D1', last, {**ALL_OK, SAME: True}, rnd=3)
-    assert drawn(store, [j])['D1']['state'] == 'answered'   # clean again: its new render is asked on the page, as any render made after a selection
+    verdict(store, 'D1', new, {**ALL_OK, SAME: True}, rnd=2)   # a later project of it that holds the comparison: nothing more is said
+    assert drawn(store, [j])['D1'] == {'kind': 'drawn', 'id': 'D1', 'name': 'D1', 'state': 'answered'}
 
 
 # ---------- F14: a picture record naming a file of another run ----------

@@ -184,6 +184,7 @@
     "marked (free), and `vw visuals next` asks the operator",
     "The operator approves the drawing before the still.",
     "Never show two items, never choose the order",
-    "the server refuses a reply to any item but the one it handed out"
+    "the server refuses a reply to any item but the one it handed out",
+    "After two failed rounds, show the operator what is still open before another round."
   ]
 }

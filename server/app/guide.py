@@ -28,7 +28,7 @@ TAKE_OPEN = ('Edit the video. It is a rough 3D blocking render made of plain col
 LIGHT_LINE = 'Light stays exactly as in the image.'
 SILENCE_LINE = 'No dialogue. No extra sound effects.'
 REPAIR_OPEN = 'Change ONLY the transparent (masked) area: {words} Everything else stays exactly as it is: every person, face, object, position and the light.'
-MAX_ROUNDS_BEFORE_OPERATOR = 2
+MAX_ROUNDS = 3   # release 2, the critic's point 2: a layout is rebuilt and checked this many times in a row with no word of the operator; then the shot is held (as a drawn graphic after round 3)
 TOO_MANY = ("{n} input pictures; GPT image takes at most {max}, the guide's frame and the shot's two drawings included. "
             'Leave out the pictures the shot needs least and ask for the still again (`vw guide still`).')   # release 1, D4: the limit, and the next step
 # design/200, Area B: said to GPT image with the shot's drawings (SK, 14 Nov 2026): it copies a reference faithfully, so it is told what not to copy
@@ -63,17 +63,73 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def accepted(g):
+    """Release 2, the critic's point 2: the operator took this scene's layout as it is, against its check (the held card's first answer)."""
+    return bool(g.get('sha256')) and (g.get('accepted') or {}).get('sha256') == g.get('sha256')
+
+
 def checked(g):
     """The fresh checker passed the check frames of this scene (its verdicts are this scene's: a new scene starts with none). Then, and only
-    then, the layout drawing's card is offered to the operator; it is also when the guide is rendered (`verdict`)."""
+    then, the layout drawing's card is offered to the operator; it is also when the guide is rendered (`verdict`). A layout the operator took
+    as it is, against its check, counts as checked."""
     v = g.get('verdicts') or []
-    return bool(v) and bool(v[-1].get('pass'))
+    return (bool(v) and bool(v[-1].get('pass'))) or accepted(g)
 
 
 def rebuild(g):
     """The scene must change before anything else of the shot: its check failed, or the operator corrected its layout drawing."""
     v, d = g.get('verdicts') or [], g.get('drawing') or {}
-    return bool(v and not v[-1].get('pass')) or (d.get('status') == 'rejected' and d.get('sha256') == g.get('sha256'))
+    return bool(v and not v[-1].get('pass') and not accepted(g)) or (d.get('status') == 'rejected' and d.get('sha256') == g.get('sha256'))
+
+
+def held(g):
+    """Release 2, the critic's point 2: the third check in a row failed with no word of the operator between (`rounds_from`: the round at their
+    last word): nothing more is built for the shot; one card asks the operator (`chat_flow._drawing_items`, `held_answer`)."""
+    v = g.get('verdicts') or []
+    return bool(v) and not v[-1].get('pass') and not accepted(g) and int(v[-1].get('round') or 0) - int(g.get('rounds_from') or 0) >= MAX_ROUNDS
+
+
+def finding(g, n=2):
+    """What the checker found on this scene, in a sentence: its failed looks, each with where it is; the first `n`, then how many more."""
+    bad = [x for x in ((g.get('verdicts') or [{}])[-1].get('looks') or []) if not x.get('pass')]
+    said = [str(x.get('look')) + (f" ({x['where']})" if x.get('where') else '') for x in bad[:n]]
+    return '; '.join(said) + (f' (and {len(bad) - n} more)' if len(bad) > n else '')
+
+
+HELD = ('The layout of {shot} failed its check {n} times in a row: the shot is held and the operator is asked in the chat (`vw visuals next`). '
+        'Send no new scene of it until they answer.')
+HELD_NOT = 'This layout does not wait for this answer any more (`vw visuals next`).'
+JUDGED = 'This scene of {shot} is already judged (round {round}: {how}): a scene gets one verdict. {then}'
+
+
+def held_answer(conn, store, user, run, outputs, shot_id, sha256, choice, quote, notes=''):
+    """The operator's answer on a held layout (one flow: the chat's card calls this). `use`: the layout goes on as it is, against its check: it
+    counts as checked and approved and its guide is rendered. `again`: three more rounds. `change`: their words on what the shot becomes; the
+    next-step line (`takes.held_due`) says what the assistant does with them."""
+    session = VS.session_of(store, run, outputs)
+    g = entry_of(session, shot_id)
+    need(g['sha256'] == sha256 and held(g), HELD_NOT)
+    need(choice in ('use', 'again', 'change'), 'A held layout is answered with use, again or change.')
+    quote, notes = str(quote or '').strip(), str(notes or '').strip()
+    need(quote, "An answer carries the operator's own words.")
+    need(choice != 'change' or notes, 'Ask the operator what the shot becomes, in their words.')
+    rnd, who = int(g['verdicts'][-1].get('round') or 0), {'quote': quote[:500], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
+    if choice == 'use':
+        d = _ensure_drawing(store, run, session, g, VS.load_json(store, g['key']))
+        g['accepted'] = {'sha256': g['sha256'], 'round': rnd, **who}
+        d.update(status='approved', verdict={'approved': True, 'against_check': True, 'notes': '', **who})
+        if not (g.get('render') or {}).get('job_id'):
+            g['render'] = {'job_id': _queue(conn, run, shot_id, 'guide', {'kind': 'guide-render', 'shot_id': shot_id, 'sha256': g['sha256'], 'spec_key': g['key'], 'seconds': g['seconds']}), 'status': 'queued'}
+        nxt = f'The layout goes on as it is, against its check: the guide is being rendered (free, several minutes). Then the still: `vw guide still --shot {shot_id} --file …`.'
+    else:
+        g['rounds_from'] = rnd   # their word: the count of rounds in a row starts again
+        if choice == 'change':
+            g['change'] = {'words': notes[:2000], 'round': rnd, **who}
+        nxt = ('Three more rounds are allowed: change the scene and send it again (`vw guide scene`).' if choice == 'again'
+               else 'Do what the operator said (the next-step line of `vw visuals next` says it).')
+    VS.save_session(store, run, session)
+    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'held layout: ' + choice, 'round': rnd, 'sha256': sha256, 'quote': who['quote'], 'notes': notes[:2000], 'by': user['id'], 'by_name': user.get('name') or ''})
+    return {'shot_id': shot_id, 'answer': choice, 'next': nxt}
 
 
 def entry_of(session, shot_id):
@@ -138,6 +194,8 @@ def drawing_verdict(conn, store, user, run, outputs, shot_id, sha256, approved, 
     notes = str(notes or '').strip()
     need(approved or notes, "A correction says what is wrong, in the operator's words.")
     need(not approved or checked(g), NOT_CHECKED.format(shot=shot_id))   # release 1: no Yes on a layout its checker has not passed (a correction is taken at any time)
+    if not approved:
+        g['rounds_from'] = int((g.get('verdicts') or [{}])[-1].get('round') or g.get('rounds_before') or 0)   # the critic's point 2: their word: the rounds in a row are counted from here
     d.update(status='approved' if approved else 'rejected', verdict={'approved': bool(approved), 'quote': str(quote).strip()[:500], 'notes': notes[:2000], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'shot drawing approved' if approved else 'shot drawing corrected', 'sha256': sha256, 'quote': d['verdict']['quote'], 'notes': notes[:2000],
@@ -187,8 +245,14 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     sha = digest(spec)
     guides = session.setdefault('guides', {})
     old = guides.get(shot_id) or {}
+    need(not held(old), HELD.format(shot=shot_id, n=MAX_ROUNDS))   # release 2, the critic's point 2: the gate: no further scene of a held shot without the operator
     if old.get('sha256') == sha:
-        return {'shot_id': shot_id, 'sha256': sha, 'unchanged': True, 'job_id': (old.get('frames') or {}).get('job_id'), 'next': 'This scene is already stored; nothing was queued.'}
+        d = old.get('drawing') or {}
+        same = ('This scene is already stored; nothing was queued.' if not rebuild(old) else   # the critic's point 3: the scene that failed, sent again, says so
+                f"This is the scene whose layout the operator corrected ({(d.get('verdict') or {}).get('notes')}): nothing was queued. The new scene must differ from it: make their correction and send it again."
+                if d.get('status') == 'rejected' else
+                f'This is the scene whose check failed ({finding(old)}): nothing was queued. The new scene must differ from it: change what the check names and send it again.')
+        return {'shot_id': shot_id, 'sha256': sha, 'unchanged': True, 'job_id': (old.get('frames') or {}).get('job_id'), 'next': same}
     k = VS.key(run, f'guides/{sha}/scene.json')
     VS.save_json(store, k, spec)
     n = int(round(spec['seconds'] * G.FPS))
@@ -197,7 +261,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     guides[shot_id] = {'sha256': sha, 'key': k, 'seconds': spec['seconds'], 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'marks': spec.get('marks') or {},
                        'checks': rows, 'overrides': [{'check': c, 'reason': why, 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()} for c, why in overrides.items()],
                        'frames': {'job_id': job_id, 'status': 'queued'}, 'verdicts': [], 'rounds_before': len(old.get('verdicts') or []) + int(old.get('rounds_before') or 0),
-                       **carried(old), 'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
+                       **carried(old), **({'rounds_from': old['rounds_from']} if old.get('rounds_from') else {}), 'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
     guides[shot_id]['drawing'] = _draw(store, run, session, spec, sha)   # design/200: free; the operator approves it before the still
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'scene', 'sha256': sha, 'key': k, 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'seconds': spec['seconds'],
@@ -220,6 +284,12 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
          'A verdict lists every look with "look" and "pass": [{"look": "…", "pass": true, "where": "…"}].')
     failed = [x['look'] for x in looks if not x['pass']]
     need(bool(passed) == (not failed), 'The verdict passes only when every look passes; a failed look names what to change.')
+    # release 2, the critic's point 8: one verdict per scene (two checkers on one scene: the later one, failing after a pass, flipped a shot whose render, card or still had moved on)
+    last = (g['verdicts'] or [{}])[-1]
+    need(not g['verdicts'], JUDGED.format(shot=shot_id, round=last.get('round'), how='passed' if last.get('pass') else 'failed',
+                                         then=f'Its guide is rendered and its layout drawing goes to the operator (`vw guide status --shot {shot_id}`).' if last.get('pass')
+                                         else f'The operator took the layout as it is (`vw guide status --shot {shot_id}`).' if accepted(g)
+                                         else HELD.format(shot=shot_id, n=MAX_ROUNDS) if held(g) else f'Change the scene and send it again (`vw guide scene --shot {shot_id} --file …`).'))
     rnd = len(g['verdicts']) + int(g.get('rounds_before') or 0) + 1
     g['verdicts'].append({'round': rnd, 'sha256': sha256, 'pass': bool(passed), 'looks': [{k: x.get(k) for k in ('look', 'pass', 'where', 'fix')} for x in looks[:60]], 'notes': str(notes or '')[:2000],
                           'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
@@ -230,8 +300,9 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
         out.update(job_id=job_id, next=f'The guide is being rendered (free, several minutes). Then the still: `vw guide still --shot {shot_id} --file …`.'
                    + ('' if (g.get('drawing') or {}).get('status') == 'approved' else " The shot's layout drawing is shown to the operator now (`vw visuals next`): no still before their Yes."))
     elif not passed:
-        out['next'] = (f'Round {rnd} failed. Show the operator what is still open before another round: ' + '; '.join(failed) if rnd >= MAX_ROUNDS_BEFORE_OPERATOR
-                       else 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.')
+        # release 2, the critic's point 2: the third failure in a row holds the shot (until then: "show the operator what is still open" from round 2, with no card and no gate; design/35 row 293)
+        out['next'] = (f'Round {rnd} failed, the third check in a row: the shot is held and the operator is asked in the chat (`vw visuals next`). Send no new scene of it until they answer. '
+                       'Still open: ' + '; '.join(failed) if held(g) else 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.')
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'guide check', 'round': rnd, 'pass': bool(passed), 'failed': failed, 'notes': str(notes or '')[:2000], 'by': user['id'], 'by_name': user.get('name') or ''})
     return out
@@ -569,7 +640,10 @@ def status(conn, store, run, outputs, shot_id):
     f, r, card = v['frames'], v['render'], v['card']
     if f['status'] != 'ready':
         nxt = 'The check frames failed: ' + str(f['error']) if f['status'] == 'failed' else 'The check frames are being rendered; ask again in a minute.'
-    elif v['verdicts'] and not v['verdicts'][-1]['pass']:   # release 1: a scene that has its verdict is not checked again: it changes first
+    elif held(g):   # release 2, the critic's point 2: the same as the next-step line: held, the operator is asked
+        nxt = (f"The check of this scene failed for the third time in a row ({'; '.join(x['look'] for x in v['verdicts'][-1]['looks'] or [] if not x.get('pass'))}): the shot is held and the operator "
+               'is asked in the chat (`vw visuals next`); send no new scene of it until they answer.')
+    elif v['verdicts'] and not v['verdicts'][-1]['pass'] and not accepted(g):   # release 1: a scene that has its verdict is not checked again: it changes first
         nxt = f"The check of this scene failed ({'; '.join(x['look'] for x in v['verdicts'][-1]['looks'] or [] if not x.get('pass'))}): change the scene (one thing at a time) and send it again (`vw guide scene --shot {shot_id} --file …`)."
     elif not v['verdicts']:
         nxt = f'A fresh vw-guide-check helper looks at the check frames (`vw guide frames --shot {shot_id}`) and gives its verdict (`vw guide verdict`).'

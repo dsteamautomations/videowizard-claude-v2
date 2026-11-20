@@ -75,7 +75,12 @@ W = {
     # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
     'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: a layout is shown to the operator, and its guide is rendered, only after its check passes)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
     'start_words': "the writers of the take's words of {ids} ({n}) (`vw guide prompt --shot S --file take.txt`)",
-    'start_scenes': 'the writers of the scene descriptions of {ids} ({n})', 'start_stills': 'the checkers of the stills of {ids} ({n})', 'start_takes': 'the checkers of the takes of {ids} ({n})',
+    'start_scenes': 'the writers of the scene descriptions of {ids} ({n})',
+    'start_rebuild': ("the writers of the scene descriptions of {ids} ({n}), each rebuilt after its check or the operator's correction: read `vw guide status --shot S` first, "
+                      'it holds what must change'),
+    'held_change': ('{name} ({shot}): its layout failed its check {n} times in a row and the operator said what the shot becomes: "{words}". Do that: a plan revision when the shot '
+                    'is cut, shortened, left out or becomes another kind of shot; a new scene (`vw guide scene`) when it stays one AI video shot.'),
+'start_stills': 'the checkers of the stills of {ids} ({n})', 'start_takes': 'the checkers of the takes of {ids} ({n})',
     'rejected_do': ('{name} ({shot}): its take was rejected ("{words}") and no new take is ordered{why}: ask the operator what happens to the shot: '
                     'cut it into shorter shots, another angle, or leave it out; a new take after that is asked with its card.'),
     'rejected_cap': ' (the cost limit refused the take ordered on the page: tell the operator the spend; only the owner can change the limit)',
@@ -234,7 +239,10 @@ def starts(session, plan, take_rows):
     from . import guide
     # release 1 (SK, 20 Nov 2026): the fresh checker first, the operator second. A scene whose check failed, or whose layout drawing the operator
     # corrected, is named with the scenes to write (the checker's finding is in the shot's verdict file; the operator's words in `vw guide status`).
-    none = [sid for sid in shots if (sid not in guides and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)) or (sid in guides and open_(sid) and guide.rebuild(guides[sid]))]
+    # Release 2, the critic's points 2 and 3: the shots with no guide yet and the shots to rebuild are two groups; a held shot (its third check in a
+    # row failed) and one whose change the operator described are not named: the card, and `held_due`, say them. (Until then: one group; design/35 rows 293, 294.)
+    none = [sid for sid in shots if sid not in guides and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)]
+    again = [sid for sid in shots if sid in guides and open_(sid) and guide.rebuild(guides[sid]) and not guide.held(guides[sid]) and not guides[sid].get('change')]
     mine = lambda g, st: st.get('guide_sha256') == g.get('sha256')
     # A guide's checker is named as soon as its check frames are ready and this scene has no verdict: all together, before any layout card is shown
     # (`chat_flow._drawing_items` offers the card only when the check passed). Never for a scene that has a verdict: passed (its card, its render) or
@@ -249,7 +257,7 @@ def starts(session, plan, take_rows):
     words = [sid for sid in shots if sid in guides and open_(sid) and not guides[sid].get('take_prompt') and any(mine(guides[sid], st) and st.get('status') == 'approved' for st in guides[sid].get('stills') or [])]
     stills = {x[1]['id'] for x in P.starts_due(session, plan)}
     looks = {row[1]['id'] for row in due(session, plan, take_rows)}
-    what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_scenes', none), ('start_guides', check), ('start_order', order), ('start_words', words),
+    what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_scenes', none), ('start_rebuild', again), ('start_guides', check), ('start_order', order), ('start_words', words),
                                                                          ('start_stills', [x for x in shots if x in stills]), ('start_takes', [x for x in shots if x in looks])) if ids]
     return P.W['start_now'].format(what='; '.join(what)) if what else ''
 
@@ -357,8 +365,10 @@ def _state(session, plan, sh, take_rows, now):
     if _still_checking(session, g, now):
         return 'checking', None, False
     from . import guide
+    if guide.held(g):
+        return 'chat', None, False   # release 2, the critic's point 2: its third check in a row failed: one card asks the operator
     if guide.rebuild(g):
-        return 'redo', None, False   # release 1: its check failed, or the operator corrected its layout: the scene is being rebuilt
+        return 'redo', None, False  # release 1: its check failed, or the operator corrected its layout: the scene is being rebuilt
     if (g.get('frames') or {}).get('status') == 'ready' and not guide.checked(g):
         return 'checking', None, False   # release 1: the layout is with its fresh checker; its card comes only when it passes
     if _card_waits(g) or _ready_to_shoot(g):
@@ -673,6 +683,18 @@ def rejected_due(session, plan, take_rows):
         if _rejected(session, js[-1]) and not again_pending(guide_) and not _rec(session, js[-1]).get('blocked'):
             words = str(_reviews(session, js[-1])[-1].get('notes') or '').strip()
             out.append(W['rejected_do'].format(name=name_of(g, sh, n, of), shot=sh['id'], words=words, why=W['rejected_cap'] if guide_.get('again_refused') else ''))
+    return ' '.join(out)
+
+
+def held_due(session, plan):
+    """Release 2, the critic's point 2: a held layout the operator answered with "Change the shot": their words, and what the assistant does with
+    them, until a new scene of the shot is sent or the plan no longer makes it an AI video shot."""
+    from . import guide
+    out = []
+    for g, sh, n, of in video_shots(plan, session) if plan else []:
+        e = (session.get('guides') or {}).get(sh['id']) or {}
+        if e.get('change') and sh['id'] not in (session.get('selections') or {}):
+            out.append(W['held_change'].format(name=name_of(g, sh, n, of), shot=sh['id'], n=guide.MAX_ROUNDS, words=e['change']['words']))
     return ' '.join(out)
 
 

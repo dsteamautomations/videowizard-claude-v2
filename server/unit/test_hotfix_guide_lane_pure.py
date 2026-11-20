@@ -72,6 +72,25 @@ def test_the_frames_of_a_replaced_scene_are_closed_before_a_job_is_taken(monkeyp
     assert "j.status='queued'" in GW.SUPERSEDE and "n.created_at > j.created_at" in GW.SUPERSEDE and "n.unit=j.unit" in GW.SUPERSEDE and "n.run_id=j.run_id" in GW.SUPERSEDE
 
 
+def test_the_queued_render_of_a_replaced_scene_is_closed_too_before_a_render_is_taken(monkeypatch):
+    """Release 2, the critic's point 1: a replaced scene's queued guide render (16 minutes, one lane) was still rendered. The statement's meaning is
+    tested here by its text only (no database runs it in this suite): the exact kinds it closes, queued only, and what makes a job replaced:
+    a guide-frames job (a newer scene sent) of the same run and the same shot, created later. A scene sent again after another (A, B, A) is
+    safe: the new A's pass queues a fresh render, created after every frames job of the shot."""
+    conn = Conn(running=set(), queued=[job('guide-render')])
+    assert run_tick(monkeypatch, conn) == ['guide-render']
+    sqls = [s for s, _ in conn.sql]
+    closes = [i for i, s in enumerate(sqls) if s == GW.SUPERSEDE]
+    render_claim = next(i for i, s in enumerate(sqls) if 'update vw2_jobs set status = case' in s and conn.sql[i][1][:2] == ('guide', 'guide-render'))
+    assert len(closes) == 2 and closes[0] < closes[1] < render_claim                                          # closed again before the render lane takes a job
+    sql = ' '.join(GW.SUPERSEDE.split())
+    assert sql.startswith("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' "
+                          "and j.request->>'kind' in ('guide-frames','guide-render') and exists (")
+    assert sql.endswith("exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frames' "
+                        "and n.created_at > j.created_at)")
+    assert "status='running'" not in sql and sql.count('guide-render') == 1                                 # never a running job; a render is never what replaces
+
+
 def test_claim_with_no_kind_is_as_before(monkeypatch):
     conn = Conn(running=set(), queued=[{'id': 'm1', 'provider': 'motion', 'request': {'kind': 'x'}}])
     assert jobs.claim(conn, 'motion')['id'] == 'm1'
