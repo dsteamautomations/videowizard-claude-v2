@@ -169,13 +169,21 @@ def finish(job, status, result, error, cost, retry_in):
             jobs.record_file(conn, job['run_id'], 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'image/png')
 
 
-def guide_running(conn):
-    row = conn.execute("select count(*) as n from vw2_jobs where status='running' and provider='guide'").fetchone()
+def guide_running(conn, kind):
+    row = conn.execute("select count(*) as n from vw2_jobs where status='running' and provider='guide' and request->>'kind' = %s", (kind,)).fetchone()
     return (row['n'] if isinstance(row, dict) else row[0]) > 0
 
 
+# hotfix (VW-24, 20 Nov 2026): a scene sent again for a shot replaces the one before it (`guide.apply_result` ignores the older result), so the
+# older scene's check frames are not rendered at all. Said on the job; nothing is written to the run's log.
+SUPERSEDED = 'superseded: a newer scene of this shot was sent; nothing to do'
+SUPERSEDE = ("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' and j.request->>'kind'='guide-frames' "
+             "and exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frames' and n.created_at > j.created_at)")
+
+
 def tick():
-    """A still first (a paid call, quick); then one render, only when no other guide render runs and the drawn renders leave room."""
+    """A still first (a paid call, quick); then the check frames of a scene (seconds; one at a time, in a lane of their own: hotfix of 20 Nov 2026,
+    they waited 16 minutes behind each render); then one render, only when no other guide render runs and the drawn renders leave room."""
     from . import worker
     from .visual_workers import renders_free
     busy = False
@@ -187,7 +195,15 @@ def tick():
     if worker.STOP:
         return busy
     with connect() as conn:
-        job = jobs.claim(conn, 'guide') if not guide_running(conn) and renders_free(conn, settings().MOTION_CAP) else None
+        conn.execute(SUPERSEDE, (SUPERSEDED,))
+        job = jobs.claim(conn, 'guide', 'guide-frames') if not guide_running(conn, 'guide-frames') else None
+    if job:
+        finish(job, *process(job, renew=lambda: worker.renew_lease(job['id'])))
+        busy = True
+    if worker.STOP:
+        return busy
+    with connect() as conn:
+        job = jobs.claim(conn, 'guide', 'guide-render') if not guide_running(conn, 'guide-render') and renders_free(conn, settings().MOTION_CAP) else None
     if job:
         finish(job, *process(job, renew=lambda: worker.renew_lease(job['id'])))
         busy = True
