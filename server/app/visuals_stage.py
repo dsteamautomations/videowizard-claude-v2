@@ -6096,6 +6096,8 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     if prev and not still:
         need(not opens_changed(session, prev, st), STILL_OPENS.format(shot=shot_id, prev=prev))
         need(passed_project(session, guarded(lambda: locate(store, session, prev))[3]), CHAIN_FIRST.format(shot=shot_id, prev=prev))
+    if not still and session.get('motion_parts'):   # release 2, F11: no animated project while a new parts file waits for the operator, or was rejected (its brief is refused too)
+        need_parts(plan, session)
     els = {e['id']: e for e in plan.get('elements') or []}
     placed = lambda ids: any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in ids)
     for p in shared:   # fix set A1.1: a shape that is no thing of the plan, drawn once: the drawings its part names place it
@@ -7046,14 +7048,13 @@ def drawn_turn(session, plan, gap, shot, shots):
     if not rec or any(r.get('pass') == NOT_SEEN for r in rec.get('rules') or []):
         return ('check-still' if row.get('still') else 'check'), ''
     if held_rules(rec):   # a failed must: its redo, unless the drawing is held after its last round
-        return ('' if not row.get('still') and int(rec.get('round') or 1) >= HELD_ROUNDS + bool((session.get('motion_more') or {}).get(sid)) else kind), ''
-    st = (session.get('motion_stills') or {}).get(sid) or {}
+        if row.get('still') or int(rec.get('round') or 1) < HELD_ROUNDS + bool((session.get('motion_more') or {}).get(sid)):
+            return kind, ''
+        ans = (session.get('motion_held') or {}).get(sid) or {}   # release 2, F4: held, and the operator answered its card with Reject: rebuilt
+        return ('motion' if (ans.get('sha256'), ans.get('round'), ans.get('answer')) == (rec.get('sha256'), rec.get('round'), 'reject') else ''), ''
     if row.get('still') and st.get('sha256') == sha:
-        prev = continues_from(plan, session, gap, shot)
-        if prev and opens_changed(session, prev, st):   # the critic's point 7: the earlier still was replaced: this still is made again, once the new one is approved
-            return ('still', '') if opens_on(session, prev) else ('', prev)
-        if st.get('rejected'):
-            return 'still', ''   # the operator's Reject: the still again
+        if st.get('rejected') or (still_approved(st) and parts_differ(session, st.get('parts'))):
+            return 'still', ''   # the operator's Reject: the still again. Release 2, F7: and a still checked with parts that were drawn anew since (its motion would be refused as stale)
         if still_approved(st):   # their Approve: its motion, which a continuing drawing builds on the earlier drawing's passed project
             return ('', prev) if prev and not (prev in shots and passed_project(session, shots[prev])) else ('motion', '')
     return '', ''   # the operator's card, or the render

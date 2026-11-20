@@ -1237,6 +1237,10 @@ def _drawn_state(session, sh, take_rows, plan=None):
         state, due = _failed_render(session, sid, rows, last)
         return state, None, due
     if checks:
+        gone = None if V.open_rules(checks[-1]) else _rejected_take(session, sid, take_rows)   # release 2, F15: clean, and the operator rejected its render: built again
+        if gone:
+            words = str(gone.get('notes') or '').strip()
+            return 'redo', None, ' '.join(x for x in (W['take_rejected'].format(shot=sid, words=f': "{words}"' if words else ''), said) if x)
         return ('redo' if V.held_rules(checks[-1]) else 'checking' if V.open_rules(checks[-1]) else 'making'), None, said   # clean: its render comes next
     if any(p.get('shot_id') == sid and not p.get('still') for p in (session.get('motion_projects') or {}).values()):
         return 'checking', None, ''
@@ -1311,7 +1315,7 @@ def drawn_due(items):
     """design/221 (the critic's points 3, 4): what the assistant does next for the drawn graphics whose render went stale or failed."""
     stale = [i['id'] for i in items if i['kind'] == 'drawn' and i['state'] == STATE['stale']]
     out = [W['render_stale_one'].format(shot=stale[0]) if len(stale) == 1 else W['render_stale'].format(n=len(stale), ids=', '.join(stale))] if stale else []
-    return ' '.join(out + [i['due'] for i in items if i['kind'] == 'drawn' and i.get('due')])
+    return ' '.join(dict.fromkeys(out + [i['due'] for i in items if i['kind'] == 'drawn' and i.get('due')]))   # release 2, F11: what several drawings wait for is said once
 
 
 def starts(items):
