@@ -9,6 +9,7 @@
 # (front = local -Y) and a purple back and nape (layout B), bar arms from the shoulder to the hand point, a prop keyed to the hand that holds it on every frame, a walk bob,
 # a camera held still with a tiny handheld drift, a sun and a plain sky. Positions at every moment come from guide_spec, the same module
 # the checks before spend use. A piece of the set on a `path` (design/207) is keyed on every frame as a walker's root is.
+# Layout B (SK, 20 Nov 2026): in the flat look every person has the yellow side stripes; a piece or a prop with a `front` has a black panel there and a purple one at its back, in both looks.
 import json
 import math
 import os
@@ -81,6 +82,23 @@ def main():
         sc.collection.objects.link(e)
         return e
 
+    def fronts(name, lo, hi, front, parent):
+        """layout B: a thing whose facing matters (its `front`, guide_spec.FRONTS): a black panel on that side of its box, a purple one on the
+        opposite side, each 60 per cent of the face each way, so never larger than it; they move, turn and spin with the thing."""
+        ax = 0 if front[0] else 1
+        c = [(a + b) / 2 for a, b in zip(lo, hi)]
+        h = [(b - a) * 0.3 for a, b in zip(lo, hi)]
+        t = min(0.012, (hi[ax] - lo[ax]) * 0.1)
+        for sign, rgb, tag in ((1, BLACK, 'FRONT_'), (-1, BACK, 'REAR_')):
+            d = sign * (1 if front[ax] > 0 else -1)
+            face = hi[ax] if d > 0 else lo[ax]
+            plo, phi = [c[i] - h[i] for i in range(3)], [c[i] + h[i] for i in range(3)]
+            plo[ax], phi[ax] = sorted((face, face + d * t))
+            o = box(tag + name, plo, phi, rgb)
+            bpy.context.view_layer.update()
+            o.parent = parent
+            o.matrix_parent_inverse = parent.matrix_world.inverted()
+
     # ---- the set ----
     spun = []
     marks = spec.get('marks') or {}
@@ -98,6 +116,8 @@ def main():
             o.data.materials.append(mat(s['colour']))
         else:
             o = box(s['id'], s['min'], s['max'], s['colour'])
+        if s.get('front'):
+            fronts(s['id'], *G._rest(s), s['front'], o)
         if s.get('spin') or s.get('path'):
             spun.append((o, s, tuple(o.location), tuple(o.rotation_euler)))
 
@@ -112,7 +132,7 @@ def main():
         box('CHEST_' + p['id'], (-0.12, -0.145, max(top - 0.45, 0.05)), (0.12, -0.13, top - 0.1), BLACK, root)
         box('BACK_' + p['id'], (-0.12, 0.13, max(top - 0.45, 0.05)), (0.12, 0.145, top - 0.1), BACK, root)   # layout B: the back by its colour, not by shading
         box('NAPE_' + p['id'], (-0.07, 0.11, top + 0.1), (0.07, 0.135, top + 0.2), BACK, root)
-        if marks.get('stripes'):
+        if marks.get('stripes') or look == 'flat':   # layout B (SK, 20 Nov 2026): every person has stripes in the flat look; the EEVEE first frame only when the scene asks
             for sx in (-0.226, 0.22):
                 box('STRIPE_' + p['id'], (sx, -0.05, 0.0), (sx + 0.006, 0.05, h - 0.02), STRIPE, root)
         arms = {}
@@ -125,6 +145,8 @@ def main():
     for pr in spec.get('props') or []:
         s = pr['size']
         props.append((pr, box('PROP_' + pr['id'], (-s[0] / 2, -s[1] / 2, -s[2] / 2), (s[0] / 2, s[1] / 2, s[2] / 2), pr['colour'])))
+        if pr.get('front'):
+            fronts(pr['id'], (-s[0] / 2, -s[1] / 2, -s[2] / 2), (s[0] / 2, s[1] / 2, s[2] / 2), pr['front'], props[-1][1])
 
     # ---- the camera: held still, tiny handheld drift ----
     bpy.ops.object.camera_add()

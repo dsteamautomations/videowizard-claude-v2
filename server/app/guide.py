@@ -13,6 +13,7 @@ from psycopg.types.json import Jsonb
 
 from . import draw3d, generations, guide_drawing, guide_spec as G, video_generators
 from . import visuals_stage as VS
+from .config import settings
 from .errors import Problem
 from .planning.digest import digest
 from .visual_contract import need, route_of
@@ -289,7 +290,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
          + f' Correct the scene file and send it again (`vw guide scene --shot {shot_id} --file work/guide/{shot_id}/scene.json`).')   # release 1, D4: a refusal ends with the next step
     slot = _slot_seconds(session, shot)
     need(spec['seconds'] >= slot - 1e-6, f"The guide runs {spec['seconds']} s and the shot's slot is {slot:.1f} s: a take is made as long as its guide, a little longer than its slot, and trimmed.")
-    rows = G.checks(spec, subjects=_people_of(plan, shot))
+    rows = G.checks(spec, subjects=_people_of(plan, shot), flat=settings().GUIDE_VIDEO_LOOK == 'flat')   # layout B: the flat video gives every person stripes
     overrides = {k: str(v).strip() for k, v in (overrides or {}).items() if str(v or '').strip()}
     need(set(overrides) <= {'support'}, 'Only the support check can be overridden, with its reason; every other refusal is fixed in the scene.')
     refused = [r for r in G.refusals(rows) if not (r['check'] == 'support' and overrides.get('support'))]
@@ -316,6 +317,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     frames = sorted({1, max(1, n // 2), n})
     job_id = _queue(conn, run, shot_id, 'guide', {'kind': 'guide-frames', 'shot_id': shot_id, 'sha256': sha, 'spec_key': k, 'frames': frames})
     guides[shot_id] = {'sha256': sha, 'key': k, 'seconds': spec['seconds'], 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'marks': spec.get('marks') or {},
+                       **({'fronts': G.fronted(spec)} if G.fronted(spec) else {}),   # layout B: the take's words name the things with front panels
                        'checks': rows, 'overrides': [{'check': c, 'reason': why, 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()} for c, why in overrides.items()],
                        'frames': {'job_id': job_id, 'status': 'queued'}, 'verdicts': [], 'rounds_before': len(old.get('verdicts') or []) + int(old.get('rounds_before') or 0),
                        **carried(old), **({'rounds_from': old['rounds_from']} if old.get('rounds_from') else {}), 'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
@@ -424,7 +426,7 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         need(len(inputs) <= still['max_inputs'], TOO_MANY.format(n=len(inputs), max=still['max_inputs']))
         roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2 + len(sheets))]
         facts = _drawn_facts(session, parents)
-        effective = '\n'.join(x for x in [STILL_OPEN, marks_line(spec.get('marks'), 'image'), d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
+        effective = '\n'.join(x for x in [STILL_OPEN, marks_line(spec.get('marks'), 'image', fronts=G.fronted(spec)), d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
                                           VS.size_line(*VS.guarded(lambda: VS.locate(store, session, shot_id))[::3]),   # design/207: (plan, shot): the size sentence, when size is the message
                                           RIGHT_HAND_WORDS if any(p.get('hands') for p in spec.get('people') or []) else '',
                                           ('What must be true:\n' + '\n'.join(f'- {f}' for f in facts)) if facts else '',
@@ -496,19 +498,24 @@ def prompt_problems(text):
     return out
 
 
-def marks_line(marks, of):
-    """The line that explains the band and the stripes of a guide, for the video or for the image made from its first frame; '' without them."""
-    marks = marks or {}
-    if not (marks.get('band') or marks.get('stripes')):
+def marks_line(marks, of, flat=False, fronts=()):
+    """The line that explains the band, the stripes and the front panels of a guide, for the video or for the image made from its first frame; '' without them.
+    flat: the video is rendered flat, where every person has stripes (layout B); fronts: the names of the things with a front panel."""
+    marks, fronts = marks or {}, list(fronts or [])
+    stripes = flat or marks.get('stripes')
+    if not (marks.get('band') or stripes or fronts):
         return ''
     return f'How to read the {of}: ' + ' '.join((['the coloured band on the ground only marks where the walking line runs; it is not a thing in the place and is never shown.'] if marks.get('band') else [])
-                                               + (["the thin yellow stripe down the side of each box person marks that person's side."] if marks.get('stripes') else []))
+                                               + (["the thin yellow stripe down the side of each box person marks that person's side."] if stripes else [])
+                                               + ([f"the black panel marks the front of {' and '.join([', '.join(fronts[:-1])] + fronts[-1:]) if len(fronts) > 1 else fronts[0]}, "
+                                                   f"the purple panel {'their' if len(fronts) > 1 else 'its'} back; the panels are never shown."] if fronts else []))
 
 
 def effective_prompt(g, words):
     """The prompt as sent: the fixed opening, the flat look explained when the video has it, the line that explains the marks when the guide has them,
     the writer's blocks, the two fixed closing lines."""
-    lines = [TAKE_OPEN] + ([FLAT_LINE] if (g.get('render') or {}).get('look') == 'flat' else []) + [x for x in [marks_line(g.get('marks'), 'video')] if x]
+    flat = (g.get('render') or {}).get('look') == 'flat'
+    lines = [TAKE_OPEN] + ([FLAT_LINE] if flat else []) + [x for x in [marks_line(g.get('marks'), 'video', flat, g.get('fronts'))] if x]
     lines.append(words.strip())
     lines += [l for l in (LIGHT_LINE, SILENCE_LINE) if l.lower() not in words.lower()]
     return '\n'.join(lines)

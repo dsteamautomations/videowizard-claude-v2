@@ -25,6 +25,9 @@ BODY_W, BODY_D, HEAD = 0.44, 0.26, 0.22     # the consultant's box person
 # black face and chest (the front), purple back and nape (the purple of the shot's drawing, draw3d.BACK), yellow stripe down each side (marks.stripes)
 MARK_COLOURS = {'black': (0.03, 0.03, 0.03), 'purple': (0.47, 0.235, 0.667), 'yellow': (0.95, 0.85, 0.05)}
 MARK_NAMES = {'black': 'the face and chest marks', 'purple': 'the back mark', 'yellow': 'the side stripes'}
+# layout B (SK 20 Nov 2026, "marks only where facing matters"): a piece or a prop may name its `front`, [x, y] as a person's facing, one side of its box;
+# it then gets a black panel on that side and a purple one on the opposite side. Without the field, a thing is plain as before.
+FRONTS = ([0, -1], [0, 1], [1, 0], [-1, 0])
 SHOULDER_OUT, SHOULDER_DOWN = 0.20, 0.30
 RECIPES = ('walker', 'one_action_close', 'transfer_close', 'other')   # design/207 (SK, 16 Nov 2026): three kinds proven here; `other` is any other kind of shot, taken with a warning
 PACES = {'stroll': (0.6, 1.1), 'everyday': (1.1, 1.5), 'brisk': (1.5, 1.9), 'hurried': (1.9, 2.5)}   # m/s (08-blender §5); a warning when the box is outside its band
@@ -338,6 +341,11 @@ def problems(spec):
         if x.get('facing') is not None and not (_vec(x['facing'], 2) and abs(x['facing'][0]) + abs(x['facing'][1]) > 0):
             out.append(f'{i}: facing is [x, y]: the thing keeps pointing as it was built for the whole shot. Without it, the thing points along its path.')
 
+    def fronted_ok(x, i):
+        if x.get('front') is not None and not (isinstance(x['front'], list) and x['front'] in FRONTS):
+            out.append(f"{i}: front is the side of the thing that is its front, as [x, y] like a person's facing: [0, -1] (toward the camera's side), "
+                       "[0, 1], [1, 0] or [-1, 0]. Leave it out when the way the thing faces does not matter.")
+
     pieces = spec.get('set')
     if not isinstance(pieces, list) or not pieces:
         out.append('set: the pieces of the place, at least the ground.')
@@ -357,6 +365,7 @@ def problems(spec):
                                      and all(isinstance(k, dict) and isinstance(k.get('t'), (int, float)) and isinstance(k.get('deg'), (int, float)) for k in spin['keys'])):
             out.append(f'{i}: spin is {{"axis": "X", "keys": [{{"t": seconds, "deg": degrees}}]}}.')
         travels(s, i, _foot(*_rest(s)) if len(out) == n else None)
+        fronted_ok(s, i)
     people = spec.get('people')
     if not isinstance(people, list):
         out.append('people: a list (empty when nobody is in the shot).')
@@ -398,6 +407,7 @@ def problems(spec):
         if not (_vec(pr.get('size')) and all(x > 0 for x in pr['size']) and _vec(pr.get('at'))):
             out.append(f'{i}: a prop has size [x, y, z] and "at": [x, y, z], the middle of its foot where it rests.')
         travels(pr, i, pr['at'] if _vec(pr.get('at')) else None)
+        fronted_ok(pr, i)
         if pr.get('path') is not None and pr.get('held'):
             out.append(f'{i}: a prop on a path is held by nobody: give it "held" or "path", not both.')
         for h in pr.get('held') or []:
@@ -447,10 +457,10 @@ def _dark_distinct(things):
     return out
 
 
-def checks(spec, subjects=None):
+def checks(spec, subjects=None, flat=True):
     """Every check that can be made on a description that has no shape problems, as rows {check, level, message}.
     level: 'refuse' (the rule is proven or SK's decision and the consultant's film kept it in every shot), 'warn', or 'info'.
-    subjects: the ids the plan puts in this shot, when known (every one needs a box)."""
+    subjects: the ids the plan puts in this shot, when known (every one needs a box). flat: the video is rendered flat, so every person has stripes."""
     rows, people, props, pieces = [], spec.get('people') or [], spec.get('props') or [], spec['set']
     boxes = [(s, *piece_box(s)) for s in pieces]   # where every piece stands at the start
     ts = times(spec, step=3)
@@ -624,9 +634,14 @@ def checks(spec, subjects=None):
         rows.append(_row('colours', 'warn', f'Colours: {line}. Use dark, strongly contrasting colours, one per thing.'))
     for p in people:   # layout B: a mark the colour of its person does not show
         for mark, c in MARK_COLOURS.items():
-            if (mark != 'yellow' or (spec.get('marks') or {}).get('stripes')) and _len(_sub(p['colour'], c)) < 0.12:
+            if (mark != 'yellow' or flat or (spec.get('marks') or {}).get('stripes')) and _len(_sub(p['colour'], c)) < 0.12:
                 rows.append(_row('colours', 'warn', f"Colours: {p['name']} is nearly the {mark} of {MARK_NAMES[mark]} on a box person; the mark would not show. Give the person another colour."))
     return rows
+
+
+def fronted(spec):
+    """The names of the things with a `front` (their black and purple panels are named in the still's and the take's words): the set's, then the props'."""
+    return [x['name'] for x in (spec.get('set') or []) + (spec.get('props') or []) if x.get('front')]
 
 
 def anything_moves(spec):

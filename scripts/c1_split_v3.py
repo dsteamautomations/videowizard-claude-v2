@@ -194,6 +194,8 @@ if __name__ == '__main__':
         prompt = rel4(prompt, parts)
         from layoutb_wording import apply as layoutb   # layout B, 20 Nov 2026: the layout video flat with thin outlines, a purple back mark; nothing in v3.json changes
         prompt = layoutb(prompt, parts)
+        from layoutb2_wording import apply as layoutb2   # layout B, second part, 20 Nov 2026: stripes on every person in the flat look; `front` on a thing; nothing in v3.json changes
+        prompt = layoutb2(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

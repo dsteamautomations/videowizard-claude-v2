@@ -115,13 +115,13 @@ def test_a_box_person_has_a_black_face_and_chest_a_purple_back_and_yellow_side_s
 
 
 def test_a_person_the_colour_of_a_mark_is_warned_and_ordinary_colours_are_not():
-    def colour_rows(spec):
-        return [r['message'] for r in G.checks(spec) if r['check'] == 'colours' and 'mark' in r['message']]
-    assert colour_rows(home_walk()) == []
+    def colour_rows(spec, flat=False):   # an EEVEE video; the flat look's stripes on everyone: test_layoutb2_pure.py
+        return [r['message'] for r in G.checks(spec, flat=flat) if r['check'] == 'colours' and 'mark' in r['message']]
+    assert colour_rows(home_walk()) == [] and colour_rows(home_walk(), True) == []
     s = home_walk()
     s['people'][2]['colour'] = [0.45, 0.25, 0.65]
     assert colour_rows(s) == ['Colours: the mother is nearly the purple of the back mark on a box person; the mark would not show. Give the person another colour.']
-    s = counter_pour()   # a yellow man: the yellow of the side stripes only matters when the scene has stripes
+    s = counter_pour()   # a yellow man: in an EEVEE video the yellow of the side stripes only matters when the scene has stripes
     assert colour_rows(s) == []
     s['marks'] = {'band': None, 'stripes': True}
     assert colour_rows(s) == ['Colours: the man is nearly the yellow of the side stripes on a box person; the mark would not show. Give the person another colour.']
@@ -168,7 +168,8 @@ def test_the_checker_is_told_what_the_check_frames_show():
     import layoutb_wording as L
     check = (ROOT / 'plugin' / 'agents' / 'vw-guide-check.md').read_text(encoding='utf-8')
     retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
-    assert check.count(L.CHECK_NEW) == 1 and L.CHECK_OLD not in check and L.CHECK_OLD in retired
+    assert L.CHECK_OLD not in check and L.CHECK_OLD in retired
+    assert L.CHECK_NEW in retired   # layout B, second part (test_layoutb2_pure.py): the stripes on every person in the flat look
     assert 'flat colours with thin black outlines' in L.CHECK_NEW and 'purple back mark' in L.CHECK_NEW and 'yellow stripe' in L.CHECK_NEW
     split = (ROOT / 'scripts' / 'c1_split_v3.py').read_text(encoding='utf-8')
     assert split.index('from rel4_wording import apply as rel4') < split.index('from layoutb_wording import apply as layoutb') < split.index('from d132_wording_v3 import')
