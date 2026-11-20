@@ -151,11 +151,11 @@ def test_the_servers_round_has_the_fixtures_shape(server):
     for kind, line in got.items():
         assert set(line) - SHAPE_EXTRA == set(want[kind]), (kind, set(line) ^ set(want[kind]))
         if 'check' in want[kind]:
-            assert set(line['check']) == set(want[kind]['check']), kind
+            assert set(line['check']) - {'short', 'notes'} == set(want[kind]['check']) - {'notes'}, kind   # release 1, B3: the short line is new (the fixture is a round of 0.118.0); `notes` only when there are any
         for b in line['buttons']:
             fbs = [x for fl in FIXTURE['lines'] if fl['kind'] == kind for x in fl['buttons'] if x['choice'].split(':')[0] == b['choice'].split(':')[0]]
             fb = next((x for x in fbs if x.get('needs_words') == b.get('needs_words')), fbs[0])
-            assert set(b) - {'sure', 'need', 'hint', 'go', 'prefill'} == set(fb) - {'sure', 'need', 'hint', 'go', 'prefill'}, (kind, b['choice'], set(b) ^ set(fb))
+            assert set(b) - {'sure', 'need', 'hint', 'go', 'prefill', 'against'} == set(fb) - {'sure', 'need', 'hint', 'go', 'prefill'}, (kind, b['choice'], set(b) ^ set(fb))   # release 1, B1: `against` in place of `sure`
             assert ({'hint', 'go', 'prefill'} <= set(b)) == bool(b['needs_words'])
         for p in line['pics']:
             fp = next((x for fl in FIXTURE['lines'] if fl['kind'] == kind for x in fl['pics'] if x['role'] == p['role']), None) or next(x for fl in FIXTURE['lines'] for x in fl['pics'] if x['role'] == p['role'])
@@ -187,9 +187,11 @@ def test_the_round_drawn_by_the_page_answered_there_and_recorded_by_the_server(s
         assert [b.split('\n')[0] for b in view.locator('#pbar button').evaluate_all('bs => bs.map(b => b.firstChild.textContent)')] == [b['label'] for b in l['buttons']], l['name']
         assert view.locator('#sansh').text_content() == l['ask']
         if l.get('check'):
-            assert view.locator('#pcheck b').text_content() == l['check']['head'] and view.locator('#pcheck').get_attribute('data-state') == l['check']['state']
-            if l['check']['show'] == 'all':
-                assert view.locator('#pcheck li').all_text_contents() == l['check']['faults']
+            assert view.locator('#pcheck b').text_content() == l['check']['short'] and view.locator('#pcheck').get_attribute('data-state') == l['check']['state']   # release 1, B3: the closed line
+            if l['check']['faults']:
+                view.locator('#pcheckb').click()
+                assert view.locator('#pfaults li').all_text_contents() == l['check']['faults']
+                view.locator('#pcheckb').click()
         if l['kind'] == 'drawn' and l['video']['code']:
             view.wait_for_function("(() => { const v = document.querySelector('#pvideo'); return v && v.readyState >= 2; })()")
         if l['kind'] == 'drawn' and not l['video']['code']:
@@ -197,8 +199,8 @@ def test_the_round_drawn_by_the_page_answered_there_and_recorded_by_the_server(s
     q, sty, d1, d2 = doc['lines'][0], L['The look of the graphics'], L['What the cavities do'], L['The wall builds itself']
     s1, s2, g, s3 = L['The finished three-storey building'], L['The kiln worker with the clay pan'], L['Fewer bricks, fewer resources'], [l for l in doc['lines'] if l['kind'] == 'still'][-1]
     # answer every line on the page
-    plan_ = [(q, 'c2', None), (sty, 'yes', None), (d1, 'plain', None), (d2, 'select', 'The end frames hold long enough.'), (s1, 'no', None),
-             (s2, 'yes', 'sure'), (g, 'correct:2', 'The icons should turn green.'), (s3, 'correct', 'Two workers, not three.')]
+    plan_ = [(q, 'c2', None), (sty, 'yes', None), (d1, 'plain', None), (d2, 'select', None), (s1, 'no', None),   # release 1, B1: Select and Yes against the check are one click
+             (s2, 'yes', None),(g, 'correct:2', 'The icons should turn green.'), (s3, 'correct', 'Two workers, not three.')]
     for l, choice, more in plan_:
         go(view, l)
         view.locator(f'#pbar [data-choice="{choice}"]').click()
@@ -225,6 +227,6 @@ def test_the_round_drawn_by_the_page_answered_there_and_recorded_by_the_server(s
     assert refs['g3']['rejection']['cause'] == P.W['later_step'] and not any(P.W['later_step'] in str(x) for x in (s.get('not_this') or {}).values())
     assert refs['k3']['status'] == 'rejected' and refs['k3']['rejection']['notes'] == 'Two workers, not three.'
     assert ('finish', 'D1', False) in server['calls'] and s['reviews']['j1'][-1] == {'decision': 'rejected', 'notes': "made again without the effect, at the operator's word"}
-    assert s['selections']['D2'] == {'job_id': 'j2', 'notes': 'The end frames hold long enough.'}                              # held: selected with the operator's reason (F3)
+    assert s['selections']['D2'] == {'job_id': 'j2', 'notes': P.W['against_note']}                                             # held: release 1, B1: selected with one click, no reason asked; the note says so
     assert out['page']['step'] == P.W['step'] and out['page']['closed'] and out['page']['lines'] == []   # design/221 phase 4: three stills and a step are made again: the page waits
     assert out['then'].endswith(P.W['page_later']) and 'Stills: 1 answered, 2 being redone, 2 could not be made.' in out['then']

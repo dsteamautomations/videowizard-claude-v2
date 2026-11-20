@@ -322,6 +322,8 @@ def test_a_drawing_with_three_notes_fits_the_page(browser, size):
         c['held'] = ''
     pg = draw(browser, doc(change), size=size)
     go(pg, CAVITIES)
+    assert pg.locator('#pnotes').count() == 0                                             # release 1, B3: the box is closed; the notes are one click away
+    pg.locator('#pcheckb').click()
     assert pg.locator('#pnotes li').all_text_contents() == notes
     for sel in ('#pcheck', '#sansh', '#smain .sname', '#sbig'):
         inside(pg, sel)

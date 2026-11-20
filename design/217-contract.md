@@ -152,6 +152,8 @@ Extra on a drawn line:
 |---|---|---|
 | `state` | str | `pass` \| `fail` \| `not_checked` \| `none` |
 | `head` | str | the one coloured line (green pass, amber fail, grey not_checked/none), e.g. "Claude's check found 4 problems: <first fault>" / "Claude's check found nothing wrong" / "Not checked: Claude's check did not come within 30 minutes. Judge it by eye." / "Not checked: Claude could not open the picture. Judge it by eye." / "Fact check: passed. All 53 rules held, after 2 redo rounds." / "Fact check: not passed. 2 of 53 rules are still open after 2 redo rounds:" / "Not fact-checked yet." |
+| `short` | str | release 1, B3 (20 Nov 2026): the one line of the closed check box and of the chat (`pictures.short`): "Passed" / "Passed, 1 note" / "Passed, N notes" (green), "1 warning: <short name>" / "N warnings: <the first one's short name>" (amber; a step's is "step n, <name>"; a long rule is cut at a word), or the `head` when it was not checked. The line is a button; a click opens `notes`, `faults`, `na` (folded) and `by`. A round written before has no `short`: the page shows `head` |
+| `notes` | [str], optional | what is not a fault: a drawn graphic's failed "should" rules; release 1: two steps alike of a graphic in steps |
 | `by` | str | who checked: "Claude looked at the picture against its list of 22 lines." / "A Claude checker that never saw the build judged 53 rules on snapshots of the video." / "" |
 | `show` | str | `first`: the faults after the first behind `words.more`; `all`: every fault in view (drawn) |
 | `faults` | [str] | the failed lines in full (steps: prefixed "Step n: ") |
@@ -176,7 +178,8 @@ Extra on a drawn line:
 | `hint`, `go` | str | with `needs_words`: the box's placeholder and its send button |
 | `prefill` | str | with `needs_words`: the box opens with this text (D3: Claude's failed lines, for the operator to send or change); "" for none |
 | `need` | str, optional | the refusal of an empty box; default `words.pictures.words_need` |
-| `sure` | {ask, go, back}, optional | asked once before the answer is written: on `yes` when `check.state` is `fail`, and on a steps `yes` when the program measured two steps alike (R3) |
+| `sure` | {ask, go, back}, optional | retired on the lines of step 6 by release 1, B1 (20 Nov 2026; design/35 row 275): no button of step 6 carries it now. (Until then: asked once before the answer was written, on `yes` when `check.state` was `fail` and on a steps `yes` when two steps were alike.) The page still draws it for a round of the 0.118.0 server |
+| `against` | true, optional | release 1, B1: this answer goes against the check (`yes` when `check.state` is `fail`; `select` on a drawn graphic that is held: `held` says why, above the buttons). One click: the answer is written at once; the page marks it "(Against the check)" and the run's log keeps it. `select` never has `needs_words` now |
 
 ### 3.10 The answer documents the page writes
 

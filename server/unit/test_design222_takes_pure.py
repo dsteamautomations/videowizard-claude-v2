@@ -232,7 +232,7 @@ def test_a_take_line_has_the_fixtures_fields_and_no_amount_of_money(held):
     s['take_checks'].update(j1=rec(look=look()))
     held(s, p)
     line, fx = line_of(s, p, [job('j1')]), FIXTURE['lines'][1]
-    assert set(line) | {'line', 'key', 'item', 'state'} == set(fx) and set(line['takes'][0]) == set(fx['takes'][0]) and set(line['takes'][0]['check']) == set(fx['takes'][0]['check'])
+    assert set(line) | {'line', 'key', 'item', 'state'} == set(fx) and set(line['takes'][0]) == set(fx['takes'][0]) and set(line['takes'][0]['check']) - {'short'} == set(fx['takes'][0]['check'])   # release 1, B3: the short line is new; the fixture is a round of 0.118.0
     assert [b['choice'] for b in line['buttons']] == ['select', 'again', 'reject'] == [b['choice'] for b in fx['buttons']]
     assert [b['label'] for b in line['buttons']] == ['Select', 'Make another', 'Reject'] and not line['buttons'][0]['needs_words']
     assert line['name'] == 'Housing at work' and line['where'] == 'In the film at 0:00.0 to 0:05.2 (5.2 s) · Housing at work'      # a shot with no title: the gap's title, never the id
@@ -257,16 +257,16 @@ def test_the_words_in_time_are_the_shots_words_with_seconds_from_its_start(held)
     assert T.caption(s, g, g['scenes'][0]['shots'][0]) is None                                                           # no words, or no times: the plain line
 
 
-def test_selecting_against_a_failed_or_missing_check_needs_a_typed_reason(held):
+def test_selecting_against_a_failed_or_missing_check_is_one_click_with_no_typed_reason(held):   # release 1, B1 (SK, 20 Nov 2026): D6's typed reason is retired (design/35 row 276)
     s, p = session(), plan(shot('S1'))
     s['guides'].update(S1=guide(takes=['j1']))
     s['take_checks'].update(j1=rec(look=look(fail=('objects',))))
     held(s, p)
     b = line_of(s, p, [job('j1')])['buttons']
-    assert b[0]['needs_words'] and b[0]['hint'] == 'The check did not pass it. Why is it right for the film all the same?' and b[0]['need'] == 'Write your reason first. It is kept with the film.'
+    assert not b[0]['needs_words'] and b[0]['hint'] == '' and b[0]['against'] is True
     assert b[1]['prefill'] == b[2]['prefill'] == 'Objects: The broom is gone at 3.5 s.' and b[1]['note'] == T.W['again_paid'] and b[2]['note'] == ''
     s['take_checks'].update(j1=rec(frames=0))
-    assert line_of(s, p, [job('j1')])['buttons'][0]['hint'] == 'It was not checked. Why is it right for the film?'
+    assert not line_of(s, p, [job('j1')])['buttons'][0]['needs_words'] and line_of(s, p, [job('j1')])['buttons'][0]['against'] is True
 
 
 def test_two_takes_of_a_shot_are_one_line_and_no_further_take_is_offered(held):
@@ -281,7 +281,7 @@ def test_two_takes_of_a_shot_are_one_line_and_no_further_take_is_offered(held):
     assert line['buttons'][1]['note'] == T.W['no_more'] and line['buttons'][2]['sure'] == {'ask': 'You rejected take 1 earlier. Use it in the film after all?', 'go': 'Use take 1 after all', 'back': 'Go back'}
     s['take_checks'].update(j1=rec(look=look(fail=('objects',))))
     old = line_of(s, p, [job('j1'), job('j2')])['buttons'][2]
-    assert old['needs_words'] and 'sure' not in old and old['hint'] == 'You rejected take 1 earlier, and its check did not pass. Why use it after all?'
+    assert not old['needs_words'] and old['sure']['ask'] == 'You rejected take 1 earlier, and its check did not pass. Use it in the film after all?'   # release 1, B1: asked once, no typed reason
 
 
 def test_make_another_is_absent_when_the_cost_limit_would_be_passed(held):

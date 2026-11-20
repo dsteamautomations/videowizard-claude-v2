@@ -87,7 +87,7 @@ def test_a_picture_gemini_checked_before_this_release_keeps_that_result_and_is_n
     assert v['by'] == 'Gemini 3.8 Flash read the picture against its list of 2 lines.' and v['faults'] == ['the people: three workers.']
     line = P.picture_line(None, s, p, old, now=NOW)
     yes = line['buttons'][0]
-    assert yes['sure']['ask'] == 'An earlier check by Gemini 3.8 Flash found 1 problem in this picture. Use it all the same?'
+    assert 'sure' not in yes and yes['against'] is True                                    # release 1, B1: one click; no second question
     assert yes['needs_words'] is False and yes['act'] == 'approve'                         # A6: a failed line is a warning: the operator may approve against it
     said = json.dumps([line['check'], yes]) + P.chat_text(line)
     assert 'Claude' not in said and said.count('Gemini 3.8 Flash') >= 3                      # one picture never shows two names, on the page or in the chat
@@ -100,7 +100,7 @@ def test_a_picture_claude_checked_names_claude_in_the_heading_the_small_line_and
     box = held(session(r), plan(shot('S1')))
     line = P.picture_line(None, box['s'], box['p'], r, now=NOW)
     said = json.dumps([line['check'], line['buttons'][0]])
-    assert line['check']['head'].startswith("Claude's check found 1 problem") and line['buttons'][0]['sure']['ask'].startswith("Claude's check found 1 problem") and 'Gemini' not in said
+    assert line['check']['head'].startswith("Claude's check found 1 problem") and line['check']['by'].startswith('Claude looked') and 'Gemini' not in said   # release 1, B1: the question (the second box) is retired
 
 
 def test_the_steps_of_a_graphic_checked_by_the_model_before_name_the_model_and_a_mixed_graphic_names_neither_alone(held):
@@ -108,12 +108,12 @@ def test_the_steps_of_a_graphic_checked_by_the_model_before_name_the_model_and_a
     box = held(session(g1, g2), plan(shot('G1', 'graphic_sequence', states=2)))
     line = P.steps_line(None, box['s'], box['p'], 'G1', [g1, g2], now=NOW)
     assert line['check']['head'].startswith('An earlier check by Gemini 3.8 Flash found 2 problems: step 1: the people')
-    assert line['buttons'][0]['sure']['ask'].startswith('An earlier check by Gemini 3.8 Flash found 2 problems in steps 1 and 2')
+    assert 'sure' not in line['buttons'][0] and line['check']['short'] == '2 warnings: step 1, the people'   # release 1, B1, B3
     assert 'Claude' not in json.dumps([line['check'], line['buttons'][0], [x.get('check_head') for x in line['pics']]]) and 'Gemini 3.8 Flash' in line['check']['by']
     g2.pop('check')
     g2.update(ready_at=NOW.isoformat(), look={'who': 'helper', 'at': NOW.isoformat(), 'sha256': 'b' * 64, 'lines': [{'id': 'x', 'check': 'the place', 'pass': False, 'seen': 'a flat roof'}]})
     line = P.steps_line(None, box['s'], box['p'], 'G1', [g1, g2], now=NOW)
-    assert line['check']['head'].startswith('The checks found 2 problems') and line['buttons'][0]['sure']['ask'].startswith('The checks found 2 problems')
+    assert line['check']['head'].startswith('The checks found 2 problems') and 'sure' not in line['buttons'][0]
     heads = [x.get('check_head') for x in line['pics'] if x.get('check_head')]
     assert heads == ["Gemini 3.8 Flash's check of step 1:", "Claude's check of step 2:"]     # each step names who checked it
     assert 'Step 1: Gemini 3.8 Flash read' in line['check']['by'] and 'Step 2: Claude looked' in line['check']['by']
@@ -149,7 +149,7 @@ def test_step_7s_still_is_listed_for_claudes_look_with_a_list_of_its_own_and_its
     done = P.record_looks(None, USER, RUN, [], [{'ref': 'st1', 'sha10': 's' * 10, 'lines': bad}], 'helper')
     assert done['recorded'] == ['st1'] and done['left'] == [] and s['guides']['S1']['stills'][0]['look']['who'] == 'helper'
     item = CF._guide_items(ctx)[0]
-    assert item['kind'] == 'still' and "Claude's check found 1 problem: on the layout: The mason stands a step left of his outline." in item['text']
+    assert item['kind'] == 'still' and item['text'] == '- 1 warning: on the layout\n- on the layout: The mason stands a step left of his outline.'   # release 1, B3: the short line, the warning in full
     assert [b['choice'] for b in item['buttons']] == ['approve', 'reject'] and not item['buttons'][0].get('needs_words')   # a warning: the operator may approve against it
     assert [(i['id'], i['state']) for i in T.expected(s, p, [], NOW)] == [('S1', 'waiting for you in the chat')] and P.looks_due(None, RUN, [], [])['pictures'] == []
 

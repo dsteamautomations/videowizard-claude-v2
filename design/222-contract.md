@@ -39,6 +39,7 @@ New: the layout `layout.kind = "takes"`, its line kind `take`, its words `layout
 |---|---|
 | `state` | `pass`, `fail` or `not_checked` |
 | `head` | "Check passed" / "Check:" / "Not checked: …" |
+| `short` | release 1, B3 (20 Nov 2026): the one line of the closed check box and of the chat, built by the server as a picture's is (`pictures.short`): "Passed", "N warnings: <the first one's short name>", or the `head` when it was not checked. A round written before has none: the page then shows `head` (with the first fault after "Check:") |
 | `faults` | `[{text, at_s}]`: the server's measured lines first ("One continuous shot: … Measured by the server."), then Claude's, each with the second it was seen (or null) |
 | `by` | who checked, and against how many lines ("" when not checked) |
 | `not_judged` | "Not judged: how things move between the frames. Play the take." |
@@ -47,13 +48,13 @@ New: the layout `layout.kind = "takes"`, its line kind `take`, its words `layout
 
 ### 3.2 A button
 
-`label`, `choice` (`select`, `again`, `reject`, `old:<n>`), `act` (`select`, `again`, `reject`), `take`, `needs_words`, `hint`, `go`, `prefill`, `need`, `note` (a small line inside the open box: that a new take is paid; why no further take can be made), `say` (with `{words}`; shown with the answer and Undo), `end` (the short row of the end card, with `{words}`), and `sure {ask, go, back}` on "Use take n after all" when that take's check passed. "Make another" is absent when two takes were made from the camera or the cost limit would be passed.
+`label`, `choice` (`select`, `again`, `reject`, `old:<n>`), `act` (`select`, `again`, `reject`), `take`, `needs_words`, `hint`, `go`, `prefill`, `need`, `note` (a small line inside the open box: that a new take is paid; why no further take can be made), `say` (with `{words}`; shown with the answer and Undo), `end` (the short row of the end card, with `{words}`), and `sure {ask, go, back}` on "Use take n after all" (asked once; the question says when that take's check did not pass). Release 1, B1 (20 Nov 2026): Select and "Use take n after all" never need words (`needs_words` false, `hint`, `go`, `need` empty): one click whatever the check says; the button carries `against: true` when the take's check did not pass, it was not checked or it is short. "Make another" is absent when two takes were made from the camera or the cost limit would be passed.
 
 ### 3.3 What each choice calls (`takes.answer`, through the chat item's run function)
 
 | Choice | Server |
 |---|---|
-| `select` | `review_take(accepted)` then `select_take` when nothing holds the take; else `select_take` with the operator's reason as notes |
+| `select` | `review_take(accepted)` then `select_take` when nothing holds the take; else `select_take` with notes: release 1, B1: the fixed sentence `pictures.W['against_note']` (a reason typed on a page published before is kept in its place), and the run's log says what the click went against |
 | `reject` | `review_take(rejected, words)`; nothing is ordered |
 | `again` | `review_take(rejected, words)`, then the word for one more take is kept on the shot (`guides[shot].again`); `guide.shoot` uses it once |
 | `old:<n>` | the newer take is rejected ("the earlier take was used instead, at the operator's word"), then take n is accepted and selected (with the reason when its check did not pass) |

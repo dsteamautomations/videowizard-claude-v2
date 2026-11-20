@@ -218,7 +218,7 @@ def test_f1_the_check_is_claudes_look_with_the_program_lines_as_advice():
     assert v['by'] == 'Claude looked at the picture against its list of 2 lines.' and v['passed'] == ['readable text: none.']
     assert v['advice'] == ["Size: 2752x1536, the film's shape.", 'Light and colour: brighter by 0.26 than the footage beside it (6 frames).']   # advice, not a fault (D2)
     item_text = P.chat_text({'check': v})
-    assert v['head'] in item_text and 'never read' not in item_text                         # the chat says the same, never `ref.checklist`
+    assert v['short'] in item_text and v['faults'][0] in item_text and 'never read' not in item_text   # the chat says the same (release 1, B3: the short line, the warning in full), never `ref.checklist`
 
 
 # ---------- the lines of the step: words and shape as the fixture ----------
@@ -245,11 +245,11 @@ def test_a_still_line_has_the_fixture_fields_words_and_buttons(monkeypatch):
     want = fixture_line('still')
     assert set(line) | {'line', 'key', 'item', 'state'} == set(want)
     assert [(b['label'], b['choice'], b['act']) for b in line['buttons']] == [(b['label'], b['choice'], b['act']) for b in want['buttons']]
-    assert line['buttons'][0]['say'] == 'Approved and placed in the film at 2:10.4.' and line['buttons'][0]['sure']['go'] == 'Use it all the same'
+    assert line['buttons'][0]['say'] == 'Approved and placed in the film at 2:10.4.' and 'sure' not in line['buttons'][0] and line['buttons'][0]['against']   # release 1, B1: one click, no second box (the fixture is a round of 0.118.0: it has one)
     assert line['buttons'][1]['say'] == 'Rejected. Claude asks for a second picture.' and line['buttons'][2]['prefill'] == "the start state: the pan is on the ground."   # D3
     assert line['where'] == 'In the film at 2:10.4 to 2:15.0 (4.6 s) · Gap 8, Homes that last' and line['try'] == 'Try 2'
     assert [x['role'] for x in line['pics']] == ['main', 'earlier'] and line['pics'][1]['why'] == 'You said: make a new picture'
-    assert set(line['check']) == set(want['check'])
+    assert set(line['check']) - {'short'} == set(want['check'])   # release 1, B3: the short line is new; the fixture is a round of 0.118.0
     assert not any('₹' in json.dumps(line, ensure_ascii=False) or 'INR' in json.dumps(line) for _ in [0])   # D1
 
 
@@ -276,7 +276,7 @@ def test_f2_r3_a_steps_line_has_one_correct_per_step_and_two_alike_is_advice_and
     assert [b_['choice'] for b_ in line['buttons']] == ['yes', 'correct:1', 'correct:2', 'correct:3']
     assert [b_['say'] for b_ in line['buttons'][1:3]] == [x['say'] for x in want['buttons'][1:3]] and line['buttons'][3]['say'] == want['buttons'][3]['say']
     assert line['check']['advice'][0] == 'Steps 2 and 3 look almost the same: the change between them is small.'
-    assert line['buttons'][0]['sure']['ask'] == "Claude's check found 1 problem in step 3, and steps 2 and 3 look almost the same. Use all 3 steps all the same?"
+    assert 'sure' not in line['buttons'][0] and line['buttons'][0]['against'] and line['check']['notes'] == [line['check']['advice'][0]]   # release 1, B1: not asked a second time; two steps alike is a note of the check
     assert line['check']['faults'] == ["Step 3: exact text: it reads 'enviromental'."] and line['buttons'][3]['prefill'] == "exact text: it reads 'enviromental'."
 
 
@@ -317,7 +317,7 @@ def test_f3_c6_a_drawn_line_reads_the_fact_check_of_its_project_and_is_held_with
     line = _paged(P.drawn_line(None, s, p, _job(), {}, ['grain', 'vignette'], True))
     want = fixture_line('drawn')
     assert set(line) | {'line', 'key', 'item', 'state'} == set(want)
-    assert line['check']['head'] == 'Not fact-checked yet.' and line['held'] == 'It has no fact check yet: to select it all the same, say why.' and line['buttons'][0]['needs_words']
+    assert line['check']['head'] == 'Not fact-checked yet.' and line['held'] == 'It has no fact check yet. Select uses it all the same.' and not line['buttons'][0]['needs_words']   # release 1, B1: no typed reason
     assert line['finish'] == 'Added by the server: a film grain and a soft darkening of the corners.' and line['buttons'][2]['choice'] == 'plain'
     s['motion_projects'] = {'p' * 64: {'rules': [{'id': P.rule_id(f'rule {n}'), 'rule': f'rule {n}'} for n in range(53)]}}
     s['motion_checks'] = {'D1': [{'sha256': 'p' * 64, 'round': 3, 'rules': [{'rule': f'rule {n}', 'pass': n > 1} for n in range(53)], 'stranger': ['0 s: a slab.']},

@@ -153,7 +153,7 @@ def test_a_passed_check_says_only_check_passed(browser):
     go(pg, ONE)
     c = pg.locator('#pcheck')
     assert c.text_content() == ONE['takes'][0]['check']['head'] == 'Check passed' and c.get_attribute('data-state') == 'pass' and 'bad' not in c.get_attribute('class')
-    assert pg.locator('#pcheck button').count() == 0
+    assert pg.locator('#pcheck button').count() == 1 and pg.locator('#pcheckb').get_attribute('aria-expanded') == 'false'   # release 1, B3: the line is a button; who checked is one click away
     assert pg.locator('#plinks button').all_text_contents() == [W['film'], W['details']]   # the fixture's line has your footage before it
     go(pg, TWO)
     assert pg.locator('#plinks button').all_text_contents() == [W['film'], W['details']] if any(p['role'] in ('before', 'after') for p in TWO['pics']) else [W['details']]   # no picture before or after: no "See it in the film"
@@ -166,11 +166,13 @@ def test_a_failed_check_shows_the_first_fault_go_to_and_see_all(browser):
     k = TWO['takes'][1]['check']
     c = pg.locator('#pcheck')
     assert c.get_attribute('data-state') == 'fail' and 'bad' in c.get_attribute('class')
-    assert ' '.join(c.text_content().split()) == ' '.join(f"{k['head']} {k['faults'][0]['text']} {W['seek'].replace('{s}', '1.5')} {W['more'].replace('{n}', '2')}".split())
+    assert ' '.join(c.text_content().split()) == f"{k['head']} {k['faults'][0]['text']}"      # release 1, B3: one closed line (a round of 0.118.0 has no short line: "Check:" and its first fault)
     assert pg.locator('#pcheck li').count() == 0 and k['faults'][1]['text'] not in c.text_content()
-    c.locator('[data-seek]').click()
+    pg.locator('#pcheckb').click()                                                        # one click opens the rest: every fault, each with its "Go to"
+    assert pg.locator('#pfaults li').count() == 2 and k['faults'][1]['text'] in c.text_content()
+    c.locator('[data-seek]').first.click()
     pg.wait_for_function("(() => { const v = document.querySelector('#pvideo'); return v.paused && Math.abs(v.currentTime - Math.min(1.5, v.duration)) < 0.05; })()")   # the stand-in clip is about 1.45 s: the time stops at its end
-    pg.locator('#pmore').click()                                                          # "See all 2" opens Details
+    pg.locator('#pdetails').click()                                                       # Details still lists them
     assert pg.locator('#ksheet').is_visible() and pg.locator('#dfaults li').count() == 2
     pg.close()
 

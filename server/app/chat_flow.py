@@ -1634,6 +1634,10 @@ def _waiting_items(ctx):
                         faults = view['faults']
                         _decided(conn, run, user, f"picture {ref['id']}", 'fix set A2.2 (a picture another picture is made from, approved in the chat)',
                                  'approved, also as the parent of new pictures' + (P._named(", although Claude's check failed a must line: ", view.get('who')) + ' '.join(faults) if faults else ''), quote)   # release 1, A2: who checked
+                    elif kind != 'sheet to approve':   # release 1, B1 (SK, 20 Nov 2026): one click against the check: no second box; the run's log keeps the fact
+                        faults = P.check_view(session, ref, plan)['faults']
+                        if faults:
+                            _decided(conn, run, user, f"picture {ref['id']}", 'release 1, B1 (approved against the check, one click)', P.W['log_against'].format(faults=' '.join(faults)), quote)
                     return out
                 return V.reject_reference(store, user, run, outputs, ref['id'], '' if choice == 'no' else words, quote)   # design/217 (F4): a bare No carries no reason
             if line:   # design/217: the style sheet and a still say the page's words in the chat too (F1: the check from Claude's look and the program's lines)
@@ -1650,10 +1654,14 @@ def _waiting_items(ctx):
             items.append(item)
         elif kind == 'graphics to approve':
             chain = V.state_chain(session, group) or []
+            line = P.steps_line(store, session, plan, group, chain)
 
-            def run_(choice, quote, words, group=group, chain=chain):
+            def run_(choice, quote, words, group=group, chain=chain, faults=line['check']['faults']):
                 if choice == 'yes':
-                    return V.sequence(store, user, run, outputs, group, [r['id'] for r in chain], quote)
+                    out = V.sequence(store, user, run, outputs, group, [r['id'] for r in chain], quote)
+                    if faults:   # release 1, B1: approved against the check with one click: the run's log keeps the fact
+                        _decided(conn, run, user, f'shot {group}', 'release 1, B1 (approved against the check, one click)', P.W['log_against'].format(faults=' '.join(faults)), quote)
+                    return out
                 k = int(choice.split(':')[1]) if choice.startswith('correct:') else len(chain)   # design/217 (F2): the step the operator named; "correct" alone is the last, as before
                 V.need(1 <= k <= len(chain), f'{title(group)}: there is no step {k}.')
                 out = V.reject_reference(store, user, run, outputs, chain[k - 1]['id'], words, quote)
@@ -1664,7 +1672,6 @@ def _waiting_items(ctx):
                         s_['references'][later['id']]['rejection']['cause'] = P.W['later_step']   # shown with the earlier try, never a reason
                         V.save_session(store, run, s_)
                 return out
-            line = P.steps_line(store, session, plan, group, chain)
             buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct in this step.' if b['needs_words'] else '') for b in line['buttons']]
             item = _item(f'graphics:{group}:{len(chain)}', 'graphics', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:],
                          text=P.chat_text(line), show=[_pic(run, r['id'], f'{group}-step-{i + 1}') for i, r in enumerate(chain)])
@@ -1778,11 +1785,16 @@ def _waiting_items(ctx):
                 text = '\n'.join('- ' + x for x in lines + look + ([why_hold + ': to select it all the same, the operator says why.'] if hold else []) if x)
             short = ev.get('timing_matches_placement') is False
 
-            def run_(choice, quote, words, job=job, group=group, hold=hold, short=short):
-                if choice == 'select':   # a held take is selected only with the operator's own reason; design/217 (F3): never a note the operator did not give
+            def run_(choice, quote, words, job=job, group=group, hold=hold, short=short, line=line):
+                if choice == 'select':   # an older film's held take is selected only with the operator's own reason
                     if not hold:   # nothing holds it: the accepted review carries the operator's click, no words
                         V.review_take(conn, store, user, run, outputs, str(job['id']), 'accepted', '', '', quote)
-                    return V.select_take(conn, store, user, run, outputs, str(job['id']), quote, words if hold else '', words if hold and short else '', None)
+                    note = (words or (P.W['against_note'] if line else '')) if hold else ''   # release 1, B1 (SK, 20 Nov 2026): a drawn graphic of step 6 is selected with one click against its check: no reason asked (one typed on an older page is kept)
+                    out = V.select_take(conn, store, user, run, outputs, str(job['id']), quote, note, note if short else '', None)
+                    if hold and line:   # the run's log keeps that it went against the check
+                        _decided(conn, run, user, f'shot {group}', 'release 1, B1 (selected against the check, one click)',
+                                 P.W['log_against_drawn'].format(why=': '.join([line['held'].split('.')[0]] + ['; '.join(line['check']['faults'])] * bool(line['check']['faults']))), words or quote)
+                    return out
                 if choice in ('plain', 'no-effect'):   # design/217: "plain" on the page; "no-effect", the chat's older word, kept
                     out = V.motion_finish(conn, store, user, run, outputs, group, False)
                     V.review_take(conn, store, user, run, outputs, str(job['id']), 'rejected', "made again without the effect, at the operator's word", '', quote)   # the drawing with the effect is not asked about again
@@ -1792,8 +1804,7 @@ def _waiting_items(ctx):
             sheet_key = res.get('sheet_key') or check.get('sheet_key')
             show += [{'key': sheet_key, 'name': f'{group}-frames.jpg'}] if sheet_key else []
             if line:
-                buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell=(why_hold + ': ask the operator why it is right for the film all the same.') if b['choice'] == 'select'
-                                   else 'Ask the operator what is wrong with it.' if b['needs_words'] else '') for b in line['buttons']]
+                buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what is wrong with it.' if b['needs_words'] else '') for b in line['buttons']]   # release 1, B1: Select asks no reason
             else:
                 buttons = [_button('Select', 'select', words=hold, tell=why_hold + ': ask the operator why it is right for the film all the same.'),
                            _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with it.')] + ([_button('Take the effect away', 'no-effect')] if fin else [])

@@ -39,14 +39,15 @@ W = {
     'say_fix_style': 'Rejected. Claude asks for a new one with your words: "{words}"', 'say_fix_still': 'Rejected. Claude asks for a new picture with your words: "{words}"',
     'say_steps': 'All {n} steps approved and placed in the film at {at}, played as a build.',
     'say_step': 'Step {k} is made again with your words: "{words}". {later} made again from it.', 'say_step_last': 'Step {k} is made again from step {p} with your words: "{words}".',
-    'say_select': 'Selected. It goes in the film at {at}.', 'say_select_why': 'Selected. It goes in the film at {at}. Your reason: "{words}"',
+    'say_select': 'Selected. It goes in the film at {at}.',
     'say_reject': 'Rejected. Claude\'s helpers rebuild it with your words: "{words}"', 'say_plain': 'It is made again without the {finish}. You see it again here.',
     'say_answer': 'Your answer: {choice}. Claude acts on it.',
     'hint_style': 'What should change?', 'hint_still': 'What should change in this picture?', 'hint_step': 'What should change in step {n}?', 'hint_reject': 'What is wrong with it?',
-    'hint_why': 'Why is it right for the film all the same?', 'go': 'Send these words', 'go_why': 'Select it with this reason', 'need_why': 'Write your reason first. It is kept with the film.',
-    'sure': "Claude's check found {problems} in this picture. Use it all the same?", 'sure_go': 'Use it all the same', 'back': 'Go back',
-    'sure_steps': "Claude's check found {problems}{alike}. Use all {n} steps all the same?", 'sure_steps_alike': "Steps {a} and {b} look almost the same. Use all {n} steps all the same?",
-    'sure_steps_go': 'Use all {n} steps all the same',
+    'go': 'Send these words',
+    # release 1, B1 (SK, 20 Nov 2026): one click. The second box ("Use it all the same?", "Go back") and the typed reason of a held drawing are retired
+    # (design/35 rows 275, 276): the warning is in view before the buttons, and Yes or Select records at once as approved against the check
+    'against_note': "Used all the same: the operator's one click, with the warning in view.", 'log_against': 'approved against the check: {faults}',
+    'log_against_drawn': 'selected against the check: {why}',
     'where': 'In the film at {start} to {end} ({secs} s) · {gap}', 'words_head': 'The words under it:', 'try': 'Try {n}',
     'foot_still': 'Your footage: click one to see it beside the new picture', 'foot_still_try': 'Your footage and the earlier try: click one to see it beside the new picture',
     'foot_steps': 'Your footage: click one to see it beside the steps', 'foot_steps_try': 'Your footage and the earlier try: click one to see it beside the steps',
@@ -57,9 +58,9 @@ W = {
     'step_cap': "Step {n}: on '{words}': {what}", 'step_cap_bare': 'Step {n}: {what}', 'step_label': 'Step {n}',
     'sheet': 'Its frames, in order', 'video': 'The drawing, playing', 'video_none': 'The video is not available here: these are its frames.',
     'finish': 'Added by the server: {finish}.',
-    'held_fact': 'Its fact check did not pass: to select it all the same, say why.', 'held_none': 'It has no fact check yet: to select it all the same, say why.',
-    'held_server': "The server's check did not pass it: to select it all the same, say why.", 'held_unread': 'It was not checked: to select it all the same, say why.',
-    'held_short': 'It is shorter than its place in the film: to select it all the same, say why.',
+    'held_fact': 'Its fact check did not pass. Select uses it all the same.', 'held_none': 'It has no fact check yet. Select uses it all the same.',
+    'held_server': "The server's check did not pass it. Select uses it all the same.", 'held_unread': 'It was not checked. Select uses it all the same.',
+    'held_short': 'It is shorter than its place in the film. Select uses it all the same.',
     # the check line (3.8)
     'pass': "Claude's check found nothing wrong", 'fail': "Claude's check found {problems}: {first}",
     'late': "Not checked: Claude's check did not come within {m} minutes. Judge it by eye.", 'unopened': 'Not checked: Claude could not open the picture. Judge it by eye.',
@@ -68,6 +69,8 @@ W = {
     'na_head': '{n} lines did not apply', 'na_head_one': '1 line did not apply',
     'all_na': 'Not checked: every line of its list was answered "does not apply". Judge it by eye.',
     'all_na_rules': 'Not fact-checked: every rule was answered "does not apply". Judge it by eye.',
+    # release 1, B3 (SK, 20 Nov 2026): the one short line of a check, for the closed box of the page and for the chat
+    'short_pass': 'Passed', 'short_note': 'Passed, 1 note', 'short_notes': 'Passed, {n} notes', 'short_warn': '1 warning: {name}', 'short_warns': '{n} warnings: {name}',
     'by':'Claude looked at the picture against its list of {n} lines.', 'by_steps': 'Claude looked at each step against its list: {ns} lines.',
     'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
     # release 1, A2: who really checked. A picture the model checked before Claude's look took over keeps that check and says so: never "Claude's check" over a model's result
@@ -640,9 +643,28 @@ def advice(ref):
     return out
 
 
-def _view(state, head, by='', faults=(), passed=(), adv=(), show='first', passed_head=None, advice_head=None, na=()):
-    return {'state': state, 'head': head, 'by': by, 'show': show, 'faults': list(faults), 'passed_head': (W['passed_head'] if passed else '') if passed_head is None else passed_head,
-            'passed': list(passed), 'advice_head': (W['advice_head'] if adv else '') if advice_head is None else advice_head, 'advice': list(adv), **na_view(na)}
+def _name(text, cap=60):
+    """A problem's short name: its words up to the first colon (the line's own name), cut at a word when long."""
+    t = str(text).split(': ')[0].rstrip('.')
+    return t if len(t) <= cap else t[:cap].rsplit(' ', 1)[0] + '…'
+
+
+def short(state, head, faults=(), notes=(), names=None):
+    """Release 1, B3 (SK, 20 Nov 2026): the one short line of a check, the same for a picture, a drawing and a take: "Passed", "Passed, 1 note",
+    "2 warnings: <the first one's short name>", or the sentence that says why it was not checked (the head)."""
+    if state == 'fail':
+        name = (list(names) if names else [_name(f) for f in faults] or [''])[0]
+        return (W['short_warn'] if len(faults) == 1 else W['short_warns']).format(n=len(faults), name=name)
+    if state == 'pass':
+        return W['short_pass'] if not notes else W['short_note'] if len(notes) == 1 else W['short_notes'].format(n=len(notes))
+    return head
+
+
+def _view(state, head, by='', faults=(), passed=(), adv=(), show='first', passed_head=None, advice_head=None, na=(), notes=(), names=None):
+    return {'state': state, 'head': head, 'short': short(state, head, faults, notes, names), 'by': by, 'show': show, 'faults': list(faults),
+            'passed_head': (W['passed_head'] if passed else '') if passed_head is None else passed_head,
+            'passed': list(passed), 'advice_head': (W['advice_head'] if adv else '') if advice_head is None else advice_head, 'advice': list(adv), **na_view(na),
+            **({'notes': list(notes)} if notes else {})}
 
 
 def look_view(ref, adv=(), now=None):
@@ -695,7 +717,8 @@ def steps_view(store, session, chain, plan=None, now=None):
     who = 'model' if whos == {'model'} else 'mixed' if 'model' in whos else ''
     if who:
         head, by = _named(head, who), ' '.join(f"Step {n}: {v['by']}" for n, v in enumerate(views, 1) if v['by'])
-    return {**_view(state, head, by, fails, passed, adv, na=na), **({'who': who} if who else {}), '_views': views, '_alike': alike}
+    names = [f'step {n}, {_name(f)}' for n, v in enumerate(views, 1) for f in v['faults']]   # release 1, B3: the short line names the step; two steps alike is a note
+    return {**_view(state, head, by, fails, passed, adv, na=na, notes=[W['alike'].format(a=a, b=b) for a, b in alike], names=names), **({'who': who} if who else {}), '_views': views, '_alike': alike}
 
 
 def alike_steps(store, chain):
@@ -792,10 +815,9 @@ def fact_view(session, store, job, shot_id, brief_now=None):
                      show='all')
     head = (W['fact_fail'].format(k=len(open_), n=n, r=r) if open_ else
             W['fact_pass_notes'].format(k=f"{len(notes)} note{'' if len(notes) == 1 else 's'}", r=r) if notes else W['fact_pass'].format(n=n, r=r))
-    view = _view('fail' if open_ else 'pass', head, W['fact_by'].format(n=n), open_,
+    return _view('fail' if open_ else 'pass', head, W['fact_by'].format(n=n), open_,
                  [W['passed_rule'].format(rule=x.get('rule')) for x in rules if x.get('pass') is True], [str(x) for x in last.get('stranger') or []], 'all',
-                 W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'], na=na)
-    return {**view, 'notes': notes} if notes else view   # design/221 row 11: the notes, as data for the page (its layout is a later phase)
+                 W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'], na=na, notes=notes)   # design/221 row 11: the notes, as data for the page
 
 
 def server_view(check):
@@ -902,7 +924,7 @@ def picture_line(store, session, plan, ref, style=False, now=None):
     earlier = [_pic(t, W['earlier'].format(n=len(tries) - i), 'earlier', cmp_cap=W['earlier'].format(n=len(tries) - i), why=_why(t)) for i, t in enumerate(tries)]
     which = ORDINAL.get(len(tries) + 1, 'a new') if tries else 'a new'
     yes = {'label': W['yes_' + kind], 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_style'] if style else W['say_still'].format(at=w['at']),
-           **({'sure': {'ask': _named(W['sure'].format(problems=_problems(len(check['faults']))), check.get('who')), 'go': W['sure_go'], 'back': W['back']}} if check['state'] == 'fail' else {})}
+           **({'against': True} if check['state'] == 'fail' else {})}   # release 1, B1: one click; the page and the log say it went against the check
     no = {'label': W['no'], 'choice': 'no', 'act': 'again', 'needs_words': False,
           'say': W['say_no_style'] if style else (W['say_no_still_n'].format(which=which) if tries else W['say_no_still'].format(which=which))}
     fix = _fix_button('correct', W['hint_style' if style else 'hint_still'], check['faults'], W['say_fix_' + kind])
@@ -931,14 +953,8 @@ def steps_line(store, session, plan, shot_id, chain, now=None):
                   **({'check_head': W['check_head_step_model' if views[i].get('who') else 'check_head_step'].format(n=i + 1)} if views[i]['faults'] else {})) for i, r in enumerate(chain)]
     tries = [t for r in chain for t in earlier_tries(session, r)]
     earlier = [_pic(t, W['earlier_step'].format(s=step_of(session, t) or '?', n=1), 'earlier', cmp_cap=W['earlier_step'].format(s=step_of(session, t) or '?', n=1), why=_why(t)) for t in tries]
-    sure = None
-    if check['state'] == 'fail' or alike:
-        bad = sorted({int(f.split(':')[0].split()[1]) for f in check['faults']})
-        problems = f"{_problems(len(check['faults']))} in step{'s' if len(bad) > 1 else ''} {_and(bad)}" if bad else ''
-        alike_w = (f", and steps {alike[0][0]} and {alike[0][1]} look almost the same" if problems else '') if alike else ''
-        sure = {'ask': _named(W['sure_steps'].format(problems=problems, alike=alike_w, n=n), check.get('who')) if problems else W['sure_steps_alike'].format(a=alike[0][0], b=alike[0][1], n=n),
-                'go': W['sure_steps_go'].format(n=n), 'back': W['back']}
-    buttons = [{'label': W['yes_steps'].format(n=n), 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_steps'].format(n=n, at=w['at']), **({'sure': sure} if sure else {})}]
+    buttons = [{'label': W['yes_steps'].format(n=n), 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_steps'].format(n=n, at=w['at']),
+                **({'against': True} if check['state'] == 'fail' else {})}]   # release 1, B1: one click; two steps alike is a note of the check (B3), not a question
     for k in range(1, n + 1):
         later = list(range(k + 1, n + 1))
         say = (W['say_step'].format(k=k, words='{words}', later=(f'Step {later[0]} is' if len(later) == 1 else f'Steps {_and(later)} are')) if later else
@@ -979,7 +995,7 @@ def drawing_notes(session, shot_id, plan=None):
 
 def drawn_line(store, session, plan, job, check, fin, motion_take, brief_now=None):
     """Kind `drawn` (contract 3.7): the video (its page copy) with the frame sheet one click away, the fact check with every open rule in full,
-    select (with the operator's reason when it is held, F3), reject, and "Take the effect away" when it has a finish (no confirmation, D8)."""
+    select (release 1, B1: one click also when it is held; `held` says why, in view before the buttons), reject, and "Take the effect away" when it has a finish (no confirmation, D8)."""
     res, shot_id = job.get('result') or {}, job['unit']
     view = fact_view(session, store, job, shot_id, brief_now) if motion_take else server_view(check)
     w = where(session, plan, shot_id)
@@ -990,8 +1006,8 @@ def drawn_line(store, session, plan, job, check, fin, motion_take, brief_now=Non
     before, after = _foot_pics(session, w['gap'])
     sheet_key = res.get('sheet_key') or check.get('sheet_key')
     pics = before + ([{'_key': sheet_key, '_mark': str(res.get('sha256') or ''), 'label': W['sheet'], 'role': 'sheet'}] if sheet_key else []) + after
-    select = {'label': W['select'], 'choice': 'select', 'act': 'select', 'needs_words': bool(held), 'say': W['say_select_why' if held else 'say_select'].format(at=w['at'], words='{words}'),
-              **({'hint': W['hint_why'], 'go': W['go_why'], 'prefill': '', 'need': W['need_why']} if held else {})}
+    select = {'label': W['select'], 'choice': 'select', 'act': 'select', 'needs_words': False, 'say': W['say_select'].format(at=w['at']),
+              **({'against': True} if held else {})}   # release 1, B1: one click, no typed reason; `held` says why above the buttons
     buttons = [select, {'label': W['reject'], 'choice': 'reject', 'act': 'reject', 'needs_words': True, 'hint': W['hint_reject'], 'go': W['go'],
                         'prefill': ' '.join(view['faults']) if view['state'] == 'fail' else '', 'say': W['say_reject']}]
     if listed:
@@ -1021,8 +1037,9 @@ def chat_text(line):
     """One flow, two front ends: what the chat shows of a page line: the check line, its faults, the measured advice, the place, the finish, why it is held."""
     c = line.get('check') or {}
     na = c.get('na') or {}   # release 1, A5: the lines that did not apply, one row: never among the faults
-    rows = ([line['where']] if line.get('where') else []) + ([c['head']] if c.get('head') else []) + (c.get('faults') or [])[1 if c.get('state') == 'fail' and c.get('show') != 'all' else 0:6] \
-        + ([f"{na['head']}: {' '.join(na['lines'][:6])}"] if na else []) \
+    said = c.get('short') or c.get('head')   # release 1, B3: the short line, a warning in full, the count of the lines that did not apply (the chat has no fold); a line with no short line says its head
+    rows = ([line['where']] if line.get('where') else []) + ([said] if said else []) + (c.get('faults') or [])[1 if c.get('state') == 'fail' and c.get('show') != 'all' and not c.get('short') else 0:6] \
+        + ([na['head']] if na else []) + ([c['by']] if c.get('who') and c.get('by') and c.get('short') else []) \
         + (c.get('advice') or [])[:4] + ([line['finish']] if line.get('finish') else []) + ([line['held']] if line.get('held') else [])
     return '\n'.join('- ' + r for r in rows if r)
 

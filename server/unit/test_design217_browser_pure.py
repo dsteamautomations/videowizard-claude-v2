@@ -278,6 +278,8 @@ def test_the_style_sheet(browser):
     go(pg, STYLE)
     assert pg.locator('#pctx').text_content() == STYLE['sub'] and pg.locator('#sansh').text_content() == STYLE['ask']
     assert pg.locator('#pcheck b').text_content() == STYLE['check']['head'] and pg.locator('#pcheck').get_attribute('data-state') == 'pass' and 'bad' not in pg.locator('#pcheck').get_attribute('class')
+    assert pg.locator('#pcheck .pby').count() == 0                                            # release 1, B3: the box is closed; who checked is one click away
+    pg.locator('#pcheckb').click()
     assert pg.locator('#pcheck .pby').text_content() == STYLE['check']['by']
     assert bar(pg) == [b['label'] for b in STYLE['buttons']] and 'primary' in pg.locator('#pbar [data-choice="yes"]').get_attribute('class')
     # the passed lines and the program's advice: folded under Details, with the server's rows
@@ -322,9 +324,9 @@ def test_a_failed_still_asks_once_and_is_marked_against_the_check(browser):
     go(pg, KILN)
     c = KILN['check']
     assert pg.locator('#pcheck').get_attribute('data-state') == 'fail' and 'bad' in pg.locator('#pcheck').get_attribute('class') and pg.locator('#pcheck b').text_content() == c['head']
-    assert pg.locator('#pcheck li').count() == 0 and pg.locator('#pmore').text_content() == W['more'].replace('{n}', '4')   # F1: the first fault in view, the rest behind "See all 4"
-    pg.locator('#pmore').click()
-    assert pg.locator('#pcheck li').all_text_contents() == c['faults'][1:] and pg.locator('#pmore').text_content() == W['fewer']
+    assert pg.locator('#pcheck li').count() == 0 and pg.locator('#pmore').count() == 0       # F1; release 1, B3: one line (this older round's head names the first fault), the rest one click away
+    pg.locator('#pcheckb').click()
+    assert pg.locator('#pcheck li').all_text_contents() == c['faults'] and pg.locator('#pcheckb').get_attribute('aria-expanded') == 'true'
     assert 'faults' not in KILN['pics'][1] and pg.locator('#sbig .pfaults').count() == 0   # the picture's failed lines are the check's: sent once, said once
     assert pg.locator('#ptry').text_content() == KILN['try']
     assert 'primary' not in (pg.locator('#pbar [data-choice="yes"]').get_attribute('class') or '')
@@ -430,7 +432,10 @@ def test_a_drawn_graphic_plays_on_a_loop_with_no_sound_its_frames_one_click_away
     v = pg.evaluate("(() => { const v = document.querySelector('#pvideo'); return [v.loop, v.muted, v.getAttribute('aria-label'), v.src.endsWith('" + BLOB + "')]; })()")
     assert v == [True, True, CAVITIES['video']['label'], True]                             # D6
     assert pg.locator('#pfinish').text_content() == CAVITIES['finish'] and pg.locator('#sfootage [data-role="sheet"] .pthl').text_content() == CAVITIES['pics'][1]['label']
-    assert pg.locator('#pcheck b').text_content() == CAVITIES['check']['head'] and pg.locator('#pcheck .pby').text_content() == CAVITIES['check']['by']
+    assert pg.locator('#pcheck b').text_content() == CAVITIES['check']['head'] and pg.locator('#pcheck .pby').count() == 0   # release 1, B3: closed
+    pg.locator('#pcheckb').click()
+    assert pg.locator('#pcheck .pby').text_content() == CAVITIES['check']['by']
+    pg.locator('#pcheckb').click()
     assert 'primary' in pg.locator('#pbar [data-choice="select"]').get_attribute('class') and 'danger' in pg.locator('#pbar [data-choice="reject"]').get_attribute('class')
     assert bar(pg) == [b['label'] for b in CAVITIES['buttons']]
     pg.locator('#pframes').click()                                                       # the frame sheet, one click away
@@ -449,6 +454,7 @@ def test_a_drawn_graphic_with_open_rules_and_no_video_needs_a_reason(browser):
     go(pg, WALL)
     assert pg.locator('#pvideo').count() == 0 and pg.locator('#sbig figure').get_attribute('data-role') == 'sheet' and pg.locator('#pnone').text_content() == WALL['video']['none']
     assert pg.locator('#pframes').count() == 0 and pg.locator('#pfinish').count() == 0
+    pg.locator('#pcheckb').click()                                                        # release 1, B3: the box is closed; one click
     assert pg.locator('#pcheck li').all_text_contents() == WALL['check']['faults'] and pg.locator('#pmore').count() == 0   # the open rules in full
     assert bar(pg) == ['Select: use it in the film', 'Reject'] and pg.locator('#pbar [data-act="plain"]').count() == 0   # no finish: no "Take the effect away"
     sel = btn(WALL, 'select')

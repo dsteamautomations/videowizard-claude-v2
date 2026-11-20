@@ -19,7 +19,7 @@ W = {
     'step': 'AI video', 'kind': 'An AI video take', 'ask': 'Is this take right for the film?',
     'take_label': 'Take {n}', 'tab_rejected': 'Take {n}, rejected',
     'select': 'Select', 'again': 'Make another', 'reject': 'Reject', 'select_old': 'Use take {n} after all',
-    'say_select': 'Take {n} selected. It goes in the film at {at}.', 'say_select_why': 'Take {n} selected. It goes in the film at {at}. Your reason: "{words}"',
+    'say_select': 'Take {n} selected. It goes in the film at {at}.',
     'say_reject': 'Take {n} rejected. No new take is ordered; Claude asks you in the chat what happens to the shot. Your words: "{words}"',
     'say_again': 'Take {n} rejected. Another take is ordered when you say done; Claude says its price in the chat then. Your words: "{words}"',
     'end_select': 'Take {n} selected, in the film at {at}.', 'end_reject': 'Take {n} rejected: "{words}"', 'end_again': 'Take {n} rejected, another take ordered: "{words}"',   # the end card's short rows
@@ -28,10 +28,11 @@ W = {
     'again_paid': 'A new take is paid. Its price is said in the chat when you say done; nothing is ordered before that.',
     'no_more': 'No further take is made from this camera: two were made. After this rejection Claude asks you in the chat: cut the shot, another angle, or leave it out.',
     'no_more_cap': 'No further take can be ordered: the cost limit of this film is reached. Only the owner can change it.',
-    'hint_why': 'The check did not pass it. Why is it right for the film all the same?', 'hint_why_none': 'It was not checked. Why is it right for the film?',
-    'hint_why_short': 'It is shorter than its place in the film. Why is it right for the film all the same?',
-    'hint_why_old': 'You rejected take {n} earlier, and its check did not pass. Why use it after all?', 'old_ask': 'You rejected take {n} earlier. Use it in the film after all?',
-    'go_why': 'Select it with this reason', 'need_why': 'Write your reason first. It is kept with the film.', 'back': 'Go back',
+    # release 1, B1 (SK, 20 Nov 2026): one click. D6's typed reason for selecting against the check is retired (design/35 row 276): the warning is in
+    # view before the buttons and Select records at once; "Use take n after all" is still asked once (D7), and says when that take's check did not pass
+    'old_ask': 'You rejected take {n} earlier. Use it in the film after all?', 'old_ask_against': 'You rejected take {n} earlier, and its check did not pass. Use it in the film after all?',
+    'back': 'Go back',
+    'log_against': ' against the check: {faults}', 'log_unchecked': ', not checked', 'log_short': ', shorter than its place in the film',
     'rejected': 'Rejected. You said: {words}', 'rejected_bare': 'Rejected. You said no, with no words.',
     'short': 'The take is {s} s; its place in the film is {slot} s.',
     'stale': 'This take was made for an earlier plan of the film and cannot be used: make another, or reject it.',
@@ -374,7 +375,7 @@ def check_view(session, job, now=None):
     late = not look and checkable(rec) and bool(rec.get('asked_at'))
     head = (W['check_fail'] if state == 'fail' else W['check_pass'] if state == 'pass' else W['unopened'] if look and look.get('not_checked') else W['all_na'] if nothing
             else W['no_frames'] if rec and not checkable(rec) else W['late'].format(m=LOOK_MINUTES) if late else W['none'])
-    return {'state': state, 'head': head, 'faults': faults, 'by': W['by'].format(n=len(rec.get('frames') or []), k=len(read)) if read else '',
+    return {'state': state, 'head': head, 'short': P.short(state, head, [f['text'] for f in faults]), 'faults': faults, 'by': W['by'].format(n=len(rec.get('frames') or []), k=len(read)) if read else '',
             'not_judged': W['not_judged'] if rec.get('guide') else '', 'passed': passed, **P.na_view(na)}
 
 
@@ -391,8 +392,8 @@ def chat_text(line):
     t = line['takes'][-1]
     c = t['check']
     na = c.get('na') or {}   # release 1, A5
-    rows = [line['where'], c['head'] if c['state'] != 'fail' else ''] + [(c['head'] + ' ' if i == 0 else '') + f['text'] + (f" (at {f['at_s']:g} s)" if f.get('at_s') is not None else '') for i, f in enumerate(c['faults'][:6])] \
-        + ([f"{na['head']}: {' '.join(na['lines'])}"] if na else []) + [t['short']] + [x['rejected'] for x in line['takes'][:-1]]
+    rows = [line['where'], c.get('short') or c['head']] + [f['text'] + (f" (at {f['at_s']:g} s)" if f.get('at_s') is not None else '') for f in c['faults'][:6]] \
+        + ([na['head']] if na else []) + [t['short']] + [x['rejected'] for x in line['takes'][:-1]]   # release 1, B3: the short line, each warning in full, the count of the lines that did not apply
     return '\n'.join('- ' + r for r in rows if r)
 
 
@@ -485,23 +486,23 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None, left_inr=Non
     for t in takes:
         t['details'] = [[W['d_where'], [where, W['length'].format(s=t['secs'], slot=f'{slot:.1f}')]]] + ([[W['d_prompt'], [prompt[:1500]]]] if prompt else []) + [[W['d_how'], [W['how'], W['how_n'].format(n=t['n'])]]]
     faults = ' '.join(f['text'] for f in cur['check']['faults'])
-    why = W['hint_why'] if cur['check']['state'] == 'fail' else W['hint_why_none'] if cur['check']['state'] != 'pass' else W['hint_why_short'] if cur['short'] else ''
-    cap = left_inr is not None and float(g.get('seconds') or 0) * price_inr_per_s > left_inr + 1e-9
+    against = cur['check']['state'] != 'pass' or bool(cur['short'])   # release 1, B1: Select is one click whatever the check says; the button says when it goes against it
+    cap =left_inr is not None and float(g.get('seconds') or 0) * price_inr_per_s > left_inr + 1e-9
     more = bool(g) and _can_again(session, g, cur_job) and not cap   # no guide entry: no take can be ordered
     buttons = [] if _stale(plan, cur_job) else [   # a take made for an earlier plan cannot be selected
-        {'label': W['select'], 'choice': 'select', 'act': 'select', 'take': cur['n'], 'needs_words': bool(why), 'hint': why, 'go': W['go_why'] if why else '', 'prefill': '',
-         'need': W['need_why'], 'note': '', 'say': W['say_select_why' if why else 'say_select'].format(n=cur['n'], at=at, words='{words}'), 'end': W['end_select'].format(n=cur['n'], at=at)}]
+        {'label': W['select'], 'choice': 'select', 'act': 'select', 'take': cur['n'], 'needs_words': False, 'hint': '', 'go': '', 'prefill': '',
+         'need': '', 'note': '', 'say': W['say_select'].format(n=cur['n'], at=at), 'end': W['end_select'].format(n=cur['n'], at=at), **({'against': True} if against else {})}]
     if more:
         buttons.append({'label': W['again'], 'choice': 'again', 'act': 'again', 'take': cur['n'], 'needs_words': True, 'hint': W['hint_again'], 'go': W['go_again'], 'prefill': faults,
                         'need': W['need_again'], 'note': W['again_paid'], 'say': W['say_again'].format(n=cur['n'], words='{words}'), 'end': W['end_again'].format(n=cur['n'], words='{words}')})
     buttons.append({'label': W['reject'], 'choice': 'reject', 'act': 'reject', 'take': cur['n'], 'needs_words': True, 'hint': W['hint_reject'], 'go': W['go_reject'], 'prefill': faults,
                     'need': W['need_words'], 'note': '' if more or not g else W['no_more_cap'] if cap and _can_again(session, g, cur_job) else W['no_more'], 'say': W['say_reject'].format(n=cur['n'], words='{words}'), 'end': W['end_reject'].format(n=cur['n'], words='{words}')})
-    for t in takes[:-1]:   # an earlier, rejected take may be used after all: asked once when its check passed, with a typed reason when it did not
+    for t in takes[:-1]:   # an earlier, rejected take may be used after all: asked once (D7); release 1, B1: no typed reason when its check did not pass: the question says so
         ok = t['check']['state'] == 'pass' and not t['short']
         label = W['select_old'].format(n=t['n'])
-        buttons.append({'label': label, 'choice': f"old:{t['n']}", 'act': 'select', 'take': t['n'], 'needs_words': not ok, 'hint': '' if ok else W['hint_why_old'].format(n=t['n']),
-                        'go': '' if ok else W['go_why'], 'prefill': '', 'need': W['need_why'], 'note': '',
-                        'say': W['say_select' if ok else 'say_select_why'].format(n=t['n'], at=at, words='{words}'), 'end': W['end_select'].format(n=t['n'], at=at), **({'sure': {'ask': W['old_ask'].format(n=t['n']), 'go': label, 'back': W['back']}} if ok else {})})
+        buttons.append({'label': label, 'choice': f"old:{t['n']}", 'act': 'select', 'take': t['n'], 'needs_words': False, 'hint': '', 'go': '', 'prefill': '', 'need': '', 'note': '',
+                        'say': W['say_select'].format(n=t['n'], at=at), 'end': W['end_select'].format(n=t['n'], at=at), **({} if ok else {'against': True}),
+                        'sure': {'ask': W['old_ask' if ok else 'old_ask_against'].format(n=t['n']), 'go': label, 'back': W['back']}})
     before, after = _beside(session, plan, gap, sh, take_rows)
     still = next((s for s in g.get('stills') or [] if s.get('status') == 'approved' and s.get('key')), None)
     pics = before + [{'_key': (_rec(session, j).get('frames') or [{}])[0].get('key'), '_mark': str((j.get('result') or {}).get('sha256') or ''), 'label': W['frame'].format(n=k), 'role': 'frame', 'take': k}
@@ -532,8 +533,8 @@ def recorded(ctx):
 # ---------- the answers ----------
 
 def answer(conn, store, user, run, outputs, shot_id, take_rows, choice, quote, words):
-    """One answer to a shot's take, from the page or the chat, through the functions the chat calls: Select (with the operator's reason when the
-    check did not pass it, it was not checked or it is short); Reject (with their words; nothing is ordered); Make another (the rejection, and
+    """One answer to a shot's take, from the page or the chat, through the functions the chat calls: Select (release 1, B1: one click also when the
+    check did not pass it, it was not checked or it is short: a fixed note, and the log says what it went against); Reject (with their words; nothing is ordered); Make another (the rejection, and
     their word for one more take, kept on the shot until `guide.shoot` uses it); Use take n after all (an earlier, rejected take)."""
     session = V.session_of(store, run, outputs)
     js = [j for j in jobs_of(take_rows, shot_id) if j.get('status') == 'ready' and not _rec(session, j).get('blocked')]
@@ -546,13 +547,20 @@ def answer(conn, store, user, run, outputs, shot_id, take_rows, choice, quote, w
         if conn is not None:
             runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'shot {shot_id}', 'rule': 'design/222 (step 7, a take answered)',
                                 'entry': entry, 'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': said or quote, 'request_id': None})
+    def against(j, is_short):
+        """Release 1, B1 (SK, 20 Nov 2026): what the one click goes against, for the run's log: the warnings in full, that it was not checked, or
+        that it is short; '' when nothing holds the take."""
+        v = check_view(session, j)
+        return (W['log_against'].format(faults=' '.join(f['text'] for f in v['faults'])) if v['state'] == 'fail' else W['log_unchecked'] if v['state'] != 'pass'
+                else W['log_short'] if is_short else '')
     if choice == 'select':
         V.need(not _stale(plan, job), W['stale_refuse'])
-        held = check_view(session, job)['state'] != 'pass' or short
-        if not held:   # nothing holds it: the accepted review carries the operator's click, no words
+        why = against(job, short)
+        note = (words or P.W['against_note']) if why else ''   # one click: no reason is asked; one typed on an older page is kept as it is
+        if not note:   # nothing holds it: the accepted review carries the operator's click, no words
             V.review_take(conn, store, user, run, outputs, jid, 'accepted', '', '', quote)
-        out = V.select_take(conn, store, user, run, outputs, jid, quote, words if held else '', words if held and short else '', None)
-        decided(W['log_select'].format(n=len(js)), words)
+        out = V.select_take(conn, store, user, run, outputs, jid, quote, note, note if short else '', None)
+        decided(W['log_select'].format(n=len(js)) + why, words)
         return out
     if choice == 'reject':
         out = V.review_take(conn, store, user, run, outputs, jid, 'rejected', words, '', quote)
@@ -581,18 +589,20 @@ def answer(conn, store, user, run, outputs, shot_id, take_rows, choice, quote, w
         V.need(not _stale(plan, old), W['stale_refuse'])
         old_short = ((old.get('result') or {}).get('evidence') or {}).get('timing_matches_placement') is False
         oid, was = str(old['id']), list(_reviews(session, old))
+        why = against(old, old_short)
+        note = (words or P.W['against_note']) if why else words
         try:   # the second critic's points 4 and 5: the earlier take is selected and nothing else is written: the newer take gets no review (a shot with a
             # selection is not asked about again), and a refusal leaves the earlier take's reviews as they were
-            if not words:
+            if not note:
                 V.review_take(conn, store, user, run, outputs, oid, 'accepted', '', '', quote)
-            out = V.select_take(conn, store, user, run, outputs, oid, quote, words, words if old_short else '', None)
+            out = V.select_take(conn, store, user, run, outputs, oid, quote, note, note if old_short else '', None)
         except Exception:
             s = V.session_of(store, run, outputs)
             if (s.get('reviews') or {}).get(oid) != was:
                 s['reviews'][oid] = was
                 V.save_session(store, run, s)
             raise
-        decided(W['log_old'].format(n=k), words)
+        decided(W['log_old'].format(n=k) + (',' + why if why.startswith(' ') else why), words)
         return out
     raise ValueError(f'Not an answer to a take: {choice!r}.')
 
