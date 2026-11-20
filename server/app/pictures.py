@@ -1249,6 +1249,7 @@ def expected(session, plan, take_rows, now=None):
     kind still, steps, drawn or component; the state in plain words (STATE)."""
     out, refs = [], list(session['references'].values())
     shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
+    wait = None   # release 2, F11: what the builders of the drawn graphics wait for, worked out once
     for gap, sh in V._accepted_shots(plan, session):
         kind = {'still': 'still', 'graphic_sequence': 'steps', 'drawn': 'drawn'}.get(V.route_of(sh))
         if not kind:
@@ -1258,11 +1259,18 @@ def expected(session, plan, take_rows, now=None):
             state, due = _selected_state(session, plan, sid, take_rows) if kind == 'drawn' and sid in (session.get('selections') or {}) else ('answered', '')   # F12
         elif kind == 'drawn':
             state, job, due = _drawn_state(session, sh, take_rows, plan)
-            if state in ('none', 'making', 'checking', 'redo'):
-                turn = V.drawn_turn(session, plan, gap, sh, shots)   # fix set A1.4: whose turn it is
+            if state != 'held' and V.base_changed(session, plan, gap, sh):   # release 2, F1, F6: built on a still that was replaced: made again from its still
+                state, job = 'redo', None
         else:
             mine = [r for r in refs if r.get('kind') in (('keyframe', 'isolated') if kind == 'still' else ('state',)) and V.made_for(session, r) == sid and not r.get('set')]
             state = _pictures_state(session, plan, mine, now, len(sh.get('states') or []) if kind == 'steps' else 1)
+        if kind == 'drawn' and state in ('none', 'making', 'checking', 'redo'):
+            turn = V.drawn_turn(session, plan, gap, sh, shots)   # fix set A1.4: whose turn it is
+            if state == 'redo' and turn == ('', '') and _rejected_take(session, sid, take_rows):
+                turn = ('motion', '')   # F15: the operator rejected its render: its builder
+            wait = V.parts_wait(plan, session) if wait is None else wait
+            if wait and not turn[0].startswith('check'):   # F11: the shared parts are not the approved ones: no builder is named, and the line says what is waited for
+                turn, due = ('', ''), ' '.join(x for x in (due, wait if turn[0] else '') if x)
         out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
                     **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
     names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}

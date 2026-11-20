@@ -6090,6 +6090,9 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
     plan = guarded(lambda: current_plan(store, session))
     prev = continues_from(plan, session, gap, shot)   # the critic's point 7: the still opens on the earlier drawing's approved still; the motion is built on its passed project
+    on = opens_on(session, prev) if prev and still else {}
+    if prev and still:   # release 2, F1: no still of a continuing drawing while the earlier one has no still in force (nor a passed project, the older order)
+        need(on or passed_project(session, guarded(lambda: locate(store, session, prev))[3]), CHAIN_STILL.format(shot=shot_id, prev=prev))
     if prev and not still:
         need(not opens_changed(session, prev, st), STILL_OPENS.format(shot=shot_id, prev=prev))
         need(passed_project(session, guarded(lambda: locate(store, session, prev))[3]), CHAIN_FIRST.format(shot=shot_id, prev=prev))
@@ -6119,7 +6122,6 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     lost = next((c for c in cmp.values() if c['state'] == 'closed' and c['with'] not in ever_drawn(store, session)), None)   # the critic's point 3: a mistyped id never drops a must
     need(not lost, WITH_UNKNOWN.format(shot=shot_id, rule=(lost or {}).get('rule'), other=(lost or {}).get('with'), ids=', '.join(drawn_ids(plan, session))))
     idle = {i for i, c in cmp.items() if c['state'] != 'ready'}
-    on = opens_on(session, prev) if prev and still else {}
     sha = hashlib.sha256(content).hexdigest()
     k = f"{run['id']}/visuals/motion/projects/{sha}.zip"
     store.put(k, content, 'application/zip')
@@ -6228,6 +6230,15 @@ def opens_changed(session, prev, st):
     """The critic's point 7: the still `st` of a drawing that continues `prev` was built on a still of `prev` that is not the one in force now:
     it is made again. A still recorded before this (no `opens_on`) is not marked."""
     return bool(prev) and 'opens_on' in (st or {}) and st['opens_on'] != opens_on(session, prev).get('png')
+
+
+def base_changed(session, plan, gap, shot):
+    """Release 2, F1 and F6 (20 Nov 2026): the drawing this one continues by the plan now, when this one's still was built on a still of it that is
+    not the one in force (replaced, or another drawing since a plan version cut the one between); else ''. Such a drawing is made again from its
+    still, whatever was finished on it: its project is bound by no verdict and is no passed project for the drawing after it."""
+    st = (session.get('motion_stills') or {}).get(shot['id']) or {}
+    prev = continues_from(plan, session, gap, shot) if 'opens_on' in st else ''   # a still recorded before it said what it opens on is not marked
+    return prev if opens_changed(session, prev, st) else ''
 
 
 def compare_frames(cmp):
@@ -7010,6 +7021,9 @@ def passed_project(session, shot):
     took = (session.get('motion_held') or {}).get(shot['id']) or {}
     if sha and ((took.get('answer') == 'select' and took.get('sha256') == sha) or shot['id'] in (session.get('selections') or {})):
         return sha   # design/221 (the critic's point 1, phases 3-4): a held drawing the operator selected anyway, or a selected shot, is passed for the drawing after it
+    st = (session.get('motion_stills') or {}).get(shot['id']) or {}
+    if opens_changed(session, st.get('opens_from'), st):   # release 2, F1: built on a still that was replaced: not a project the next drawing is built on
+        return ''
     rounds = motion_rounds(session, shot['id'], sha) if sha else []
     return sha if rounds and not open_rules(rounds[-1]) else ''
 
@@ -7017,15 +7031,16 @@ def passed_project(session, shot):
 def drawn_turn(session, plan, gap, shot, shots):
     """Fix set A1.4 (19 Nov 2026): whose turn a drawn shot is, from what the server holds: ('still' | 'motion': its builder can start now;
     'check-still' | 'check': its checker can start now; '': the operator's turn, the render's, or nothing yet, the drawing it waits on or '').
-    `shots`: the plan's shots by id. Nothing can start before the shared parts are approved."""
+    `shots`: the plan's shots by id. Nothing can start before the shared parts are approved: `pictures.expected` holds a builder's turn for them."""
     sid = shot['id']
     mine = sorted(((p.get('at') or '', sha, p) for sha, p in (session.get('motion_projects') or {}).items() if p.get('shot_id') == sid), key=lambda x: x[0])
-    if not mine:
-        if len(drawn_ids(plan, session)) >= 2 and not parts_ready(session):
-            return '', ''
-        prev = continues_from(plan, session, gap, shot)   # the critic's point 7: its still opens on the earlier drawing's approved still (or its passed project, the older order)
+    prev = continues_from(plan, session, gap, shot)
+    if not mine:   # the critic's point 7: its still opens on the earlier drawing's approved still (or its passed project, the older order)
         return ('', prev) if prev and not (opens_on(session, prev) or (prev in shots and passed_project(session, shots[prev]))) else ('still', '')
     _, sha, row = mine[-1]
+    st = (session.get('motion_stills') or {}).get(sid) or {}
+    if opens_changed(session, prev, row if row.get('still') else st):   # the critic's point 7: the earlier still was replaced: this still is made again, once the new one is
+        return ('still', '') if opens_on(session, prev) else ('', prev)   # approved. Release 2, F1: whatever came after this still (its motion, a verdict, a render)
     rec = next((c for c in reversed((session.get('motion_checks') or {}).get(sid) or []) if c.get('sha256') == sha), None)
     kind = 'still' if row.get('still') else 'motion'
     if not rec or any(r.get('pass') == NOT_SEEN for r in rec.get('rules') or []):
@@ -7091,6 +7106,8 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     kept = st_.get('sha256') if (st_.get('at') or '') <= at else None   # the still this project was built from, uploaded again unchanged, is no redraw
     need(still or (session.get('motion_bound') or {}).get(shot['id']) == sha
          or not any(p.get('shot_id') == shot['id'] and s_ not in (sha, kept) and (p.get('at') or '') > at for s_, p in session['motion_projects'].items()), REDONE.format(shot=shot['id']))
+    base = '' if still else base_changed(session, plan, gap, shot)   # release 2, F1, F2, F6: no verdict (so no binding, no comparison answered) on a project built on a still that was replaced
+    need(not base, STILL_OPENS.format(shot=shot['id'], prev=base))
     cmp = comparing(session, plan, held)   # fix set A1.2: the rules that compare with another drawing
     idle = {i for i, c in cmp.items() if c['state'] != 'ready'}   # nothing to compare with yet (or the other drawing left the plan): a note, not this verdict's
     idle |= left_out(session, shot['id'], sha)   # the critic's point 1: nor a comparison that turned ready after the upload: its checker was not given the frame
