@@ -438,5 +438,5 @@ def test_the_instructions_and_the_helper_say_that_the_look_checks_and_no_text_sa
 
 
 def test_the_versions_of_this_release():
-    assert Settings.model_fields['SERVER_VERSION'].default == '0.117.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.101.0'   # design/221; design/218: 0.116.0 / 0.100.0; design/217: 0.115.0 / 0.99.0; design/216b: 0.114.0 / 0.98.0; design/216: 0.113.0 / 0.97.0; design/215: 0.112.0 / 0.96.0
-    assert json.loads((REPO / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.101.0'
+    assert Settings.model_fields['SERVER_VERSION'].default == '0.118.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.102.0'   # release 0.118.0 / 0.102.0 (20 Nov 2026): step 7 on the page, the step 6 fix set, the page fixes; design/221: 0.117.0 / 0.101.0; design/218: 0.116.0 / 0.100.0; design/217: 0.115.0 / 0.99.0; design/216b: 0.114.0 / 0.98.0; design/216: 0.113.0 / 0.97.0; design/215: 0.112.0 / 0.96.0
+    assert json.loads((REPO / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.102.0'
