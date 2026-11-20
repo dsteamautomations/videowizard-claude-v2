@@ -49,6 +49,7 @@ def test_a_line_that_does_not_apply_needs_its_reason_and_is_recorded_once_neithe
     assert not s['references']['r1'].get('look')
     out = send(WHY)
     assert out['recorded'] == ['r1'] and out['refused'] == {} and out['left'] == []                 # recorded once: nothing is asked again
+    assert out['log'] == f'1 line did not apply: The housing site: wear ({WHY})'                    # kept in the run's log (runlog writes what a step returns as `log`)
     look = s['references']['r1']['look']
     assert [l for l in look['lines'] if l['check'] == 'wear'] == [{'id': next(l['id'] for l in row['lines'] if l['check'] == 'wear'), 'check': 'wear', 'pass': 'na', 'seen': WHY}]
     assert P.due(s, p) == [] and P.offered(s, s['references']['r1'], p, NOW)
@@ -122,7 +123,8 @@ def test_a_takes_line_that_does_not_apply_is_no_fault_no_pass_and_never_a_fail_o
     na = lambda why: [{'id': l['id'], 'pass': 'na' if l['check'] == 'people' else True, 'seen': why if l['check'] == 'people' else ''} for l in want]
     said = T.record(s, p, rows, {'ref': 'j1', 'sha10': SHA[:10], 'lines': na('')}, 'helper')
     assert said == P.PIC_LOOK_NA.format(name='Housing at work', check='people', id=want[0]['id'], max=300) and not s['take_checks']['j1'].get('look')
-    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': SHA[:10], 'lines': na('No person is in this shot.')}, 'helper') is None
+    out = P.record_looks(None, USER, RUN, [], [{'ref': 'j1', 'sha10': SHA[:10], 'lines': na('No person is in this shot.')}], 'helper', rows)   # the route both front ends use
+    assert out['recorded'] == ['j1'] and out['log'] == '1 line did not apply: Housing at work: people (No person is in this shot.)'   # kept in the run's log
     r = s['take_checks']['j1']
     assert r['look']['lines'][0]['pass'] == 'na' and [x['state'] for x in r['scorecard'] if x['line'] == 'people'] == ['Does not apply']
     assert not [x for x in r['scorecard'] if x['state'] in ('Fail', 'Not sure')] and r['not_read'] is False
@@ -168,7 +170,7 @@ def test_a_sets_line_that_does_not_apply_needs_its_reason_and_is_listed_apart():
     assert 'T_LAY' in out['refused'] and out['refused']['T_LAY'].startswith('T_LAY: the result just after: the line') and 'does not apply' in out['refused']['T_LAY'] and '--looks' in out['refused']['T_LAY']
     pic['lines'][2].update({'seen': WHY})
     out = RS.round_looks(store, SUSER, SRUN, [], sent, 'helper')
-    assert out['refused'] == {} and state(store) == 2
+    assert out['refused'] == {} and state(store) == 2 and out['log'].startswith('1 line did not apply: T_LAY, the result just after: ') and out['log'].endswith(f'({WHY})')
     s = set_saved(store)
     stored = s['references'][pic['ref']]['look']['lines'][2]
     assert stored['pass'] == 'na' and stored['seen'] == WHY

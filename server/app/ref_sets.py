@@ -1182,7 +1182,8 @@ def round_looks(store, user, run, outputs, sets, by):
     session = V.session_of(store, run, outputs)
     rd = session.get('round')
     V.need(V.round_v2(session) and rd.get('pass') != 1, 'No set of the reference round waits for a look.')
-    who, recorded, refused = by if by in ref_find.WHO else 'assistant', [], {}
+    from . import pictures
+    who, recorded, refused, na = by if by in ref_find.WHO else 'assistant', [], {}, []
     one = _one
     for s in sets or []:
         eid = (s or {}).get('element_id')
@@ -1219,12 +1220,13 @@ def round_looks(store, user, run, outputs, sets, by):
                              'trial': None, 'ref': p['id'],
                              **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': one(got[w['id']].get('seen'))}
                                                                              for w in check_lines(p)]})}
+                na += pictures.na_said(f"{eid}, {p.get('view') or p['id']}", p['look'])   # release 1, A5: for the run's log
             row['set_look'] = {'who': who, 'at': at, 'set': row['set'], 'recommend': s['recommend'], 'golden': s.get('golden') or None, 'reason': one(s['reason']),
                                **({k: v for k, v in model.items() if v})}
             recorded.append(eid)
     V.save_session(store, run, session)
     left = [eid for eid, _ in _due(session, rd)]
-    return {'recorded': recorded, 'refused': refused, 'left': left, 'then': SETS_LOOK if left else then_of(session)}
+    return {'recorded': recorded, 'refused': refused, 'left': left, 'then': SETS_LOOK if left else then_of(session), **pictures.na_log(na)}
 
 
 # ---------- the second go, the rewrite, a thing back after a second send ----------

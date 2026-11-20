@@ -274,6 +274,11 @@ def _card_waits(g):
         or any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') for s in g.get('stills') or [])
 
 
+def _still_checking(session, g, now=None):
+    """Release 1, A1: a still of the shot waits for Claude's look (`pictures.start_offered`): its card is not in the chat yet."""
+    return any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') and not P.start_offered(session, s, now) for s in g.get('stills') or [])
+
+
 def question_open(session, shot_id):
     """E18: an open question on the shot: nothing is made from it, and its take is not selected, until the operator answers it in the chat."""
     return bool((session.get('questions') or {}).get(shot_id))
@@ -300,7 +305,7 @@ def _state(session, plan, sh, take_rows, now):
         if _rec(session, j).get('blocked'):
             return 'chat', None, seen   # "send the same request once more?" is asked in the chat
         if _rejected(session, j):
-            return ('redo' if again_pending(g) and not _card_waits(g) else 'chat'), None, True   # E30: a remake whose still or layout card waits reads "waiting for you in the chat"
+            return ('checking' if _still_checking(session, g, now) else 'redo' if again_pending(g) and not _card_waits(g) else 'chat'), None, True   # E30: a remake whose still or layout card waits reads "waiting for you in the chat"
         if question_open(session, sid):
             return 'chat', None, True
         if _stale(plan, j):
@@ -308,8 +313,8 @@ def _state(session, plan, sh, take_rows, now):
         return ('done' if offered(session, j, now) else 'checking'), j, seen
     if not g:
         return 'none', None, False
-    if any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') and not P.start_offered(session, s, now) for s in g.get('stills') or []):
-        return 'checking', None, False   # release 1, A1: the shot's still waits for Claude's look; its card comes after
+    if _still_checking(session, g, now):
+        return 'checking', None, False
     if _card_waits(g) or _ready_to_shoot(g):
         return 'chat', None, False   # a card waits in the chat: the layout drawing, the still, or the word to make the take
     return 'making', None, False

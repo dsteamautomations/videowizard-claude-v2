@@ -550,24 +550,37 @@ def _look(sha, want, sent, who, at):
             **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': ' '.join(str(got[w['id']].get('seen') or '').split())} for w in want]})}
 
 
+def na_said(name, look):
+    """Release 1, A5: the lines of a look that did not apply, each with its reason, for the run's log."""
+    return [f"{name}: {l['check']} ({l.get('seen') or ''})" for l in (look or {}).get('lines') or [] if l.get('pass') == V.NA]
+
+
+def na_log(said):
+    """The one log line of a step that recorded lines which did not apply; nothing when there is none."""
+    return {'log': f"{W['na_head_one'] if len(said) == 1 else W['na_head'].format(n=len(said))}: " + '; '.join(said)} if said else {}
+
+
 def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
     """`POST /api/runs/{run_id}/visuals/pictures/looks`: each picture's look, line by line (contract 5.4, 5.5). A refused picture records
-    nothing; the others record. Returns {recorded: [ref], refused: {ref: message}, left: [ref], then}."""
+    nothing; the others record. Returns {recorded: [ref], refused: {ref: message}, left: [ref], then}, and `log` (release 1, A5: the lines
+    that did not apply, kept in the run's log) when a recorded look has one."""
     session = V.session_of(store, run, outputs)
     V.need(V.round_v2(session), PIC_LOOK_NONE)
     plan = V.guarded(lambda: V.current_plan(store, session))
     stamp(session, plan)
-    who, recorded, refused, at = by if by in ref_find.WHO else 'assistant', [], {}, _now().isoformat()
+    who, recorded, refused, at, na = by if by in ref_find.WHO else 'assistant', [], {}, _now().isoformat(), []
     for p in pictures or []:
         p = p if isinstance(p, dict) else {}
         rid = str(p.get('ref') or '')
         if rid not in session['references'] and any(str(j['id']) == rid for j in take_rows or []):   # design/222: an AI video take's look
             from . import takes
+            name = next((takes.name_of(*row[:4]) for row in takes.due(session, plan, take_rows) if str(row[4]['id']) == rid), rid)
             fault = takes.record(session, plan, take_rows, p, who, at)
             if fault:
                 refused[rid] = fault
             else:
                 recorded.append(rid)
+                na += na_said(name, session['take_checks'][rid]['look'])
             continue
         start = next((x for x in starts_due(session, plan) if x[3]['id'] == rid), None) if rid not in session['references'] else None
         if start:   # release 1, A1: the look of step 7's still, kept on the still
@@ -579,6 +592,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             else:
                 st['look'] = _look(st['sha256'], want, p, who, at)
                 recorded.append(rid)
+                na += na_said(name, st['look'])
             continue
         r = session['references'].get(rid) or {}
         name = name_of(session, plan, r) if r else rid
@@ -593,6 +607,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
         why = ' '.join(str(p.get('not_checked') or '').split())
         r['look'] = _look(r['sha256'], want, p, who, at)
         recorded.append(rid)
+        na += na_said(name, r['look'])
         if r.get('kind') == 'component' and not why and not _failed_lines(r) and not all_na(r['look']):   # the program's advice lines (transparency, light) never decide it; release 1, A5: nor a list where nothing applied
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
@@ -601,7 +616,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
     takes_left = [str(row[4]['id']) for row in takes_.due(session, plan, take_rows)]   # the critic's S8: the takes still due are counted
     left = [r['id'] for r in due(session, plan)] + [x[3]['id'] for x in starts_due(session, plan)]
     failed = components_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent
-    return {'recorded': recorded, 'refused': refused, 'left': left + takes_left,
+    return {'recorded': recorded, 'refused': refused, 'left': left + takes_left, **na_log(na),
             'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else '' if takes_left else LOOKS_NONE] + ([takes_.waits_words(session, plan, take_rows)] if takes_left else []) + failed).strip()}
 
 

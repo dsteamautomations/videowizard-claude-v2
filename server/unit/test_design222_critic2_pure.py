@@ -275,6 +275,12 @@ def test_16_the_cause_is_the_still_its_card_comes_first_then_the_take_with_no_sh
     new = still_made(store, conn)
     s = saved(store)
     plan_ = V.current_plan(store, s)
+    # release 1, A1 (SK, 20 Nov 2026): the new still is checked by Claude's look first; its card comes with the look
+    assert states(s, plan_, conn.takes) == [('VS1', 'being checked by Claude')] and CF._guide_items(CF._ctx(conn, store, USER, NEW, [])) == []
+    row = next(x for x in P.looks_due(store, NEW, [], conn.takes)['pictures'] if x['ref'] == new)
+    answers = [{'id': l['id'], 'pass': True, 'seen': 'As the drawing shows.' if l.get('say') else ''} for l in row['lines']]
+    assert P.record_looks(store, USER, NEW, [], [{'ref': new, 'sha10': row['sha10'], 'lines': answers}], 'helper', conn.takes)['recorded'] == [new]
+    s = saved(store)
     assert states(s, plan_, conn.takes) == [('VS1', 'waiting for you in the chat')]                 # E30: its still's card waits
     assert [i['kind'] for i in CF._guide_items(CF._ctx(conn, store, USER, NEW, []))] == ['still']
     G.approve_still(conn, store, USER, NEW, [], 'VS1', new, 'sha-still', 'Yes.')
