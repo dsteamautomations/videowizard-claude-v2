@@ -1706,6 +1706,10 @@ def _waiting_items(ctx):
                 return out
             ask = (f"{ids[0]}: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?" if len(ids) == 1 else
                    f"{', '.join(ids)}: the drawing as it stands at the end of each of these shots, in order, before any motion is added. Are they right?")
+            last = lambda sid, st: next((c for c in reversed((session.get('motion_checks') or {}).get(sid) or []) if c.get('still') and c.get('sha256') == st.get('sha256')), None)
+            bare = [sid for sid, st in zip(ids, sts) if last(sid, st) and not last(sid, st).get('rules')]
+            if bare:   # release 2, F10: the still passed with nothing checked (no rule of its list is one a still can show): the card says so
+                ask += ' No rule could be checked on ' + ('this still' if len(ids) == 1 else 'the still of ' + ', '.join(bare)) + ': judge it by eye.'
             items.append(_item(f"still-end:{it}:{hashlib.sha256(''.join(st['png'] for st in sts).encode()).hexdigest()[:10]}", 'still end-frame', where, ask, run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the still, in their words.')],
                                show=[{'key': st['frame_key'], 'name': f'{sid}-still-end.png'} for sid, st in zip(ids, sts)]))

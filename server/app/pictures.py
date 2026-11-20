@@ -779,7 +779,9 @@ def rule_id(text):
     return hashlib.sha1(' '.join(str(text or '').split()).lower().encode('utf-8')).hexdigest()[:8]
 
 
-RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*(?:\(\s*(still|motion)?\s*,?\s*(?:with\s+([A-Za-z0-9_-]+))?\s*\))?[*_]*\s*:\s*[*_]*\s*', re.I)
+_MARK = r'(?:(still|motion)|with\s+([A-Za-z0-9_-]+))?'   # release 2, F13: the two pieces of a mark, in either order, with a comma or a semicolon
+RULE_CLASS = re.compile(r'[*_]*(must|should)[*_]*\s*(?:\(\s*' + _MARK + r'\s*[,;]?\s*' + _MARK + r'\s*\))?[*_]*\s*:\s*[*_]*\s*', re.I)
+RULE_MARKED = re.compile(r'[*_]*(must|should)[*_]*\s*\([^)]*\)[*_]*\s*:', re.I)   # F13: a class, brackets and a colon left at the start of a rule's words: a mark that was not read
 
 
 def rules_of(text):
@@ -794,8 +796,9 @@ def rules_of(text):
         if m:
             c = RULE_CLASS.match(m.group(1))
             words = ' '.join(m.group(1)[c.end() if c else 0:].split())
-            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must', **({'shows': c.group(2).lower()} if c and c.group(2) else {}),
-                                           **({'with': c.group(3)} if c and c.group(3) else {})})
+            shows, other = (c.group(2) or c.group(4), c.group(3) or c.group(5)) if c else (None, None)
+            out.setdefault(rule_id(words), {'id': rule_id(words), 'rule': words, 'class': c.group(1).lower() if c else 'must', **({'shows': shows.lower()} if shows else {}),
+                                           **({'with': other} if other else {})})
     return list(out.values())
 
 

@@ -6113,6 +6113,8 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
          'brief-lines.json is not the brief\'s lines as `vw motion brief` wrote them: run `vw motion brief --shot ' + shot_id + '` again, read the rules again, then upload.')
     lines = brief_lines or motion_brief(store, run, outputs, shot_id)['lines']   # design/221 S3: the brief the rules were written from, line by line
     held = pictures.rules_of(rules_text)
+    odd = next((h['rule'] for h in held if pictures.RULE_MARKED.match(h['rule'])), None)   # release 2, F13: a mark the server cannot read is never kept as the rule's words
+    need(not odd, RULE_MARK.format(shot=shot_id, rule=odd))
     cmp = comparing(session, plan, held)
     lost = next((c for c in cmp.values() if c['state'] == 'closed' and c['with'] not in ever_drawn(store, session)), None)   # the critic's point 3: a mistyped id never drops a must
     need(not lost, WITH_UNKNOWN.format(shot=shot_id, rule=(lost or {}).get('rule'), other=(lost or {}).get('with'), ids=', '.join(drawn_ids(plan, session))))
@@ -6178,6 +6180,8 @@ def comparing(session, plan, held):
 
 WITH_UNKNOWN = ('{shot}: the rule "{rule}" compares with {other}, which is not a drawn shot of this plan and was in no earlier version of it. The drawn shots are {ids}: '
                 "correct the id in the rule's mark (`with <shot id>`) in rules.md, then upload again.")
+RULE_MARK = ('{shot}: the mark of the rule "{rule}" cannot be read, so the rule would lose it. A rule starts with `must:` or `should:`, and its mark is one of `(still)`, '
+             '`(motion)`, `(still, with <shot id>)`, `(motion, with <shot id>)`: correct it in rules.md, then upload again.')   # release 2, F13
 
 
 def ever_drawn(store, session):
@@ -7078,7 +7082,8 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     need(not blind, MOTION_RULE_NEED.format(shot=shot['id'], rule=str(blind[0])[:160] if blind else ''))
     bare_na = [r['rule'] for r in rules if r['pass'] == NA and not str(r.get('why') or '').strip()]
     need(not bare_na, MOTION_RULE_NA.format(shot=shot['id'], rule=str(bare_na[0])[:160] if bare_na else ''))
-    marks ={h['id']: h.get('shows') for h in held}   # fix set B3: each rule is marked when it is written: a still can show it, or only motion shows it
+    marked = any(h.get('shows') for h in held)   # release 2, F9: in a list with marks, a rule with none is one a still can show, as `still_rules` gives it to the checker
+    marks = {h['id']: h.get('shows') or ('still' if marked else None) for h in held}   # fix set B3: each rule is marked when it is written: a still can show it, or only motion shows it
     if still:   # a still shows no motion: an answer to a rule only motion shows is not the still's, whatever it says. A rule with no mark (a list written
         # before the marks) keeps the hotfix of 19 Nov (VW-24): answered "not seen" on a still it is a rule left out, never a frame to fetch or "not seen twice"
         rules = [r for r in rules if marks.get(pictures.rule_id(r['rule'])) != 'motion' and (r['pass'] != NOT_SEEN or marks.get(pictures.rule_id(r['rule'])) == 'still')]
@@ -7108,7 +7113,7 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
         need(not unknown, MOTION_RULE_UNKNOWN.format(shot=shot['id'], rule=str(unknown[0])[:160] if unknown else ''))
         open_before = [e['rule'] for i, e in earlier.items() if later and not settled(e) and i not in got]   # release 1, A3: a rule that did not apply is not asked again
         need(not open_before, MOTION_RULE_FAILED_BEFORE.format(shot=shot['id'], n=len(open_before), rule=str(open_before[0])[:160] if open_before else ''))
-        skipped = [h['rule'] for h in held if (not still or (h.get('shows') == 'still' and h.get('class') != 'should'))   # row 3, fix set B3: a still answers the musts marked as ones a still can show; an unmarked list, any of them
+        skipped = [h['rule'] for h in held if (not still or (marks[h['id']] == 'still' and h.get('class') != 'should'))   # row 3, fix set B3: a still answers the musts marked as ones a still can show; an unmarked list, any of them
                    and h['id'] not in out_ and h['id'] not in got and not (h['id'] in earlier and (same or settled(earlier[h['id']])))]
         need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
         rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held
@@ -7316,7 +7321,7 @@ def picture_file(store, run, session, rid):
     """Fix set B1 (defect 55, 19 Nov 2026): where this picture's file is: the key its record names (an approved drawing is kept under
     visuals/drawings/), else <run>/visuals/references/<id>.png; '' when no file is there. The brief and the fetch both ask this."""
     for k in (((session.get('references') or {}).get(rid) or {}).get('key'), key(run, f'references/{rid}.png')):
-        if k and store.exists(k):
+        if k and k.startswith(f"{run['id']}/") and store.exists(k):   # release 2, F14: a record naming a file of another run is treated as missing
             return k
     return ''
 
