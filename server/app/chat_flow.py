@@ -1630,14 +1630,15 @@ def _waiting_items(ctx):
                 if choice == 'yes':
                     out = V.approve_reference(store, user, run, outputs, ref['id'], ref['sha256'], quote, conn)
                     if ref.get('parent_wanted'):   # fix set A2.2: one answer, the operator's: approved, and allowed as the parent of new pictures
-                        faults = P.check_view(session, ref, plan)['faults']
+                        view = P.check_view(session, ref, plan)
+                        faults = view['faults']
                         _decided(conn, run, user, f"picture {ref['id']}", 'fix set A2.2 (a picture another picture is made from, approved in the chat)',
-                                 'approved, also as the parent of new pictures' + (", although Claude's check failed a must line: " + ' '.join(faults) if faults else ''), quote)
+                                 'approved, also as the parent of new pictures' + (P._named(", although Claude's check failed a must line: ", view.get('who')) + ' '.join(faults) if faults else ''), quote)   # release 1, A2: who checked
                     return out
                 return V.reject_reference(store, user, run, outputs, ref['id'], '' if choice == 'no' else words, quote)   # design/217 (F4): a bare No carries no reason
             if line:   # design/217: the style sheet and a still say the page's words in the chat too (F1: the check from Claude's look and the program's lines)
                 faults = line['check']['faults'] if ref.get('parent_wanted') else None   # fix set A2.2: the card says plainly what its Yes carries
-                early = '' if faults is None else '- ' + (P.W['parent_card_failed'].format(lines=' '.join(faults)) if faults else P.W['parent_card']) + '\n'
+                early = '' if faults is None else '- ' + (P._named(P.W['parent_card_failed'].format(lines=' '.join(faults)), line['check'].get('who')) if faults else P.W['parent_card']) + '\n'
                 item = _item(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", 'picture', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_,
                              [_button(b['label'], b['choice'], words=b['needs_words'], tell='Ask the operator what to correct.' if b['needs_words'] else '') for b in line['buttons']],
                              text=early + P.chat_text(line), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
@@ -1815,6 +1816,8 @@ def _guide_items(ctx):
             continue
         title = shots[sid].get('title') or sid
         still = next((s for s in g.get('stills') or [] if s.get('status') == 'candidate' and s.get('guide_sha256') == g['sha256'] and s.get('key')), None)
+        if still and not P.start_offered(session, still):
+            continue   # release 1, A1: step 7's still is checked by Claude's look first; its card comes with the look, or after 30 minutes as not checked
         if still:
             def run_(choice, quote, words, sid=sid, still=still):
                 if choice == 'approve':
@@ -1823,7 +1826,8 @@ def _guide_items(ctx):
             show = ([{'key': still['overlay_key'], 'name': f'{sid}-still-on-the-guide.png'}] if still.get('overlay_key') else []) + [{'key': still['key'], 'name': f'{sid}-still.png'}]
             items.append(_item(f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',
                                f'{title}: this still starts the shot. On the first picture, does every person and thing sit on the red outlines?', run_,
-                               [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show))
+                               [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show,
+                               text=P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else ''))   # the check's line and its warnings: the operator may approve against them
             continue
         if not g.get('take_prompt') or sid in session['selections']:
             continue

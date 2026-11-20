@@ -75,11 +75,22 @@ def start(s):
     s['references']['s-street-1']['role'] = 'start'
 
 
+def test_a_start_picture_of_a_v2_film_is_no_longer_checked_by_the_model(monkeypatch):
+    s = making()
+    start(s)
+    monkeypatch.setattr(IC, 'run_check', boom)
+    store, job, result, due = finalize(monkeypatch, s, extra=0)
+    r = saved(store)['references']['s-street-1']
+    assert due is True and 'check_pending' not in r and r['ready_at'] and 'model' not in r['check']   # release 1, A1: Claude's look, the program's code lines only
+
+
 def sheet_alone(s):
     s.pop('round')
 
 
-CASES = {'the start picture of a video shot': (start, 0),   # design/217 (C1): a still of a shot of a v2 film is Claude's now (test_design217_server_pure) 'a set of an older round': (lambda s: s['round'].pop('v'), 2),
+# design/217 (C1): a still of a shot of a v2 film is Claude's (test_design217_server_pure); release 1, A1 (SK, 20 Nov 2026): a start or end picture too
+# (test_rel1a_who_checks_pure): no picture of steps 6 and 7 of such a film goes to the model. What is left to the model here: a set of an older round, a sheet with no round.
+CASES = {'a set of an older round': (lambda s: s['round'].pop('v'), 2),
          "a person's sheet with no round": (sheet_alone, 2)}
 
 

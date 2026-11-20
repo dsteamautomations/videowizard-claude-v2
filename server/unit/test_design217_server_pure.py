@@ -64,8 +64,8 @@ def all_pass(listed, say='As the picture shows.'):
 def test_c1_a_still_a_step_the_style_sheet_and_a_component_of_a_v2_film_are_claudes_and_nothing_else_is():
     s, p = session(), plan(shot('S1'), shot('V1', 'video'))
     assert all(P.claude_checks(s, ref('x', k), p) for k in ('keyframe', 'state', 'style', 'component'))
-    assert not P.claude_checks(s, ref('x', 'keyframe', 'V1'), p)                         # an AI video's start image: step 7, untouched (C7)
-    assert not P.claude_checks(s, ref('x', 'keyframe', role='start'), p)
+    # release 1, A1 (SK, 20 Nov 2026): a start or end picture is Claude's too (until then C7 left it to the model, and with it every still: each keyframe carries a role)
+    assert P.claude_checks(s, ref('x', 'keyframe', 'V1'), p) and P.claude_checks(s, ref('x', 'keyframe', role='start'), p)
     assert not P.claude_checks(s, ref('x', 'sheet', set='x'), p) and not P.claude_checks(s, ref('x', 'frame'), p)   # sets (design/214) and footage
     assert not P.claude_checks(session(v=1), ref('x'), p)                                  # an older film keeps the check of before
 

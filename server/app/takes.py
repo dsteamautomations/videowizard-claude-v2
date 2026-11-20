@@ -308,6 +308,8 @@ def _state(session, plan, sh, take_rows, now):
         return ('done' if offered(session, j, now) else 'checking'), j, seen
     if not g:
         return 'none', None, False
+    if any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') and not P.start_offered(session, s, now) for s in g.get('stills') or []):
+        return 'checking', None, False   # release 1, A1: the shot's still waits for Claude's look; its card comes after
     if _card_waits(g) or _ready_to_shoot(g):
         return 'chat', None, False   # a card waits in the chat: the layout drawing, the still, or the word to make the take
     return 'making', None, False

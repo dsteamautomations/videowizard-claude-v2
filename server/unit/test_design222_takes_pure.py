@@ -92,7 +92,7 @@ def test_a_film_with_no_ai_video_has_no_step_7(held):
 @pytest.mark.parametrize('change, rows, state', [
     (lambda s: None, [], 'not started'),
     (lambda s: s['guides'].update(S1=guide(drawing='proposed', still=None, prompt=False)), [], 'waiting for you in the chat'),        # the layout drawing's card
-    (lambda s: s['guides'].update(S1=guide(still='candidate', prompt=False)), [], 'waiting for you in the chat'),                   # the still's card
+    (lambda s: (s['guides'].update(S1=guide(still='candidate', prompt=False)), s['guides']['S1']['stills'][0].update(look={'sha256': 's' * 64, 'lines': []})), [], 'waiting for you in the chat'),   # the still's card, once Claude looked at it (release 1, A1)
     (lambda s: s['guides'].update(S1=guide()), [], 'waiting for you in the chat'),                                                  # the word to make the take
     (lambda s: s['guides'].update(S1=guide(still=None, prompt=False)), [], 'being made'),
     (lambda s: s['guides'].update(S1=guide()), [job('j1', status='running')], 'being made'),
@@ -100,6 +100,7 @@ def test_a_film_with_no_ai_video_has_no_step_7(held):
     (lambda s: (s['guides'].update(S1=guide()), s['take_checks'].update(j1=rec(look=look()))), [job('j1')], 'made and checked'),
     (lambda s: (s['guides'].update(S1=guide()), s['take_checks'].update(j1=rec(blocked='the guide came back unedited'))), [job('j1')], 'waiting for you in the chat'),
     (lambda s: s['guides'].update(S1=guide()), [job('j1', status='failed')], 'could not be made'),
+    (lambda s: s['guides'].update(S1=guide(still='candidate', prompt=False)), [], 'being checked by Claude'),                      # release 1, A1: the still waits for Claude's look; then its card
     (lambda s: (s['guides'].update(S1=guide()), s['selections'].update(S1={'job_id': 'j1'})), [job('j1')], 'answered'),
     (lambda s: (s['guides'].update(S1=guide()), s['take_checks'].update(j1=rec(look=look())), s['reviews'].update(j1=[{'decision': 'rejected', 'notes': 'x'}])), [job('j1')], 'waiting for you in the chat'),
     (lambda s: (s['guides'].update(S1=guide(again={'job_id': 'j1', 'words': 'x'})), s['reviews'].update(j1=[{'decision': 'rejected', 'notes': 'x'}])), [job('j1')], 'being redone'),

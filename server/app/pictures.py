@@ -70,6 +70,8 @@ W = {
     'all_na_rules': 'Not fact-checked: every rule was answered "does not apply". Judge it by eye.',
     'by':'Claude looked at the picture against its list of {n} lines.', 'by_steps': 'Claude looked at each step against its list: {ns} lines.',
     'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
+    # release 1, A2: who really checked. A picture the model checked before Claude's look took over keeps that check and says so: never "Claude's check" over a model's result
+    'who_model': 'An earlier check by Gemini 3.8 Flash', 'who_mixed': 'The checks', 'check_head_step_model': "Gemini 3.8 Flash's check of step {n}:",
     'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
     'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
     'fact_none': 'Not fact-checked yet.', 'fact_stale': 'Fact check: not passed. The brief changed after its rules were written:',
@@ -162,6 +164,7 @@ LOOK_HOW = {
               '`earlier` is the picture this one was made again from; `step before` is the previous step of a graphic.',
               'Exact words are read letter for letter. A face that matches a person of the footage fails "a real face". Anything the request did not ask for fails "nothing extra".',
               'Never pass a line you did not look at. A picture you could not open is `not_checked`, with why, and then has no lines.',
+              'A row of kind `start` is the still an AI video shot starts from: its `overlay` input shows it under the red outlines of the layout, its `layout` input is the layout alone.',
               'The light, the fine detail and the size are measured by the program: they are not your lines.', V.NA_HOW],
     'file': {'by': 'assistant | helper',
              'pictures': [{'ref': '<the picture id>', 'sha10': '<the first 10 characters of its sha256, as listed>',
@@ -198,6 +201,11 @@ def all_na(look):
     return bool(rows) and all(l.get('pass') == V.NA for l in rows)
 
 
+def _named(text, who):
+    """Release 1, A2: a sentence of the check with who really checked: Claude (as written), the model before this release ('model'), or both ('mixed': the steps of one graphic)."""
+    return str(text).replace("Claude's check", W['who_' + who]) if who else text
+
+
 def _and(items):
     items = [str(x) for x in items]
     return items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' and ' + items[-1]
@@ -211,7 +219,8 @@ def _plain_cost(text):
 # ---------- which pictures Claude checks (C1) ----------
 
 def video_shot(session, plan, ref):
-    """True when the picture is made for an AI video shot (its start or end image, step 7): never Claude's step-6 check."""
+    """True when the picture is a start or end picture, or is made for an AI video shot. (Until release 1 this kept a picture from Claude's
+    check; every keyframe carries the role `start` or `end`, so it kept every still from it. Now it only says which question stays in the chat.)"""
     if ref.get('role') in ('start', 'end') or ref.get('pending_end'):
         return True
     shot = _scene_of(plan, session, ref)[1] if plan else None
@@ -220,8 +229,9 @@ def video_shot(session, plan, ref):
 
 def claude_checks(session, ref, plan=None):
     """C1: this picture is checked by Claude's look, not by a model on the server: a still, a step of a graphic, the style sheet, a component
-    or a remade one of these, of a film whose round is v2. Never a picture of a set (design/214), a footage picture, or an AI video's start."""
-    return (V.round_v2(session) and ref.get('kind') in LOOK_KINDS and not ref.get('set') and not (ref.get('kind') == 'keyframe' and video_shot(session, plan, ref)))
+    or a remade one of these, of a film whose round is v2. Never a picture of a set (design/214) or a footage picture.
+    Release 1, A1 (SK, 20 Nov 2026): a start or end picture too: no picture of steps 6 and 7 goes to the model check. (`plan` is no longer read.)"""
+    return bool(V.round_v2(session) and ref.get('kind') in LOOK_KINDS and not ref.get('set'))
 
 
 def _line(check, pass_when, say=False):
@@ -346,10 +356,38 @@ def stamp(session, plan):
     return changed
 
 
+START_ON_LAYOUT = ('on the layout', "every person and thing sits where the layout puts it: on the overlay sent with it, on the red outlines of the guide's first frame")
+
+
+def start_lines(session, plan, shot, still):
+    """Release 1, A1 (SK, 20 Nov 2026): the check list of step 7's still (the start picture of an AI video shot) for Claude's look. What it was
+    judged on until now, by the operator alone on its overlay: every person and thing on the red outlines of the layout; the facts of the drawn
+    things among its inputs (the request's "What must be true", guide._drawn_facts); then the fixed lines of every made picture."""
+    from . import guide
+    return ([_line(*START_ON_LAYOUT)] + [_line('drawn fact: ' + f, f'the picture shows it as the approved drawings do: {f}', True) for f in guide._drawn_facts(session, still.get('inputs') or [])]
+            + [_line(l['check'], l['pass_when']) for l in image_check.FIXED])
+
+
+def starts_due(session, plan):
+    """Release 1, A1: the stills of step 7 that wait for Claude's look: [(name, shot, the guide's entry, the still)]: a finished candidate made from
+    the guide as it is, with no look of its content yet. Only on a film whose round is v2, as every picture Claude checks."""
+    if not plan or not V.round_v2(session):
+        return []
+    from . import takes
+    return [(takes.name_of(gap, sh, n, of), sh, g, st) for gap, sh, n, of in takes.video_shots(plan, session) for g in [(session.get('guides') or {}).get(sh['id']) or {}]
+            for st in g.get('stills') or [] if st.get('status') == 'candidate' and st.get('key') and st.get('sha256') and st.get('guide_sha256') == g.get('sha256') and not looked(st)]
+
+
+def start_offered(session, still, now=None):
+    """Release 1, A1: step 7's still is shown to the operator with its look recorded, or PICTURE_LOOK_MINUTES after Claude was asked (as not
+    checked): as a picture of step 6 (`offered`). On a film of the older round: at once, as before."""
+    return not V.round_v2(session) or bool(looked(still)) or late(still, now)
+
+
 def asked(session, plan):
     """C3: the first time Claude is asked to check a picture (listed by `looks_due`, or said by `waits_words`), it gets `asked_at`. True when the session changed."""
     changed = False
-    for r in due(session, plan):
+    for r in due(session, plan) + [x[3] for x in starts_due(session, plan)]:
         if not r.get('asked_at'):
             r['asked_at'] = _now().isoformat()
             changed = True
@@ -380,7 +418,7 @@ def waits_words(session, plan):
     """The first thing `next` and `status` say while pictures wait for Claude's look (C2: the duty is never silent), then each failed component.
     Stamps `asked_at` on the pictures it reports (the caller saves the session)."""
     asked(session, plan)
-    n = len(due(session, plan))
+    n = len(due(session, plan)) + len(starts_due(session, plan))   # release 1, A1: with the stills of step 7
     return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + components_failed(session, plan))
 
 
@@ -425,7 +463,12 @@ def looks_due(store, run, outputs, take_rows=None):
         out.append({'ref': r['id'], 'sha10': str(r['sha256'])[:10], 'kind': r.get('kind'), 'name': name_of(session, plan, r), 'shot_id': V.made_for(session, r),
                     **({'n': step_of(session, r)} if r.get('kind') == 'state' else {}), 'key': _big(store, session, r['id']),
                     'inputs': [{**i, 'key': _big(store, session, i['ref'])} for i in inputs], 'request': (r.get('generation') or {}).get('prompt') or '', 'lines': lines(session, plan, r)})
-    some = any(p['kind'] == 'take' for p in out)   # the critic's S8: the takes have their own helper, named in this answer
+    for name, sh, g, st in starts_due(session, plan):   # release 1, A1: step 7's still: the picture, its overlay on the layout, the layout alone, the pictures it was made from
+        out.append({'ref': st['id'], 'sha10': str(st['sha256'])[:10], 'kind': 'start', 'name': name, 'shot_id': sh['id'], 'key': st['key'],
+                    'inputs': [{'ref': role, 'role': role, 'key': k} for role, k in (('overlay', st.get('overlay_key')), ('layout', (g.get('render') or {}).get('frame1_key'))) if k]
+                              + [{'ref': i['id'], 'role': 'parent', 'key': _big(store, session, i['id'])} for i in st.get('inputs') or [] if i.get('id') in session['references']],
+                    'request': st.get('prompt') or '', 'lines': start_lines(session, plan, sh, st)})
+    some =any(p['kind'] == 'take' for p in out)   # the critic's S8: the takes have their own helper, named in this answer
     then = ' '.join(x for x in (LOOKS_THEN if any(p['kind'] != 'take' for p in out) else '', takes.W['looks_then'] if some else '') if x) or LOOKS_NONE
     return {'pictures': out, 'then': then, 'how': LOOK_HOW, **({'how_take': TAKE_LOOK_HOW} if some else {})}
 
@@ -463,6 +506,14 @@ TAKE_LOOK_HOW = {
     'file': 'The same file as for pictures: one row per take with its `ref`, its `sha10` as listed, and one answer per line: {id, pass, seen, at_s}; `pass` is true, false or "na".'}
 
 
+def _look(sha, want, sent, who, at):
+    """A picture's look as it is stored: who, when, the content it is of, and each line's answer by the list's own order; or why it was not opened."""
+    why = ' '.join(str(sent.get('not_checked') or '').split())
+    got = {a.get('id'): a for a in sent.get('lines') or [] if isinstance(a, dict)}
+    return {'who': who, 'at': at, 'sha256': sha,
+            **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': ' '.join(str(got[w['id']].get('seen') or '').split())} for w in want]})}
+
+
 def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
     """`POST /api/runs/{run_id}/visuals/pictures/looks`: each picture's look, line by line (contract 5.4, 5.5). A refused picture records
     nothing; the others record. Returns {recorded: [ref], refused: {ref: message}, left: [ref], then}."""
@@ -482,6 +533,17 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             else:
                 recorded.append(rid)
             continue
+        start = next((x for x in starts_due(session, plan) if x[3]['id'] == rid), None) if rid not in session['references'] else None
+        if start:   # release 1, A1: the look of step 7's still, kept on the still
+            name, sh, _g, st = start
+            want = start_lines(session, plan, sh, st)
+            fault = PIC_LOOK_GONE.format(name=name) if not p.get('sha10') or str(st['sha256'])[:10] != str(p['sha10'])[:10] else _fault(name, want, p)
+            if fault:
+                refused[rid] = fault
+            else:
+                st['look'] = _look(st['sha256'], want, p, who, at)
+                recorded.append(rid)
+            continue
         r = session['references'].get(rid) or {}
         name = name_of(session, plan, r) if r else rid
         if not (r.get('status') == 'candidate' and r.get('sha256') and claude_checks(session, r, plan) and str(r['sha256'])[:10] == str(p.get('sha10') or '')[:10] and p.get('sha10')):
@@ -493,10 +555,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             refused[rid] = fault
             continue
         why = ' '.join(str(p.get('not_checked') or '').split())
-        got = {a.get('id'): a for a in p.get('lines') or [] if isinstance(a, dict)}
-        r['look'] = {'who': who, 'at': at, 'sha256': r['sha256'],
-                     **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': ' '.join(str(got[w['id']].get('seen') or '').split())}
-                                                               for w in want]})}
+        r['look'] = _look(r['sha256'], want, p, who, at)
         recorded.append(rid)
         if r.get('kind') == 'component' and not why and not _failed_lines(r) and not all_na(r['look']):   # the program's advice lines (transparency, light) never decide it; release 1, A5: nor a list where nothing applied
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
@@ -504,7 +563,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
     V.save_session(store, run, session)
     from . import takes as takes_
     takes_left = [str(row[4]['id']) for row in takes_.due(session, plan, take_rows)]   # the critic's S8: the takes still due are counted
-    left = [r['id'] for r in due(session, plan)]
+    left = [r['id'] for r in due(session, plan)] + [x[3]['id'] for x in starts_due(session, plan)]
     failed = components_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent
     return {'recorded': recorded, 'refused': refused, 'left': left + takes_left,
             'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else '' if takes_left else LOOKS_NONE] + ([takes_.waits_words(session, plan, take_rows)] if takes_left else []) + failed).strip()}
@@ -564,7 +623,8 @@ def check_view(session, ref, plan=None, now=None):
         return _view('none', W['none'], adv=adv)
     fails = [_say(l.get('check'), l.get('seen')) for l in rows if l.get('pass') is False and (l.get('weight') or 'must') == 'must' and l.get('check') != 'light and colour']
     passed = [_say(l.get('check'), l.get('seen') or l.get('check')) for l in rows if l.get('pass') is True]
-    return _view('fail' if fails else 'pass', W['fail'].format(problems=_problems(len(fails)), first=fails[0]) if fails else W['pass'], W['by_older'].format(n=len(rows)), fails, passed, adv)
+    head = _named(W['fail'].format(problems=_problems(len(fails)), first=fails[0]) if fails else W['pass'], 'model')   # release 1, A2: the heading names the model, as the small line does
+    return {**_view('fail' if fails else 'pass', head, W['by_older'].format(n=len(rows)), fails, passed, adv), 'who': 'model'}
 
 
 def steps_view(store, session, chain, plan=None, now=None):
@@ -580,7 +640,11 @@ def steps_view(store, session, chain, plan=None, now=None):
     counts = [len((looked(r) or {}).get('lines') or []) for r in chain]
     by = W['by_steps'].format(ns=_and(counts)) if any(counts) else ''
     na = [f'Step {n}: {x}' for n, v in enumerate(views, 1) for x in (v.get('na') or {}).get('lines') or []]   # release 1, A5
-    return {**_view(state, head, by, fails, passed, adv, na=na), '_views': views, '_alike': alike}
+    whos = {v.get('who') or 'claude' for v in views if v['state'] in ('pass', 'fail')}   # release 1, A2: who checked the steps: Claude, the model before this release, or both
+    who = 'model' if whos == {'model'} else 'mixed' if 'model' in whos else ''
+    if who:
+        head, by = _named(head, who), ' '.join(f"Step {n}: {v['by']}" for n, v in enumerate(views, 1) if v['by'])
+    return {**_view(state, head, by, fails, passed, adv, na=na), **({'who': who} if who else {}), '_views': views, '_alike': alike}
 
 
 def alike_steps(store, chain):
@@ -787,7 +851,7 @@ def picture_line(store, session, plan, ref, style=False, now=None):
     earlier = [_pic(t, W['earlier'].format(n=len(tries) - i), 'earlier', cmp_cap=W['earlier'].format(n=len(tries) - i), why=_why(t)) for i, t in enumerate(tries)]
     which = ORDINAL.get(len(tries) + 1, 'a new') if tries else 'a new'
     yes = {'label': W['yes_' + kind], 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_style'] if style else W['say_still'].format(at=w['at']),
-           **({'sure': {'ask': W['sure'].format(problems=_problems(len(check['faults']))), 'go': W['sure_go'], 'back': W['back']}} if check['state'] == 'fail' else {})}
+           **({'sure': {'ask': _named(W['sure'].format(problems=_problems(len(check['faults']))), check.get('who')), 'go': W['sure_go'], 'back': W['back']}} if check['state'] == 'fail' else {})}
     no = {'label': W['no'], 'choice': 'no', 'act': 'again', 'needs_words': False,
           'say': W['say_no_style'] if style else (W['say_no_still_n'].format(which=which) if tries else W['say_no_still'].format(which=which))}
     fix = _fix_button('correct', W['hint_style' if style else 'hint_still'], check['faults'], W['say_fix_' + kind])
@@ -813,7 +877,7 @@ def steps_line(store, session, plan, shot_id, chain, now=None):
     cap = lambda i: (W['step_cap'].format(n=i + 1, words=states[i]['words'], what=states[i].get('what_appears') or '') if i < len(states) and states[i].get('words') else
                      W['step_cap_bare'].format(n=i + 1, what=(states[i] if i < len(states) else {}).get('what_appears') or ''))
     steps = [_pic(r, W['step_label'].format(n=i + 1), 'step', n=i + 1, caption=cap(i), faults=views[i]['faults'],
-                  **({'check_head': W['check_head_step'].format(n=i + 1)} if views[i]['faults'] else {})) for i, r in enumerate(chain)]
+                  **({'check_head': W['check_head_step_model' if views[i].get('who') else 'check_head_step'].format(n=i + 1)} if views[i]['faults'] else {})) for i, r in enumerate(chain)]
     tries = [t for r in chain for t in earlier_tries(session, r)]
     earlier = [_pic(t, W['earlier_step'].format(s=step_of(session, t) or '?', n=1), 'earlier', cmp_cap=W['earlier_step'].format(s=step_of(session, t) or '?', n=1), why=_why(t)) for t in tries]
     sure = None
@@ -821,7 +885,7 @@ def steps_line(store, session, plan, shot_id, chain, now=None):
         bad = sorted({int(f.split(':')[0].split()[1]) for f in check['faults']})
         problems = f"{_problems(len(check['faults']))} in step{'s' if len(bad) > 1 else ''} {_and(bad)}" if bad else ''
         alike_w = (f", and steps {alike[0][0]} and {alike[0][1]} look almost the same" if problems else '') if alike else ''
-        sure = {'ask': W['sure_steps'].format(problems=problems, alike=alike_w, n=n) if problems else W['sure_steps_alike'].format(a=alike[0][0], b=alike[0][1], n=n),
+        sure = {'ask': _named(W['sure_steps'].format(problems=problems, alike=alike_w, n=n), check.get('who')) if problems else W['sure_steps_alike'].format(a=alike[0][0], b=alike[0][1], n=n),
                 'go': W['sure_steps_go'].format(n=n), 'back': W['back']}
     buttons = [{'label': W['yes_steps'].format(n=n), 'choice': 'yes', 'act': 'approve', 'needs_words': False, 'say': W['say_steps'].format(n=n, at=w['at']), **({'sure': sure} if sure else {})}]
     for k in range(1, n + 1):
