@@ -34,7 +34,8 @@ class Conn:
 
 
 def row(n, stage='visuals', shot='', status='open', log='the last lines'):
-    return {'id': n, 'stage': stage, 'log_excerpt': (core.SHOT_LINE + shot + '\n' if shot else '') + log, 'status': status}
+    """A row filed under the scope rule: its first line names its shot, else its step (the critic's point 6: a row without either is older)."""
+    return {'id': n, 'stage': stage, 'log_excerpt': (core.SHOT_LINE + shot + '\n' if shot else core.STEP_LINE + stage + '\n' if stage else '') + log, 'status': status}
 
 
 def write(defects, **about):
@@ -95,7 +96,7 @@ def test_the_shot_is_kept_in_the_first_line_of_the_log_excerpt_and_read_back(mon
     assert conn.inserted == (RUN_ID, 'visuals', 'the brief is refused', 'holds shot: S2\nline 1\nline 2', 'u1')   # the step it was filed in, when none is named
     assert core.defect_shot({'log_excerpt': conn.inserted[3]}) == 'S2'
     assert core.file_defect(conn, USER, {'id': RUN_ID}, 'voice', 'no sound', None) == {'ticket': 9, 'holds': {'stage': 'voice'}}
-    assert conn.inserted == (RUN_ID, 'voice', 'no sound', '', 'u1')            # no shot: the excerpt as it was sent
+    assert conn.inserted == (RUN_ID, 'voice', 'no sound', 'holds step: voice\n', 'u1')   # no shot: its step first (the critic's point 6), then the excerpt as it was sent
     assert core.defect_shot({'log_excerpt': 'a log that happens to say holds shot: S9 further down\nholds shot: S9'}) == ''   # only the first line, from its start
     assert core.defect_shot({'log_excerpt': None}) == ''
 

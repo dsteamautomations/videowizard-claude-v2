@@ -377,6 +377,7 @@ def test_f15_a_clean_drawing_the_operator_rejects_is_named_for_a_rebuild_with_th
     class One:   # the one render row, as the database gives it
         execute = lambda self, *a: self
         fetchone = lambda self: j
+        fetchall = lambda self: []   # no open defect (the critic's point 1 on release 3: review_take asks)
     out = VS.review_take(One(), store, USER, NEW, [], j['id'], 'rejected', 'the rods are too thin', '', 'Reject')
     assert out['decision'] == 'rejected' and 'for_the_assistant' not in out
     item = drawn(store, [j])['D1']

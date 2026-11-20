@@ -189,10 +189,15 @@ def defect_shot(row):
     return first[len(SHOT_LINE):].strip() if first.startswith(SHOT_LINE) else ''
 
 
+STEP_LINE = 'holds step: '   # the critic's point 6 on release 3: a defect filed under the scope rule with no shot says so; a row without either line is older
+
+
 def open_defect_rows(conn, run_id):
-    """Release 3, C6: the run's open defects with what each holds: its shot, else its step, else (a row with neither) every step."""
+    """Release 3, C6: the run's open defects with what each holds: its shot, else its step. A row written before the scope rule (no "holds" line
+    first in its log excerpt) holds every step, as it did when it was filed (the critic's point 6)."""
     rows = conn.execute("select id, stage, log_excerpt from vw2_defects where run_id=%s and status='open' order by id", (run_id,)).fetchall()
-    return [{'defect': r['id'], **({'shot': defect_shot(r)} if defect_shot(r) else {'stage': r['stage']} if r.get('stage') else {})} for r in rows]
+    step = lambda r: r.get('stage') and str(r.get('log_excerpt') or '').startswith(STEP_LINE)
+    return [{'defect': r['id'], **({'shot': defect_shot(r)} if defect_shot(r) else {'stage': r['stage']} if step(r) else {})} for r in rows]
 
 
 def open_defects(conn, run_id):
@@ -202,9 +207,9 @@ def open_defects(conn, run_id):
 def holds(defects, stage=None, shots=()):
     """Release 3, C6 (SK, 20 Nov 2026: "Block only what it names"): the open defects that hold a write. A defect that names a shot holds the
     writes that name that shot; one that names a step holds the writes of that step, and a write that states no step; a row with neither
-    (the older server) holds every write."""
+    (the older server) holds every write. `chain`: the shot and the drawings that continue from it (visuals_stage.held_chain), when known."""
     stages = stage if isinstance(stage, tuple) else (stage,) if stage else ()
-    return [d for d in defects if (d['shot'] in shots if d.get('shot') else not d.get('stage') or not stages or d['stage'] in stages)]
+    return [d for d in defects if (any(s in shots for s in d.get('chain') or [d['shot']]) if d.get('shot') else not d.get('stage') or not stages or d['stage'] in stages)]
 
 
 def holding(nxt, stage):
@@ -224,20 +229,30 @@ def load_run(conn, user, run_id, lock=False, stage=None, shots=()):
         raise Problem(404, 'NOT_FOUND', 'Run not found.')  # 404 so run ids are not probeable
     if lock:
         conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run_id),))
-        opened = holds(open_defect_rows(conn, run_id), stage, shots)   # design/48 O.2; release 3, C6: a write waits for the builder only when an open defect holds it
-        if opened:
-            raise Problem(409, 'DEFECT_OPEN', defect_open(opened[0]), defect=opened[0]['defect'], defects=[d['defect'] for d in opened],
-                          holds={k: opened[0][k] for k in ('shot', 'stage') if opened[0].get(k)})
+        need_free(open_defect_rows(conn, run_id), stage, shots)   # design/48 O.2; release 3, C6: a write waits for the builder only when an open defect holds it
     return row
+
+
+def need_free(defects, stage=None, shots=()):
+    """The refusal of a write an open defect holds (load_run, and visuals_stage.need_free for a write that acts on a shot)."""
+    opened = holds(defects, stage, shots)
+    if opened:
+        raise Problem(409, 'DEFECT_OPEN', defect_open(opened[0], shots), defect=opened[0]['defect'], defects=[d['defect'] for d in opened],
+                      holds={k: opened[0][k] for k in ('shot', 'stage') if opened[0].get(k)})
 
 
 DEFECT_OPEN = ('defect {n} is open on this run and holds {what}; the builder resolves it, then the run continues. Do not send this call again now: tell the operator, and '
                'send it once the builder says the defect is fixed.')   # fix set M6 (19 Nov 2026): the refusal ends with the next step; release 3, C6: and says what it holds
 DEFECT_OPEN_SHOT = ('defect {n} is open on this run and holds shot {shot} only; the rest of the run goes on. Do not send this call again now: tell the operator, go on with '
                     'the other shots, and send it once the builder says the defect is fixed.')
+DEFECT_OPEN_CHAIN = ('defect {n} is open on this run and holds shot {shot}; {via} continues from it and waits for it too, and the rest of the run goes on. Do not send this '
+                     'call again now: tell the operator, go on with the other shots, and send it once the builder says the defect is fixed.')   # the critic's point 2 on release 3
 
 
-def defect_open(d):
+def defect_open(d, shots=()):
+    via = next((s for s in shots if s != d.get('shot') and s in (d.get('chain') or ())), '') if d.get('shot') and d['shot'] not in shots else ''
+    if via:
+        return DEFECT_OPEN_CHAIN.format(n=d['defect'], shot=d['shot'], via=via)
     if d.get('shot'):
         return DEFECT_OPEN_SHOT.format(n=d['defect'], shot=d['shot'])
     return DEFECT_OPEN.format(n=d['defect'], what=f"the {d['stage']} step" if d.get('stage') else 'every step')
@@ -497,5 +512,5 @@ def file_defect(conn, user, run, stage, error, log_excerpt, shot=None):
     stage = stage or next_for(conn, run).get('stage')
     shot = ' '.join(str(shot or '').split())
     row = conn.execute('insert into vw2_defects(run_id, stage, error, log_excerpt, by_user) values (%s,%s,%s,%s,%s) returning id',
-                       (run['id'], stage, error, ((SHOT_LINE + shot + '\n' if shot else '') + (log_excerpt or ''))[:8000], user['id'])).fetchone()
+                       (run['id'], stage, error, ((SHOT_LINE + shot + '\n' if shot else STEP_LINE + stage + '\n' if stage else '') + (log_excerpt or ''))[:8000], user['id'])).fetchone()
     return {'ticket': row['id'], 'holds': {'shot': shot} if shot else {'stage': stage}}

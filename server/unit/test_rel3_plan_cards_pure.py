@@ -151,8 +151,7 @@ def test_a_question_about_a_thing_names_the_shots_that_show_it_and_the_thing_its
     store, sess, d = film(change(doc(), lambda s, _: s['D2'].update(element_ids=['E2'])))
     answered(sess, 'E2')
 
-    def edit(s, new):
-        s['D2'].update(purpose='the closing card with the supplied logo')
+    def edit(s, new):   # the critic's point 3: the thing's own record; a change of D2's words is asked (test_rel3b_critic_pure.py)
         next(e for e in new['elements'] if e['id'] == 'E2').update(requirements='the logo file the operator gave')
     V.new_version(store, RUN, sess, change(d, edit), USER, [], answers='E2')
     assert cards(store, sess) == [] and sess['accepted']['G2']['quote'] == 'Use the client logo'

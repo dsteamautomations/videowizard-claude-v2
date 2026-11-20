@@ -585,19 +585,22 @@ def _answered_for(session, item):
 
 def _named(session, plan, old, gap, item):
     """Release 3, C2: what the answered question names in this gap: (its shots, its thing). A question on a shot names that shot; on a thing, the
-    thing and the shots that show it (before or after the change); on a picture, the shot or the thing the picture is of."""
+    thing and the shots that show it in the plan in force (the critic's point 3: never a shot the change gives it); on a picture, the shot or the
+    thing the picture is of."""
     ref = (session.get('references') or {}).get(item) or {}
     item = ref.get('shot_id') or ref.get('element_id') or item
-    shots = [s for g_ in (old, gap) for sc in all_scenes(g_) for s in sc['shots']]
+    shots = [s for sc in all_scenes(old) for s in sc['shots']]
     if any(e['id'] == item for e in plan.get('elements') or []):
         return {s['id'] for s in shots if item in (s.get('element_ids') or [])}, item
     return {s['id'] for s in shots if s['id'] == item}, None
 
 
 def _own_without(plan, gap, shots, element):
-    """The gap's own content (as `gap_own_digest`) without these shots and this thing."""
+    """The gap's own content (as `gap_own_digest`) without these shots and this thing. With a thing (the critic's point 3 on release 3), its
+    shots stay but for the thing in their `element_ids`: a change to their type, timing, route or words is still a change."""
     g = note_free_gap(gap)
-    strip = lambda scenes: [{**sc, 'shots': [s for s in sc['shots'] if s['id'] not in shots]} for sc in scenes]
+    strip = lambda scenes: [{**sc, 'shots': [{**s, 'element_ids': [e for e in s.get('element_ids') or [] if e != element]} if element and s['id'] in shots else s
+                                             for s in sc['shots'] if element or s['id'] not in shots]} for sc in scenes]
     g = {**g, **({'scenes': strip(g['scenes'])} if g.get('scenes') else {}), **({'choices': [{**c, 'scenes': strip(c['scenes'])} for c in g['choices']]} if g.get('choices') else {})}
     used = {eid for sc in all_scenes(g) for s in sc['shots'] for eid in s['element_ids']} - {element}
     return digest({'gap': g, 'elements': note_free_elements([e for e in plan['elements'] if e['id'] in used])})
@@ -5877,6 +5880,7 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     quote = said(quote, 'Rejected' if decision == 'rejected' else 'Accepted', user)   # design/99 C3: a take's reason is optional
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('video', 'drawn')", (job_id, run['id'])).fetchone()   # design/113 E3: a drawing is reviewed like a take
     need(job and job['status'] == 'ready', 'Review a ready take.')
+    need_free(conn, store, run, [job['unit']])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     ev = job['result']['evidence']
     need(decision != 'accepted' or ev.get('timing_matches_placement') or (timing_notes or '').strip(), 'The take duration differs from the placement; explain in timing_notes before accepting.')
     review = {'id': digest({'job': str(job_id), 'decision': decision, 'notes': notes, 'at': datetime.now(timezone.utc).isoformat()}), 'decision': decision, 'notes': notes,
@@ -5929,6 +5933,7 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     quote = said(quote, 'Selected', user)   # design/99 C2
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('video', 'drawn')", (job_id, run['id'])).fetchone()   # design/113 E3: a drawing is reviewed like a take
     need(job and job['status'] == 'ready', 'Select a ready take.')
+    need_free(conn, store, run, [job['unit']])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     _no_question(session, job['unit'])   # design/110 rule 0
     if str(notes or '').strip():
         ev = job['result']['evidence']
@@ -6195,8 +6200,9 @@ def still_stale(store, session, st):
     return bool(row) and (st.get('parts') or {}) != (parts_in_force(session, motion.unpack(store.get(row['key']))).get('used') or {})
 
 
-def still_answer(store, user, run, outputs, shot_ids, ok, quote, words=''):
+def still_answer(store, user, run, outputs, shot_ids, ok, quote, words='', conn=None):
     """design/221 row 3: the operator's Approve of the still end-frame(s) of one card, or Reject with their words (the still is redone and asked again)."""
+    need_free(conn, store, run, shot_ids)   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = session_of(store, run, outputs)
     stills = session.get('motion_stills') or {}
     for sid in shot_ids:
@@ -6792,6 +6798,7 @@ def render_motion(conn, store, user, run, outputs, body):
     first, the spec approved when the shot has one; cached by the request's digest; free; reviewed and selected like a take."""
     from . import motion
     _motion_run(run)
+    need_free(conn, store, run, [body.get('shot_id')])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = session_of(store, run, outputs)
     shot, spec, files, request = _motion_request(store, session, run, body['shot_id'])
     _no_question(session, shot['id'])   # design/110 rule 0
@@ -6826,6 +6833,7 @@ def motion_finish(conn, store, user, run, outputs, shot_id, on):
     without (or with) the layer. One function for the page's button and `vw motion finish`. Free. A new take: the selection is not moved."""
     from . import motion
     _motion_run(run)
+    need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = session_of(store, run, outputs)
     shot, _spec, files, _request = _motion_request(store, session, run, shot_id)
     asked = motion.finish_of(files)[0]
@@ -7065,6 +7073,38 @@ def is_shot(store, run, outputs, shot_id):
         return False
 
 
+def held_chain(plan, session, shot):
+    """Release 3, C6: the held shot, then each drawing that continues from it (a chain): they wait for the same defect (held_line, need_free)."""
+    wait, grown = [shot], True
+    while grown:   # a chain: each drawing that continues one that waits
+        grown = False
+        for gap in plan['gaps']:
+            for sc in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])) if not gap.get('choices') or session['choice_selections'].get(gap['gap_id']) else []:
+                for s in sc['shots']:
+                    if s.get('visual_type') == 'drawn' and s['id'] not in wait and continues_from(plan, session, gap, s) in wait:
+                        wait.append(s['id'])
+                        grown = True
+    return wait
+
+
+def need_free(conn, store, run, shots):
+    """The critic's point 1 on release 3: the one guard of a write that acts on a shot, in the server functions every front end calls (the tool,
+    the chat's items and cards, the page): refused while an open defect holds the shot, or the drawing it continues from (point 2), or the step."""
+    from . import core
+    shots = [s for s in shots if isinstance(s, str) and s]
+    if conn is None or not shots:
+        return
+    rows = core.open_defect_rows(conn, run['id'])
+    if any(d.get('shot') for d in rows):
+        try:
+            session = session_of(store, run, [])
+            plan = current_plan(store, session)
+            rows = [{**d, 'chain': held_chain(plan, session, d['shot'])} if d.get('shot') else d for d in rows]
+        except (Problem, ValueError, KeyError, StopIteration, TypeError):
+            pass   # no plan to read: the named shot alone is held
+    core.need_free(rows, 'visuals', shots)
+
+
 def held_line(plan, session, defects):
     """Release 3, C6: the next-step sentence for each open defect that names a shot: the shot is held, the drawings that continue from it wait
     for it too, everything else goes on. '' when no open defect names a shot (a defect about a step refuses the call itself)."""
@@ -7072,15 +7112,7 @@ def held_line(plan, session, defects):
     for d in defects:
         if not d.get('shot'):
             continue
-        wait, grown = [d['shot']], True
-        while grown:   # a chain: each drawing that continues one that waits
-            grown = False
-            for gap in plan['gaps']:
-                for sc in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])) if not gap.get('choices') or session['choice_selections'].get(gap['gap_id']) else []:
-                    for s in sc['shots']:
-                        if s.get('visual_type') == 'drawn' and s['id'] not in wait and continues_from(plan, session, gap, s) in wait:
-                            wait.append(s['id'])
-                            grown = True
+        wait = held_chain(plan, session, d['shot'])
         out.append(f"Defect {d['defect']} is open on {d['shot']}: nothing more is sent for {d['shot']} until the builder says it is fixed. "
                    + (f"{', '.join(wait[1:])} continue{'s' if len(wait) == 2 else ''} from it and wait{'s' if len(wait) == 2 else ''} for it too. " if wait[1:] else '')
                    + 'Everything else goes on.')
@@ -7182,6 +7214,7 @@ def held_drawing(session, shot_id):
 def held_answer(conn, store, user, run, outputs, shot_id, job_id, choice, quote, words=''):
     """design/221 row 18: the operator's answer on a held drawing's card: select it anyway (with their reason, as select_take asks of a held
     drawing), reject it (rebuilt from round 1), or one more round (once: the server then takes round 4)."""
+    need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = session_of(store, run, outputs)
     rec = held_drawing(session, shot_id)
     need(rec, f'{shot_id}: no drawing of it is held now: run `vw visuals next`.')
@@ -7285,6 +7318,7 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     passed before may be left out (it keeps its pass); with `conn`, a label of this shot only that the latest check finds too short is a must."""
     from . import pictures
     _motion_run(run)
+    need_free(conn, store, run, [body.get('shot_id')])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = session_of(store, run, outputs)
     plan, gap, _scene, shot = guarded(lambda: locate(store, session, body.get('shot_id') or ''))
     sha = body.get('sha256') or ''

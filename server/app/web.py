@@ -430,6 +430,7 @@ def _visuals_act(code, vw2_session, body):
     with db_connect() as conn:
         run = _run_at(conn, user, code, 'visuals')
         store = storage()
+        V.need_free(conn, store, run, [body.get('shot_id')])   # the critic's point 1 on release 3: a page action on a shot an open defect holds
         outputs = core.current_outputs(conn, run['id'])
         calls = {
             'treatment': lambda: V.treatment(store, user, run, outputs, None, quote, accept=list(body.get('accept') or []), send_back=list(body.get('send_back') or []), notes=str(body.get('notes') or '')),   # design/124 Change 6

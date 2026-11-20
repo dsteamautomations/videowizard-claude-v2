@@ -1327,6 +1327,7 @@ def shots_of(body):
 
 def _visuals_run(conn, user, run_id, shots=()):
     run = core.load_run(conn, user, run_id, lock=True, stage='visuals', shots=shots)
+    visuals_stage.need_free(conn, storage(), run, shots)   # the critic's point 2 on release 3: and the drawings that continue from a held shot
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     nxt = core.next_for(conn, run)

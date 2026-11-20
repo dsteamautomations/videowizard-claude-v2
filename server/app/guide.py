@@ -107,6 +107,7 @@ def held_answer(conn, store, user, run, outputs, shot_id, sha256, choice, quote,
     """The operator's answer on a held layout (one flow: the chat's card calls this). `use`: the layout goes on as it is, against its check: it
     counts as checked and approved and its guide is rendered. `again`: three more rounds. `change`: their words on what the shot becomes; the
     next-step line (`takes.held_due`) says what the assistant does with them."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     need(g['sha256'] == sha256 and held(g), HELD_NOT)
@@ -231,6 +232,7 @@ def _ensure_drawing(store, run, session, g, spec):
 
 def drawing_verdict(conn, store, user, run, outputs, shot_id, sha256, approved, quote, notes=''):
     """The operator's verdict on a shot's drawing, by the scene it was made from: approved with their words, or a correction in words (the scene is then changed)."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     d = _ensure_drawing(store, run, session, g, VS.load_json(store, g['key']))
@@ -271,6 +273,7 @@ def carried(old):
 def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     """A helper's scene description for a shot: its shape, then every check that needs no Blender; refused before anything is rendered or paid.
     `overrides`: {'support': '<why>'} is the one refusal that can be overridden, with its reason on the record."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     plan, gap, scene, shot = VS.guarded(lambda: VS.locate(store, session, shot_id))
     need(route_of(shot) == 'video', f'{shot_id} is not an AI video shot; a guide is made only for AI video shots.')
@@ -326,6 +329,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
 
 def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, notes=''):
     """The double check of every guide (SK's requirement B4): a fresh checker's verdict on the check frames. The server counts the rounds; a pass queues the render."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     need(g['sha256'] == sha256, 'The scene changed since these frames were made; look at the frames of the current scene (`vw guide frames`).')
@@ -384,6 +388,7 @@ def _input(store, run, session, shot_id, p, people):
 def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, repair_of=None, region=None, look=None):
     """The still of a shot: GPT image 2.6 whatever the film's picture AI (SK, 10 Nov); Image 1 is the guide's first frame; then the given approved pictures,
     each with its job; the layout numbers are written by the server from the scene. With `repair_of` and `region`: a masked repair of one wrong part."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     VS._no_question(session, shot_id)
@@ -443,6 +448,7 @@ def _still(g, still_id):
 
 def approve_still(conn, store, user, run, outputs, shot_id, still_id, sha256, quote):
     """The operator approves the exact file, on the overlay. One approved still per guide."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     s = _still(g, still_id)
@@ -461,6 +467,7 @@ def approve_still(conn, store, user, run, outputs, shot_id, still_id, sha256, qu
 
 
 def reject_still(conn, store, user, run, outputs, shot_id, still_id, notes, quote):
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     s = _still(g, still_id)
@@ -499,6 +506,7 @@ def effective_prompt(g, words):
 
 def set_prompt(conn, store, user, run, outputs, shot_id, prompt):
     """The writer's words for the take, kept until the operator says Shoot. Refused when it carries what the tests showed to fail."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
     words = str(prompt or '').strip()
@@ -574,6 +582,7 @@ def cancel_order(conn, store, user, run, outputs, shot_id, quote):
 def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     """The operator's go-ahead: one Gemini edit of the guide. Refused while anything of the card is missing, while a take is open, and when nothing
     changed since the last take (the same request is never sent twice; `again` only after a take that came back as the guide itself or at the wrong length)."""
+    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     plan, gap, scene, shot = VS.guarded(lambda: VS.locate(store, session, shot_id))
     VS._no_question(session, shot_id)

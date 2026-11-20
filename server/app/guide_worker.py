@@ -196,6 +196,7 @@ BACKFILL = ("insert into vw2_jobs(run_id, stage, unit, provider, request, reques
             "where j.provider='guide' and j.status='queued' and j.request->>'kind'='guide-render' and not (j.request ? 'split') "
             "and not exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frame1' "
             "and n.request->>'sha256'=j.request->>'sha256')")
+BACKFILL_LOCK = "select pg_advisory_xact_lock(hashtext('vw2-guide-backfill'))"   # the critic's point 5 on release 4: workers tick at once; the second insert waits and sees the first's row
 
 
 def tick():
@@ -216,6 +217,7 @@ def tick():
         conn.execute(SUPERSEDE, (SUPERSEDED,))
     try:   # in a transaction of its own: this statement was never run against a database in the tests; its fault must not stop the lanes
         with connect() as conn:
+            conn.execute(BACKFILL_LOCK)
             conn.execute(BACKFILL)
     except Exception:
         import logging

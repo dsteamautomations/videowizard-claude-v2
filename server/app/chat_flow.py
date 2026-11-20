@@ -1717,7 +1717,7 @@ def _waiting_items(ctx):
             sts = [session['motion_stills'][sid] for sid in ids]
 
             def run_(choice, quote, words, ids=ids):
-                out = V.still_answer(store, user, run, outputs, ids, choice == 'approve', quote, words)
+                out = V.still_answer(store, user, run, outputs, ids, choice == 'approve', quote, words, conn=conn)
                 _decided(conn, run, user, 'shot ' + ', '.join(ids), 'design/221 row 3 (the still end-frame, approved in the chat)',
                          'the still end-frame approved' if choice == 'approve' else f'the still end-frame rejected: "{words}"', words or quote)
                 return out
