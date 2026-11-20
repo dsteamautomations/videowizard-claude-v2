@@ -149,9 +149,12 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     session = VS.session_of(store, run, outputs)
     plan, gap, scene, shot = VS.guarded(lambda: VS.locate(store, session, shot_id))
     need(route_of(shot) == 'video', f'{shot_id} is not an AI video shot; a guide is made only for AI video shots.')
+    upright = VS.vertical_video(run, {'gaps': [{'scenes': [{'shots': [shot]}]}]})   # release 1, C5: a plan from before the plan's own refusal: the same sentence, before anything is rendered or paid
+    need(not upright, ''.join(upright))
     VS._no_question(session, shot_id)
     wrong = G.problems(spec)
-    need(not wrong, 'The scene description cannot be built: ' + ' '.join(wrong[:6]) + (f' (and {len(wrong) - 6} more)' if len(wrong) > 6 else ''))
+    need(not wrong, 'The scene description cannot be built: ' + ' '.join(wrong[:6]) + (f' (and {len(wrong) - 6} more)' if len(wrong) > 6 else '')
+         + f' Correct the scene file and send it again (`vw guide scene --shot {shot_id} --file work/guide/{shot_id}/scene.json`).')   # release 1, D4: a refusal ends with the next step
     slot = _slot_seconds(session, shot)
     need(spec['seconds'] >= slot - 1e-6, f"The guide runs {spec['seconds']} s and the shot's slot is {slot:.1f} s: a take is made as long as its guide, a little longer than its slot, and trimmed.")
     rows = G.checks(spec, subjects=_people_of(plan, shot))

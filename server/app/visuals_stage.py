@@ -451,6 +451,20 @@ def carried_warnings(session, run, plan, outputs):
     return answer_warnings(plan, out)
 
 
+VERTICAL_VIDEO = ('{shots}: AI video is not built for a vertical film yet: the video AI makes its takes in the horizontal shape only. '
+                  'Make {these} a still, a drawn graphic or footage in the plan, then check the plan again.')
+
+
+def vertical_video(run, plan):
+    """Release 1, C5 (SK, 20 Nov 2026): vertical AI video is not built. The AI video shots of a film whose shape, or whose AI video shape, is
+    vertical, refused in one plain sentence (a refusal of the plan, not a warning); [] for a film with no AI video shot, a horizontal film,
+    a film from before the shape was recorded, or a shape not recorded yet."""
+    if film.older(run) or '9:16' not in (film.frame(run), film.frame(run, video=True)):
+        return []
+    ids = [sh['id'] for gap in plan['gaps'] for sc in all_scenes(gap) for sh in sc['shots'] if route_of(sh) == 'video']
+    return [VERTICAL_VIDEO.format(shots=', '.join(ids), these='this shot' if len(ids) == 1 else 'each of these shots')] if ids else []
+
+
 def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # design/89 A1, finding 3
@@ -460,6 +474,9 @@ def check(store, run, outputs, document):
                                        drawn_route(run) == 'motion', not film.older(run))   # design/89 B4; design/124-b item 13; design/130 §12; design/139 R3
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc), 'errors': list(getattr(exc, 'errors', None) or [str(exc)])}   # design/148 A1: every item's first failure, as a list too
+    upright = vertical_video(run, plan)   # release 1, C5: an AI video shot on a vertical film is refused here, at the plan, in one plain sentence
+    if upright:
+        return {'status': 'rejected', 'error': '\n'.join(upright), 'errors': upright}
     departed = _ways_departed(session, plan) if session.get('treatment') else []   # design/207: what only the proposal refused before, so a clean check means the proposal is taken
     if departed:
         return {'status': 'rejected', 'error': '\n'.join(departed), 'errors': departed}
@@ -486,6 +503,7 @@ def propose(conn, store, user, run, outputs, document):
     ensure_timing(store, run, session)   # saved with the proposal
     plan, warnings = guarded(lambda: validate_plan(_with_direction(session, document), session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
                                                    drawn_route(run) == 'motion', not film.older(run)))   # design/130 §12; design/139 R3; design/207: the Direction is placed by the server (the older refusal "starts from the treatment's Direction, word for word" is retired)
+    need(not vertical_video(run, plan), '\n'.join(vertical_video(run, plan)))   # release 1, C5: as the check refuses it
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     departed = _ways_departed(session, plan)   # a route that departs from the recorded treatment needs a new treatment, with the reason
     need(not departed, '\n'.join(departed))
