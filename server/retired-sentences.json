@@ -189,6 +189,10 @@
     "Nothing of this is asked one at a time during the builds.",
     "the server refuses every write on the run until the builder marks the defect fixed",
     "| 4. The guide is rendered | by the server, after a passing verdict; `vw guide status --shot S` | free, several minutes |",
-    "Then `vw motion render --shot S` (free; it checks the timing)."
+    "Then `vw motion render --shot S` (free; it checks the timing).",
+    "They show plain coloured boxes: box people with a black face mark and chest mark, the set as boxes.",
+    "The small black squares on box people show which way each person faces.",
+    "The small black squares on box people mark their face and chest, so they show which way each person faces.",
+    "the thin stripe down the side of each box person marks that person's side."
   ]
 }

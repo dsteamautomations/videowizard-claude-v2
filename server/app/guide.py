@@ -21,11 +21,15 @@ HOW = 'guide'   # the kind of attempt in the record of generations
 
 STILL_OPEN = ('The FIRST image is a rough 3D layout made of plain coloured boxes. Make ONE real photograph with EXACTLY the camera angle, lens, framing, positions, '
               'sizes and light and shadow directions of the first image. Never show the boxes; replace every box with the real thing described. The small black '
-              'squares on box people show which way each person faces. Every piece of the place stays exactly where its box is, at the same size.')
+              'squares on box people mark the face and chest, and the purple squares the back, so they show which way each person faces. '
+              'Every piece of the place stays exactly where its box is, at the same size.')
 TAKE_OPEN = ('Edit the video. It is a rough 3D blocking render made of plain coloured boxes. Turn it into real footage of the place, people and light in the image, '
              'in its exact look. The image is exactly the first frame. Keep every movement, path, position and timing of the video exactly, and keep the camera exactly '
              'as in the video (held still, tiny handheld drift). One continuous shot: no cuts, no zoom, real-time speed, no slow motion. The small black squares on box '
-             'people mark their face and chest, so they show which way each person faces. Never show the boxes; no 3D-render look, no captions, no subtitles.')
+             'people mark their face and chest, and the purple squares their back, so they show which way each person faces. Never show the boxes; no 3D-render look, no captions, no subtitles.')
+# layout B (SK, 20 Nov 2026): said only when the shot's video was rendered flat (its render records the look); the first frame and the still keep EEVEE's light
+FLAT_LINE = ('The video is drawn in flat colours with thin black outlines only to mark the layout; the footage shows neither: '
+             'its light, shadows and surfaces are those of the image.')
 LIGHT_LINE = 'Light stays exactly as in the image.'
 SILENCE_LINE = 'No dialogue. No extra sound effects.'
 REPAIR_OPEN = 'Change ONLY the transparent (masked) area: {words} Everything else stays exactly as it is: every person, face, object, position and the light.'
@@ -420,7 +424,7 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         need(len(inputs) <= still['max_inputs'], TOO_MANY.format(n=len(inputs), max=still['max_inputs']))
         roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2 + len(sheets))]
         facts = _drawn_facts(session, parents)
-        effective = '\n'.join(x for x in [STILL_OPEN, d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
+        effective = '\n'.join(x for x in [STILL_OPEN, marks_line(spec.get('marks'), 'image'), d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
                                           VS.size_line(*VS.guarded(lambda: VS.locate(store, session, shot_id))[::3]),   # design/207: (plan, shot): the size sentence, when size is the message
                                           RIGHT_HAND_WORDS if any(p.get('hands') for p in spec.get('people') or []) else '',
                                           ('What must be true:\n' + '\n'.join(f'- {f}' for f in facts)) if facts else '',
@@ -492,13 +496,19 @@ def prompt_problems(text):
     return out
 
 
+def marks_line(marks, of):
+    """The line that explains the band and the stripes of a guide, for the video or for the image made from its first frame; '' without them."""
+    marks = marks or {}
+    if not (marks.get('band') or marks.get('stripes')):
+        return ''
+    return f'How to read the {of}: ' + ' '.join((['the coloured band on the ground only marks where the walking line runs; it is not a thing in the place and is never shown.'] if marks.get('band') else [])
+                                               + (["the thin yellow stripe down the side of each box person marks that person's side."] if marks.get('stripes') else []))
+
+
 def effective_prompt(g, words):
-    """The prompt as sent: the fixed opening, the line that explains the marks when the guide has them, the writer's blocks, the two fixed closing lines."""
-    marks = g.get('marks') or {}
-    lines = [TAKE_OPEN]
-    if marks.get('band') or marks.get('stripes'):
-        lines.append('How to read the video: ' + ' '.join(([f'the coloured band on the ground only marks where the walking line runs; it is not a thing in the place and is never shown.'] if marks.get('band') else [])
-                                                         + (["the thin stripe down the side of each box person marks that person's side."] if marks.get('stripes') else [])))
+    """The prompt as sent: the fixed opening, the flat look explained when the video has it, the line that explains the marks when the guide has them,
+    the writer's blocks, the two fixed closing lines."""
+    lines = [TAKE_OPEN] + ([FLAT_LINE] if (g.get('render') or {}).get('look') == 'flat' else []) + [x for x in [marks_line(g.get('marks'), 'video')] if x]
     lines.append(words.strip())
     lines += [l for l in (LIGHT_LINE, SILENCE_LINE) if l.lower() not in words.lower()]
     return '\n'.join(lines)
@@ -659,7 +669,8 @@ def apply_result(session, job, status, result, error):
         return {'kind': 'first frame made', 'ok': ok, **({'frame1_key': result['frame1_key']} if ok else {'error': error})}
     if req['kind'] == 'guide-render':
         kept = {k: v for k, v in (g.get('render') or {}).items() if k in ('frame1_key', 'frame1_sha256', 'frame1_job_id')}   # a video that failed does not take the first frame with it
-        g['render'] = {**kept, 'job_id': str(job['id']), 'status': 'ready' if ok else 'failed', **({k: result[k] for k in ('guide_key', 'sha256', 'bytes', 'frame1_key', 'frame1_sha256', 'render_seconds')} if ok else {'error': error})}
+        g['render'] = {**kept, 'job_id': str(job['id']), 'status': 'ready' if ok else 'failed', **({k: result[k] for k in ('guide_key', 'sha256', 'bytes', 'frame1_key', 'frame1_sha256', 'render_seconds')} if ok else {'error': error}),
+                       **({'look': result['look']} if ok and result.get('look') else {})}   # layout B: the take's words say how the video looks
         return {'kind': 'guide rendered', 'ok': ok, **({'guide_key': result['guide_key'], 'sha256': result['sha256'], 'render_seconds': result['render_seconds']} if ok else {'error': error})}
     if req['kind'] == 'guide-still':
         s = next((s for s in g.get('stills') or [] if s['id'] == req['reference']['id']), None)

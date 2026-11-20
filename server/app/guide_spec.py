@@ -21,6 +21,10 @@ MIN_S, MAX_S = 3, 15                       # one take (SK, 10 Nov 2026: up to 15
 REACH = 0.62                                # m, shoulder to hand; SK's instruction (rule 102); set on close hand shots, not a tested limit
 TOP_SPEED = 2.5                             # m/s for a person's box (rule 45); set on street walks
 BODY_W, BODY_D, HEAD = 0.44, 0.26, 0.22     # the consultant's box person
+# the marks on a box person, each its own small box with its own colour, so front, back and side read in a flat render too (layout B, SK 20 Nov 2026):
+# black face and chest (the front), purple back and nape (the purple of the shot's drawing, draw3d.BACK), yellow stripe down each side (marks.stripes)
+MARK_COLOURS = {'black': (0.03, 0.03, 0.03), 'purple': (0.47, 0.235, 0.667), 'yellow': (0.95, 0.85, 0.05)}
+MARK_NAMES = {'black': 'the face and chest marks', 'purple': 'the back mark', 'yellow': 'the side stripes'}
 SHOULDER_OUT, SHOULDER_DOWN = 0.20, 0.30
 RECIPES = ('walker', 'one_action_close', 'transfer_close', 'other')   # design/207 (SK, 16 Nov 2026): three kinds proven here; `other` is any other kind of shot, taken with a warning
 PACES = {'stroll': (0.6, 1.1), 'everyday': (1.1, 1.5), 'brisk': (1.5, 1.9), 'hurried': (1.9, 2.5)}   # m/s (08-blender §5); a warning when the box is outside its band
@@ -618,6 +622,10 @@ def checks(spec, subjects=None):
     seen = [(x['name'], x['colour']) for x in pieces + people + props if share_in_frame(rect(spec, _corners(*piece_box(x)) if x in pieces else (person_corners(x, 0.0) if x in people else _corners(*prop_box(spec, x, 0.0))))) > 0]
     for line in _dark_distinct(seen)[:6]:
         rows.append(_row('colours', 'warn', f'Colours: {line}. Use dark, strongly contrasting colours, one per thing.'))
+    for p in people:   # layout B: a mark the colour of its person does not show
+        for mark, c in MARK_COLOURS.items():
+            if (mark != 'yellow' or (spec.get('marks') or {}).get('stripes')) and _len(_sub(p['colour'], c)) < 0.12:
+                rows.append(_row('colours', 'warn', f"Colours: {p['name']} is nearly the {mark} of {MARK_NAMES[mark]} on a box person; the mark would not show. Give the person another colour."))
     return rows
 
 

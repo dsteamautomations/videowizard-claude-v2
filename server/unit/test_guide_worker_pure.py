@@ -27,9 +27,9 @@ def blender(monkeypatch, tmp_path):
     """Blender faked: it writes one small picture per asked frame and records each call."""
     calls = []
 
-    def run(spec_path, outdir, frames, samples):
+    def run(spec_path, outdir, frames, samples, look='eevee'):
         assert json.loads(Path(spec_path).read_text(encoding='utf-8'))['recipe'] == 'walker'
-        calls.append({'frames': list(frames), 'samples': samples, 'outdir': Path(outdir).name})
+        calls.append({'frames': list(frames), 'samples': samples, 'outdir': Path(outdir).name, 'look': look})
         Path(outdir).mkdir(parents=True, exist_ok=True)
         for f in frames:
             (Path(outdir) / f'g{f:04d}.png').write_bytes(png((10 * samples, 40, 90)))
@@ -50,7 +50,7 @@ def test_check_frames_are_rendered_stored_and_joined_into_one_strip_and_the_fold
     calls, store, tmp = blender
     status, result, error, cost, retry = W.process(job('guide-frames', frames=[1, 75, 150]))
     assert status == 'ready' and error is None and cost == {'provider': 'guide', 'inr': 0}
-    assert calls == [{'frames': [1, 75, 150], 'samples': 1, 'outdir': 'check'}]
+    assert calls == [{'frames': [1, 75, 150], 'samples': 1, 'outdir': 'check', 'look': 'flat'}]   # layout B: the check frames show what the video shows
     assert [f['key'] for f in result['frames']] == [f'run-1/visuals/guides/abc/check-{n:04d}.png' for n in (1, 75, 150)]
     strip = Image.open(BytesIO(store.files[result['strip_key']]))
     assert strip.height == 240 and strip.width > 3 * 240 and not (tmp / 'j1').exists()
@@ -67,7 +67,7 @@ def test_a_guide_is_rendered_in_chunks_with_the_claim_renewed_and_frame_one_agai
     monkeypatch.setattr(W.subprocess, 'run', ffmpeg)
     status, result, error, cost, retry = W.process(job('guide-render', seconds=5), renew=lambda: renewed.append(1))
     assert status == 'ready', error
-    assert calls[0] == {'frames': [1], 'samples': 16, 'outdir': 'first'}
+    assert calls[0] == {'frames': [1], 'samples': 16, 'outdir': 'first', 'look': 'eevee'}
     assert [c['frames'][0] for c in calls[1:]] == [1, 31, 61, 91, 121] and calls[-1]['frames'][-1] == 150 and all(c['samples'] == 1 for c in calls[1:])
     assert len(renewed) == 5 and '-framerate' in encoded[0] and encoded[0][encoded[0].index('-framerate') + 1] == '30'
     assert result['guide_key'] == 'run-1/visuals/guides/abc/guide.mp4' and store.files[result['guide_key']].endswith(b'guide') and result['frames'] == 150
@@ -112,7 +112,7 @@ def test_the_blender_call_runs_the_servers_own_script_in_software_graphics(monke
     W.run_blender(tmp_path / 's.json', tmp_path / 'o', [1], 16)
     cmd = seen['cmd']
     assert cmd[1:5] == ['-b', '--factory-startup', '--gpu-backend', 'opengl'] and cmd[6].endswith('guide_scene.py') and Path(cmd[6]).exists()
-    assert cmd[-2:] == ['frames=1', 'samples=16'] and seen['env']['LIBGL_ALWAYS_SOFTWARE'] == '1' and seen['timeout'] == 900
+    assert cmd[-3:] == ['frames=1', 'samples=16', 'look=eevee'] and seen['env']['LIBGL_ALWAYS_SOFTWARE'] == '1' and seen['timeout'] == 900
 
 
 # ---------- the overlay ----------

@@ -1,11 +1,12 @@
 # The server's one Blender script: builds a guide from a scene description (app/guide_spec.py) and renders frames of it.
 # Integration steps B to D (SK, 12 Nov 2026). The helper writes data, never code; this file is the only code Blender runs.
 #
-# Run:  blender -b --factory-startup --python guide_scene.py -- <scene.json> <outdir> frames=all|1,75,150 [samples=1] [size=1280x720]
+# Run:  blender -b --factory-startup --python guide_scene.py -- <scene.json> <outdir> frames=all|1,75,150 [samples=1] [size=1280x720] [look=eevee|flat]
+# look=flat (layout B, SK 20 Nov 2026): Workbench, flat material colours, no shadows, thin black outlines: the layout video. eevee: the first frame, for the still.
 # Writes g0001.png ... into <outdir> and prints "GUIDE DONE <n>" as its last line; any fault ends with "GUIDE FAILED: <why>" and exit code 1.
 #
 # What the building blocks reproduce (the consultant's finished film and our own runs): box people with black face and chest marks
-# (front = local -Y), bar arms from the shoulder to the hand point, a prop keyed to the hand that holds it on every frame, a walk bob,
+# (front = local -Y) and a purple back and nape (layout B), bar arms from the shoulder to the hand point, a prop keyed to the hand that holds it on every frame, a walk bob,
 # a camera held still with a tiny handheld drift, a sun and a plain sky. Positions at every moment come from guide_spec, the same module
 # the checks before spend use. A piece of the set on a `path` (design/207) is keyed on every frame as a walker's root is.
 import json
@@ -20,7 +21,7 @@ from mathutils import Vector
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'app'))
 import guide_spec as G   # noqa: E402  (standard library only)
 
-BLACK, STRIPE = (0.03, 0.03, 0.03), (0.95, 0.85, 0.05)
+BLACK, BACK, STRIPE = G.MARK_COLOURS['black'], G.MARK_COLOURS['purple'], G.MARK_COLOURS['yellow']
 
 
 def fail(why):
@@ -42,6 +43,9 @@ def main():
     frames = list(range(1, n + 1)) if opt.get('frames', 'all') == 'all' else [int(x) for x in opt['frames'].split(',')]
     if not frames or min(frames) < 1 or max(frames) > n:
         fail('frames run from 1 to %d' % n)
+    look = opt.get('look', 'eevee')
+    if look not in ('eevee', 'flat'):
+        fail('look is eevee or flat')
 
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o, do_unlink=True)
@@ -106,6 +110,8 @@ def main():
         box('HEAD_' + p['id'], (-G.HEAD / 2, -G.HEAD / 2, top + 0.02), (G.HEAD / 2, G.HEAD / 2, h - 0.02), p['colour'], root)
         box('FACE_' + p['id'], (-0.07, -0.135, top + 0.1), (0.07, -0.11, top + 0.2), BLACK, root)
         box('CHEST_' + p['id'], (-0.12, -0.145, max(top - 0.45, 0.05)), (0.12, -0.13, top - 0.1), BLACK, root)
+        box('BACK_' + p['id'], (-0.12, 0.13, max(top - 0.45, 0.05)), (0.12, 0.145, top - 0.1), BACK, root)   # layout B: the back by its colour, not by shading
+        box('NAPE_' + p['id'], (-0.07, 0.11, top + 0.1), (0.07, 0.135, top + 0.2), BACK, root)
         if marks.get('stripes'):
             for sx in (-0.226, 0.22):
                 box('STRIPE_' + p['id'], (sx, -0.05, 0.0), (sx + 0.006, 0.05, h - 0.02), STRIPE, root)
@@ -192,10 +198,22 @@ def main():
     bg.inputs[1].default_value = float(spec.get('sky_strength', 0.8))
 
     # ---- render (the view transform is left at Blender's default: changing it washes the picture out) ----
-    sc.render.engine = 'BLENDER_EEVEE'
     sc.render.resolution_x, sc.render.resolution_y = width, height
-    if hasattr(sc, 'eevee'):
-        sc.eevee.taa_render_samples = int(opt.get('samples', 1))
+    if look == 'flat':   # layout B: each thing its material's own colour (diffuse_color, set with its node colour in mat()), no light or shadow, thin black outlines
+        sc.render.engine = 'BLENDER_WORKBENCH'
+        sh = sc.display.shading
+        sh.light = 'FLAT'
+        sh.color_type = 'MATERIAL'
+        sh.show_shadows = False
+        sh.show_object_outline = True
+        sh.object_outline_color = (0, 0, 0)
+        sc.display.render_aa = '5'
+        sky, strength = spec.get('sky') or (0.6, 0.62, 0.66), float(spec.get('sky_strength', 0.8))
+        sc.world.color = tuple(c * strength for c in sky)   # Workbench ignores the world's nodes: the sky as EEVEE shows it
+    else:
+        sc.render.engine = 'BLENDER_EEVEE'
+        if hasattr(sc, 'eevee'):
+            sc.eevee.taa_render_samples = int(opt.get('samples', 1))
     for f in frames:
         t0 = time.time()
         sc.frame_set(f)

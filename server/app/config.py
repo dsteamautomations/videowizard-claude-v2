@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     GUIDE_TIMEOUT: int = 900            # seconds for one Blender call (a chunk of frames)
     GUIDE_CHUNK: int = 30               # frames a call; the job's claim is renewed between calls (about 4 s a frame on the VM)
     GUIDE_FRAME1_SAMPLES: int = 16      # the first frame again at full quality: the still is made from it and needs true shadows
+    GUIDE_VIDEO_LOOK: str = 'flat'      # layout B (SK, 20 Nov 2026): the layout video and the check frames in Workbench, flat colours, thin black outlines; 'eevee' renders them as before
 
 
 @lru_cache

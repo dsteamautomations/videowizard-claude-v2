@@ -32,4 +32,5 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     # the critic's points on releases 3 and 4 (commit 74f4d7a) are rows 307 to 309
     for n in ('307', '308', '309'):
         assert n in rows, n
-    assert '310' not in rows
+    assert 'GUIDE_VIDEO_LOOK' in rows['310'] and 'layout B' in rows['310']   # layout B (20 Nov) is row 310
+    assert '311' not in rows

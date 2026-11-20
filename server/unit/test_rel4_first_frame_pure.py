@@ -301,7 +301,7 @@ def test_the_first_frame_job_is_one_blender_call_at_full_quality(blender):
     calls, store, tmp = blender
     status, result, error, cost, retry = W.process(job('guide-frame1', seconds=5))
     assert status == 'ready' and error is None and cost == {'provider': 'guide', 'inr': 0}
-    assert calls == [{'frames': [1], 'samples': 16, 'outdir': 'first'}]                             # the same call as the frame-1 step of the one job before
+    assert calls == [{'frames': [1], 'samples': 16, 'outdir': 'first', 'look': 'eevee'}]                          # the same call as the frame-1 step of the one job before
     data = store.files['run-1/visuals/guides/abc/frame1.png']
     assert result['frame1_key'] == 'run-1/visuals/guides/abc/frame1.png' and result['frame1_sha256'] == hashlib.sha256(data).hexdigest() and 'guide_key' not in result
     assert not [k for k in store.files if k.endswith('.mp4')] and not (tmp / 'j1').exists()
@@ -320,7 +320,7 @@ def test_the_video_job_does_not_render_the_first_frame_again_and_encodes_as_befo
                         '-pix_fmt', 'yuv420p', str(Path(folder) / 'guide.mp4')]]                    # the encoder's line, as it was
     assert store.files['run-1/visuals/guides/abc/frame1.png'] == b'the-first-frame-as-its-own-job-left-it'
     assert result['frame1_sha256'] == hashlib.sha256(b'the-first-frame-as-its-own-job-left-it').hexdigest() and result['frames'] == 150
-    assert set(result) == {'guide_key', 'sha256', 'bytes', 'frame1_key', 'frame1_sha256', 'frames', 'render_seconds'}   # the same record as before
+    assert set(result) == {'guide_key', 'sha256', 'bytes', 'frame1_key', 'frame1_sha256', 'frames', 'render_seconds', 'look'}   # the same record as before, with the look (layout B)
 
 
 def test_a_blender_fault_fails_the_first_frame_job_with_its_reason(blender, monkeypatch):

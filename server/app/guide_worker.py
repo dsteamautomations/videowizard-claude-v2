@@ -33,11 +33,12 @@ def spool():
 
 # ---------- Blender ----------
 
-def run_blender(spec_path, outdir, frames, samples):
-    """One Blender call for a list of frames. Succeeds only when the script's last line says so and every frame is on disk."""
+def run_blender(spec_path, outdir, frames, samples, look='eevee'):
+    """One Blender call for a list of frames. Succeeds only when the script's last line says so and every frame is on disk.
+    look: 'eevee' (the first frame, for the still) or 'flat' (layout B: Workbench, flat colours, thin black outlines)."""
     s = settings()
     cmd = [s.BLENDER_BIN, '-b', '--factory-startup', '--gpu-backend', 'opengl', '--python', str(SCRIPT), '--', str(spec_path), str(outdir),
-           'frames=' + ','.join(str(f) for f in frames), f'samples={samples}']
+           'frames=' + ','.join(str(f) for f in frames), f'samples={samples}', f'look={look}']
     env = {**os.environ, 'LIBGL_ALWAYS_SOFTWARE': '1'}
     r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=s.GUIDE_TIMEOUT, preexec_fn=(lambda: os.nice(10)) if hasattr(os, 'nice') else None)
     tail = [l for l in (r.stdout or '').splitlines() if l.startswith('GUIDE ')]
@@ -116,7 +117,7 @@ def process(job, renew=None):
         spec_path = folder / 'scene.json'
         spec_path.write_bytes(store.get(req['spec_key']))
         if req['kind'] == 'guide-frames':
-            run_blender(spec_path, folder / 'check', req['frames'], 1)
+            run_blender(spec_path, folder / 'check', req['frames'], 1, settings().GUIDE_VIDEO_LOOK)   # layout B: the checker sees what the video shows
             pngs = [(folder / 'check' / f'g{f:04d}.png').read_bytes() for f in req['frames']]
             frames = []
             for f, png in zip(req['frames'], pngs):
@@ -138,8 +139,8 @@ def process(job, renew=None):
         first = {'frame1_key': frame1_key, 'frame1_sha256': hashlib.sha256(store.get(frame1_key)).hexdigest()}   # of the file as it is stored
         if req['kind'] == 'guide-frame1':
             return 'ready', {**first, 'render_seconds': round(time.time() - t0, 1)}, None, {'provider': 'guide', 'inr': 0}, None
-        for a in range(1, n + 1, s.GUIDE_CHUNK):
-            run_blender(spec_path, folder / 'all', list(range(a, min(a + s.GUIDE_CHUNK, n + 1))), 1)
+        for a in range(1, n + 1, s.GUIDE_CHUNK):   # layout B (SK, 20 Nov 2026): every frame of the video in one look, its frame 1 too; the still keeps the EEVEE frame 1 above
+            run_blender(spec_path, folder / 'all', list(range(a, min(a + s.GUIDE_CHUNK, n + 1))), 1, s.GUIDE_VIDEO_LOOK)
             if renew:
                 renew()   # a guide of 15 s is about half an hour of rendering; the claim lasts twenty minutes
         out = folder / 'guide.mp4'
@@ -150,7 +151,7 @@ def process(job, renew=None):
         data = out.read_bytes()
         guide_key = f'{base}/guide.mp4'
         sha = _put(store, guide_key, data, 'video/mp4')
-        return 'ready', {'guide_key': guide_key, 'sha256': sha, 'bytes': len(data), **first, 'frames': n, 'render_seconds': round(time.time() - t0, 1)}, None, {'provider': 'guide', 'inr': 0}, None
+        return 'ready', {'guide_key': guide_key, 'sha256': sha, 'bytes': len(data), **first, 'frames': n, 'render_seconds': round(time.time() - t0, 1), 'look': s.GUIDE_VIDEO_LOOK}, None, {'provider': 'guide', 'inr': 0}, None
     except Exception as exc:   # a fault is reported as it is; nothing was paid for
         return 'failed', {'phase': req['kind']}, f'{exc.__class__.__name__}: {str(exc)[:400]}', None, None
     finally:
