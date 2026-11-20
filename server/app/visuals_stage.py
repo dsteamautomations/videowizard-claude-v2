@@ -6097,13 +6097,13 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     placed = lambda ids: any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in ids)
     for p in shared:   # fix set A1.1: a shape that is no thing of the plan, drawn once: the drawings its part names place it
         need(p.get('element') or shot_id not in (p.get('shots') or []) or placed([p['id']]), PARTS_USE.format(shot=shot_id, thing=p['title'] or p['id'], id=p['id']))
-    mine = view_parts(session, shot)
+    mine, fits = view_parts(session, shot), fit_parts(session, shot)
     for e in shot.get('element_ids') or []:   # defect 56 (VW-24, 19 Nov 2026): a thing may have several views among the parts (cut across, from above); a drawing places the view it shows
-        views = [p['id'] for p in shared if p.get('element') == e]
+        views = fits.get(e) or []   # release 2, F5: with a stated view, its parts of that view or of no view; drawn in other views only: nothing of it is demanded
         thing = (els.get(e) or {}).get('name') or e
-        if len(views) > 1 and mine.get(e) and not placed(mine[e]):   # fix set B2: the view the shot's spec states, when the thing has a part drawn in it
+        if len([p for p in shared if p.get('element') == e]) > 1 and mine.get(e) and not placed(mine[e]):   # fix set B2: the view the shot's spec states, when the thing has a part drawn in it
             need(False, PARTS_USE_VIEW.format(shot=shot_id, thing=thing, view=shot['drawing_spec']['view'], ids=', '.join(mine[e])))
-        if views and not placed(views):   # no stated view, or no part drawn in it: one of the thing's views is enough (defect 56's fix, kept)
+        if views and not placed(views):   # no stated view: one of the thing's views is enough (defect 56's fix, kept)
             need(False, PARTS_USE.format(shot=shot_id, thing=thing, id=views[0]) if len(views) == 1 else PARTS_USE_ONE.format(shot=shot_id, thing=thing, ids=', '.join(views)))
     from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
     notes = pictures.notes_in(rules_text)
@@ -6386,6 +6386,37 @@ def view_parts(session, shot):
         if view and p.get('view') == view and p.get('element') in (shot.get('element_ids') or []):
             out.setdefault(p['element'], []).append(p['id'])
     return out
+
+
+PARTS_NO_VIEW = ' No part of {things} is drawn in the view {view}: draw it in this drawing yourself, and place no part of another view for it.'
+
+
+def fit_parts(session, shot):
+    """Release 2, F5 (20 Nov 2026): {thing: its approved parts a drawing of this shot may place for it}, for the upload and the brief: every part of
+    the thing when the spec states no view; with a stated view, its parts drawn in that view or naming no view. A thing drawn in other views only
+    has an empty list: nothing of it is demanded (the wrong view is the wrong picture), and the brief says to draw it."""
+    view = (shot.get('drawing_spec') or {}).get('view') or ''
+    out = {}
+    for p in (session.get('motion_parts_approved') or {}).get('parts') or []:
+        if p.get('element') in (shot.get('element_ids') or []):
+            out.setdefault(p['element'], []).extend([p['id']] if not view or (p.get('view') or view) == view else [])
+    return out
+
+
+def parts_differ(session, used):
+    """Release 2, F7: these parts as a still was checked with them ({part id: its digest}) are not the approved ones now."""
+    now = {p['id']: p.get('digest') for p in (session.get('motion_parts_approved') or {}).get('parts') or []}
+    return any(now.get(i) != d for i, d in (used or {}).items())
+
+
+def parts_wait(plan, session):
+    """Release 2, F11: what the builders of the drawn graphics wait for while the shared parts are not the approved ones (none yet, rejected, or a
+    new file on its card), in `need_parts`'s own sentence; '' when nothing is waited for."""
+    try:
+        need_parts(plan, session)
+    except ValueError as exc:
+        return str(exc)
+    return ''
 
 
 def parts_in_force(session, files):
@@ -7252,8 +7283,10 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     shown = [l for l in sm.get('labels') or [] if _flat(l) != _flat(note)]
     used = shot_parts(session, shot)   # design/221 row 1: the approved shared parts of this shot's things, and those of no thing
     mine = {i for ids in view_parts(session, shot).values() for i in ids}   # fix set B2, A3.2: the view this drawing shows, named with its parts
+    bare = [els.get(e, {}).get('name') or e for e, ids in fit_parts(session, shot).items() if not ids]   # release 2, F5: drawn in other views only; the line changes for such a shot alone
     lines += [('Use these parts', PARTS_LINE.format(parts='; '.join(f"{p['id']}: {p['title']}" + (f" (view {p['view']})" if p.get('view') else '') for p in used),
-                                                    view=f", {spec['view']} ({', '.join(p['id'] for p in used if p['id'] in mine)})," if mine else '') if used else '')]
+                                                    view=f", {spec['view']} ({', '.join(p['id'] for p in used if p['id'] in mine)})," if mine else '')
+               + (PARTS_NO_VIEW.format(things=', '.join(bare), view=spec.get('view')) if bare else '') if used else '')]
     lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in shown) or 'none'}."),   # design/221 (the critic's A1): the labels are in the plan before the first brief
               ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame, in the box from 80 % of the width and 90 % of the height to the edges. '
                                              'Do not draw it, and keep that corner free.' if note else ''),
