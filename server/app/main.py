@@ -70,7 +70,21 @@ async def plugin_version_gate(request, call_next):
 
 @app.middleware('http')
 async def decision_log(request, call_next):
-    """design/142 R1: every write under /api/runs/{run}/ and every refusal is one entry of the run's decision log, written on its own connection."""
+    """design/142 R1: every write under /api/runs/{run}/ and every refusal is one entry of the run's decision log, written on its own connection.
+    Release 3, E1: a refused read of a run too (its small JSON answer is read; an answered read, a file among them, passes untouched)."""
+    if request.method == 'GET' and runlog.PATH.match(request.url.path):
+        response = await call_next(request)
+        if response.status_code < 400:
+            return response
+        raw = b''.join([c async for c in response.body_iterator])
+        try:
+            parsed = json.loads(raw) if 'json' in (response.headers.get('content-type') or '') else {}
+        except ValueError:
+            parsed = {}
+        entry = runlog.entry_from(request.url.path, {}, response.status_code, parsed, read=True)
+        if entry:
+            await run_in_threadpool(runlog.write_apart, entry)
+        return RawResponse(content=raw, status_code=response.status_code, headers=dict(response.headers), media_type=response.media_type)
     if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE') or not (runlog.PATH.match(request.url.path) or runlog.PAGE.match(request.url.path)):
         return await call_next(request)
     body = {}
@@ -1540,13 +1554,13 @@ def visuals_motion_render(run_id: UUID, body: Draw, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/chat/next')
 def visuals_chat_next(run_id: UUID, body: ChatNext, user=User, conn=DB):   # design/188: one decision at a time, in the chat; design/190: or one card
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.next_item(conn, storage(), user, run, outputs, body.one, body.many))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.logged(chat_flow.next_item(conn, storage(), user, run, outputs, body.one, body.many)))   # release 3, E1: the log line names what was handed out
 
 
 @app.post('/api/runs/{run_id}/visuals/chat/card')
 def visuals_chat_card(run_id: UUID, body: CardAnswers, user=User, conn=DB):   # design/190
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.card_answer(conn, storage(), user, run, outputs, body.card, [a.model_dump() for a in body.answers], body.one))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.logged(chat_flow.card_answer(conn, storage(), user, run, outputs, body.card, [a.model_dump() for a in body.answers], body.one)))
 
 
 class PageAnswer(Strict):   # design/204: one answer the operator gave on the artifact page
@@ -1579,7 +1593,7 @@ def visuals_page_record(run_id: UUID, body: PageAnswers, user=User, conn=DB):   
 @app.post('/api/runs/{run_id}/visuals/chat/answer')
 def visuals_chat_answer(run_id: UUID, body: ChatAnswer, user=User, conn=DB):
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes, body.one, body.many))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.logged(chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes, body.one, body.many)))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/finish', status_code=201)

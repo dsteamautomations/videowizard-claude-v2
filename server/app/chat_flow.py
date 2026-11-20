@@ -2216,6 +2216,22 @@ def _entry(item):
     return {**{k: v for k, v in pub.items() if k not in ('how', 'waiting_after_this', 'needed', 'say_last')}, 'name': name, 'ask': f"{name}: {pub['ask']}"}
 
 
+def handed(out):
+    """Release 3, E1: what a next call handed out, for its line in the run's log: the item's id and kind, a group's ids, a card's size."""
+    if out.get('item'):
+        return f"handed out {out['item']['id']} ({out['item'].get('kind') or 'item'})"
+    if out.get('group'):
+        return f"handed out {len(out['group']['items'])} together ({out['group']['kind']}): " + ', '.join(i['id'] for i in out['group']['items'])
+    if out.get('card'):
+        return f"handed out card {out['card']['id']} ({out['card'].get('step') or 'card'}, {out['card'].get('entries')} lines)"
+    return 'nothing handed out'
+
+
+def logged(out):
+    """The answer of a next call, or of an answer that brings the next card, with its line for the run's log (the routes add it)."""
+    return {**out, 'log': handed(out)}
+
+
 def next_item(conn, store, user, run, outputs, one=False, many=False):
     """design/217 (C2): the pictures that wait for Claude's check are said first, in `then`: the duty is never silent."""
     out = _next_item(conn, store, user, run, outputs, one, many)

@@ -7,7 +7,7 @@ import re
 from .errors import Problem
 
 ABOUT_KEYS = ('unit', 'stage', 'beat_id', 'shot_id', 'shot', 'gap_id', 'gap', 'element_id', 'reference_id', 'ref', 'sub_clip_id', 'clip_id', 'job_id', 'job', 'voice_id', 'voice_ids',
-              'slide_no', 'slide', 'decision', 'key', 'value', 'kind', 'word', 'say_as')   # design/194: the word corrected and how it is said
+              'slide_no', 'slide', 'decision', 'key', 'value', 'kind', 'word', 'say_as', 'item')   # design/194: the word corrected and how it is said; release 3, E1: the item a question or an answer is on
 WORD_KEYS = ('quote', 'accepted_quote', 'confirm_quote', 'note', 'notes', 'reason')
 PATH = re.compile(r'^/api/runs/([0-9a-f-]{36})/([a-z_-]+)(?:/(.*))?$')
 PAGE = re.compile(r'^/runs/([A-Za-z0-9_-]+)/(visuals|review|voices2)/act$')   # design/145 L1: the pages' buttons
@@ -34,9 +34,15 @@ def stage_of(segment, body):
     return SEGMENT_STAGE.get(segment, 'run')   # design/145 L4: a step outside a stage (a defect, a claim) is the run's
 
 
-def entry_from(path, body, status, response):
-    """The entry for one write under /api/runs/{run}/ or one page button (/runs/<code>/<page>/act), or None for paths that are not a run's step."""
+def entry_from(path, body, status, response, read=False):
+    """The entry for one write under /api/runs/{run}/ or one page button (/runs/<code>/<page>/act), or None for paths that are not a run's step.
+    read (release 3, E1): a read of a run is an entry only when it was refused."""
     body, response = body if isinstance(body, dict) else {}, response if isinstance(response, dict) else {}
+    if read:
+        m = PATH.match(path or '')
+        if not m or m.group(2) in SKIP or status < 400 or status == 401 or response.get('code') == 'NOT_FOUND':   # not signed in, or a run this user does not hold: no run to write under
+            return None
+        return _entry(m.group(1), stage_of(m.group(2), {}), f"read {m.group(2)}{('/' + m.group(3)) if m.group(3) else ''}", {}, status, response)
     page = PAGE.match(path or '')
     if page:   # design/145 L1: the run is found by its code when the entry is written
         stage = 'options' if page.group(2) == 'review' and body.get('action') == 'record' else PAGE_STAGE[page.group(2)]
@@ -46,6 +52,8 @@ def entry_from(path, body, status, response):
         return None
     run_id, segment, rest = m.group(1), m.group(2), m.group(3) or ''
     e = _entry(run_id, stage_of(segment, body), f"{segment}{('/' + rest) if rest else ''}", body, status, response)
+    if f'{segment}/{rest}' == 'visuals/ask' and e['kind'] == 'step':   # release 3, E1: a question the assistant puts on an item: when it was asked, on what, in which words
+        return {**e, 'kind': 'question', 'entry': _short(f"asked on {body.get('item')}: {body.get('question')} ({' | '.join(str(c) for c in body.get('choices') or [])})", 1500)}
     return {**e, 'by_kind': 'assistant'} if f'{segment}/{rest}' in HELPERS_WORDS else e
 
 
