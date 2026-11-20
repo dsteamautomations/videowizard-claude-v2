@@ -75,7 +75,7 @@ def test_4_every_group_of_what_can_start_is_named_exactly_when_its_gate_lets_it_
     frames_back(store, conn)
     assert said() == 'Start now, together in one message: ' + GUIDE_CHECK.format(ids='VS1', n=1) + '.'   # release 1 (20 Nov 2026): the checker first; no layout card before its verdict (test_rel1d_layout_check_pure.py)
     passed(store, conn)                                                                          # the real gate takes the verdict
-    assert said() == '' and 'The guide is not rendered yet' in refused(lambda: still_made(store, conn))   # being rendered: no still can be ordered, and none is named
+    assert said() == '' and 'The first frame of the layout is not rendered yet' in refused(lambda: still_made(store, conn))   # being rendered: no still can be ordered, and none is named
     s = saved(store)
     g = s['guides']['VS1']
     G.apply_result(s, {'id': g['render']['job_id'], 'request': {'kind': 'guide-render', 'shot_id': 'VS1', 'sha256': g['sha256']}}, 'ready',
@@ -116,7 +116,7 @@ def test_the_gate_that_waits_for_a_guides_check_and_the_line_for_a_shot_whose_fr
     states = lambda: [(i['id'], i['state']) for i in T.expected(saved(store), V.current_plan(store, saved(store)), [])]
     assert said() == 'Start now, together in one message: ' + GUIDE_CHECK.format(ids='VS1', n=1) + '.' and states() == [('VS1', 'being checked by Claude')]
     assert 'is not checked yet' in refused(lambda: G.drawing_verdict(conn, store, USER, NEW, [], 'VS1', sha, True, 'Yes.'))   # no Yes on a layout before its check
-    assert 'The guide is not rendered yet: it is rendered after a fresh checker passes its check frames' in refused(lambda: still_made(store, conn))   # the gate: no still yet
+    assert 'The first frame of the layout is not rendered yet: it is rendered, before the video, after a fresh checker passes the check frames' in refused(lambda: still_made(store, conn))   # the gate: no still yet (release 4; until then: "The guide is not rendered yet")
     assert saved(store)['guides']['VS1'].get('render') is None
     G.verdict(conn, store, OTHER, NEW, [], 'VS1', sha, True, [{'look': 'everyone reads as a person', 'pass': True}])
     assert saved(store)['guides']['VS1']['render']['status'] == 'queued' and said() == ''       # the verdict is what queues the render; the checker is not named again

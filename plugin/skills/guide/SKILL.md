@@ -17,7 +17,7 @@ You write data and words. You never run Blender, never call a picture or video m
 | 1b. The shot's drawing | the server draws the shot from the scene: through the camera and from above, each person with front, back and working arm marked. Only after a fresh checker has passed the layout (row 3: the checkers of all the layouts are started together, in one message, before any layout card is shown), the operator approves it in the chat (`vw visuals next`), or `vw guide drawing --shot S` then `vw guide drawing-approve --shot S --sha … --quote "<their words>"`. No still before their Yes. | free |
 | 2. Check frames | `vw guide frames --shot S` (three frames and a strip arrive in `work/guide/<shot>/frames/`) | free |
 | 3. The double check | a fresh `vw-guide-check` helper, who has not seen the build, writes `verdict.json`; `vw guide verdict --shot S --file …` | free |
-| 4. The guide is rendered | by the server, after a passing verdict; `vw guide status --shot S` | free, several minutes |
+| 4. The guide is rendered | by the server, after a passing verdict: its first frame first (under a minute), its video behind it (several minutes; needed only for the take, row 8). Order the still (row 5) as soon as the first frame is ready; `vw guide status --shot S` says which is ready | free |
 | 5. The still | `vw guide still --shot S --file still.json`; then `vw guide look --shot S` | paid (one picture) |
 | 6. The overlay | the operator looks at the overlay and approves the exact file, or it is repaired or rejected | free |
 | 7. The take's words | `vw guide prompt --shot S --file take.txt` | free |

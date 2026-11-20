@@ -128,8 +128,16 @@ def process(job, renew=None):
             return 'ready', {'frames': frames, 'strip_key': strip_key, 'render_seconds': round(time.time() - t0, 1)}, None, {'provider': 'guide', 'inr': 0}, None
         s = settings()
         n = int(round(req['seconds'] * G.FPS))
-        run_blender(spec_path, folder / 'first', [1], s.GUIDE_FRAME1_SAMPLES)   # the still is made from this frame: full quality, true shadows
-        frame1 = (folder / 'first' / 'g0001.png').read_bytes()
+        frame1_key = f'{base}/frame1.png'
+        # release 4 (SK, 20 Nov 2026): the first frame is a job of its own (`guide-frame1`, the quick lane), so a still never waits behind a video.
+        # The video's job makes it only when it is not stored yet: a job queued by the older code (one job for both), or a first-frame job that failed.
+        # ponytail: two workers can each render a missing first frame at the same moment (the later file stays); a claim on the frame if that is ever seen.
+        if req['kind'] == 'guide-frame1' or not store.exists(frame1_key):
+            run_blender(spec_path, folder / 'first', [1], s.GUIDE_FRAME1_SAMPLES)   # the still is made from this frame: full quality, true shadows
+            store.put(frame1_key, (folder / 'first' / 'g0001.png').read_bytes(), 'image/png')
+        first = {'frame1_key': frame1_key, 'frame1_sha256': hashlib.sha256(store.get(frame1_key)).hexdigest()}   # of the file as it is stored
+        if req['kind'] == 'guide-frame1':
+            return 'ready', {**first, 'render_seconds': round(time.time() - t0, 1)}, None, {'provider': 'guide', 'inr': 0}, None
         for a in range(1, n + 1, s.GUIDE_CHUNK):
             run_blender(spec_path, folder / 'all', list(range(a, min(a + s.GUIDE_CHUNK, n + 1))), 1)
             if renew:
@@ -140,10 +148,9 @@ def process(job, renew=None):
         if r.returncode != 0 or not out.exists():
             raise RuntimeError('the frames could not be joined into a video: ' + (r.stderr or '').strip()[-200:])
         data = out.read_bytes()
-        guide_key, frame1_key = f'{base}/guide.mp4', f'{base}/frame1.png'
+        guide_key = f'{base}/guide.mp4'
         sha = _put(store, guide_key, data, 'video/mp4')
-        return 'ready', {'guide_key': guide_key, 'sha256': sha, 'bytes': len(data), 'frame1_key': frame1_key, 'frame1_sha256': _put(store, frame1_key, frame1, 'image/png'),
-                         'frames': n, 'render_seconds': round(time.time() - t0, 1)}, None, {'provider': 'guide', 'inr': 0}, None
+        return 'ready', {'guide_key': guide_key, 'sha256': sha, 'bytes': len(data), **first, 'frames': n, 'render_seconds': round(time.time() - t0, 1)}, None, {'provider': 'guide', 'inr': 0}, None
     except Exception as exc:   # a fault is reported as it is; nothing was paid for
         return 'failed', {'phase': req['kind']}, f'{exc.__class__.__name__}: {str(exc)[:400]}', None, None
     finally:
@@ -179,13 +186,22 @@ def guide_running(conn, kind):
 SUPERSEDED = 'superseded: a newer scene of this shot was sent; nothing to do'
 # Release 2, the critic's point 1: the older scene's queued guide render too (16 minutes, one lane). A job is replaced when a guide-frames job of the
 # same run and shot was created after it (a newer scene was sent); a scene sent again later gets a fresh render at its pass, newer than every frames job.
-SUPERSEDE = ("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' and j.request->>'kind' in ('guide-frames','guide-render') "
+# Release 4: the queued first frame of the older scene too.
+SUPERSEDE = ("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' and j.request->>'kind' in ('guide-frames','guide-frame1','guide-render') "
              "and exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frames' and n.created_at > j.created_at)")
+# Release 4, the film in mid-step at the deploy: a video job queued by the older code (one job for the first frame and the video: its request has no
+# `split`) gets a first-frame job of its own, once, so its still does not wait for its turn in the render lane. Kept until no such job is queued.
+BACKFILL = ("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) "
+            "select j.run_id, j.stage, j.unit, j.provider, jsonb_set(j.request, '{kind}', '\"guide-frame1\"'), gen_random_uuid() from vw2_jobs j "
+            "where j.provider='guide' and j.status='queued' and j.request->>'kind'='guide-render' and not (j.request ? 'split') "
+            "and not exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frame1' "
+            "and n.request->>'sha256'=j.request->>'sha256')")
 
 
 def tick():
-    """A still first (a paid call, quick); then the check frames of a scene (seconds; one at a time, in a lane of their own: hotfix of 20 Nov 2026,
-    they waited 16 minutes behind each render); then one render, only when no other guide render runs and the drawn renders leave room."""
+    """A still first (a paid call, quick); then one quick Blender job (seconds to a minute; one at a time, in a lane of their own: hotfix of 20 Nov
+    2026, the check frames waited 16 minutes behind each render): the first frame of a layout that passed (release 4), else the check frames of a
+    scene; then one render, only when no other guide render runs and the drawn renders leave room."""
     from . import worker
     from .visual_workers import renders_free
     busy = False
@@ -198,7 +214,15 @@ def tick():
         return busy
     with connect() as conn:
         conn.execute(SUPERSEDE, (SUPERSEDED,))
-        job = jobs.claim(conn, 'guide', 'guide-frames') if not guide_running(conn, 'guide-frames') else None
+    try:   # in a transaction of its own: this statement was never run against a database in the tests; its fault must not stop the lanes
+        with connect() as conn:
+            conn.execute(BACKFILL)
+    except Exception:
+        import logging
+        logging.getLogger('vw2.guide').exception('the first-frame jobs of older video jobs were not queued')
+    with connect() as conn:
+        quick = not guide_running(conn, 'guide-frame1') and not guide_running(conn, 'guide-frames')
+        job = (jobs.claim(conn, 'guide', 'guide-frame1') or jobs.claim(conn, 'guide', 'guide-frames')) if quick else None
     if job:
         finish(job, *process(job, renew=lambda: worker.renew_lease(job['id'])))
         busy = True

@@ -185,6 +185,7 @@
     "The operator approves the drawing before the still.",
     "Never show two items, never choose the order",
     "the server refuses a reply to any item but the one it handed out",
-    "After two failed rounds, show the operator what is still open before another round."
+    "After two failed rounds, show the operator what is still open before another round.",
+    "| 4. The guide is rendered | by the server, after a passing verdict; `vw guide status --shot S` | free, several minutes |"
   ]
 }

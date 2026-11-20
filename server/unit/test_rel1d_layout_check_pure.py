@@ -215,13 +215,13 @@ def test_the_film_in_mid_step_at_the_deploy_shaped_like_the_live_one(held):
         s['guides'][sid] = live('proposed', before=1)
     held(s, p)
     assert layout_cards(s, p) == []                                                               # nobody is asked anything now
-    assert T.status_line(T.expected(s, p, [], NOW)) == 'AI video: 7 being checked by Claude, 2 being made, 10 being redone.'
+    assert T.status_line(T.expected(s, p, [], NOW)) == 'AI video: 7 being checked by Claude, 2 first frame ready: the still can be ordered, 10 being redone.'   # release 4 (until then: "2 being made")
     assert T.starts(s, p, []) == (START + SCENES.format(ids=', '.join(ids[2:12]), n=10) + '; ' + CHECK.format(ids=', '.join(ids[12:]), n=7) + '; '
                                   + STILLS.format(ids='S01, S02', n=2) + '.')
     for sid in ids[12:]:                                                                          # the seven checks pass
         s['guides'][sid].update(verdicts=[{'sha256': 'g' * 64, 'pass': True}], render={'job_id': 'r', 'status': 'queued'})
     assert layout_cards(s, p) == ids[12:15]                                                       # only the three new drawings are asked; the four approved ones stand
-    assert T.status_line(T.expected(s, p, [], NOW)) == 'AI video: 6 being made, 10 being redone, 3 waiting for you in the chat.'
+    assert T.status_line(T.expected(s, p, [], NOW)) == 'AI video: 4 being made, 2 first frame ready: the still can be ordered, 10 being redone, 3 waiting for you in the chat.'   # release 4 (until then: "6 being made")
 
 
 # ---------- the run's log: the checker's verdict is the assistant's line ----------
