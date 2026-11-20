@@ -180,6 +180,8 @@
     "list each change in `changed_from_plan`.",
     "select it anyway with their reason",
     "`select` needs `--notes` saying why it is taken",
-    "Nothing of step 7 is asked one by one"
+    "Nothing of step 7 is asked one by one",
+    "Never show two items, never choose the order",
+    "the server refuses a reply to any item but the one it handed out"
   ]
 }

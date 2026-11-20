@@ -2477,6 +2477,14 @@ def cmd_visuals(a):
             card['card_file'], card['answers_path'] = str(folder / f"{card['id']}.html"), str(folder / f"{card['id']}.answers.json")   # full paths, for reading and writing; the command takes `answers_file`
             return (first + f"{card['step']}: {card['entries']} entries on one card ({card['id']}). Say: \"{card['say_before']}\" Card file: {card['card_file']}. "
                     f"Write the answers to: {card['answers_path']}. Then: vw visuals card --file {card['answers_file']}. " + out['how'])
+        group = out.get('group')
+        if group:   # release 2, B4 and B4b: several end-frames, or layout drawings, ready together: one message, one question for each
+            (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
+            for e in group['items']:
+                e['show_files'] = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in e.get('show') or []]
+            return (first + f"{group['heading']} Show them side by side in one message and ask one question for each: "
+                    + ' '.join(f"{e['name']} (item {e['id']}): \"{e['ask']}\" Files: {'; '.join(e['show_files'])}. Buttons: " + ', '.join(f"{b['label']} [{b['choice']}]" for b in e['buttons']) + '.'
+                               for e in group['items']) + ' ' + out['how'])
         if not item:
             return ((f"Show these files, each with its line, and ask nothing: {'; '.join(p + ': ' + s for p, s in shows)}. " if shows else '')
                     + ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', ''))
@@ -2492,8 +2500,8 @@ def cmd_visuals(a):
         return (on_page + first + f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
-        out = write(base + '/chat/next', {'one': bool(a.one)})
-        said = chat_line(out) + (' ' + out['then'] if out.get('then') and not out.get('item') else '')   # design/211: a v2 round that waits for the assistant (the looks, a rewrite): the server's sentence
+        out = write(base + '/chat/next', {'one': bool(a.one), 'many': True})   # release 2, B4: this tool can show a group
+        said = chat_line(out) + (' ' + out['then'] if out.get('then') and not (out.get('item') or out.get('group')) else '')   # design/211: a v2 round that waits for the assistant (the looks, a rewrite): the server's sentence
         chat = ws / 'work' / 'page' / 'in-chat.txt'   # the critic's point 4: once the step went to the chat, neither sentence is repeated on every later `next`
         early, lost = ({}, '') if chat.is_file() else republish_now(ws), page_unconfirmed(ws, 'Ask this step in the chat: what follows is its next decision.')   # fix set (c), (e)
         if lost[0]:   # said once: the round is dealt with, the step is asked here
@@ -2685,7 +2693,7 @@ def cmd_visuals(a):
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
         if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
             emit({'action': 'refused', 'message': 'Give the item and the button chosen: `vw visuals decide --item <id from vw visuals next> --choice <the button\'s choice> --quote "<their words>"`.'}, 2)
-        out = write(base + '/chat/answer', {'item': a.item, 'choice': a.choice, 'quote': a.quote or '', 'notes': a.notes or '', 'one': bool(a.one)})
+        out = write(base + '/chat/answer', {'item': a.item, 'choice': a.choice, 'quote': a.quote or '', 'notes': a.notes or '', 'one': bool(a.one), 'many': True})
         emit(out, 0, 'Recorded. ' + (out.get('then') or '') + ' ' + chat_line(out))   # the answer carries the next decision: one call per answer
     if a.what == 'accept':
         emit(write(base + '/accept', {'gap_ids': a.gaps, 'quote': a.quote}))

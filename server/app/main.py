@@ -1426,10 +1426,12 @@ class ChatAnswer(Write):   # design/188: the operator's answer to the one decisi
     quote: str = Field(default='', max_length=2000)
     notes: str = Field(default='', max_length=4000)
     one: bool = False   # design/190: what comes next is asked one at a time, never on a card
+    many: bool = False   # release 2, B4: this tool can show a group (several end-frames, or layout drawings, in one message)
 
 
 class ChatNext(Write):   # design/190: `one` asks the treatment's lines and the plan's gaps one at a time (a machine that cannot show the card)
     one: bool = False
+    many: bool = False   # release 2, B4: this tool can show a group; a tool that does not say so (an older plugin) gets one item at a time
 
 
 class CardEntry(Strict):
@@ -1527,7 +1529,7 @@ def visuals_motion_render(run_id: UUID, body: Draw, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/chat/next')
 def visuals_chat_next(run_id: UUID, body: ChatNext, user=User, conn=DB):   # design/188: one decision at a time, in the chat; design/190: or one card
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.next_item(conn, storage(), user, run, outputs, body.one))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.next_item(conn, storage(), user, run, outputs, body.one, body.many))
 
 
 @app.post('/api/runs/{run_id}/visuals/chat/card')
@@ -1566,7 +1568,7 @@ def visuals_page_record(run_id: UUID, body: PageAnswers, user=User, conn=DB):   
 @app.post('/api/runs/{run_id}/visuals/chat/answer')
 def visuals_chat_answer(run_id: UUID, body: ChatAnswer, user=User, conn=DB):
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes, body.one))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes, body.one, body.many))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/finish', status_code=201)

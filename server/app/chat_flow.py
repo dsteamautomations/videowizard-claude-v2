@@ -1545,9 +1545,10 @@ def _drawing_items(ctx):
     if plan and session.get('guides'):   # Area B: the drawing of an AI video shot, before its still
         from . import guide
         shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
-        for sid, g in session['guides'].items():
+        for sid in [s for s in shots if s in session['guides']]:   # release 2, B4b: in the order of the film (until then: the order the guides were written; design/35 row 290)
+            g = session['guides'][sid]
             d = g.get('drawing') or {}
-            if sid not in shots or d.get('status') != 'proposed' or d.get('sha256') != g['sha256']:
+            if d.get('status') != 'proposed' or d.get('sha256') != g['sha256']:
                 continue
 
             def run_(choice, quote, words, sid=sid, sha=g['sha256']):
@@ -2168,9 +2169,38 @@ def card_answer(conn, store, user, run, outputs, card_id, answers, one=False):
                     + ('What comes next is in this answer: show it now; do not run `vw visuals next` for it.' if nxt.get('item') or nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')}
 
 
-def next_item(conn, store, user, run, outputs, one=False):
+# ---------- release 2, B4 and B4b (SK, 20 Nov 2026): several of one kind, ready together, in one message; still one decision per picture ----------
+
+TOGETHER = {'still-end:': ('still end-frame', '{n} still end-frames of drawn graphics are ready: each is the drawing as it stands at the end of its shot, before any motion is added.'),
+            'shot-drawing:': ('layout drawing', '{n} layout drawings of AI video shots are ready: each shows how its shot is laid out.')}   # an item's id prefix: (the kind, the shared heading)
+GROUP_MAX = 4   # the question tool takes four questions in one call; more wait for the next message
+GROUP_HOW = ('The tool saved every entry\'s files in the run folder (`show_files` of each entry of `group.items`). Post `group.heading` as your own one line. Then show the pictures of '
+             'all entries in one message, side by side, in this order, each under its entry\'s `name` (' + LOOK_ONLY + '); an entry\'s `text`, when it has one, goes under its picture as it is. '
+             'Then ask with the question tool, in one call: one question for each entry, in this order: the question is the entry\'s `ask` and nothing else; its options are the '
+             'entry\'s buttons (`label` and `description`), in their order, and no others. Never one question for several pictures. '
+             'Record each reply with its own call, in any order: `vw visuals decide --item <the entry\'s id> --choice <the button\'s choice> --quote "<their words>"`. '
+             'A reply that asks for a change needs the operator\'s words (`--notes`): a typed reply is recorded with them at once; where they are missing, ask them for that picture only '
+             'and record the other replies meanwhile: one picture never holds another. Record every reply of the message before you show anything a record returns; '
+             'an entry left unanswered comes back by itself. If the question tool cannot take several questions, run `vw visuals next --one`: the same decisions, one at a time. '
+             'Say nothing about what you did.')
+
+
+def _together(items, many):
+    """What is handed out in one message: the first waiting item; or, for a tool that can show a group (`many`), every waiting item of the first
+    one's kind when that kind is in `TOGETHER`, in their order, at most `GROUP_MAX`. The one function both kinds, the handing out and the answer go through."""
+    pre = next((p for p in TOGETHER if items[0]['id'].startswith(p)), None) if items and many else None
+    return [i for i in items if i['id'].startswith(pre)][:GROUP_MAX] if pre else items[:1]
+
+
+def _entry(item):
+    """One item of a group: as it is handed out alone, with a name for its picture and a question that says which picture it asks about."""
+    pub, name = _public(item, '', 1), item['question'].split(': ')[0]
+    return {**{k: v for k, v in pub.items() if k not in ('how', 'waiting_after_this', 'needed', 'say_last')}, 'name': name, 'ask': f"{name}: {pub['ask']}"}
+
+
+def next_item(conn, store, user, run, outputs, one=False, many=False):
     """design/217 (C2): the pictures that wait for Claude's check are said first, in `then`: the duty is never silent."""
-    out = _next_item(conn, store, user, run, outputs, one)
+    out = _next_item(conn, store, user, run, outputs, one, many)
     try:
         session = V.session_of(store, run, outputs)
         plan = V.current_plan(store, session) if session.get('current') and V.round_v2(session) else None
@@ -2192,7 +2222,7 @@ def next_item(conn, store, user, run, outputs, one=False):
         due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan))) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
-        show = _finished({'session': session, 'store': store}, six) if out.get('item') or out.get('card') else []   # fix set A3.4: a finished drawing is shown with the next answer too (with nothing waiting: `_next_item`), once
+        show = _finished({'session': session, 'store': store}, six) if out.get('item') or out.get('card') or out.get('group') else []   # fix set A3.4: a finished drawing is shown with the next answer too (with nothing waiting: `_next_item`), once
         if show:
             V.save_session(store, run, session)
             out['show'], out['show_how'] = show, SHOW_FIRST
@@ -2222,7 +2252,7 @@ def _finished(ctx, six):
     return out
 
 
-def _next_item(conn, store, user, run, outputs, one=False):
+def _next_item(conn, store, user, run, outputs, one=False, many=False):
     """The one decision the operator takes now; or, for the treatment's lines and the plan's gaps, all of them on one card (design/190; `one` asks
     them one at a time, the older way, kept for a machine that cannot show the card); or that nothing is needed and what is being made."""
     try:
@@ -2241,11 +2271,16 @@ def _next_item(conn, store, user, run, outputs, one=False):
             V.save_session(store, run, session)
         return {'item': None, 'card': card, 'waiting_after_this': len(items) - len(on_card), 'needed': True, 'say_last': NEEDED, 'how': CARD_HOW}
     if items:
-        item = items[0]
-        if (session.get('chat_item') or {}).get('id') != item['id'] or session.get('chat_card'):
-            session['chat_item'] = {'id': item['id'], 'at': datetime.now(timezone.utc).isoformat()}
+        group = _together(items, many and not one)   # release 2, B4 and B4b: several end-frames, or layout drawings, ready together; else the one item, as before
+        item, ids, held = items[0], [i['id'] for i in group], session.get('chat_item') or {}
+        if held.get('id') != item['id'] or (held.get('group') or ids[:1]) != ids or session.get('chat_card'):
+            session['chat_item'] = {'id': item['id'], 'at': datetime.now(timezone.utc).isoformat(), **({'group': ids} if len(ids) > 1 else {})}
             session.pop('chat_card', None)   # one at a time now: a card shown before is not answered any more
             V.save_session(store, run, session)
+        if len(group) > 1:
+            kind, heading = next(v for p, v in TOGETHER.items() if item['id'].startswith(p))
+            return {'item': None, 'group': {'kind': kind, 'heading': heading.format(n=len(group)), 'items': [_entry(i) for i in group]},
+                    'waiting_after_this': len(items) - len(group), 'needed': True, 'say_last': NEEDED, 'how': GROUP_HOW}
         pub = _public(item, summary, len(items), one)
         if item.get('_line') and P.complete(_step6(ctx)):   # design/221 row 18: everything of step 6 is made: the page offers it, in one visit
             pub['how'] = (T.W['page_now'] if item['_line'].get('kind') == 'take' else P.W['page_now']) + pub['how']   # design/222: a take is answered on the page of step 7
@@ -2267,15 +2302,18 @@ def _next_item(conn, store, user, run, outputs, one=False):
                    + (STATUS_HOW if count else '') + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
 
 
-def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='', one=False):
-    """The operator's answer to the item that was handed out. Any other item is refused by name."""
+def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='', one=False, many=False):
+    """The operator's answer to the item that was handed out, or to one item of the group that was handed out (release 2, B4: each on its own, in
+    any order). Any other item is refused by name."""
     ctx = _ctx(conn, store, user, run, outputs)
     items, _summary, _ = _candidates(ctx)
-    current = items[0] if items else None
-    handed = (ctx['session'].get('chat_item') or {}).get('id')
-    V.need(current, 'Nothing waits for an answer now: run `vw visuals next`.')
-    V.need(item_id == current['id'] and handed == current['id'],
-           f"{item_id} is not the decision that is open. The open one is {current['id']} ({current['position']}): show it with `vw visuals next` and record the operator's answer to it. One decision at a time, in the server's order.")
+    handed = ctx['session'].get('chat_item') or {}
+    open_ids = handed.get('group') or [handed.get('id')]   # a session of the older server holds the one id
+    now = _together(items, len(open_ids) > 1)
+    current = next((i for i in now if i['id'] == item_id and item_id in open_ids), None)
+    V.need(items, 'Nothing waits for an answer now: run `vw visuals next`.')
+    V.need(current,
+           f"{item_id} is not the decision that is open. The open one is {now[0]['id']} ({now[0]['position']}): show it with `vw visuals next` and record the operator's answer to it. One decision at a time, in the server's order.")
     choices = current['buttons'] + list(current.get('other_choices') or [])
     button = next((b for b in choices if b['choice'] == choice), None)
     V.need(button, f"Not an answer to this item: {choice!r}. Its answers are: " + ', '.join(f"{b['choice']} ({b['label']})" for b in choices) + '.')
@@ -2289,10 +2327,13 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     out = out if isinstance(out, dict) else {}
     done = {k: out[k] for k in ('recorded', 'accepted', 'revise', 'for_the_assistant', 'held', 'pass', 'queued', 'errors') if k in out}
     said = out.get('tell') or (out.get('then') if V.round_v2(session) else None)   # design/211: an answer of a v2 round carries the server's own "what next" (the second go ordered, a set made)
-    nxt = next_item(conn, store, user, run, outputs, one)   # SK, 12 Nov 2026: record and fetch in one step, so the operator waits once per answer, not twice
+    nxt = next_item(conn, store, user, run, outputs, one, many)   # SK, 12 Nov 2026: record and fetch in one step, so the operator waits once per answer, not twice
     return {'answered': item_id, 'choice': choice, **done, **nxt,
             'then': (str(said) + ' ' if said else '')
+                    + ('If the operator answered other pictures of the same message, record those first; show only what the last record returns. ' if len(open_ids) > 1 else '')
                     + ('The next decision is in `item`: show it now; do not run `vw visuals next` for it.' if nxt.get('item')
-                       else 'What comes next is a card (`card`): show it now, as `how` says.' if nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')
+                       else 'What comes next is a card (`card`): show it now, as `how` says.' if nxt.get('card')
+                       else 'What comes next is several pictures in one message (`group`): show them now, as `how` says.' if nxt.get('group')
+                       else 'No decision waits now: give the `working` lines and the last line.')
                     + (' ' + nxt['then'] if nxt.get('then') and nxt['then'] != said else '')
                     + (' The operator asked for a change: make only that change, send it again, and it returns in its turn.' if button.get('needs_words') else '')}
