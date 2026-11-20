@@ -154,7 +154,7 @@ Steps, seats, bending and door arcs; an arm passing through a thing; one thing h
 - `parents`: only approved pictures, each with its job. For the first still of a scene: the people's full-length and face pictures and each prop's picture, cropped to the thing. For later stills of the same scene: crops of the scene's first approved still. Never a whole photo taken from another camera position; never a person's working-pose picture.
 - A describes-what-it-looks-like word beats a trade name. A "not a …" phrase goes in only after that fault has been seen.
 
-After `vw guide look`, show the operator the overlay and say what to look for: every person and thing sits on the red outlines. Then: approve the exact file; or repair one wrong part (`vw guide repair --still ID --region left,top,width,height --prompt "what is wrong; what it becomes"`); or reject it with the reason. A fault in the guide itself is fixed in the scene, never in words.
+After `vw guide look`, show the operator the overlay and say what to look for: every person and thing sits on the red outlines. Claude checks the still first: `vw visuals pictures --looks` lists it (kind `start`) with its lines; its card comes with the check, or after 30 minutes as not checked. Then: approve the exact file; or repair one wrong part (`vw guide repair --still ID --region left,top,width,height --prompt "what is wrong; what it becomes"`); or reject it with the reason. A fault in the guide itself is fixed in the scene, never in words.
 
 ## The take's words
 

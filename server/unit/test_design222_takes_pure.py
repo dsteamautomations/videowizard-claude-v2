@@ -430,8 +430,9 @@ def test_the_served_text_says_the_new_order_and_the_replaced_sentences_are_retir
     import sys
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d222_wording_v3 as D
+    import rel1a_wording as REL1A   # release 1, section A: step 7's still and the answer "na" come inside this script's sentences on a take's check
     v3 = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
-    st = next(s for s in v3['stages'] if s['name'] == 'visuals')
+    st = REL1A.before(next(s for s in v3['stages'] if s['name'] == 'visuals'))
     later = next(p for p in st['parts'] if p['name'] == 'later')['text']
     assert D.CHECK_NEW in later and D.SHOOT_NEW in later and 'Gemini reads every ready take' not in later
     old = next(p for p in D.before(st)['parts'] if p['name'] == 'later')['text']

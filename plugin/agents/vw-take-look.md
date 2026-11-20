@@ -15,7 +15,7 @@ Read and write every file by its full path, the run folder's path first (`<run f
 
 For each of your takes:
 1. Read its row, then look at **every** frame in order, the sheet and the still. Do not skip frames. The sheet shows what happens between two half-second frames: use it to place a fault.
-2. Answer every line of its `lines` by the points of `how_take.judge`, each of them and no other: `pass` true or false, from what the frames show, never from the request. Be literal.
+2. Answer every line of its `lines` by the points of `how_take.judge`, each of them and no other: `pass` true or false, from what the frames show, never from the request. Be literal. Or `"pass": "na"`, "does not apply here", with one sentence in `seen` saying why: only when these frames cannot show the thing the line asks about, or the line is about another thing than this take shows (a line about how a hand holds a tool, where no hand is in the frame; a line about the whole room, on a close view of one object). Never for something that is in view: that passes or fails.
 3. A fail gets one plain sentence of what you saw (`seen`), in words the operator can read and send back as a correction, and `at_s`: the second of the frame that shows it. A thing present in one frame and gone in the next with no hand near it fails its line; say both seconds.
 4. What the still already shows is not a fault of the take: where the request and the still differ, judge the take against the still.
 5. You are not asked how things move between the frames (speed, a jerk, a flicker shorter than half a second): the operator plays the take. Never write that a take is right as a whole: you answer its lines.

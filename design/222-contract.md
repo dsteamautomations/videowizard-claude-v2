@@ -43,6 +43,7 @@ New: the layout `layout.kind = "takes"`, its line kind `take`, its words `layout
 | `by` | who checked, and against how many lines ("" when not checked) |
 | `not_judged` | "Not judged: how things move between the frames. Play the take." |
 | `passed` | the lines that passed |
+| `na` | release 1, A5 (20 Nov 2026): only when a line did not apply: `{head: "1 line did not apply", lines: [str]}`, each line with its reason; never among `faults` or `passed`. A take whose every line of Claude's did not apply is `not_checked`. In a look a line's `pass` is `true`, `false` or `"na"` (with why in `seen`); on the scorecard such a line reads "Does not apply" |
 
 ### 3.2 A button
 

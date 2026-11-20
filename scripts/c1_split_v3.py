@@ -176,6 +176,8 @@ if __name__ == '__main__':
         prompt = fixset4(prompt, parts)
         from fixset5_wording import apply as fixset5   # fix set, 20 Nov 2026: the page's link only from `vw visuals page --shown`, a page of an older tool published again early, never a new page
         prompt = fixset5(prompt, parts)
+        from rel1a_wording import apply as rel1a   # release 1, section A, 20 Nov 2026: a rule or a line answered "na" (does not apply, with why), step 7's still checked by Claude before its card
+        prompt = rel1a(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

@@ -156,6 +156,8 @@ Extra on a drawn line:
 | `show` | str | `first`: the faults after the first behind `words.more`; `all`: every fault in view (drawn) |
 | `faults` | [str] | the failed lines in full (steps: prefixed "Step n: ") |
 | `passed_head`, `passed` | str, [str] | behind "Details"-style fold |
+| `na` | {`head`: str, `lines`: [str]} | release 1, A5 (20 Nov 2026): only when a line did not apply: "2 lines did not apply" and each line with its reason (steps: prefixed "Step n: "; a drawn graphic: its rules). Never among `faults` or `passed`; to show folded |
+| `who` | str | release 1, A2: only when Claude did not check it alone: `model` (Gemini 3.8 Flash checked it before this release; `head` and `by` name it) or `mixed` (a graphic whose steps were checked by both) |
 | `advice_head`, `advice` | str, [str] | the program's measured lines (light, fine detail, size, transparency, two steps alike) shown as advice, never a fault (C4, D2, R3); for a drawn graphic "What the checker saw" |
 
 `state` meanings: `pass` and `fail` from Claude's recorded look (or, for a drawn graphic, from the fact check round of the take's project sha); `not_checked`: the look said `not_checked` or the time-out passed (C3); `none`: a drawn graphic with no fact check yet, or an older svg drawing with no server check.
@@ -245,7 +247,7 @@ The light line is not in Claude's list: the program measures it (advice, D2).
 ```json
 {"by": "assistant | helper",
  "pictures": [{"ref": "<id>", "sha10": "<first 10 of its sha256>",
-               "lines": [{"id": "<line id>", "pass": true, "seen": "<one sentence, required with a fail and with a `say` line, at most 300 characters>"}],
+               "lines": [{"id": "<line id>", "pass": true, "seen": "<one sentence, required with a fail, with \"na\" and with a `say` line, at most 300 characters>"}],
                "not_checked": "<only for a picture that could not be opened: why, one line; then no lines>"}]}
 ```
 
@@ -260,6 +262,7 @@ Reuse the design/214 sentences with "picture" wording: `LOOK_LINE_OPEN` (a line 
 - Stored on the reference: `ref.look = {who, at, sha256, lines: [{id, check, pass, seen}]}` or `{who, at, sha256, not_checked}`. The program's lines stay in `ref.check.code`. `check_summary` reads `look` for these kinds. A helper that stops half-way: the pictures it did not answer stay due (never marked passed).
 - Offered: `waiting()` lists a picture only with a look recorded, or after `PICTURE_LOOK_MINUTES = 30` from `asked_at` (stamped the first time `looks_due` lists it or `waits_words` reports it, never from when it was made: a film paused overnight is not offered as not checked), then as `not_checked` with "Claude's check did not come within 30 minutes" (C3, F6). A look that arrives later and before the operator's answer replaces it.
 - A candidate the model checked before the deploy (`check.lines` or `check.model`, no `look`, no `ready_at`) keeps that check: offered as before, its check line from those lines; only a picture still `check_pending` at the deploy goes to Claude. Its chat item keeps its id and answers.
+- Release 1, section A (20 Nov 2026). A line's `pass` is `true`, `false` or `"na"` ("does not apply here", with why in `seen`; refused without it: `PIC_LOOK_NA`); stored as sent; a look whose every line is `"na"` reads `not_checked` ("judge by eye"), and a component is not approved on it. A start or end picture is Claude's too (`claude_checks` no longer leaves it to the model). The looks route also lists step 7's still, a row of kind `start`: `{ref: <still id>, sha10, kind: "start", name, shot_id, key, inputs: [{ref, role: "overlay" | "layout" | "parent", key}], request, lines}`; its look is stored on the still (`session.guides[shot].stills[i].look`, the same shape, with `asked_at`), and its chat card comes with the look or after the same 30 minutes. The line "a real face" names the people of the shot whose permission is recorded (`session.likeness`).
 - A component whose look fails (or could not be opened) stays a candidate and is named, with its failed lines, in the `then` of the looks route and in `next` / `status` / the page's record ("make it again …"); the program's advice lines never decide its approval.
 - Rule 0, fork 4 (a parent approved with a failed line): on a v2 film the failed lines are Claude's (`V.parent_failed`).
 - Meanwhile its row is in `layout.coming` as `checking`.

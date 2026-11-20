@@ -174,6 +174,7 @@
     "a shot whose only text they are has `labels: []` and is not asked for labels",
     "is started only after that shot's project has passed its fact check)",
     "typing none of it; give the operator the link; when they say done",
-    "publish the page again to the same link first, as it says."
+    "publish the page again to the same link first, as it says.",
+    "VideoWizard's checker of the pictures of step 6 (a still, a step of a graphic, the style sheet, a component)."
   ]
 }
