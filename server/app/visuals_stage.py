@@ -6224,15 +6224,15 @@ def round_rules(session, shot_id, sha, cmp=None, passed=False):
     if row.get('still') or not prev or prev.get('still') or not row.get('rules') or prev.get('brief_at') != digest(row.get('brief') or {}):
         return None
     said = {pictures.rule_id(r.get('rule')): r for r in prev.get('rules') or []}
-    if all(r.get('pass') is True for r in said.values()):
+    if all(settled(r) for r in said.values()):   # release 1, A3: a rule that did not apply is recorded once, never asked again
         return None
     mine = [h for h in row['rules'] if cmp.get(h['id'], {'state': 'ready'})['state'] == 'ready'
-            and (said.get(h['id'], {}).get('pass') is not True or (h['id'] in cmp and said[h['id']].get('with_png') != cmp[h['id']]['png']))]
+            and (not settled(said.get(h['id'], {})) or (h['id'] in cmp and said[h['id']].get('with_png') != cmp[h['id']]['png']))]
     if passed:
         return [f"must: {h['rule']}" for h in row['rules'] if h not in mine and h.get('class') != 'should' and said.get(h['id'], {}).get('pass') is True
                 and cmp.get(h['id'], {'state': 'ready'})['state'] == 'ready']
     return [f"{h.get('class') or 'must'}: {h['rule']}" for h in mine] + [f"{r.get('class') or 'must'}: {r['rule']}" for i, r in said.items()
-                                                                        if i not in {h['id'] for h in row['rules']} and r.get('pass') is not True]
+                                                                        if i not in {h['id'] for h in row['rules']} and not settled(r)]
 
 
 def still_rules(held):
@@ -6849,6 +6849,11 @@ MOTION_NOT_CHECKED = ('{shot}: there is no finished check of this project: run `
 
 
 NOT_SEEN = 'not seen'   # design/221 row 12: the third answer to a rule: the checker could not judge it from its frames
+NA = 'na'   # release 1, A3 (SK, 20 Nov 2026): "does not apply here", an answer to a check line everywhere Claude checks (a set, a picture, a take, a drawing's rule), with one sentence why
+# A4: the guard. The server cannot see the picture, so it is said where the checker reads how to judge (the `how` served with the looks)
+NA_HOW = ('A line may also be answered "does not apply here": `"pass": "na"`, with one sentence in `seen` saying why. Give it only when this view cannot show '
+          'the thing the line asks about, or the line is about another thing than this picture shows: for example a line about how a hand holds a tool, where '
+          'no hand is in the frame; a line about the whole room, on a close view of one object. Never for something that is in view: that passes or fails.')
 
 
 def answered(row):
@@ -6960,6 +6965,15 @@ MOTION_RULE_NEED = ('{shot}: the rule "{rule}" is not seen: say in `need` the fr
                     'and send the verdict again.')
 MOTION_RULE_FAILED_BEFORE = ('{shot}: in round 2 or 3 a verdict may leave out a rule that passed before, but every rule that failed before is answered: '
                              '{n} left out, first: "{rule}". Add it and send the verdict again.')   # design/221 row 13
+# release 1, A3, A4: "does not apply" always says why; a rule already judged is in view, so it is never cleared this way
+MOTION_RULE_NA = ('{shot}: the rule "{rule}" is answered "na" (does not apply here) with no reason: say in `why`, in one sentence, why this drawing cannot show it or what '
+                  'other thing the rule is about; or answer it pass or fail. Then send the verdict again.')
+MOTION_RULE_NA_JUDGED = ('{shot}: the rule "{rule}" {was} in an earlier round, so this drawing shows it: answer it pass or fail, not "na", and send the verdict again.')
+
+
+def settled(rule):
+    """Release 1, A3: an answer that is not asked again: a pass, or "does not apply" (recorded once)."""
+    return rule.get('pass') is True or rule.get('pass') == NA
 
 
 def _rule_class(r):
@@ -6998,8 +7012,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     idle = {i for i, c in cmp.items() if c['state'] != 'ready'}   # nothing to compare with yet (or the other drawing left the plan): a note, not this verdict's
     idle |= left_out(session, shot['id'], sha)   # the critic's point 1: nor a comparison that turned ready after the upload: its checker was not given the frame
     bare = still and still_rules([h for h in held if h['id'] not in idle]) == []   # the carry-over c2: no rule of the list is one a still can show: an empty verdict passes the still
-    need((rules or bare) and all(isinstance(r, dict) and (r.get('pass') is True or r.get('pass') is False or r.get('pass') == NOT_SEEN) and str(r.get('rule') or '').strip() for r in rules),
-         'The verdict lists the rules checked; every rule has pass true or false (or "not seen", with the frame it needs in `need`) and its words (`rule`).')
+    need((rules or bare) and all(isinstance(r, dict) and (r.get('pass') is True or r.get('pass') is False or r.get('pass') in (NOT_SEEN, NA)) and str(r.get('rule') or '').strip() for r in rules),
+         'The verdict lists the rules checked; every rule has pass true or false (or "not seen", with the frame it needs in `need`; or "na", it does not apply here, with why in `why`) '
+         'and its words (`rule`).')
     rules = [{**r, 'rule': str(r['rule'])[m.end():] if (m := pictures.RULE_CLASS.match(str(r['rule']))) else r['rule']} for r in rules]   # row 11: a class copied into the words is not part of them
     rules = [{**r, **({'with_png': cmp[i]['png']} if i in cmp else {})} for r in rules for i in [pictures.rule_id(r['rule'])] if i not in idle]   # compared with this picture of the other drawing
     frame = ''
@@ -7013,7 +7028,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     need(not mute, MOTION_RULE_WORDS.format(shot=shot['id'], rule=str(mute[0])[:160] if mute else ''))
     blind = [r['rule'] for r in rules if r['pass'] == NOT_SEEN and not str(r.get('need') or '').strip()]
     need(not blind, MOTION_RULE_NEED.format(shot=shot['id'], rule=str(blind[0])[:160] if blind else ''))
-    marks = {h['id']: h.get('shows') for h in held}   # fix set B3: each rule is marked when it is written: a still can show it, or only motion shows it
+    bare_na = [r['rule'] for r in rules if r['pass'] == NA and not str(r.get('why') or '').strip()]
+    need(not bare_na, MOTION_RULE_NA.format(shot=shot['id'], rule=str(bare_na[0])[:160] if bare_na else ''))
+    marks ={h['id']: h.get('shows') for h in held}   # fix set B3: each rule is marked when it is written: a still can show it, or only motion shows it
     if still:   # a still shows no motion: an answer to a rule only motion shows is not the still's, whatever it says. A rule with no mark (a list written
         # before the marks) keeps the hotfix of 19 Nov (VW-24): answered "not seen" on a still it is a rule left out, never a frame to fetch or "not seen twice"
         rules = [r for r in rules if marks.get(pictures.rule_id(r['rule'])) != 'motion' and (r['pass'] != NOT_SEEN or marks.get(pictures.rule_id(r['rule'])) == 'still')]
@@ -7035,14 +7052,16 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
            for i, r in ((pictures.rule_id(r.get('rule')), r) for r in rules)}   # design/221 (the critic's A4): not seen twice in a round is a failed must
     out_ = idle | ({i for i, r in got.items() if r.get('twice')} if still else set())   # the carry-over c1: on a still a rule not seen twice is left out (the animated drawing answers it): a still never loops on "not seen"
     got, earlier = {i: r for i, r in got.items() if i not in out_}, {i: e for i, e in earlier.items() if i not in out_}
+    judged = [(r['rule'], earlier[i]['pass']) for i, r in got.items() if r['pass'] == NA and i in earlier and isinstance(earlier[i].get('pass'), bool)]   # release 1, A4: a rule that passed or failed before keeps the existing rules
+    need(not judged, MOTION_RULE_NA_JUDGED.format(shot=shot['id'], rule=str(judged[0][0])[:160], was='passed' if judged[0][1] else 'failed') if judged else '')
     if held:   # design/217 (C6): the verdict answers the project's whole rule list, by the rules' own words; a project uploaded before keeps the older way (any list)
         known = {h['id']: h for h in held}
         unknown = [r['rule'] for i, r in got.items() if i not in known and i not in earlier and r.get('group') != 'seen']   # a fault the checker adds of its own is a new rule, group "seen"
         need(not unknown, MOTION_RULE_UNKNOWN.format(shot=shot['id'], rule=str(unknown[0])[:160] if unknown else ''))
-        open_before = [e['rule'] for i, e in earlier.items() if later and e.get('pass') is not True and i not in got]
+        open_before = [e['rule'] for i, e in earlier.items() if later and not settled(e) and i not in got]   # release 1, A3: a rule that did not apply is not asked again
         need(not open_before, MOTION_RULE_FAILED_BEFORE.format(shot=shot['id'], n=len(open_before), rule=str(open_before[0])[:160] if open_before else ''))
         skipped = [h['rule'] for h in held if (not still or (h.get('shows') == 'still' and h.get('class') != 'should'))   # row 3, fix set B3: a still answers the musts marked as ones a still can show; an unmarked list, any of them
-                   and h['id'] not in out_ and h['id'] not in got and not (h['id'] in earlier and (same or earlier[h['id']].get('pass') is True))]
+                   and h['id'] not in out_ and h['id'] not in got and not (h['id'] in earlier and (same or settled(earlier[h['id']])))]
         need(not skipped, MOTION_RULE_OPEN.format(shot=shot['id'], n=len(skipped), rule=str(skipped[0])[:160] if skipped else ''))
         rules = [{**(got.get(h['id']) or {**earlier[h['id']], 'carried': True}), 'class': h.get('class') or 'must', 'held': True} for h in held
                  if (not still or h['id'] in got or h['id'] in earlier) and h['id'] not in out_]
@@ -7057,8 +7076,9 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     failed = [r for r in rules if r['pass'] is False and r['class'] == 'must']
     notes = [r['rule'] for r in rules if r['pass'] is False and r['class'] == 'should']
     blind = [{'rule': r['rule'], 'need': str(r.get('need') or '')} for r in rules if r['pass'] == NOT_SEEN]
+    na = [{'rule': r['rule'], 'why': ' '.join(str(r.get('why') or '').split())[:500]} for r in rules if r['pass'] == NA]   # release 1, A4: a note for the operator, never a failed must: it holds nothing, no frame is fetched, no round is counted
     rec = {'sha256': sha, 'round': rnd, 'stranger': [str(x)[:500] for x in body.get('stranger') or []][:20] or list((prev or {}).get('stranger') or []) * same,
-           'rules': [{k: (str(r.get(k))[:500] if k not in ('pass', 'carried') else r[k]) for k in ('n', 'group', 'rule', 'pass', 'class', 'kind', 'where', 'fix', 'need', 'carried', 'with_png') if k in r}
+           'rules': [{k: (str(r.get(k))[:500] if k not in ('pass', 'carried') else r[k]) for k in ('n', 'group', 'rule', 'pass', 'class', 'kind', 'where', 'fix', 'need', 'why', 'carried', 'with_png') if k in r}
                      for r in rules][:80],
            **({'label_musts': labels} if labels else {}), 'answered': answered((session.get('motion_projects') or {}).get(sha)), 'brief_at': brief_at,   # the critic's A1: the rules and brief it answered
            **({'still': True} if still else {}), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
@@ -7105,9 +7125,10 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
         nxt = (f"Passed, {n_notes}: `vw motion render --shot {shot['id']}`."
                + (f" The plan names another project for {shot['id']} ({other[:12]}…): take sha256 out of its scene_motion first, so the render takes this one." if other and other != sha else '')
                + (' The notes are shown with the drawing: ' + '; '.join(f'"{n}"' for n in notes) + '.' if notes else ''))
-    return {'shot_id': shot['id'], 'round': rnd, 'failed': names, 'notes': notes, 'not_seen': blind,
+    return {'shot_id': shot['id'], 'round': rnd, 'failed': names, 'notes': notes, 'not_seen': blind, **({'na': na} if na else {}),
             'log': f"round {rnd}: {len(names)} of {len(rules)} rules failed" + (': ' + '; '.join(f'"{n}"' for n in names) if names else '')   # design/221 row 22: the log line says what failed
-                   + (f'; {n_notes}' if notes else '') + (f'; {len(blind)} not seen' if blind else ''),
+                   + (f'; {n_notes}' if notes else '') + (f'; {len(blind)} not seen' if blind else '')
+                   + (f'; {len(na)} did not apply: ' + '; '.join(f"\"{x['rule']}\" ({x['why']})" for x in na) if na else ''),   # release 1, A5: kept in the run's log
             'next': nxt}
 
 

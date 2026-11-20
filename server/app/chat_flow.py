@@ -896,7 +896,7 @@ def _told(line):
     parts = [line.get('text') or ''] + [(line.get('likeness') or {}).get('ask') or ''] + [line.get('differs') or ''] + [line.get('partial') or ''] + [WORDS['read_first'].format(warning=w) for w in line.get('warnings') or []]
     parts += [f"{p['label']}: {p['note']}" + (' (weak)' if p.get('weak') else '') for p in line.get('pics') or [] if p.get('note')]
     parts += [check['by']] if check else []
-    parts += list(check.get('lines') or []) + list(line.get('changes') or [])
+    parts += list(check.get('lines') or []) + ([check['na']['head'] + ': ' + ' '.join(check['na']['lines'])] if check.get('na') else []) + list(line.get('changes') or [])   # release 1, A5
     parts += [WORDS['model_' + k].format(words=v) for k, v in (line.get('look') or {}).items() if v]   # design/213: the image model's notes as Claude's two plain lines; the raw notes stay in the record
     parts += [line['searched']['text']] if line.get('searched') else []   # design/215
     parts += [line['asked']] if isinstance(line.get('asked'), str) else []
@@ -1236,7 +1236,9 @@ def _round_v2(ctx, every, step):
             fault = lambda p, x: plain(p, x) if x.get('check') in ('size', 'parent') else WORDS['check_line'].format(pic=named(p), seen=plain(p, x))
             faults = [fault(p, x) for p in shown for x in (p.get('check') or {}).get('failed') or []]
             off = [WORDS['check_off'].format(pic=named(p)) + (': ' + str(p['check']['error']) if (p.get('check') or {}).get('error') else '.') for p, st in zip(shown, states) if st == 'none']
-            check = {'state': state, 'by': WORDS['by_' + state], 'chip': WORDS['chip_fail'].format(faults=_n(len(faults), 'fault')) if state == 'fail' else WORDS['chip_' + state], 'lines': faults + off}
+            na = [f"{named(p)}: {x['check']}: {x['seen']}" for p in shown for x in (p.get('check') or {}).get('na') or []]   # release 1, A5: the lines that did not apply, apart from the faults
+            check = {'state': state, 'by': WORDS['by_' + state], 'chip': WORDS['chip_fail'].format(faults=_n(len(faults), 'fault')) if state == 'fail' else WORDS['chip_' + state], 'lines': faults + off,
+                     **P.na_view(na)}
             proposed, again = sf.get('rec') or {}, int(sf.get('makes_left') or 0) > 0
             do = proposed.get('do') if proposed.get('do') in ('use', 'remake', 'doubt') else None
             chat, page, add = answers()

@@ -64,7 +64,11 @@ W = {
     'pass': "Claude's check found nothing wrong", 'fail': "Claude's check found {problems}: {first}",
     'late': "Not checked: Claude's check did not come within {m} minutes. Judge it by eye.", 'unopened': 'Not checked: Claude could not open the picture. Judge it by eye.',
     'none': 'Not checked: no check was run on this picture. Judge it by eye.',
-    'by': 'Claude looked at the picture against its list of {n} lines.', 'by_steps': 'Claude looked at each step against its list: {ns} lines.',
+    # release 1, A5: the lines that did not apply, listed apart; a list where every line did not apply is not a check
+    'na_head': '{n} lines did not apply', 'na_head_one': '1 line did not apply',
+    'all_na': 'Not checked: every line of its list was answered "does not apply". Judge it by eye.',
+    'all_na_rules': 'Not fact-checked: every rule was answered "does not apply". Judge it by eye.',
+    'by':'Claude looked at the picture against its list of {n} lines.', 'by_steps': 'Claude looked at each step against its list: {ns} lines.',
     'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
     'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
     'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
@@ -120,6 +124,7 @@ W = {
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
     'comp_unopened': 'Claude could not open it ({why}).',
+    'comp_all_na': 'Claude answered every line of its list "does not apply": it is not checked.',
 }
 PAGE = {   # layout.words.pictures: the page's chrome
     'todo': 'Needs your answer', 'coming': 'Could not be made', 'recorded': 'Answered earlier', 'nothing': W['nothing'], 'against': 'Against the check',
@@ -134,8 +139,11 @@ PAGE = {   # layout.words.pictures: the page's chrome
     'help': 'How this works', 'keys': 'Keys: the left and right arrows move between the things that need an answer. Escape closes what is open.', 'close': 'Close'}
 
 # ---------- Claude's check: the refusals (design/214's sentences, said of pictures) ----------
-PIC_LOOK_OPEN = ('{name}: the line "{check}" ({id}) has no answer: every line of the picture gets `pass`, true or false. Answer it in its `lines` and send the file again '
-                 '(`vw visuals pictures --looks <file>`).')
+PIC_LOOK_OPEN = ('{name}: the line "{check}" ({id}) has no answer: every line of the picture gets `pass`: true, false or "na" (does not apply here, with why in `seen`). '
+                 'Answer it in its `lines` and send the file again (`vw visuals pictures --looks <file>`).')
+# release 1, A3: "does not apply" with no reason
+PIC_LOOK_NA = ('{name}: the line "{check}" ({id}) is answered "does not apply" with no reason: say in `seen`, in one sentence of at most {max} characters, why this view '
+               'cannot show it or what other thing the line is about; or answer it pass or fail. Then send the file again (`vw visuals pictures --looks <file>`).')
 PIC_LOOK_UNKNOWN = '{name}: {id} is not a line of this picture now: list the pictures again (`vw visuals pictures --looks`), answer the lines it gives and send the file again.'
 PIC_LOOK_WORDS = ('{name}: the line "{check}" ({id}) needs one plain sentence of what was seen (`seen`, at most {max} characters): a fail always, and a pass of a line marked '
                   '`say`. Add it and send the file again (`vw visuals pictures --looks <file>`).')
@@ -154,10 +162,11 @@ LOOK_HOW = {
               '`earlier` is the picture this one was made again from; `step before` is the previous step of a graphic.',
               'Exact words are read letter for letter. A face that matches a person of the footage fails "a real face". Anything the request did not ask for fails "nothing extra".',
               'Never pass a line you did not look at. A picture you could not open is `not_checked`, with why, and then has no lines.',
-              'The light, the fine detail and the size are measured by the program: they are not your lines.'],
+              'The light, the fine detail and the size are measured by the program: they are not your lines.', V.NA_HOW],
     'file': {'by': 'assistant | helper',
              'pictures': [{'ref': '<the picture id>', 'sha10': '<the first 10 characters of its sha256, as listed>',
-                           'lines': [{'id': '<a line id of its `lines`>', 'pass': 'true | false', 'seen': '<with a fail, and with a line marked `say`: one plain sentence, at most 300 characters>'}],
+                           'lines': [{'id': '<a line id of its `lines`>', 'pass': 'true | false | "na"',
+                                      'seen': '<with a fail, with "na" (why it does not apply) and with a line marked `say`: one plain sentence, at most 300 characters>'}],
                            'not_checked': '<only for a picture that could not be opened: why, one line; then no lines>'}]},
     'send': '`vw visuals pictures --looks <file>`. A refused picture is named with its reason: fix its row and send it again; the others are recorded.'}
 
@@ -175,6 +184,18 @@ def _say(check, words):
 
 def _problems(n):
     return f"{n} problem{'' if n == 1 else 's'}"
+
+
+def na_view(lines):
+    """Release 1, A5: the lines that did not apply as the page and the chat get them, one field: {'na': {'head', 'lines'}}; nothing when there is none."""
+    lines = list(lines)
+    return {'na': {'head': W['na_head_one'] if len(lines) == 1 else W['na_head'].format(n=len(lines)), 'lines': lines}} if lines else {}
+
+
+def all_na(look):
+    """Release 1, A5: every line of this look was answered "does not apply": nothing was judged, so it is not a check."""
+    rows = (look or {}).get('lines') or []
+    return bool(rows) and all(l.get('pass') == V.NA for l in rows)
 
 
 def _and(items):
@@ -348,7 +369,7 @@ def components_failed(session, plan):
     for r in session['references'].values():
         look = looked(r)
         if r.get('kind') == 'component' and r.get('status') == 'candidate' and look and claude_checks(session, r, plan):
-            why = look.get('not_checked') and W['comp_unopened'].format(why=look['not_checked'])
+            why = W['comp_unopened'].format(why=look['not_checked']) if look.get('not_checked') else W['comp_all_na'] if all_na(look) else ''
             fails = _failed_lines(r)
             if why or fails:
                 out.append(W['comp_failed'].format(name=name_of(session, plan, r), ref=r['id'], lines=why or ' '.join(fails), element=r.get('element_id') or 'E'))
@@ -421,9 +442,11 @@ def _fault(name, want, sent):
         return PIC_LOOK_UNKNOWN.format(name=name, id=unknown[0])
     for w in want:
         a = got.get(w['id'])
-        if not a or not isinstance(a.get('pass'), bool):
+        if not a or not (isinstance(a.get('pass'), bool) or a.get('pass') == V.NA):
             return PIC_LOOK_OPEN.format(name=name, check=w['check'], id=w['id'])
         words = one(a.get('seen'))
+        if a['pass'] == V.NA and not words:   # release 1, A3: "does not apply" always says why
+            return PIC_LOOK_NA.format(name=name, check=w['check'], id=w['id'], max=LOOK_SAY)
         if len(words) > LOOK_SAY or (not words and (a['pass'] is False or w.get('say'))):
             return PIC_LOOK_WORDS.format(name=name, check=w['check'], id=w['id'], max=LOOK_SAY)
     return None
@@ -436,8 +459,8 @@ TAKE_LOOK_HOW = {
               'With a fail, say in one plain sentence what you saw, in words the operator can send back, and give `at_s`: the second of the frame that shows it.',
               'What the still already shows is not a fault of the take: judge the take against the still where the request and the still differ.',
               'You are not asked how things move between the frames (speed, a jerk): the operator plays the take. A thing present in one frame and gone in the next with no hand near it fails its line.',
-              'A take whose frames you could not open is `not_checked`, with why, and then has no lines. Never pass a line you did not look at.'],
-    'file': 'The same file as for pictures: one row per take with its `ref`, its `sha10` as listed, and one answer per line: {id, pass, seen, at_s}.'}
+              'A take whose frames you could not open is `not_checked`, with why, and then has no lines. Never pass a line you did not look at.', V.NA_HOW],
+    'file': 'The same file as for pictures: one row per take with its `ref`, its `sha10` as listed, and one answer per line: {id, pass, seen, at_s}; `pass` is true, false or "na".'}
 
 
 def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
@@ -475,7 +498,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
                      **({'not_checked': why} if why else {'lines': [{'id': w['id'], 'check': w['check'], 'pass': got[w['id']]['pass'], 'seen': ' '.join(str(got[w['id']].get('seen') or '').split())}
                                                                for w in want]})}
         recorded.append(rid)
-        if r.get('kind') == 'component' and not why and not _failed_lines(r):   # the program's advice lines (transparency, light) never decide it
+        if r.get('kind') == 'component' and not why and not _failed_lines(r) and not all_na(r['look']):   # the program's advice lines (transparency, light) never decide it; release 1, A5: nor a list where nothing applied
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
@@ -507,27 +530,36 @@ def advice(ref):
     return out
 
 
-def _view(state, head, by='', faults=(), passed=(), adv=(), show='first', passed_head=None, advice_head=None):
+def _view(state, head, by='', faults=(), passed=(), adv=(), show='first', passed_head=None, advice_head=None, na=()):
     return {'state': state, 'head': head, 'by': by, 'show': show, 'faults': list(faults), 'passed_head': (W['passed_head'] if passed else '') if passed_head is None else passed_head,
-            'passed': list(passed), 'advice_head': (W['advice_head'] if adv else '') if advice_head is None else advice_head, 'advice': list(adv)}
+            'passed': list(passed), 'advice_head': (W['advice_head'] if adv else '') if advice_head is None else advice_head, 'advice': list(adv), **na_view(na)}
+
+
+def look_view(ref, adv=(), now=None):
+    """The check of a picture Claude looks at, from its look as it is now: a failed line is a problem; a line that does not apply (release 1, A5) is
+    neither a problem nor passed and is listed apart (`na`); a list where every line does not apply is not a check."""
+    look = looked(ref)
+    if look and look.get('not_checked'):
+        return _view('not_checked', W['unopened'], adv=adv)
+    if not look:
+        return _view('not_checked', W['late'].format(m=PICTURE_LOOK_MINUTES) if late(ref, now) else W['none'], adv=adv)
+    rows = look.get('lines') or []
+    fails = [_say(l['check'], l.get('seen')) for l in rows if l.get('pass') is False]
+    passed = [_say(l['check'], l.get('seen') or l['check']) for l in rows if l.get('pass') is True]
+    na = [_say(l['check'], l.get('seen')) for l in rows if l.get('pass') == V.NA]
+    if all_na(look):
+        return _view('not_checked', W['all_na'], W['by'].format(n=len(rows)), adv=adv, na=na)
+    return _view('fail' if fails else 'pass', W['fail'].format(problems=_problems(len(fails)), first=fails[0]) if fails else W['pass'],
+                 W['by'].format(n=len(rows)), fails, passed, adv, na=na)
 
 
 def check_view(session, ref, plan=None, now=None):
     """F1: one picture's check, from Claude's look (`ref.look`) and the program's lines (`ref.check.code`); never from `ref.checklist`.
     A film of before (round not v2) keeps its model's lines (`ref.check.lines`). States: pass, fail, not_checked, none."""
     adv = advice(ref)
-    look = looked(ref)
     if claude_checks(session, ref, plan) and not older(ref):   # a picture the model checked before the deploy keeps that check
-        if look and look.get('not_checked'):
-            return _view('not_checked', W['unopened'], adv=adv)
-        if look:
-            rows = look.get('lines') or []
-            fails = [_say(l['check'], l.get('seen')) for l in rows if l.get('pass') is False]
-            passed = [_say(l['check'], l.get('seen') or l['check']) for l in rows if l.get('pass') is True]
-            return _view('fail' if fails else 'pass', W['fail'].format(problems=_problems(len(fails)), first=fails[0]) if fails else W['pass'],
-                         W['by'].format(n=len(rows)), fails, passed, adv)
-        return _view('not_checked', W['late'].format(m=PICTURE_LOOK_MINUTES) if late(ref, now) else W['none'], adv=adv)
-    rows = [l for l in ((ref.get('check') or {}).get('lines') or []) if isinstance(l, dict)]
+        return look_view(ref, adv, now)
+    rows =[l for l in ((ref.get('check') or {}).get('lines') or []) if isinstance(l, dict)]
     if not rows:
         return _view('none', W['none'], adv=adv)
     fails = [_say(l.get('check'), l.get('seen')) for l in rows if l.get('pass') is False and (l.get('weight') or 'must') == 'must' and l.get('check') != 'light and colour']
@@ -547,7 +579,8 @@ def steps_view(store, session, chain, plan=None, now=None):
             next((v['head'] for v in views if v['state'] in ('not_checked', 'none')), W['pass']) if state == 'not_checked' else W['pass'])
     counts = [len((looked(r) or {}).get('lines') or []) for r in chain]
     by = W['by_steps'].format(ns=_and(counts)) if any(counts) else ''
-    return {**_view(state, head, by, fails, passed, adv), '_views': views, '_alike': alike}
+    na = [f'Step {n}: {x}' for n, v in enumerate(views, 1) for x in (v.get('na') or {}).get('lines') or []]   # release 1, A5
+    return {**_view(state, head, by, fails, passed, adv, na=na), '_views': views, '_alike': alike}
 
 
 def alike_steps(store, chain):
@@ -632,6 +665,10 @@ def fact_view(session, store, job, shot_id, brief_now=None):
     open_ = ([str(r.get('rule')) for r in rules if r.get('pass') is False and r.get('class') != 'should']   # design/221 row 11: a failed must; no class is a must
              + [W['not_seen'].format(need=r.get('need'), rule=r.get('rule')) for r in rules if r.get('pass') == V.NOT_SEEN] + [str(x) for x in last.get('label_musts') or []])   # rows 12, 17
     notes = [str(r.get('rule')) for r in rules if r.get('pass') is False and r.get('class') == 'should']
+    na = [_say(str(r.get('rule')).rstrip('.'), r.get('why')) for r in rules if r.get('pass') == V.NA]   # release 1, A5: a rule that does not apply: no fault, not counted as held, listed apart
+    if na and len(na) == len(rules) and not last.get('label_musts'):   # nothing was judged: never "passed"
+        return _view('not_checked', W['all_na_rules'], W['fact_by'].format(n=n), show='all', na=na)
+    n -= len(na)
     redo = max(int(last.get('round') or 1) - 1, 0)
     r = f"{redo} redo round{'' if redo == 1 else 's'}"
     changed = V.stale_brief(store, None, None, session, sha, shot_id, now=brief_now) if brief_now else []
@@ -642,7 +679,7 @@ def fact_view(session, store, job, shot_id, brief_now=None):
             W['fact_pass_notes'].format(k=f"{len(notes)} note{'' if len(notes) == 1 else 's'}", r=r) if notes else W['fact_pass'].format(n=n, r=r))
     view = _view('fail' if open_ else 'pass', head, W['fact_by'].format(n=n), open_,
                  [W['passed_rule'].format(rule=x.get('rule')) for x in rules if x.get('pass') is True], [str(x) for x in last.get('stranger') or []], 'all',
-                 W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'])
+                 W['fact_passed_head'].format(n=n, round=int(last.get('round') or 1)), W['fact_saw'], na=na)
     return {**view, 'notes': notes} if notes else view   # design/221 row 11: the notes, as data for the page (its layout is a later phase)
 
 
@@ -868,7 +905,9 @@ def question_line(session, plan, item, q, ref):
 def chat_text(line):
     """One flow, two front ends: what the chat shows of a page line: the check line, its faults, the measured advice, the place, the finish, why it is held."""
     c = line.get('check') or {}
+    na = c.get('na') or {}   # release 1, A5: the lines that did not apply, one row: never among the faults
     rows = ([line['where']] if line.get('where') else []) + ([c['head']] if c.get('head') else []) + (c.get('faults') or [])[1 if c.get('state') == 'fail' and c.get('show') != 'all' else 0:6] \
+        + ([f"{na['head']}: {' '.join(na['lines'][:6])}"] if na else []) \
         + (c.get('advice') or [])[:4] + ([line['finish']] if line.get('finish') else []) + ([line['held']] if line.get('held') else [])
     return '\n'.join('- ' + r for r in rows if r)
 
@@ -907,7 +946,7 @@ def _component_state(rs):
     if any(r['status'] == 'approved' for r in live):
         return 'done'
     look = looked(live[-1])
-    return 'redo' if look and (look.get('not_checked') or _failed_lines(live[-1])) else 'checking'   # a failed one is made again by the assistant
+    return 'redo' if look and (look.get('not_checked') or _failed_lines(live[-1]) or all_na(look)) else 'checking'   # a failed one is made again by the assistant
 
 
 def _ts(v):

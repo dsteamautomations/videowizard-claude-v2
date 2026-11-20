@@ -43,6 +43,7 @@ W = {
     'check_pass': 'Check passed', 'check_fail': 'Check:', 'measured': '{line}: {seen}. Measured by the server.',
     'late': "Not checked: Claude's check did not come within {m} minutes. Judge it by eye.", 'unopened': 'Not checked: Claude could not open its frames. Judge it by eye.',
     'no_frames': 'Not checked: its frames could not be made. Judge it by eye.', 'none': 'Not checked. Judge it by eye.',
+    'all_na': 'Not checked: every line of its list was answered "does not apply". Judge it by eye.',   # release 1, A5
     'by': 'Claude looked at {n} frames of this take (one every half second, the first and the last), the sheet at four a second and the start picture, against {k} lines. '
           'The server measured the rest: real footage, the length, the first frame, one continuous shot.',
     'not_judged': 'Not judged: how things move between the frames. Play the take.',
@@ -357,15 +358,17 @@ def check_view(session, job, now=None):
     code = [l for l in rec.get('code_lines') or [] if isinstance(l.get('pass'), bool)] if rec.get('guide') else []
     read = [] if not look or look.get('not_checked') else look['lines']
     older = [l for l in rec.get('lines') or [] if isinstance(l.get('pass'), bool)] if not rec.get('guide') else []   # a take checked before this design keeps the lines it has
+    na = [f"{cap(l['check'])}: {l.get('seen') or ''}" for l in read if l['pass'] == V.NA]   # release 1, A5: a line that does not apply: no fault, not passed, listed apart
     faults = [{'text': W['measured'].format(line=cap(l['check']), seen=l.get('seen') or ''), 'at_s': l.get('at_s')} for l in code if not l['pass']] \
-        + [{'text': f"{cap(l['check'])}: {l.get('seen') or ''}", 'at_s': l.get('at_s')} for l in read + older if not l['pass']]
-    passed = [cap(l['check']) + (f": {l['seen']}" if l.get('seen') else '') for l in code + read + older if l['pass']]
-    state = 'fail' if faults else 'pass' if (read or older) else 'not_checked'
+        + [{'text': f"{cap(l['check'])}: {l.get('seen') or ''}", 'at_s': l.get('at_s')} for l in read + older if l['pass'] is False]
+    passed = [cap(l['check']) + (f": {l['seen']}" if l.get('seen') else '') for l in code + read + older if l['pass'] is True]
+    nothing = P.all_na(look)   # every line Claude was asked does not apply: nothing was judged from the frames
+    state = 'fail' if faults else 'pass' if (read or older) and not nothing else 'not_checked'
     late = not look and checkable(rec) and bool(rec.get('asked_at'))
-    head = (W['check_fail'] if state == 'fail' else W['check_pass'] if state == 'pass' else W['unopened'] if look and look.get('not_checked')
+    head = (W['check_fail'] if state == 'fail' else W['check_pass'] if state == 'pass' else W['unopened'] if look and look.get('not_checked') else W['all_na'] if nothing
             else W['no_frames'] if rec and not checkable(rec) else W['late'].format(m=LOOK_MINUTES) if late else W['none'])
     return {'state': state, 'head': head, 'faults': faults, 'by': W['by'].format(n=len(rec.get('frames') or []), k=len(read)) if read else '',
-            'not_judged': W['not_judged'] if rec.get('guide') else '', 'passed': passed}
+            'not_judged': W['not_judged'] if rec.get('guide') else '', 'passed': passed, **P.na_view(na)}
 
 
 def item_id(session, job):
@@ -380,8 +383,9 @@ def chat_text(line):
     """What the chat shows of a take's line: the place, the check's line and its faults, a short take, why no further take."""
     t = line['takes'][-1]
     c = t['check']
+    na = c.get('na') or {}   # release 1, A5
     rows = [line['where'], c['head'] if c['state'] != 'fail' else ''] + [(c['head'] + ' ' if i == 0 else '') + f['text'] + (f" (at {f['at_s']:g} s)" if f.get('at_s') is not None else '') for i, f in enumerate(c['faults'][:6])] \
-        + [t['short']] + [x['rejected'] for x in line['takes'][:-1]]
+        + ([f"{na['head']}: {' '.join(na['lines'])}"] if na else []) + [t['short']] + [x['rejected'] for x in line['takes'][:-1]]
     return '\n'.join('- ' + r for r in rows if r)
 
 

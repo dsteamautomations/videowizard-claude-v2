@@ -77,7 +77,7 @@ LOOK_HOW = {
               # design/214: the check of a set is Claude's, line by line
               'The check list: each picture comes with its own (`lines`). Answer every line of every picture, pass or fail, from what you see in the picture, never from the '
               'request or the notes; a fact of the drawing is checked against the drawing sheet among the inputs. Never pass a line you did not look at; a picture you could '
-              'not open is `not_checked`, with why.',
+              'not open is `not_checked`, with why.', V.NA_HOW,
               'What the image model changed: read its notes for what it took from the web instead of the request, and what it left out. Say it for the operator in two plain lines: '
               '`chose`, what the model chose, and `aside`, what it set aside; no file name, no heading, nothing copied from the notes as written.'],
     'may_show': ('A person alone on plain ground. An object or a material with no person; a hand, and the material the thing works on, only in a picture that shows it in use. A place as '
@@ -87,8 +87,8 @@ LOOK_HOW = {
                        'golden': '<with use: the id of the picture every shot starts from; null for a person, and with remake or doubt>', 'reason': '<one line, at most 300 characters>',
                        'chose': '<one line, at most 300 characters: what the image model chose>', 'aside': '<one line, at most 300 characters: what it set aside>',
                        'pictures': [{'ref': '<the picture id>', 'view': '<its view>', 'verdict': 'pass | weak | fail', 'seen': '<one line: what you saw, at most 300 characters>',
-                                     'lines': [{'id': "<the id of a line of this picture's `lines`>", 'pass': 'true | false',
-                                                'seen': '<with a fail, and with a pass of a line marked `say`: one plain sentence of what you saw, at most 300 characters>'}],
+                                     'lines': [{'id': "<the id of a line of this picture's `lines`>", 'pass': 'true | false | "na"',
+                                                'seen': '<with a fail, with "na" (why it does not apply) and with a pass of a line marked `say`: one plain sentence of what you saw, at most 300 characters>'}],
                                      'not_checked': '<only for a picture you could not open: why, in one line; it then needs no verdict, seen or lines>'}]}]},
     'send': ('`vw visuals round --looks <file>`. Every picture of a set gets its row. `use`: the set can serve as it is; `remake`: a fault would be copied into the film (say which '
              'picture and what is wrong, so the request can be rewritten); `doubt`: you cannot tell. `chose` and `aside` are required where the pictures of the set carry '
@@ -111,8 +111,12 @@ LOOK_SEEN = '{eid}: a look says in one line what was seen, at most {max} charact
 LOOK_GOLDEN = '{eid}: the picture proposed as the starting picture is not a picture of this set.'
 LOOK_MODEL = ("{eid}: the pictures of this set carry the image model's notes: say what it chose (`chose`) and what it set aside (`aside`), one line each, at most {max} characters.")
 # design/214: the check of a set is answered line by line in the look
-LOOK_LINE_OPEN = ('{eid}: {pic}: the line "{check}" ({id}) has no answer: every line of every picture gets `pass`, true or false. Answer it in that picture\'s `lines` and '
-                  'send the file again (`vw visuals round --looks <file>`).')
+LOOK_LINE_OPEN = ('{eid}: {pic}: the line "{check}" ({id}) has no answer: every line of every picture gets `pass`: true, false or "na" (does not apply here, with why in '
+                  '`seen`). Answer it in that picture\'s `lines` and send the file again (`vw visuals round --looks <file>`).')
+# release 1, A3: "does not apply" with no reason; A5: a picture whose every line does not apply
+LOOK_LINE_NA = ('{eid}: {pic}: the line "{check}" ({id}) is answered "does not apply" with no reason: say in `seen`, in one sentence of at most {max} characters, why this '
+                'view cannot show it or what other thing the line is about; or answer it pass or fail. Then send the file again (`vw visuals round --looks <file>`).')
+ALL_NA = 'Every line of its list was answered "does not apply": it is not checked.'
 LOOK_LINE_UNKNOWN = ('{eid}: {pic}: {id} is not a line of this picture now: list the sets again (`vw visuals round --looks`), answer the lines it gives and send the file again.')
 LOOK_NOT_CHECKED = ('{eid}: {pic}: `not_checked` is only for a picture that could not be opened, and then the picture carries no `verdict` and no `lines`. '
                     'This one carries both: take `not_checked` out if the picture was checked, or the verdict and the lines if it was not, and send the file again '
@@ -715,14 +719,17 @@ def check_summary(session, ref):
     if pictures.claude_checks(session, row):   # design/217: a step-6 picture of a v2 film is checked by Claude's look too
         view = pictures.check_view(session, row)
         return {'state': {'not_checked': 'none'}.get(view['state'], view['state']), 'failed': [{'check': f, 'seen': ''} for f in view['faults']],
-                'error': (pictures.looked(row) or {}).get('not_checked') or None}
+                'error': (pictures.looked(row) or {}).get('not_checked') or None, **({'na': [{'check': x, 'seen': ''} for x in view['na']['lines']]} if view.get('na') else {})}
     if V.round_v2(session) and row.get('kind') == 'sheet' and row.get('set'):
         # design/214: a set of a v2 round is checked by Claude's look, line by line; a model's result stored before stays in the record and is not read here.
         # 'none': not checked (no look with line answers yet, or the picture could not be opened: `error` says why). The code checks stay.
         look = row.get('look') or {}
         failed = [{'check': l.get('check'), 'seen': l.get('seen') or ''} for l in look.get('lines') or [] if l.get('pass') is False]
         failed += [{'check': c.get('check'), 'seen': c.get('seen') or ''} for c in (check or {}).get('code') or [] if c.get('pass') is False]
-        return {'state': 'fail' if failed else 'pass' if 'lines' in look else 'none', 'failed': failed, 'error': look.get('not_checked') or None}
+        # release 1, A5: a line that does not apply is no fault and is given apart (`na`, only when there is one); a list where every line does not apply is not a check
+        na, nothing = [{'check': l.get('check'), 'seen': l.get('seen') or ''} for l in look.get('lines') or [] if l.get('pass') == V.NA], pictures.all_na(look)
+        return {'state': 'fail' if failed else 'pass' if 'lines' in look and not nothing else 'none', 'failed': failed,
+                'error': look.get('not_checked') or (ALL_NA if nothing else None), **({'na': na} if na else {})}
     if not check:
         return {'state': 'none', 'failed': [], 'error': None}
     failed = list(check.get('must_failed') or [])
@@ -1115,9 +1122,11 @@ def _line_fault(eid, pic, sent):
         return LOOK_LINE_UNKNOWN.format(eid=eid, pic=name, id=unknown[0])
     for w in want:
         a = got.get(w['id'])
-        if not a or not isinstance(a.get('pass'), bool):
+        if not a or not (isinstance(a.get('pass'), bool) or a.get('pass') == V.NA):
             return LOOK_LINE_OPEN.format(eid=eid, pic=name, check=w['check'], id=w['id'])
         words = _one(a.get('seen'))
+        if a['pass'] == V.NA and not words:
+            return LOOK_LINE_NA.format(eid=eid, pic=name, check=w['check'], id=w['id'], max=ref_find.SEEN_CHARS)
         if len(words) > ref_find.SEEN_CHARS or (not words and (a['pass'] is False or w.get('say'))):
             return LOOK_LINE_WORDS.format(eid=eid, pic=name, check=w['check'], id=w['id'], max=ref_find.SEEN_CHARS)
     return None

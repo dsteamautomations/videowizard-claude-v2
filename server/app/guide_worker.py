@@ -293,6 +293,8 @@ def scorecard(code_lines, reading):
     def state(*ls):
         if any(l is None or l.get('pass') is None for l in ls):
             return 'Not sure'
+        if any(l['pass'] == 'na' for l in ls):   # release 1, A3 (visuals_stage.NA): the line does not apply to this take: never a fail, never a pass
+            return 'Does not apply'
         return 'Pass' if all(l['pass'] for l in ls) else 'Fail'
     rows = [{'line': 'real footage and length', 'state': state(by.get('real footage'), by.get('as long as the guide')), 'seen': '; '.join(l['seen'] for l in (by.get('real footage'), by.get('as long as the guide')) if l)},
             {'line': 'first frame', 'state': state(by.get('first frame matches the still')), 'seen': (by.get('first frame matches the still') or {}).get('seen', '')}]
