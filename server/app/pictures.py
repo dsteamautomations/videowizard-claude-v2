@@ -71,6 +71,13 @@ W = {
     'by':'Claude looked at the picture against its list of {n} lines.', 'by_steps': 'Claude looked at each step against its list: {ns} lines.',
     'by_older': 'Gemini 3.8 Flash read the picture against its list of {n} lines.',
     # release 1, A2: who really checked. A picture the model checked before Claude's look took over keeps that check and says so: never "Claude's check" over a model's result
+    # release 1, A7: "a real face" in Claude's list. The operator's permission for a person of the footage is the record of design/207 and 213 (visuals_stage.likeness)
+    'face_when': 'no face that matches a real person in the footage pictures sent as references',
+    'face_ok': ', other than {names}, whom the operator has permitted the film to show: a match with {names} is not a fault',
+    'face_made': "; a face that matches the film's own made references is never a fault",
+    'face_ask': ('{name} ({eid}) is a person of the footage, a made picture shows them, and the operator has not been asked: ask the operator once whether made pictures may '
+                 'show this person, and record their words (`vw visuals likeness --element {eid} --quote "<their words>"`; for No: add `--stand-in`). Until then a face '
+                 'that matches them is a warning.'),
     'who_model': 'An earlier check by Gemini 3.8 Flash', 'who_mixed': 'The checks', 'check_head_step_model': "Gemini 3.8 Flash's check of step {n}:",
     'passed_head': 'The lines it passed', 'advice_head': 'Measured by the program, for you to judge', 'check_head': "Claude's check of this picture:", 'check_head_step': "Claude's check of step {n}:",
     'fact_pass': 'Fact check: passed. All {n} rules held, after {r}.', 'fact_fail': 'Fact check: not passed. {k} of {n} rules are still open after {r}:',
@@ -162,7 +169,8 @@ LOOK_HOW = {
     'judge': ["Answer every line of the picture's `lines`, pass or fail, from what you see in the picture, never from the request. A line's `pass_when` says what passes.",
               'Compare with the inputs where a line asks for it: a parent is what the picture was made from; `scene` pictures are the approved pictures of the same scene; '
               '`earlier` is the picture this one was made again from; `step before` is the previous step of a graphic.',
-              'Exact words are read letter for letter. A face that matches a person of the footage fails "a real face". Anything the request did not ask for fails "nothing extra".',
+              'Exact words are read letter for letter. A face that matches a real person of the footage fails "a real face", unless its line names that person as permitted; '
+              "a face that matches the film's own made references is never a fault. Anything the request did not ask for fails \"nothing extra\".",
               'Never pass a line you did not look at. A picture you could not open is `not_checked`, with why, and then has no lines.',
               'A row of kind `start` is the still an AI video shot starts from: its `overlay` input shows it under the red outlines of the layout, its `layout` input is the layout alone.',
               'The light, the fine detail and the size are measured by the program: they are not your lines.', V.NA_HOW],
@@ -265,11 +273,39 @@ def step_of(session, ref):
     return next((n for n, r in enumerate(chain, 1) if r['id'] == ref['id']), None)
 
 
+def _people(plan, shot):
+    """The people a shot shows, as the plan names them: {person element id: name}, in the shot's order."""
+    names = V.people_of(plan) if plan else {}
+    ids = list((shot or {}).get('element_ids') or []) + [s.get('element_id') for s in (shot or {}).get('subjects') or []]
+    return {i: names[i] for i in dict.fromkeys(ids) if i in names}
+
+
+def face_line(session, plan, shot):
+    """Release 1, A7 (SK, 20 Nov 2026): "a real face" as Claude's list asks it of a picture made for this shot. A person of the shot for whom the
+    operator's permission is recorded (`visuals_stage.likeness_of`: asked once, at step 1 of the references) is named: a match with them is not a
+    fault, and only another real face from the footage is. With no permission (a stand-in, by the operator's No) the line is as it was for that
+    person. A made character has no footage behind it: a match with the film's own made references is never a fault."""
+    ok = [name for eid, name in _people(plan, shot).items() if V.likeness_of(session, eid)]
+    return {'check': 'a real face', 'pass_when': W['face_when'] + (W['face_ok'].format(names=_and(ok)) if ok else '') + W['face_made']}
+
+
+def faces_to_ask(session, plan):
+    """Release 1, A7: the people of the footage whom a picture now waiting for its look shows and about whom the operator was never asked (a face
+    frame is kept, and neither the permission nor a stand-in is recorded: `ref_sets.footage_person`): said in the next step, each once, with
+    the command that records the answer. Normally none: step 1 of the references asks it before any picture is made."""
+    from . import ref_sets
+    shots = [_scene_of(plan, session, r)[1] for r in due(session, plan)] + [x[1] for x in starts_due(session, plan)]
+    people = {eid: name for sh in shots for eid, name in _people(plan, sh).items()}
+    return [W['face_ask'].format(name=name, eid=eid) for eid, name in people.items() if ref_sets.footage_person(session, plan, eid).get('state') == 'ask']
+
+
 def lines(session, plan, ref):
     """C1, contract 5.3: the check list of one picture for Claude's look. The program's list for the picture (image_check.lines_of: the server's
     lines, the writer's checklist, the fixed lines), plus per kind: the background-figure line of a still (C5), the step line of a step, the
-    style sheet's own lines, the original's list and two lines of a remade picture. Each line's id is made of its words."""
-    own = list(image_check.lines_of(ref))
+    style sheet's own lines, the original's list and two lines of a remade picture. Each line's id is made of its words.
+    Release 1, A7: the fixed line "a real face" is asked as `face_line` says it for the picture's shot."""
+    face = face_line(session, plan, _scene_of(plan, session, ref)[1])
+    own = [face if l['check'] == 'a real face' else l for l in image_check.lines_of(ref)]
     kind = ref.get('kind')
     orig = session['references'].get(ref.get('fix_of') or '') if ref.get('fix_of') else None
     if orig:   # a remade picture is checked against its original's whole list, never a smaller one
@@ -365,7 +401,7 @@ def start_lines(session, plan, shot, still):
     things among its inputs (the request's "What must be true", guide._drawn_facts); then the fixed lines of every made picture."""
     from . import guide
     return ([_line(*START_ON_LAYOUT)] + [_line('drawn fact: ' + f, f'the picture shows it as the approved drawings do: {f}', True) for f in guide._drawn_facts(session, still.get('inputs') or [])]
-            + [_line(l['check'], l['pass_when']) for l in image_check.FIXED])
+            + [_line(l['check'], l['pass_when']) for l in (face_line(session, plan, shot) if l['check'] == 'a real face' else l for l in image_check.FIXED)])   # A7: the same face line as a still's
 
 
 def starts_due(session, plan):
@@ -419,7 +455,7 @@ def waits_words(session, plan):
     Stamps `asked_at` on the pictures it reports (the caller saves the session)."""
     asked(session, plan)
     n = len(due(session, plan)) + len(starts_due(session, plan))   # release 1, A1: with the stills of step 7
-    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + components_failed(session, plan))
+    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + faces_to_ask(session, plan) + components_failed(session, plan))   # release 1, A7: a person of the footage nobody was asked about
 
 
 def _big(store, session, ref_id):

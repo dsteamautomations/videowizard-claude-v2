@@ -267,7 +267,7 @@ def test_S16_N2_the_looks_listing_carries_the_judging_points_and_the_shape_of_th
     step1_done(film)
     film.back()
     how = film.due()['how']
-    assert how == RS.LOOK_HOW and len(how['judge']) == 6 and any('approved drawing' in p and 'footage picture' in p for p in how['judge']) and any("the plan's description" in p for p in how['judge'])
+    assert how == RS.LOOK_HOW and len(how['judge']) == 7 and how['judge'][5] == VS.NA_HOW and any('approved drawing' in p and 'footage picture' in p for p in how['judge']) and any("the plan's description" in p for p in how['judge'])
     row = how['file']['sets'][0]
     assert set(row) == {'element_id', 'set', 'recommend', 'golden', 'reason', 'chose', 'aside', 'pictures'} and set(row['pictures'][0]) == {'ref', 'view', 'verdict', 'seen', 'lines', 'not_checked'} and '--looks' in how['send']
     assert '`how`' in RS.SETS_LOOK and 'its group name' in RS.SETS_LOOK and 'its group name' in RF.FIND_START
