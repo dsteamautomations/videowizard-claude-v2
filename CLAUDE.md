@@ -36,7 +36,7 @@ VideoWizard is built for **every category of video**: documentaries and explaine
 5. **Deploy** with the script that matches the change (both if both sides changed):
    - `./scripts/deploy-server.sh` — anything under `server/`. Tell SK first: the workers restart.
    - `./scripts/deploy-plugin.sh` — anything under `plugin/`. The operator must restart Claude Code in the operator folder afterwards.
-6. **Resolution note.** One line on the defect: what was wrong, what changed, which commit; and set its `status` to `fixed` in `vw2_defects` (the run refuses every write while a defect is `open`, design/48).
+6. **Resolution note.** One line on the defect: what was wrong, what changed, which commit; and set its `status` to `fixed` in `vw2_defects` (while a defect is `open` the run refuses the writes it holds: those of the shot it names, else of its step; design/48, release 3).
 7. **Tell SK** the operator can resume with `/vw:vw what is next for <run code>`.
 
 ## Deploy scripts

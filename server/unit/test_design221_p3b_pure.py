@@ -209,7 +209,8 @@ def test_the_texts_say_labels_first_the_binding_and_the_order_of_a_diagram():
     import d221d_wording_v3 as W
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
     import fixset4_wording as FIX4   # fix set, the critic's points: the still of a continuing drawing is started on the earlier still's approval (inside this script's sentence)
-    stage = FIX2.before(FIX4.before(visuals()))
+    import rel3_wording as REL3   # release 3: the render is named with --wait inside this script's sentence
+    stage = FIX2.before(FIX4.before(REL3.before(visuals())))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

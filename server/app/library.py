@@ -268,7 +268,7 @@ def check_prompt(prompt, fix=False, placed=True, picture=False):
             continue
         if m and not re.search(r'\d|\b(one|two|three|four|five|six|half|bricks?|paces?|body-lengths?|arm-lengths?|hands?|doorways?|courses?|metres?|meters?)\b', sentence, re.I):
             raise ValueError(f'The prompt places something at {m.group(1)!r} with no landmark and measured distance ({sentence.strip()[:80]!r}): say the landmark and how far from it, '
-                             'in a unit the picture shows (bricks, paces, a hand, a doorway).')
+                             'in a unit the picture shows (a hand, a pace, the width of a thing in the frame).')   # release 3, E3: examples of any film (they named bricks and a doorway)
     m = placed and re.search(r'\b(as before|facing each other|sit as before|the parents as before)\b', text, re.I)   # design/111 F7: a look is a target, a head turn and a mouth
     if m:
         raise ValueError(f'{m.group(0)!r} says nothing a picture can show: write where each person\'s eyes are (a landmark or a named person), the head turn and the mouth.')

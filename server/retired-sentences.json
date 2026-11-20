@@ -185,6 +185,8 @@
     "The operator approves the drawing before the still.",
     "Never show two items, never choose the order",
     "the server refuses a reply to any item but the one it handed out",
-    "After two failed rounds, show the operator what is still open before another round."
+    "After two failed rounds, show the operator what is still open before another round.",
+    "Nothing of this is asked one at a time during the builds.",
+    "the server refuses every write on the run until the builder marks the defect fixed"
   ]
 }

@@ -184,7 +184,8 @@ def test_the_texts_say_the_camera_the_shared_look_the_binding_family_and_no_rule
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221c_wording_v3 as W
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
-    stage = FIX2.before(visuals())
+    import rel3_wording as REL3   # release 3, E4: this script's sentence "Nothing of this is asked one at a time during the builds." is replaced
+    stage = FIX2.before(REL3.before(visuals()))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)
