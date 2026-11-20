@@ -1850,6 +1850,11 @@ def _zoom_uploads(folder, sent):
     return [paths[i:i + ZOOM_UPLOAD] for i in range(0, len(paths), ZOOM_UPLOAD)]
 
 
+def _artifact_id(url):
+    """The artifact a link names: its last path segment, whatever the spelling (claude.ai/artifact/X, claude.ai/code/artifact/X, a trailing slash, a query)."""
+    return re.split(r'[?#]', str(url).strip())[0].rstrip('/').rsplit('/', 1)[-1]
+
+
 def _page_text(folder, name):
     f = folder / name
     return f.read_text(encoding='utf-8').strip() if f.is_file() else ''
@@ -2489,7 +2494,11 @@ def cmd_visuals(a):
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
         out = write(base + '/chat/next', {'one': bool(a.one)})
         said = chat_line(out) + (' ' + out['then'] if out.get('then') and not out.get('item') else '')   # design/211: a v2 round that waits for the assistant (the looks, a rewrite): the server's sentence
-        early, lost = republish_now(ws), page_unconfirmed(ws, 'Ask this step in the chat: what follows is its next decision.')   # fix set (c), (e)
+        chat = ws / 'work' / 'page' / 'in-chat.txt'   # the critic's point 4: once the step went to the chat, neither sentence is repeated on every later `next`
+        early, lost = ({}, '') if chat.is_file() else republish_now(ws), page_unconfirmed(ws, 'Ask this step in the chat: what follows is its next decision.')   # fix set (c), (e)
+        if lost[0]:   # said once: the round is dealt with, the step is asked here
+            (ws / 'work' / 'page' / 'shown.txt').write_text(lost[0]['page_unconfirmed']['round'] + '\n', encoding='utf-8')
+            chat.write_text(lost[0]['page_unconfirmed']['round'] + '\n', encoding='utf-8')
         emit({**out, **early[0], **lost[0]}, 0, lost[1] + early[1] + said)
     if a.what == 'card':   # design/190: every answer of one card in one call. The answers file is the copy kept here until the server has them; then it is marked sent
         given = Path(a.file or '')
@@ -2516,7 +2525,7 @@ def cmd_visuals(a):
         folder = ws / 'work' / 'page'
         folder.mkdir(parents=True, exist_ok=True)
         url_file, current, made_by = folder / 'url.txt', folder / 'current.txt', folder / 'page-version.txt'   # design/206: which tool's page file is published at the link
-        if getattr(a, 'url', None) and url_file.is_file() and url_file.read_text(encoding='utf-8').strip() != a.url.strip():
+        if getattr(a, 'url', None) and url_file.is_file() and _artifact_id(url_file.read_text(encoding='utf-8')) != _artifact_id(a.url):   # the critic's point 5: the same artifact under another spelling of its link is the same page
             if not getattr(a, 'new_page', False):   # fix set (d): a publish that did not go to the run's own link is never taken silently as a new page
                 emit({'action': 'refused', 'message': PAGE_OTHER_LINK.format(url=url_file.read_text(encoding='utf-8').strip())}, 2)
             (folder / 'pictures.json').unlink(missing_ok=True)   # design/210: a page published anew holds no picture yet: every picture is offered again
@@ -2525,6 +2534,7 @@ def cmd_visuals(a):
         if getattr(a, 'url', None):
             url_file.write_text(a.url.strip() + '\n', encoding='utf-8')
             made_by.write_text(plugin_version() + '\n', encoding='utf-8')
+            (folder / 'in-chat.txt').unlink(missing_ok=True)   # the page is published: the page path is open again
             emit({'url': a.url.strip()}, 0, 'The page link is kept for this run. Now send the pictures, when the round has any (step 2 of `how`), and write the round to the page (step 3).')
 
         def hand(page, more=None, said=''):
@@ -2533,6 +2543,9 @@ def cmd_visuals(a):
             until `--fetch`."""
             todo = [c for c in _pic_codes(page.get('pictures')) if not (folder / 'pics' / f'{c}.json').is_file() or not (folder / 'zoom' / f'{c}.jpg').is_file()]
             now = datetime.now(timezone.utc)
+            (folder / 'in-chat.txt').unlink(missing_ok=True)   # the page is wanted again: its checks are said again
+            link = url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else ''
+            old = bool(link) and (made_by.read_text(encoding='utf-8').strip() if made_by.is_file() else '') != plugin_version()   # published from an older page file: it cannot draw today's lines
             if isinstance(page.get('capabilities'), dict):   # fix set (c): kept, so a page of an older tool can be published again before the page is wanted
                 (folder / 'capabilities.json').write_text(json.dumps(page['capabilities']) + '\n', encoding='utf-8')
 
@@ -2540,17 +2553,17 @@ def cmd_visuals(a):
                 """Fix set (a): the note the page shows while its pictures are sent, as one ready write: a document of `rounds` older than the
                 round, which takes its place. Not on `--fetch`: it was handed with the sentence `preparing`."""
                 L = page.get('loading')
-                if not isinstance(L, dict) or getattr(a, 'fetch', False):
+                if not isinstance(L, dict) or getattr(a, 'fetch', False) or old:   # the critic's point 2: a page of an older tool cannot draw the note (it would replace the round in view with a near-empty one): it is published again first
                     return {}
                 lid = 'loading-' + at.strftime('%Y%m%d-%H%M%S-%f')
                 doc = {'round': lid, 'at': at.isoformat(), 'run': m['code'], 'step': page['step'], 'open': False, 'summary': '', 'note': str(L.get('note') or ''), 'lines': [],
-                       'loading': {'minutes': L.get('minutes'), 'expected': L.get('expected'), 'late': str(L.get('late') or '')}}
+                       'loading': {'minutes': L.get('minutes'), 'expected': L.get('expected'), 'late': str(L.get('late') or ''), **({'late_after': L['late_after']} if L.get('late_after') else {})}}
                 (folder / f'{lid}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
                 return {'loading_write': [{'op': 'set', 'collection': 'rounds', 'doc_id': lid, 'file_path': str(folder / f'{lid}.json')}]}
             if len(todo) >= PREPARE_MIN and page.get('preparing') and not getattr(a, 'fetch', False):
                 first = loading(now)
-                emit({'preparing': page['preparing'], 'pictures_to_fetch': len(todo), **first, **{k: v for k, v in (more or {}).items() if k != 'then'}}, 0,
-                     said + f'Say this to the operator first, as it is: "{page["preparing"]}" '
+                emit({'preparing': page['preparing'], 'pictures_to_fetch': len(todo), **first, **({'republish': True} if old else {}), **{k: v for k, v in (more or {}).items() if k != 'then'}}, 0,
+                     said + f'Say this to the operator first, as it is: "{page["preparing"]}" ' + (REPUBLISH if old else '')
                      + ('Then, when the page has a link, send `loading_write` to it (ArtifactData, action "batch", `writes` it, unchanged): the page then says its pictures are being loaded. ' if first else '')
                      + 'Then run `vw visuals page --fetch`: it fetches the pictures and gives the round. Nothing was written to the page yet.')
             rnd = page['round']
@@ -2563,8 +2576,6 @@ def cmd_visuals(a):
             (folder / f'{rnd}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
             current.write_text(rnd + '\n', encoding='utf-8')
             waiting = len([l for l in page['lines'] if l['state'] == 'open'])
-            link = url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else ''
-            old = bool(link) and (made_by.read_text(encoding='utf-8').strip() if made_by.is_file() else '') != plugin_version()   # published from an older page file: it cannot draw today's lines
             more = {**(more or {}), **({'republish': True} if old else {}), **page_pictures(m, folder, page.get('pictures'), page.get('videos')),   # design/210: the round's pictures, fetched and ready to send
                     **({'pictures_failed': page['pictures_failed']} if page.get('pictures_failed') else {})}
             if more.get('picture_batches') or more.get('zoom_uploads'):   # fix set (a): something is sent before the round: the page says so meanwhile

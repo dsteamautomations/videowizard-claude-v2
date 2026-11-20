@@ -3,7 +3,7 @@ for the page's database whose newest round can change while the page is open (no
 
 (a) with no round at all the page says "Nothing to decide yet"; while a step is being loaded (the loading note is the newest document of
 `rounds`) it says, in the server's words, that the pictures are being loaded and that the page fills itself, and it does fill itself when the
-round arrives; (e) after twice the minutes stated it says to ask the assistant; (f) the round's count ("10 of 10 …") and what was answered
+round arrives; (e) ten minutes after the note, or three times the minutes stated when that is more, it says that the load is late (the browser's clock is moved); (f) the round's count ("10 of 10 …") and what was answered
 earlier are shown. The fit: at page areas of 1536 x 510 and 1900 x 830, light and dark, nothing scrolls the page. Skipped where Playwright or
 its browser is not installed."""
 import base64
@@ -15,14 +15,14 @@ import pytest
 pytest.importorskip('playwright.sync_api')
 
 from test_design212_browser_pure import PAGE, SIZES, browser, picture   # noqa: F401 (`browser` is the fixture)
-from test_design217_browser_pure import HOST, ROUND, STUB, doc, inside, page
+from test_design217_browser_pure import HOST, KILN, ROUND, STUB, doc, go, inside, page
 from test_design222_browser_pure import doc as takes_doc, page as takes_page, still_main
 
 ONCE = "onSnapshot(f){ f({docs: [{data: () => window.__round}]}); return () => {}; }"
 LIVE = "onSnapshot(f){ window.__fire = () => f({docs: window.__round ? [{data: () => window.__round}] : []}); window.__fire(); return () => {}; }"
 assert STUB.count(ONCE) == 1
 NOTE = 'The pictures of this step are being loaded: 19 lines, about 2 minutes. This page fills itself: there is no need to reload it.'
-LATE = 'This is taking longer than expected: ask the assistant in the chat.'
+LATE = 'This is taking longer than expected. Nothing is lost and the page still fills itself: wait a little longer, or ask the assistant once its turn in the chat has ended.'
 FITS = [('fit-small', 'light'), ('fit-small', 'dark'), ('fit-large', 'light'), ('fit-large', 'dark')]
 
 
@@ -30,10 +30,10 @@ def loading(ago_s=0, minutes=2):
     """The loading note as the tool writes it, handed out `ago_s` seconds ago."""
     at = datetime.now(timezone.utc) - timedelta(seconds=ago_s)
     return {'round': 'loading-x', 'at': at.isoformat(), 'run': 'VW-99', 'step': 'Pictures and drawn graphics', 'open': False, 'summary': '', 'note': NOTE, 'lines': [],
-            'loading': {'minutes': minutes, 'expected': 19, 'late': LATE}}
+            'loading': {'minutes': minutes, 'expected': 19, 'late': LATE, 'late_after': max(10, 3 * minutes)}}
 
 
-def live(browser, d, size='fit-large', scheme='light'):
+def live(browser, d, size='fit-large', scheme='light', clock=False):
     """The page with the database's newest round `d` (None: no round at all); `window.__fire()` gives it the round again after a change."""
     pg = browser.new_page(viewport=SIZES[size], color_scheme=scheme)
     pg.errors = []
@@ -43,6 +43,8 @@ def live(browser, d, size='fit-large', scheme='light'):
             f"<script>window.__round = {json.dumps(d).replace('</', '<\\/')}; window.__zoom = {{}}; window.__nopic = [];"
             f"window.__pic = 'data:image/png;base64,{base64.b64encode(picture()).decode()}';{STUB.replace(ONCE, LIVE)}</script>" + PAGE.read_text(encoding='utf-8') + '</body></html>')
     pg.route('**/*', lambda r: r.fulfill(status=200, content_type='text/html', body=html) if r.request.url == HOST else r.fulfill(status=200, content_type='text/css', body=''))
+    if clock:   # the browser's clock, to be moved by the test (`pg.clock.fast_forward`)
+        pg.clock.install(time=datetime.now(timezone.utc))
     pg.goto(HOST)
     pg.wait_for_function("document.querySelector('#msg').textContent !== 'Loading…' || !!document.querySelector('#loading')")
     return pg
@@ -79,26 +81,46 @@ def test_the_page_fills_itself_when_the_round_arrives_and_goes_back_to_loading_f
     assert pg.locator('#sets').is_hidden() and pg.locator('#loading').text_content() == NOTE and not pg.errors
 
 
-def test_a_load_older_than_twice_the_minutes_stated_says_to_ask_the_assistant(browser):
-    pg = live(browser, loading(ago_s=5 * 60))   # 2 minutes stated: late after 4
+def test_a_normal_load_is_never_called_late_and_ten_minutes_after_the_note_it_is(browser):
+    """The critic's point 1, with the browser's clock moved: 2 minutes stated; on the real run the page was still loading at 4."""
+    pg = live(browser, loading(), clock=True)
+    pg.clock.fast_forward(9 * 60 * 1000 + 30 * 1000)
+    assert pg.locator('#loadinglate').count() == 0 and pg.locator('#msg').text_content() == 'Loading…' and pg.locator('#loading').text_content() == NOTE
+    pg.clock.fast_forward(60 * 1000)
+    pg.wait_for_selector('#loadinglate', state='visible', timeout=8000)
     assert pg.locator('#loadinglate').text_content() == LATE and pg.locator('#msg').text_content() == LATE and pg.locator('#loading').text_content() == NOTE
-    assert no_scroll(pg) and not pg.errors
+    assert 'ask the assistant in the chat.' not in LATE and no_scroll(pg) and not pg.errors
 
 
-def test_the_loading_notes_timer_never_redraws_the_round_that_arrived(browser):
-    pg = live(browser, loading(ago_s=4 * 60 - 2))   # the late sentence is due in two seconds
+def test_three_times_the_minutes_stated_when_that_is_more_also_for_a_note_that_names_no_time(browser):
+    d = loading(minutes=5)
+    d['loading'].pop('late_after')   # a note written before the server named the time: the page works it out the same way
+    pg = live(browser, d, clock=True)
+    pg.clock.fast_forward(14 * 60 * 1000)
+    assert pg.locator('#loadinglate').count() == 0
+    pg.clock.fast_forward(90 * 1000)
+    pg.wait_for_selector('#loadinglate', state='visible', timeout=8000)
+
+
+def test_a_page_opened_long_after_the_note_says_it_at_once(browser):
+    pg = live(browser, loading(ago_s=11 * 60))
+    assert pg.locator('#loadinglate').text_content() == LATE and no_scroll(pg) and not pg.errors
+
+
+def test_the_loading_notes_timer_never_wipes_a_box_being_typed_in(browser):
+    """The round arrives two seconds before the note would be late; the operator types a correction; the note's time passes: the text is still there."""
+    pg = live(browser, loading(), clock=True)
+    pg.clock.fast_forward(10 * 60 * 1000 - 2000)
     pg.evaluate(f"window.__round = {json.dumps(doc())}; window.__fire()")
     pg.wait_for_selector('#smain .swrap', state='attached', timeout=10000)
-    pg.evaluate("document.querySelector('#smain .swrap').dataset.mark = 'kept'")
-    pg.wait_for_timeout(3500)
-    assert pg.evaluate("(document.querySelector('#smain .swrap') || {dataset: {}}).dataset.mark") == 'kept'   # nothing was drawn again: a box being typed in keeps its text
-
-
-def test_the_late_sentence_appears_by_itself_when_the_time_is_reached(browser):
-    pg = live(browser, loading(ago_s=4 * 60 - 2))   # two seconds before twice the minutes
-    assert pg.locator('#loadinglate').count() == 0
-    pg.wait_for_selector('#loadinglate', state='visible', timeout=8000)
-    assert pg.locator('#loadinglate').text_content() == LATE
+    go(pg, KILN)
+    pg.locator('#pbar [data-choice="correct"]').click()
+    pg.locator('#sfix').fill('Two distant workers.')
+    pg.evaluate("document.querySelector('#sfix').dataset.mark = 'typed'")
+    pg.clock.fast_forward(30 * 1000)
+    pg.wait_for_timeout(300)
+    assert pg.locator('#sfix').input_value() == 'Two distant workers.' and pg.locator('#sets').is_visible() and not pg.errors
+    assert pg.evaluate("[document.querySelector('#sfix').dataset.mark, document.activeElement.id]") == ['typed', 'sfix']   # the very box, the caret still in it: nothing was drawn again
 
 
 @pytest.mark.parametrize('size,scheme', FITS)

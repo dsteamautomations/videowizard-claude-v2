@@ -761,8 +761,8 @@ function draw(force){
   if(things){ tDraw(); return; }
   if(sets){ sDraw(); return; }
   if(!round){ list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); list.appendChild(el('div','state','Nothing to decide yet. The assistant writes the lines here when a step is ready.')); $('dots').textContent=''; $('msg').textContent='Nothing to decide yet'; return; }
-  if(round.loading){   // fix set (SK, 20 Nov 2026): a step is being loaded: the page says so, in the server's words, and fills itself when the round arrives (it listens to `rounds`); after twice the minutes stated it says to ask the assistant
-    const L=round.loading, due=Date.parse(round.at)+2*(Number(L.minutes)||1)*60000, late=!(Date.now()<due);
+  if(round.loading){   // fix set (SK, 20 Nov 2026): a step is being loaded: the page says so, in the server's words, and fills itself when the round arrives (it listens to `rounds`); the load is called late only `late_after` minutes after the note (10 minutes, or three times the minutes stated when that is more: the minutes cover the server's copies only)
+    const L=round.loading, due=Date.parse(round.at)+(Number(L.late_after)||Math.max(10,3*(Number(L.minutes)||1)))*60000, late=!(Date.now()<due);
     list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); $('dots').textContent=''; $('summary').textContent='';
     $('step').textContent='VideoWizard · '+(round.run||'')+' · '+(round.step||''); $('title').textContent=(round.step||'Your')+': your decisions';
     const box=el('div','state',round.note||'Loading…'); box.id='loading'; list.appendChild(box);

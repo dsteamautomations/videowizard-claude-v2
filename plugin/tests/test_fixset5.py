@@ -10,7 +10,7 @@ from test_visuals_cli import args, harness, jobs_answer, run   # noqa: F401 (har
 import vw
 
 LOADING = {'note': 'The pictures of this step are being loaded: 1 line, about 1 minute. This page fills itself: there is no need to reload it.',
-           'late': 'This is taking longer than expected: ask the assistant in the chat.', 'minutes': 1, 'expected': 1}
+           'late': 'This is taking longer than expected: ask the assistant in the chat.', 'minutes': 1, 'expected': 1, 'late_after': 10}
 SAID = 'Preparing 12 pictures for the page, about 1 minute.'
 SAY = '1 thing needs your answer:\n- The wall\nThen say done here.'
 NEXT = {'item': None, 'working': ['2 drawings are being made.'], 'say_last': 'Nothing is needed from you now.'}
@@ -45,7 +45,7 @@ def test_with_many_pictures_the_loading_note_is_handed_before_anything_is_fetche
     [w] = out['loading_write']
     doc = json.loads(open(w['file_path'], encoding='utf-8').read())
     assert rc == 0 and got == [] and (w['op'], w['collection']) == ('set', 'rounds') and w['doc_id'] == doc['round'] and doc['round'].startswith('loading-')
-    assert doc['loading'] == {'minutes': 1, 'expected': 1, 'late': LOADING['late']} and doc['note'] == LOADING['note'] and doc['lines'] == [] and doc['open'] is False
+    assert doc['loading'] == {'minutes': 1, 'expected': 1, 'late': LOADING['late'], 'late_after': 10} and doc['note'] == LOADING['note'] and doc['lines'] == [] and doc['open'] is False
     assert doc['step'] == 'Reference drawings' and doc['run'] == 'VW-9' and 'loading_write' in err and err.index('loading_write') < err.index('--fetch')
     rc, out, err = run(args(what='page', record=False, fetch=True), capsys)
     rnd = json.loads(page_at(ws, 'r1.json').read_text(encoding='utf-8'))
@@ -160,14 +160,69 @@ def test_a_round_handed_and_never_confirmed_is_said_at_the_next_call_with_the_ch
     rc, out, err = run(args(what='next', one=False), capsys)
     assert out['page_unconfirmed'] == {'round': 'r1', 'step': 'Reference drawings', 'lines': 1, 'large_not_uploaded': 2}
     assert 'was handed out and never confirmed on the page' in err and '2 large files were not uploaded' in err and 'Ask this step in the chat' in err
+    rc, out, err = run(args(what='next', one=False), capsys)
+    assert 'page_unconfirmed' not in out and 'never confirmed' not in err   # the critic's point 4: said once; the step is in the chat now
+
+
+def test_the_page_call_says_an_unconfirmed_round_too_and_a_confirmed_one_is_never_said(harness, monkeypatch, capsys):
+    ws, _ = harness
+    linked(ws)
+    fake(monkeypatch, lambda: with_pics('r1', 1, 2, say=SAY))
+    run(args(what='page', record=False), capsys)
     fake(monkeypatch, lambda: with_pics('r2', 1, 2, say=SAY))
     rc, out, err = run(args(what='page', record=False), capsys)
-    assert 'never confirmed on the page' in err and out['round'] == 'r2'   # said once more with the round given anew
+    assert 'never confirmed on the page' in err and out['round'] == 'r2'   # said with the round given anew
     read_back(ws, 'r2')
     run(args(what='page', record=False, shown=True), capsys)
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: dict(NEXT))
     rc, out, err = run(args(what='next', one=False), capsys)
     assert 'page_unconfirmed' not in out and 'never confirmed' not in err
+
+
+def test_once_the_step_went_to_the_chat_next_does_not_repeat_the_republish_either(harness, monkeypatch, capsys):
+    """The critic's point 4: the page path failed and the step is asked in the chat: the republish is said with that call and not on every later `next`."""
+    ws, _ = harness
+    linked(ws, version='0.0.1')
+    fake(monkeypatch, lambda: with_pics('r1', 1, say=SAY))
+    run(args(what='page', record=False), capsys)   # handed; the republish fails, the step goes to the chat
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: dict(NEXT))
+    rc, out, err = run(args(what='next', one=False), capsys)
+    assert 'page_unconfirmed' in out and 'republish_now' in out
+    for _ in range(2):
+        rc, out, err = run(args(what='next', one=False), capsys)
+        assert 'page_unconfirmed' not in out and 'republish_now' not in out and 'publish it again' not in err
+    fake(monkeypatch, lambda: with_pics('r2', 1, say=SAY))
+    rc, out, err = run(args(what='page', record=False), capsys)   # the page is wanted again (the next step): checked again, as before
+    assert out['republish'] is True
+
+
+# ---------- the critic's point 2: a page of an older tool gets no loading note ----------
+
+def test_a_page_published_by_an_older_tool_is_published_again_first_and_gets_no_loading_note(harness, monkeypatch, capsys):
+    ws, _ = harness
+    linked(ws, version='0.0.1')
+    fake(monkeypatch, lambda: with_pics('r1', *range(1, 13), preparing=SAID, say=SAY, loading=LOADING))
+    rc, out, err = run(args(what='page', record=False), capsys)   # many pictures: the sentence `preparing` first
+    assert rc == 0 and 'loading_write' not in out and out['republish'] is True and 'publish it again to the same link first' in err and err.index('publish it again') < err.index('--fetch')
+    fake(monkeypatch, lambda: with_pics('r2', 20, 21, loading=LOADING))
+    rc, out, err = run(args(what='page', record=False), capsys)   # a few pictures: the round at once
+    assert 'loading_write' not in out and out['republish'] is True and 'loading_write' not in err
+    run(args(what='page', url=URL, record=False), capsys)   # published again: the page can draw the note
+    fake(monkeypatch, lambda: with_pics('r3', 30, 31, loading=LOADING))
+    assert 'loading_write' in run(args(what='page', record=False), capsys)[1]
+
+
+# ---------- the critic's point 5: the same page under another spelling of its link ----------
+
+def test_the_same_artifact_under_another_spelling_is_the_same_page_and_another_id_is_refused(harness, monkeypatch, capsys):
+    ws, _ = harness
+    linked(ws)
+    page_at(ws, 'pictures.json').write_text('{"again": 0, "thumbs": ["p1"], "zoom": {}}', encoding='utf-8')
+    for same in ('https://claude.ai/code/artifact/abc', 'https://claude.ai/artifact/abc/', 'https://claude.ai/artifact/abc?x=1#top', URL):
+        rc, out, err = run(args(what='page', url=same, record=False), capsys)
+        assert rc == 0 and page_at(ws, 'pictures.json').exists(), same   # the same page: its pictures are still there
+    rc, out, err = run(args(what='page', url='https://claude.ai/code/artifact/abd', record=False), capsys)
+    assert rc == 2 and 'another link' in out['message']
 
 
 # ---------- (f) a thing with no line is named ----------

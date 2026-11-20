@@ -767,9 +767,9 @@ WORDS = {
     'say_done': 'Then say done here.',
     'say_nothing': 'Nothing needs your answer on this page now.',
     'preparing': 'Preparing {pictures} for the page, about {minutes}.',
-    # fix set (SK, 20 Nov 2026): what the page itself says while its pictures are sent, and when that takes more than twice the minutes stated
+    # fix set (SK, 20 Nov 2026): what the page itself says while its pictures are sent, and when the load is late (`page_flow.late_after`)
     'loading': 'The pictures of this step are being loaded: {lines}, about {minutes}. This page fills itself: there is no need to reload it.',
-    'loading_late': 'This is taking longer than expected: ask the assistant in the chat.',
+    'loading_late': 'This is taking longer than expected. Nothing is lost and the page still fills itself: wait a little longer, or ask the assistant once its turn in the chat has ended.',
     # design/213: a person the footage shows (step 1): the permission is asked, nothing else
     'likeness_ask': 'Your footage shows this person. Do you have their permission to make pictures of them?',
     'likeness_ask_child': 'Your footage shows this person, a child. Do you have the permission of a parent or guardian to make pictures of them?',

@@ -35,9 +35,18 @@ def test_a_round_with_pictures_comes_with_the_loading_note_the_minutes_and_the_l
     got = PF._with_pictures(store, {'step': 'Pictures and drawn graphics', 'lines': lines})
     assert got['preparing'] == 'Preparing 19 pictures for the page, about 2 minutes.'
     assert got['loading'] == {'note': 'The pictures of this step are being loaded: 19 lines, about 2 minutes. This page fills itself: there is no need to reload it.',
-                              'late': 'This is taking longer than expected: ask the assistant in the chat.', 'minutes': 2, 'expected': 19}
+                              'late': LATE, 'minutes': 2, 'expected': 19, 'late_after': 10}
     one = PF._with_pictures(store, {'lines': lines[:1]})['loading']
     assert one['minutes'] == 1 and one['expected'] == 1 and '1 line, about 1 minute.' in one['note']
+
+
+LATE = 'This is taking longer than expected. Nothing is lost and the page still fills itself: wait a little longer, or ask the assistant once its turn in the chat has ended.'
+
+
+def test_a_load_is_late_only_after_ten_minutes_or_three_times_the_minutes_stated():
+    """The critic's point 1: the minutes stated cover the server's copies only; the laptop's fetch, the uploads and the round come after them."""
+    assert [PF.late_after(m) for m in (1, 2, 3, 4, 7)] == [10, 10, 10, 12, 21]
+    assert 'interrupt' not in LATE and CF.WORDS['loading_late'] == LATE and 'ask the assistant in the chat.' not in LATE
 
 
 def test_a_round_with_no_picture_has_no_loading_note():
@@ -88,6 +97,20 @@ def test_a_thing_that_is_made_and_has_no_line_is_named_never_left_out_silently()
                                    'never leave them out silently.')
     old = PF._pictures_page({'session': SESSION}, {}, [dict(l) for l in LINES[:1]] + [line('take:job-7', 'The MO1')], SIX)   # a line of a render that is not the one counted
     assert 'The MO1 (made and checked)' in old['not_on_page']
+
+
+def test_a_thing_whose_only_line_is_an_open_question_is_on_the_page():
+    """The critic's point 6a: a question about a made picture is asked in the picture's place; the picture is not missing."""
+    lines = [line('question:K1', 'A question about the IM1'), line('question:GS1', 'A question about the GS1'), line('take:job-8', 'The MO1')]   # by its picture, and by its shot
+    page = PF._pictures_page({'session': SESSION}, {}, lines, SIX)
+    assert page['layout']['count'] == '5 of 5 pictures and drawn graphics are on this page.' and 'not_on_page' not in page
+
+
+def test_a_thing_with_a_line_is_not_also_listed_as_answered_earlier():
+    """The critic's point 6b: a render selected before a re-render is asked again on the new render: one place on the page, its line."""
+    six = [item('steps', 'GS1', 'answered'), item('drawn', 'MO1', 'answered'), item('still', 'IM2', 'answered')]
+    page = PF._pictures_page({'session': SESSION}, {}, [line('graphics:GS1:3', 'The GS1'), line('take:job-9', 'The MO1')], six)   # MO1's new render: its job is not in the list, its name is
+    assert [r['name'] for r in page['layout']['recorded']] == ['The IM2'] and page['layout']['count'] == '3 of 3 pictures and drawn graphics are on this page.'
 
 
 def test_a_round_with_no_list_of_the_step_is_as_before():

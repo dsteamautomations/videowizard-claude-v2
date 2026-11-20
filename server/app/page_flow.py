@@ -61,6 +61,12 @@ PIC_WORKERS = 8   # pictures whose sizes are made at one time: the storage reads
 PREPARE_SECONDS = 4   # ponytail: the laptop fetches a picture's two copies one by one, about two seconds each (VW-24, finding 16); fetching several at once would change this
 
 
+def late_after(minutes):
+    """The critic's point 1: the minutes after which the page calls a load late, counted from the loading note: the minutes stated cover the
+    server's copies only; the laptop's fetch, the uploads and the round's write come after them (VW-24: still loading at 4 minutes)."""
+    return max(10, 3 * int(minutes or 1))
+
+
 def pic_code(key, mark=''):
     """A picture's code on the page: the same for the same storage key AND the same content in every round, so a picture is sent once, and a
     picture stored again under a key used before is a new picture (defect 55, VW-24). `mark`: the content's mark, its sha256; with none, the key alone."""
@@ -177,8 +183,8 @@ def _with_pictures(store, page):
         n = len(page['pictures'])   # design/216 (B2): said before the laptop fetches them, about two copies a picture at two seconds each
         minutes = max(1, -(-n * PREPARE_SECONDS // 60))
         page['preparing'] = CF.WORDS['preparing'].format(pictures=CF._n(n, 'picture'), minutes=CF._n(minutes, 'minute'))
-        waits = len([l for l in page['lines'] if l.get('state') == 'open'])   # fix set (a), (e): what the page says from the first moment, and after twice the minutes stated
-        page['loading'] = {'note': CF.WORDS['loading'].format(lines=CF._n(waits, 'line'), minutes=CF._n(minutes, 'minute')), 'late': CF.WORDS['loading_late'], 'minutes': minutes, 'expected': waits}
+        waits = len([l for l in page['lines'] if l.get('state') == 'open'])   # fix set (a), (e): what the page says from the first moment, and when the load is late (`late_after`)
+        page['loading'] = {'note': CF.WORDS['loading'].format(lines=CF._n(waits, 'line'), minutes=CF._n(minutes, 'minute')), 'late': CF.WORDS['loading_late'], 'minutes': minutes, 'expected': waits, 'late_after': late_after(minutes)}
     if failed:
         page['pictures_failed'] = failed
     return page
@@ -1007,6 +1013,14 @@ def _counted(session, page, things, words, quiet):
         elif kind == 'picture':
             ref = (session.get('references') or {}).get(rest.rsplit(':', 1)[0])
             on.add(V.made_for(session, ref) if ref else None)
+        elif kind == 'question':   # the critic's point 6a: a question about a made picture stands in its place: by its picture, or by its shot
+            ref = (session.get('references') or {}).get(rest)
+            on.add(V.made_for(session, ref) if ref else rest)
+    named = {l.get('name') for l in page['lines']}   # ponytail: a line of a render the list does not hold (selected before a re-render) is matched by its name; the shot's id on the line if two shots ever share a title
+    kept = [r for r in page['layout'].get('recorded') or [] if r['name'] not in named and r['name'] not in {i['name'] for i in things if i['id'] in on}]
+    if 'recorded' in page['layout']:   # the critic's point 6b: a thing with a line is not also listed as answered earlier
+        page['layout'].pop('recorded')
+        page['layout'].update({'recorded': kept} if kept else {})
     out = [i for i in things if i['id'] not in on and i['state'] not in quiet]
     page['layout']['count'] = words.format(n=len(things) - len(out), m=len(things))
     if out:
