@@ -298,6 +298,10 @@ def test_17_the_cause_is_the_layout_the_order_is_kept_and_its_drawing_card_comes
     scene(store, conn, changed)
     s = saved(store)
     assert s['guides']['VS1']['again']['words'] == 'The father starts nearer the gate.' and s['guides']['VS1']['drawing']['status'] == 'proposed'
+    assert states(s, V.current_plan(store, s), conn.takes) == [('VS1', 'being redone')]         # release 1 (20 Nov 2026): the new layout is checked first; its card comes when the check passes
+    from test_guide_route_pure import OTHER, frames_back
+    G.verdict(conn, store, OTHER, NEW, [], 'VS1', frames_back(store, conn), True, [{'look': 'everyone reads as a person', 'pass': True}])
+    s = saved(store)
     assert states(s, V.current_plan(store, s), conn.takes) == [('VS1', 'waiting for you in the chat')]
 
 

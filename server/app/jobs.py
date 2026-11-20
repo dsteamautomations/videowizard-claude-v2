@@ -111,13 +111,14 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
     return row
 
 
-def claim(conn, provider):
-    """Claim one queued job (or a storage_pending one whose retry delay passed) with a lease."""
+def claim(conn, provider, kind=None):
+    """Claim one queued job (or a storage_pending one whose retry delay passed) with a lease. `kind` (hotfix, 20 Nov 2026): only a job whose
+    request is of that kind, so a quick kind of a provider does not wait behind a slow one."""
     return conn.execute('''update vw2_jobs set status = case when status='queued' then 'running' else status end,
                            lease_until = now() + interval '20 minutes', attempt = attempt + 1, updated_at = now()
-                           where id = (select id from vw2_jobs where provider=%s and ((status='queued' and (lease_until is null or lease_until < now())) or (status='storage_pending' and (lease_until is null or lease_until < now())))
+                           where id = (select id from vw2_jobs where provider=%s and (%s::text is null or request->>'kind' = %s) and ((status='queued' and (lease_until is null or lease_until < now())) or (status='storage_pending' and (lease_until is null or lease_until < now())))
                                        order by created_at limit 1 for update skip locked)
-                           returning *''', (provider,)).fetchone()
+                           returning *''', (provider, kind, kind)).fetchone()
 
 
 def finish(conn, job_id, status, *, result=None, error=None, cost=None, retry_in=None):

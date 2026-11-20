@@ -53,8 +53,27 @@ NEVER = [
 ]
 
 
+# release 1 (SK, 20 Nov 2026): a layout is checked before its card is shown: the fresh checker first, the operator second (design/35 row 281)
+NOT_CHECKED = ('The layout of {shot} is not checked yet: a fresh `vw-guide-check` helper passes its check frames first (`vw guide status --shot {shot}`); '
+               'its drawing is shown to the operator after that.')
+REDRAWN = 'This drawing replaces an earlier one of this shot: the layout was rebuilt after its check.'
+
+
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def checked(g):
+    """The fresh checker passed the check frames of this scene (its verdicts are this scene's: a new scene starts with none). Then, and only
+    then, the layout drawing's card is offered to the operator; it is also when the guide is rendered (`verdict`)."""
+    v = g.get('verdicts') or []
+    return bool(v) and bool(v[-1].get('pass'))
+
+
+def rebuild(g):
+    """The scene must change before anything else of the shot: its check failed, or the operator corrected its layout drawing."""
+    v, d = g.get('verdicts') or [], g.get('drawing') or {}
+    return bool(v and not v[-1].get('pass')) or (d.get('status') == 'rejected' and d.get('sha256') == g.get('sha256'))
 
 
 def entry_of(session, shot_id):
@@ -118,6 +137,7 @@ def drawing_verdict(conn, store, user, run, outputs, shot_id, sha256, approved, 
     need(str(quote or '').strip(), "A verdict carries the operator's own words.")
     notes = str(notes or '').strip()
     need(approved or notes, "A correction says what is wrong, in the operator's words.")
+    need(not approved or checked(g), NOT_CHECKED.format(shot=shot_id))   # release 1: no Yes on a layout its checker has not passed (a correction is taken at any time)
     d.update(status='approved' if approved else 'rejected', verdict={'approved': bool(approved), 'quote': str(quote).strip()[:500], 'notes': notes[:2000], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'shot drawing approved' if approved else 'shot drawing corrected', 'sha256': sha256, 'quote': d['verdict']['quote'], 'notes': notes[:2000],
@@ -186,7 +206,8 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     return {'shot_id': shot_id, 'sha256': sha, 'job_id': job_id, 'frames': frames,
             'warnings': [r['message'] for r in rows if r['level'] == 'warn'], 'info': [r['message'] for r in rows if r['level'] == 'info'],
             'cannot_see': G.BLIND, 'layout': G.layout_block(spec), 'drawing_notes': guides[shot_id]['drawing']['notes'],
-            'next': f"The shot's drawing is made (free); the operator approves it in the chat before the still. " f'Check frames {frames} are being rendered (free). Then a fresh vw-guide-check helper looks at them: `vw guide frames --shot {shot_id}`, `vw guide verdict --shot {shot_id} --file …`.'}
+            'next': f'Check frames {frames} are being rendered (free). Then a fresh vw-guide-check helper looks at them: `vw guide frames --shot {shot_id}`, `vw guide verdict --shot {shot_id} --file …`. '
+                    "The shot's drawing is made (free); it is shown to the operator only after that check passes, and they approve it in the chat before the still."}
 
 
 def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, notes=''):
@@ -206,7 +227,8 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
     if passed and not (g.get('render') or {}).get('job_id'):
         job_id = _queue(conn, run, shot_id, 'guide', {'kind': 'guide-render', 'shot_id': shot_id, 'sha256': g['sha256'], 'spec_key': g['key'], 'seconds': g['seconds']})
         g['render'] = {'job_id': job_id, 'status': 'queued'}
-        out.update(job_id=job_id, next=f'The guide is being rendered (free, several minutes). Then the still: `vw guide still --shot {shot_id} --file …`.')
+        out.update(job_id=job_id, next=f'The guide is being rendered (free, several minutes). Then the still: `vw guide still --shot {shot_id} --file …`.'
+                   + ('' if (g.get('drawing') or {}).get('status') == 'approved' else " The shot's layout drawing is shown to the operator now (`vw visuals next`): no still before their Yes."))
     elif not passed:
         out['next'] = (f'Round {rnd} failed. Show the operator what is still open before another round: ' + '; '.join(failed) if rnd >= MAX_ROUNDS_BEFORE_OPERATOR
                        else 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.')
@@ -251,6 +273,8 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
     spec = VS.load_json(store, g['key'])
     still = video_generators.STILL
     sheets = []
+    d = _ensure_drawing(store, run, session, g, spec)   # design/200, Area B
+    need(d['status'] == 'approved', NOT_APPROVED.format(shot=shot_id, sha=g['sha256']))   # release 1: a masked repair too (a still kept from an earlier scene is not repaired under a layout nobody approved)
     if repair_of:
         base = next((s for s in g['stills'] if s['id'] == repair_of and s.get('key') and s.get('status') in ('candidate', 'approved')), None)
         need(base, f'{repair_of} is not a finished still of this shot.')
@@ -260,8 +284,6 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         effective = REPAIR_OPEN.format(words=words)
     else:
         need(isinstance(parents, list), 'parents: a list of {"id", "job", "crop"?}.')
-        d = _ensure_drawing(store, run, session, g, spec)   # design/200, Area B
-        need(d['status'] == 'approved', NOT_APPROVED.format(shot=shot_id, sha=g['sha256']))
         people = VS.people_of(VS.guarded(lambda: VS.current_plan(store, session)))
         pairs = [_input(store, run, session, shot_id, p, people) for p in parents]
         sheets = [{'id': f"shot-drawing-{v['id']}-{g['sha256'][:12]}", 'key': v['plain_key'], 'sha256': v['plain_sha256']} for v in d['views']]
@@ -547,7 +569,9 @@ def status(conn, store, run, outputs, shot_id):
     f, r, card = v['frames'], v['render'], v['card']
     if f['status'] != 'ready':
         nxt = 'The check frames failed: ' + str(f['error']) if f['status'] == 'failed' else 'The check frames are being rendered; ask again in a minute.'
-    elif not v['verdicts'] or not v['verdicts'][-1]['pass']:
+    elif v['verdicts'] and not v['verdicts'][-1]['pass']:   # release 1: a scene that has its verdict is not checked again: it changes first
+        nxt = f"The check of this scene failed ({'; '.join(x['look'] for x in v['verdicts'][-1]['looks'] or [] if not x.get('pass'))}): change the scene (one thing at a time) and send it again (`vw guide scene --shot {shot_id} --file …`)."
+    elif not v['verdicts']:
         nxt = f'A fresh vw-guide-check helper looks at the check frames (`vw guide frames --shot {shot_id}`) and gives its verdict (`vw guide verdict`).'
     elif r['status'] != 'ready':
         nxt = 'The render failed: ' + str(r['error']) if r['status'] == 'failed' else 'The guide is being rendered (free, several minutes); ask again later.'
@@ -556,7 +580,7 @@ def status(conn, store, run, outputs, shot_id):
     else:
         nxt = 'Still missing before the take: ' + ', '.join(card['missing']) + '.'
     d = g.get('drawing') or {}
-    if d.get('status') == 'proposed':   # design/200: no still before the operator's Yes on the shot's drawing
+    if d.get('status') == 'proposed' and checked(g):   # design/200: no still before the operator's Yes on the shot's drawing; release 1: it waits for them only once its check passed
         nxt = f"The shot's drawing waits for the operator's answer (`vw visuals next`, or `vw guide drawing --shot {shot_id}`); no still is made before their Yes. " + nxt
     elif d.get('status') == 'rejected':
         nxt = f"The operator corrected the shot's drawing ({(d.get('verdict') or {}).get('notes')}): change the scene and send it again (`vw guide scene --shot {shot_id} --file …`). " + nxt

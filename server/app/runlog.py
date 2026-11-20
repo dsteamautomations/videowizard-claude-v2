@@ -16,6 +16,7 @@ FILM_STAGE = {'category': 'intake', 'shape': 'media', 'colours': 'visuals', 'fon
 SEGMENT_STAGE = {'voice': 'voice', 'analysis': 'analysis', 'options': 'options', 'master': 'master', 'visuals': 'visuals', 'motion': 'visuals', 'assembly': 'assembly',
                  'delivery': 'delivery', 'files': 'media'}
 PLAIN_KINDS = ('step', 'question', 'answer')   # design/192 (intake 8, brief 7): the prepare of a text stage, a question asked with the question tool, its answer
+HELPERS_WORDS = {'visuals/guide/verdict'}   # release 1 (20 Nov 2026): a step whose `notes` are a helper's finding, never the operator's words: logged as the assistant's
 SKIP = {'log', 'files'}   # the assistant's entries are written by their own endpoint; design/145 L4: upload signs and receipts (the media record says it)
 log = logging.getLogger('vw2.runlog')
 
@@ -44,7 +45,8 @@ def entry_from(path, body, status, response):
     if not m or m.group(2) in SKIP:
         return None
     run_id, segment, rest = m.group(1), m.group(2), m.group(3) or ''
-    return _entry(run_id, stage_of(segment, body), f"{segment}{('/' + rest) if rest else ''}", body, status, response)
+    e = _entry(run_id, stage_of(segment, body), f"{segment}{('/' + rest) if rest else ''}", body, status, response)
+    return {**e, 'by_kind': 'assistant'} if f'{segment}/{rest}' in HELPERS_WORDS else e
 
 
 def _entry(run_id, stage, step, body, status, response, run_code=None):

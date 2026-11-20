@@ -14,7 +14,7 @@ You write data and words. You never run Blender, never call a picture or video m
 | Step | Command | Paid? |
 |---|---|---|
 | 1. Scene description | a `vw-guide-scene` helper writes `work/guide/<shot>/scene.json`; `vw guide scene --shot S --file …` | free |
-| 1b. The shot's drawing | the server draws the shot from the scene: through the camera and from above, each person with front, back and working arm marked. The operator approves it in the chat (`vw visuals next`), or `vw guide drawing --shot S` then `vw guide drawing-approve --shot S --sha … --quote "<their words>"`. No still before their Yes. | free |
+| 1b. The shot's drawing | the server draws the shot from the scene: through the camera and from above, each person with front, back and working arm marked. Only after a fresh checker has passed the layout (row 3: the checkers of all the layouts are started together, in one message, before any layout card is shown), the operator approves it in the chat (`vw visuals next`), or `vw guide drawing --shot S` then `vw guide drawing-approve --shot S --sha … --quote "<their words>"`. No still before their Yes. | free |
 | 2. Check frames | `vw guide frames --shot S` (three frames and a strip arrive in `work/guide/<shot>/frames/`) | free |
 | 3. The double check | a fresh `vw-guide-check` helper, who has not seen the build, writes `verdict.json`; `vw guide verdict --shot S --file …` | free |
 | 4. The guide is rendered | by the server, after a passing verdict; `vw guide status --shot S` | free, several minutes |
@@ -197,7 +197,7 @@ These rules are for every shot with a person, of any kind. The server refuses a 
 When the scene is accepted, the server draws it from the same numbers as the guide (free): through the film's camera and from above. Every person is drawn with a pale face and chest with dark marks, a purple back and an orange right arm, so the operator and the picture AI can both see which way each person faces and which arm works.
 
 - A piece of the set or a prop that is a thing with an approved drawing set (the `vw:drawing` skill) carries `"drawn_as": "<element id>"`, and `"turn": <degrees>` when it is turned. It is then drawn as the thing's own model, standing where its box stands. Make the box the thing's real size: the server says when the two disagree.
-- The operator approves the drawing before the still. A correction changes the scene, and the new scene is drawn and approved again.
+- The operator sees the drawing only once a fresh checker has passed the layout, and approves it before the still. A correction changes the scene, and the new scene is drawn, checked and approved again.
 - The still's request then carries the two drawings after the guide's first frame, with the words that explain them. You do not send them and you do not describe them: write the still's words as before.
 - When an approved still looks drawn rather than photographed, make it again with a look reference: `"look": "<the id of an approved picture of this film>"` in the still's file. Only its surface, light and colour are taken.
 

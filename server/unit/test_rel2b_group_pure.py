@@ -6,7 +6,7 @@ handed out again, alone or with what became ready since. Only one ready: exactly
 same sentence as before. Both kinds go through one function (`chat_flow._together`). Without a database."""
 import pytest
 
-from app import chat_flow as CF, visuals_stage as V
+from app import chat_flow as CF, guide as G, visuals_stage as V
 from test_design222_takes_pure import RUN, USER, plan, shot
 
 WHERE = 'Step 6, drawn graphics: the still end-frame'
@@ -192,9 +192,20 @@ def test_reference_drawings_and_other_kinds_are_not_grouped(chat):
 
 def test_the_layout_drawings_wait_in_the_order_of_the_film(monkeypatch):
     p = plan(shot('S1', start=0), shot('S2', start=130), shot('S3', start=260))
-    guide = lambda sha: {'sha256': sha, 'drawing': {'status': 'proposed', 'sha256': sha, 'views': [{'id': 'camera', 'labelled_key': 'k/' + sha}]}}
-    s = {'guides': {'S3': guide('3' * 64), 'S1': guide('1' * 64), 'S2': guide('2' * 64)}}                      # written in another order than the film's
+    guide = lambda sha: {'sha256': sha, 'verdicts': [{'pass': True}], 'drawing': {'status': 'proposed', 'sha256': sha, 'views': [{'id': 'camera', 'labelled_key': 'k/' + sha}]}}
+    s = {'guides': {'S3': guide('3' * 64), 'S1': guide('1' * 64), 'S2': guide('2' * 64)}}                      # written in another order than the film's; each passed its check
     monkeypatch.setattr(V, '_accepted_shots', lambda p_, s_: [(g, sh) for g in p_['gaps'] for sc in g['scenes'] for sh in sc['shots']])
-    items = CF._drawing_items({'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None})
+    ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
+    items = CF._drawing_items(ctx)
     assert [i['id'].split(':')[:2] for i in items] == [['shot-drawing', 'S1'], ['shot-drawing', 'S2'], ['shot-drawing', 'S3']]
     assert all(any(i['id'].startswith(pre) for pre in CF.TOGETHER) for i in items)                             # the ids the group is keyed on
+    # release 1 (a layout is checked before its card is shown) holds inside a group: a layout not yet checked, or whose check failed, is no card
+    s['guides']['S1']['verdicts'] = []
+    s['guides']['S3']['verdicts'] = [{'pass': True}, {'pass': False}]
+    items = CF._drawing_items(ctx)
+    assert [i['id'].split(':')[1] for i in items] == ['S2'] and CF._together(items, True) == items
+    s['guides']['S1']['verdicts'] = [{'pass': True}]                                                           # its check passed since: it joins the next message
+    s['guides']['S2']['rounds_before'] = 1                                                                     # a rebuilt layout says so on its own entry
+    items = CF._drawing_items(ctx)
+    assert [i['id'].split(':')[1] for i in CF._together(items, True)] == ['S1', 'S2']
+    assert [G.REDRAWN in CF._entry(i)['text'] for i in items] == [False, True]
