@@ -1545,14 +1545,17 @@ def _drawing_items(ctx):
     if plan and session.get('guides'):   # Area B: the drawing of an AI video shot, before its still
         from . import guide
         shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
-        for sid, g in session['guides'].items():
+        for sid in [sid for sid in shots if sid in session['guides']]:   # release 1: in film order
+            g = session['guides'][sid]
             d = g.get('drawing') or {}
-            if sid not in shots or d.get('status') != 'proposed' or d.get('sha256') != g['sha256']:
+            # release 1 (SK, 20 Nov 2026): the fresh checker first, the operator second: the card is offered only when this scene's check passed.
+            # (Until this release: as soon as the scene was sent, before its check; 13 of 15 approved layouts were then rebuilt; design/35 row 281.)
+            if d.get('status') != 'proposed' or d.get('sha256') != g['sha256'] or not guide.checked(g):
                 continue
 
             def run_(choice, quote, words, sid=sid, sha=g['sha256']):
                 return guide.drawing_verdict(conn, store, user, run, outputs, sid, sha, choice == 'yes', quote, words)
-            lines = ["Each person's pale side with the dark stripe is the chest, the purple side is the back, the orange arm is the right arm, the arm that works. "
+            lines = ([guide.REDRAWN] if g.get('rounds_before') else []) + ["Each person's pale side with the dark stripe is the chest, the purple side is the back, the orange arm is the right arm, the arm that works. "
                      'Check that each person faces what they do and that the working hand can reach it.']
             lines += (['Changed from the plan to make the shot possible:'] + [f'- {c}' for c in d['changes']]) if d.get('changes') else []
             lines += (['Notes:'] + [f'- {c}' for c in d['notes']]) if d.get('notes') else []

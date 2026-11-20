@@ -48,7 +48,7 @@ def look(fail=(), sha=SHA, **more):
 
 
 def guide(sha='g' * 64, drawing='approved', still='approved', prompt=True, takes=(), **more):
-    return {'sha256': sha, 'key': 'k', 'seconds': 6, 'drawing': {'status': drawing, 'sha256': sha}, 'render': {'status': 'ready', 'guide_key': 'g.mp4', 'frame1_key': 'f1.png', 'sha256': 'r'},
+    return {'sha256': sha, 'key': 'k', 'seconds': 6, 'drawing': {'status': drawing, 'sha256': sha}, 'verdicts': [{'sha256': sha, 'pass': True}], 'render': {'status': 'ready', 'guide_key': 'g.mp4', 'frame1_key': 'f1.png', 'sha256': 'r'},
             'stills': [{'id': 'st1', 'status': still, 'guide_sha256': sha, 'key': 'run-1/still.png', 'sha256': 's' * 64, 'overlay_key': 'o.jpg'}] if still else [],
             **({'take_prompt': {'prompt': 'ONE action only: he lays the brick.', 'at': 't'}} if prompt else {}),
             'takes': [{'job_id': j, 'camera': 'cam1'} for j in takes], 'checks': [], **more}

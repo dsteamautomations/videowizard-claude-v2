@@ -182,6 +182,8 @@ if __name__ == '__main__':
         prompt = rel1b(prompt, parts)
         from rel1c_wording import apply as rel1c   # release 1, the critic's point 10: a held drawing and `select` are one click (no reason asked); "No finished take is asked one by one"
         prompt = rel1c(prompt, parts)
+        from rel1d_wording import apply as rel1d   # release 1, 20 Nov 2026: a layout is checked by a fresh checker before its card is shown; the checkers of the layouts together
+        prompt = rel1d(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))
