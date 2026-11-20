@@ -14,7 +14,7 @@ import pytest
 
 from app import font_sample, motion as M, pictures as P, visuals_stage as VS
 from app.errors import Problem
-from step6_shape import RULES, SHAPE, answers, build, load, parts_svg, play, rules_text, upload, verdict
+from step6_shape import RULES, SHAPE, answers, build, load, parts_svg, play, rules_text, stills, upload, verdict
 from test_design221_p1_pure import NEW, edit_plan
 from test_design221_p3c_pure import still_verdict
 from test_visuals_stage_pure import g, saved
@@ -117,7 +117,7 @@ def test_b2_a_cross_section_passes_with_the_section_view_and_is_refused_with_the
 
 
 def test_b2_a_shot_with_no_stated_view_passes_with_any_one_view():
-    store = load()
+    store = stills(load(), ('D1', *SECTION), ('D2', *SECTION))   # release 2, F1: D3 continues D2, so its still comes after theirs
     for view in ('part-block-section', 'part-block-top', 'part-block-under'):
         assert upload(store, 'D3', view, 'part-base', still=True)['sha256']
     with pytest.raises(Problem) as e:
@@ -127,7 +127,7 @@ def test_b2_a_shot_with_no_stated_view_passes_with_any_one_view():
 
 
 def test_b2_a_thing_with_one_view_behaves_as_before():
-    store = load()
+    store = stills(load(), ('D1', *SECTION), ('D2', *SECTION))   # release 2, F1: D3 continues D2, and D4 returns to D1
     with pytest.raises(Problem) as e:
         upload(store, 'D3', 'part-block-top', still=True)
     assert 'D3 shows Base but does not use its shared part: place part-base with <use href="#part-base">' in str(e.value)
@@ -139,7 +139,7 @@ def test_b2_a_thing_with_one_view_behaves_as_before():
 def test_b2_a_stated_view_no_part_is_drawn_in_and_parts_that_name_no_view_keep_the_any_one_rule():
     store = load()
     edit_plan(store, lambda d: d['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec'].update(view='elevation'))   # no part of the block or the rod is an elevation
-    assert upload(store, 'D1', 'part-block-top', 'part-rod-grid', still=True)['sha256']
+    assert upload(store, 'D1', 'part-block-under', still=True)['sha256']   # release 2, F5 (was: any one view, the view from above too): the part that names no view; of the rod, drawn in other views only, nothing
     old = load(views=False)   # a parts file approved before a part named its view (defect 56's fix, kept)
     assert all(not p['view'] for p in saved(old)['motion_parts_approved']['parts'])
     assert upload(old, 'D1', 'part-block-top', 'part-rod-grid', still=True)['sha256']

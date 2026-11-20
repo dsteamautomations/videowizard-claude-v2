@@ -19,7 +19,7 @@ import pytest
 
 from app import chat_flow as C, core, font_sample, library, main as API, motion as M, pictures as P, visuals_stage as VS
 from app.errors import Problem
-from step6_shape import build, load, parts_svg, upload
+from step6_shape import build, load, parts_svg, stills as still_ends, upload
 from test_design130_p1_pure import motion_store
 from test_design221_p1_pure import NEW, edit_plan, edit_session
 from test_design221_p2_pure import EVEN, LEAVES, SOLID, upload as upload_mo, verdict as verdict_mo
@@ -312,7 +312,7 @@ def test_m6_the_refusals_seen_on_the_run_end_with_the_next_step():
     assert core.DEFECT_OPEN.format(n=7) == ('defect 7 is open on this run; the builder resolves it, then the run continues. Do not send this call again now: tell the '
                                             'operator, and send it once the builder says the defect is fixed.')
     assert 'DEFECT_OPEN.format(n=opened[0])' in (ROOT / 'server' / 'app' / 'core.py').read_text(encoding='utf-8')   # the write refused while a defect is open says it
-    store = load()
+    store = still_ends(load(), ('D1', *SECTION), ('D2', *SECTION))   # release 2, F1: D3 continues D2, so its still comes after theirs
     with pytest.raises(Problem) as e:
         upload(store, 'D3', 'part-base', still=True)   # D3 shows the block and places none of its three views
     assert 'D3 shows Block but uses none of its shared parts' in e.value.message and e.value.message.endswith(again)

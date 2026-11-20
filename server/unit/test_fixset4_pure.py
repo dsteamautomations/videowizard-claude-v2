@@ -173,7 +173,7 @@ def test_p4_a_carries_text_shot_with_a_corner_note_or_a_logo_and_no_labels_is_as
 # ---------- 5: a comparison that comes due while the drawing is being redone ----------
 
 def test_p5_a_drawing_being_redone_is_not_due_for_a_comparison_on_its_old_project():
-    store = load()
+    store = alone(load())   # release 2, F1: D4 as a drawing of its own, else its still would wait for D1's new one
     sha, _ = bound(store, 'D1', SECTION, comparing('D4'))
     jobs = [now_job('D1')]
     upload(store, 'D1', *SECTION, still=True, rules=comparing('D4'), more='redrawn {}')   # a new still: unbound, being redone (A3.5)

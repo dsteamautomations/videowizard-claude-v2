@@ -85,6 +85,16 @@ def verdict(store, shot_id, sha, said, rnd=1):
     return g(lambda: VS.motion_verdict(store, USER, NEW, [], {'shot_id': shot_id, 'sha256': sha, 'round': rnd, 'rules': [answer(r, v) for r, v in answers(said).items()]}))
 
 
+def stills(store, *shots):
+    """Release 2, F1: the still end-frame of each of these shots, checked and approved, so that a drawing that continues the last one may upload its
+    own still. Each is (shot id, the parts it places)."""
+    for n, (shot_id, *part_ids) in enumerate(shots):
+        sha = upload(store, shot_id, *part_ids, still=True, more=f'still {n} {{}}')['sha256']
+        still_verdict(store, sha, answers(SHAPE['rounds']['D1']['still']), shot=shot_id, key=f'run-1/visuals/motion/tools/{shot_id}/0.png')
+        next(i for i in chat(store, 'still end-frame') if shot_id in i['question'])['_run']('approve', 'Approve', '')
+    return store
+
+
 def play(store, shot_id, *part_ids):
     """One drawing through its two rounds as the fixture records them: the still, its verdict, the operator's approval, the motion, its verdict."""
     rounds = SHAPE['rounds']['D1']
