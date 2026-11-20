@@ -85,7 +85,7 @@ def test_the_queued_render_of_a_replaced_scene_is_closed_too_before_a_render_is_
     assert len(closes) == 2 and closes[0] < closes[1] < render_claim                                          # closed again before the render lane takes a job
     sql = ' '.join(GW.SUPERSEDE.split())
     assert sql.startswith("update vw2_jobs j set status='failed', error=%s, updated_at=now() where j.provider='guide' and j.status='queued' "
-                          "and j.request->>'kind' in ('guide-frames','guide-render') and exists (")
+                          "and j.request->>'kind' in ('guide-frames','guide-frame1','guide-render') and exists (")   # release 4: the queued first frame too
     assert sql.endswith("exists (select 1 from vw2_jobs n where n.run_id=j.run_id and n.unit=j.unit and n.provider='guide' and n.request->>'kind'='guide-frames' "
                         "and n.created_at > j.created_at)")
     assert "status='running'" not in sql and sql.count('guide-render') == 1                                 # never a running job; a render is never what replaces

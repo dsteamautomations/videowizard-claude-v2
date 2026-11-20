@@ -4,6 +4,7 @@ still made from the guide's first frame, the overlay, the operator's go-ahead, a
 Every step is a server function that the page and the chat tool both call. Everything of a shot lives under session['guides'][shot_id]; nothing here
 touches the older pictures of a film. Paid steps check the film's cap first; the take is one creation per attempt and the same request is never sent twice.
 """
+import hashlib
 import re
 import uuid
 from datetime import datetime, timezone
@@ -118,9 +119,8 @@ def held_answer(conn, store, user, run, outputs, shot_id, sha256, choice, quote,
         d = _ensure_drawing(store, run, session, g, VS.load_json(store, g['key']))
         g['accepted'] = {'sha256': g['sha256'], 'round': rnd, **who}
         d.update(status='approved', verdict={'approved': True, 'against_check': True, 'notes': '', **who})
-        if not (g.get('render') or {}).get('job_id'):
-            g['render'] = {'job_id': _queue(conn, run, shot_id, 'guide', {'kind': 'guide-render', 'shot_id': shot_id, 'sha256': g['sha256'], 'spec_key': g['key'], 'seconds': g['seconds']}), 'status': 'queued'}
-        nxt = f'The layout goes on as it is, against its check: the guide is being rendered (free, several minutes). Then the still: `vw guide still --shot {shot_id} --file …`.'
+        _render(conn, store, run, shot_id, g)
+        nxt = f'The layout goes on as it is, against its check. {RENDER_NEXT.format(shot=shot_id)}'
     else:
         g['rounds_from'] = rnd   # their word: the count of rounds in a row starts again
         if choice == 'change':
@@ -142,6 +142,51 @@ def _queue(conn, run, shot_id, provider, request):
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,%s,%s, gen_random_uuid()) returning id",
                        (run['id'], shot_id, provider, Jsonb(request))).fetchone()
     return str(row['id'])
+
+
+# Release 4 (SK, 20 Nov 2026): the first frame of a layout first, its video behind it. The still needs only frame 1; the video is needed only for
+# the take. Both are kept on g['render']: `frame1_key` (the still can be ordered) and `status` 'ready' with `guide_key` (the take can be sent).
+# A record of the older code (one job for both) has both and reads as before. (Until then: one job, and the still waited for the video; design/35 row 302.)
+FRAME_S = 4   # seconds of rendering one frame of the video on the server (design/181); only for the "about N minutes" of a sentence
+RENDER_NEXT = ('The first frame of the layout is being made (free, under a minute); then the still: `vw guide still --shot {shot} --file …`. '
+               'The layout video renders behind it (free, several minutes) and is needed only for the take.')
+RETRY = 'send the same scene again to render it again (`vw guide scene --shot {shot} --file work/guide/{shot}/scene.json`)'
+
+
+def _render(conn, store, run, shot_id, g):
+    """What a checked scene still lacks is queued: its first frame (a quick job) and then its video (the render lane); a file of this same scene
+    still in storage is used again (a scene sent again after another). A job that failed is queued again. Returns what was queued, in words."""
+    r, req, out = g.setdefault('render', {}), {'shot_id': shot_id, 'sha256': g['sha256'], 'spec_key': g['key'], 'seconds': g['seconds']}, []
+    for key, sha, name in (('frame1_key', 'frame1_sha256', 'frame1.png'), ('guide_key', 'sha256', 'guide.mp4')):
+        k = VS.key(run, f"guides/{g['sha256']}/{name}")
+        if not r.get(key) and store.exists(k):
+            data = store.get(k)
+            r.update({key: k, sha: hashlib.sha256(data).hexdigest(), 'reused': True}, **({'status': 'ready', 'bytes': len(data)} if key == 'guide_key' else {}))
+    if not r.get('frame1_key') and (not r.get('frame1_job_id') or r.get('frame1_error')):
+        r.pop('frame1_error', None)
+        r['frame1_job_id'] = _queue(conn, run, shot_id, 'guide', {'kind': 'guide-frame1', **req})
+        out.append('first frame')
+    if r.get('status') != 'ready' and (not r.get('job_id') or r.get('status') == 'failed'):
+        r.pop('error', None)
+        r.update(job_id=_queue(conn, run, shot_id, 'guide', {'kind': 'guide-render', **req, 'split': True}), status='queued')   # `split`: its first frame is another job
+        out.append('layout video')
+    return out
+
+
+def render_line(shot_id, g):
+    """Where the shot's first frame and its video stand, in one sentence for the status, the refused take and the next-step line; '' when both are ready."""
+    r, retry = g.get('render') or {}, RETRY.format(shot=shot_id)
+    if r.get('status') == 'ready':
+        return ''
+    if r.get('status') == 'failed':
+        return f"The layout video of {shot_id} failed ({r.get('error')}): {retry}."
+    if r.get('frame1_key'):
+        return (f'The layout video of {shot_id} is still being rendered (needed only for the take; about {max(1, round(g["seconds"] * G.FPS * FRAME_S / 60))} minutes of rendering, '
+                'one video at a time).')
+    if r.get('frame1_error'):
+        return (f"The first frame of {shot_id} failed ({r['frame1_error']}): no still can be ordered yet. It is made again with the layout video, which is rendering; "
+                f'to make it at once, {retry}.')
+    return f'The first frame of {shot_id} is being made (free, under a minute of rendering); the still can be ordered when it is ready.'
 
 
 def _slot_seconds(session, shot):
@@ -247,6 +292,11 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     old = guides.get(shot_id) or {}
     need(not held(old), HELD.format(shot=shot_id, n=MAX_ROUNDS))   # release 2, the critic's point 2: the gate: no further scene of a held shot without the operator
     if old.get('sha256') == sha:
+        again = _render(conn, store, run, shot_id, old) if old.get('render') and checked(old) and not rebuild(old) else []   # release 4: the retry of a first frame or a video that failed
+        if again:
+            VS.save_session(store, run, session)
+            return {'shot_id': shot_id, 'sha256': sha, 'unchanged': True, 'job_id': (old.get('frames') or {}).get('job_id'),
+                    'next': f"This scene is already stored: its {' and its '.join(again)} is queued again (free)."}
         d = old.get('drawing') or {}
         same = ('This scene is already stored; nothing was queued.' if not rebuild(old) else   # the critic's point 3: the scene that failed, sent again, says so
                 f"This is the scene whose layout the operator corrected ({(d.get('verdict') or {}).get('notes')}): nothing was queued. The new scene must differ from it: make their correction and send it again."
@@ -295,9 +345,10 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
                           'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
     out = {'shot_id': shot_id, 'round': rnd, 'pass': bool(passed), 'failed': failed}
     if passed and not (g.get('render') or {}).get('job_id'):
-        job_id = _queue(conn, run, shot_id, 'guide', {'kind': 'guide-render', 'shot_id': shot_id, 'sha256': g['sha256'], 'spec_key': g['key'], 'seconds': g['seconds']})
-        g['render'] = {'job_id': job_id, 'status': 'queued'}
-        out.update(job_id=job_id, next=f'The guide is being rendered (free, several minutes). Then the still: `vw guide still --shot {shot_id} --file …`.'
+        _render(conn, store, run, shot_id, g)   # release 4: the first frame, then the video (until then: one `guide-render` job for both)
+        r = g['render']
+        out.update(job_id=r.get('job_id'), next=('The first frame and the video of this scene were rendered before and are used again: the still can be ordered '
+                                                  f'(`vw guide still --shot {shot_id} --file …`).' if r.get('status') == 'ready' else RENDER_NEXT.format(shot=shot_id))
                    + ('' if (g.get('drawing') or {}).get('status') == 'approved' else " The shot's layout drawing is shown to the operator now (`vw visuals next`): no still before their Yes."))
     elif not passed:
         # release 2, the critic's point 2: the third failure in a row holds the shot (until then: "show the operator what is still open" from round 2, with no card and no gate; design/35 row 293)
@@ -311,8 +362,8 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
 # ---------- step C: the still, the overlay ----------
 
 def _render_ready(g):
-    r = g.get('render') or {}
-    need(r.get('status') == 'ready' and r.get('frame1_key'), 'The guide is not rendered yet: it is rendered after a fresh checker passes its check frames (`vw guide status`).')
+    r = g.get('render') or {}   # release 4: the still needs the first frame only, not the video (until then: `status` ready too)
+    need(r.get('frame1_key'), 'The first frame of the layout is not rendered yet: it is rendered, before the video, after a fresh checker passes the check frames (`vw guide status`).')
     return r
 
 
@@ -529,6 +580,8 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     g = entry_of(session, shot_id)
     need(shot_id not in (session.get('selections') or {}), f'{shot_id} has a take selected: no new take is made while it stands. To make another, the operator rejects the selected take first.')   # design/222, the second critic's point 3
     card = ready_card(session, shot_id, VS.prices()['video_inr_per_s'])
+    need(card['missing'] != ['the rendered guide'],   # release 4: only the video is awaited: said plainly; no take is ever sent without the whole video
+         render_line(shot_id, g) + f' No take is sent without it: send this again when `vw guide status --shot {shot_id}` says it is ready.')
     need(card['ready'], 'Not ready to shoot; still missing: ' + ', '.join(card['missing']) + '.')
     ordered, quote = word_for(g, quote)
     render, still = g['render'], card['still']
@@ -590,8 +643,14 @@ def apply_result(session, job, status, result, error):
     if req['kind'] == 'guide-frames':
         g['frames'] = {'job_id': str(job['id']), 'status': 'ready' if ok else 'failed', **({'frames': result['frames'], 'strip_key': result['strip_key']} if ok else {'error': error})}
         return {'kind': 'check frames', 'ok': ok, **({'strip_key': result['strip_key']} if ok else {'error': error})}
+    if req['kind'] == 'guide-frame1':   # release 4: the first frame alone: the still can be ordered; the video's own record is untouched
+        r = g.setdefault('render', {})
+        r.pop('frame1_error', None)
+        r.update({k: result[k] for k in ('frame1_key', 'frame1_sha256')} if ok else {'frame1_error': error})
+        return {'kind': 'first frame made', 'ok': ok, **({'frame1_key': result['frame1_key']} if ok else {'error': error})}
     if req['kind'] == 'guide-render':
-        g['render'] = {'job_id': str(job['id']), 'status': 'ready' if ok else 'failed', **({k: result[k] for k in ('guide_key', 'sha256', 'bytes', 'frame1_key', 'frame1_sha256', 'render_seconds')} if ok else {'error': error})}
+        kept = {k: v for k, v in (g.get('render') or {}).items() if k in ('frame1_key', 'frame1_sha256', 'frame1_job_id')}   # a video that failed does not take the first frame with it
+        g['render'] = {**kept, 'job_id': str(job['id']), 'status': 'ready' if ok else 'failed', **({k: result[k] for k in ('guide_key', 'sha256', 'bytes', 'frame1_key', 'frame1_sha256', 'render_seconds')} if ok else {'error': error})}
         return {'kind': 'guide rendered', 'ok': ok, **({'guide_key': result['guide_key'], 'sha256': result['sha256'], 'render_seconds': result['render_seconds']} if ok else {'error': error})}
     if req['kind'] == 'guide-still':
         s = next((s for s in g.get('stills') or [] if s['id'] == req['reference']['id']), None)
@@ -634,7 +693,7 @@ def status(conn, store, run, outputs, shot_id):
         return {'shot_id': shot_id, 'guide': None, 'next': f'No guide yet: write the scene description and send it, `vw guide scene --shot {shot_id} --file work/guide/{shot_id}/scene.json`.'}
     g = session['guides'][shot_id]
     names = (['strip'] + [f"check-{f['n']:04d}" for f in (g.get('frames') or {}).get('frames') or []] if (g.get('frames') or {}).get('status') == 'ready' else []) \
-        + (['frame1', 'guide'] if (g.get('render') or {}).get('status') == 'ready' else []) \
+        + (['frame1'] if (g.get('render') or {}).get('frame1_key') else []) + (['guide'] if (g.get('render') or {}).get('status') == 'ready' else []) \
         + [n for s in g.get('stills') or [] if s.get('key') for n in (['still-' + s['id']] + (['overlay-' + s['id']] if s.get('overlay_key') else []))]
     names += ['drawing-' + x['id'] for x in (g.get('drawing') or {}).get('views') or []]
     f, r, card = v['frames'], v['render'], v['card']
@@ -647,12 +706,16 @@ def status(conn, store, run, outputs, shot_id):
         nxt = f"The check of this scene failed ({'; '.join(x['look'] for x in v['verdicts'][-1]['looks'] or [] if not x.get('pass'))}): change the scene (one thing at a time) and send it again (`vw guide scene --shot {shot_id} --file …`)."
     elif not v['verdicts']:
         nxt = f'A fresh vw-guide-check helper looks at the check frames (`vw guide frames --shot {shot_id}`) and gives its verdict (`vw guide verdict`).'
-    elif r['status'] != 'ready':
-        nxt = 'The render failed: ' + str(r['error']) if r['status'] == 'failed' else 'The guide is being rendered (free, several minutes); ask again later.'
+    elif not r['frame1_url']:   # release 4: the first frame is what the still waits for (until then: the whole render)
+        nxt = render_line(shot_id, g)
     elif card['ready']:
         nxt = f"Ready to shoot: show the operator the card ({card['seconds']} s, about {card['cost_inr']:.0f} rupees). On their word: `vw guide shoot --shot {shot_id} --quote \"…\"`."
-    else:
-        nxt = 'Still missing before the take: ' + ', '.join(card['missing']) + '.'
+    else:   # release 4: the first frame is ready: the still goes on while the video renders; the two are said apart
+        rest = [m for m in card['missing'] if m != 'the rendered guide']
+        ordered = any(s.get('guide_sha256') == g['sha256'] and s.get('status') in ('generating', 'candidate', 'approved') for s in g.get('stills') or [])
+        nxt = ' '.join(x for x in ((f'First frame ready: the still can be ordered (`vw guide still --shot {shot_id} --file …`).' if not ordered
+                                    else 'Still missing before the take: ' + ', '.join(rest) + '.' if rest
+                                    else 'Everything else for the take is ready: the word to shoot is asked when the layout video is ready.'), render_line(shot_id, g)) if x)
     d = g.get('drawing') or {}
     if d.get('status') == 'proposed' and checked(g):   # design/200: no still before the operator's Yes on the shot's drawing; release 1: it waits for them only once its check passed
         nxt = f"The shot's drawing waits for the operator's answer (`vw visuals next`, or `vw guide drawing --shot {shot_id}`); no still is made before their Yes. " + nxt
@@ -683,7 +746,7 @@ def file(store, run, outputs, shot_id, name):
 TAKE_RETIRED = ('The picture-to-video take (a start picture, an end picture and a motion text) is retired. An AI video shot is made from a guide: load the vw:guide skill, '
                 'then `vw guide scene --shot S --file work/guide/S/scene.json`.')
 START_PICTURE_RETIRED = ('A start picture composed from words is retired for an AI video shot. Its still is made from the guide\'s first frame: '
-                         '`vw guide still --shot S --file …` after the guide is rendered (the vw:guide skill).')
+                         '`vw guide still --shot S --file …` as soon as that first frame is rendered (the vw:guide skill).')   # release 4 (until then: "after the guide is rendered")
 
 
 def older_take_retired(*_):

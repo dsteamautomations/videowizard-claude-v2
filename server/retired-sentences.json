@@ -187,6 +187,8 @@
     "the server refuses a reply to any item but the one it handed out",
     "After two failed rounds, show the operator what is still open before another round.",
     "Nothing of this is asked one at a time during the builds.",
-    "the server refuses every write on the run until the builder marks the defect fixed"
+    "the server refuses every write on the run until the builder marks the defect fixed",
+    "| 4. The guide is rendered | by the server, after a passing verdict; `vw guide status --shot S` | free, several minutes |",
+    "Then `vw motion render --shot S` (free; it checks the timing)."
   ]
 }

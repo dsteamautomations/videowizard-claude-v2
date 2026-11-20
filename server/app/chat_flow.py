@@ -2249,7 +2249,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         rows = V.take_jobs(conn, run)
         if T.asked(session, plan, rows):   # design/222: Claude is asked to check the takes from now
             V.save_session(store, run, session)
-        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.starts(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows), T.held_due(session, plan)) if x)   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
+        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.starts(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows), T.held_due(session, plan), T.render_due(session, plan)) if x)   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)

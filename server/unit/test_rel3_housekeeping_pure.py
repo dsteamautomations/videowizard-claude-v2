@@ -25,4 +25,8 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert 'once the earlier drawing\'s still is approved' in rows['260']
     for n, words in (('298', 'left as it is today'), ('299', 'no reminder'), ('300', 'Keep fixed for now'), ('301', 'player box')):
         assert words in rows[n] and 'Not to be built' in rows[n], n
-    assert '302' not in rows
+    # the merge of release 4: its row is 302; release 3's older ways (C6, C1, C2, E2) are 303 to 306
+    assert 'guide-frame1' in rows['302'] and 'release 4' in rows['302']
+    for n, words in (('303', 'C6'), ('304', 'C1'), ('305', 'C2'), ('306', 'E2')):
+        assert words in rows[n] and 'release 3' in rows[n], n
+    assert '307' not in rows

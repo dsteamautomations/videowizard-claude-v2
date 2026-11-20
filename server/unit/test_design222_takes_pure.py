@@ -94,7 +94,7 @@ def test_a_film_with_no_ai_video_has_no_step_7(held):
     (lambda s: s['guides'].update(S1=guide(drawing='proposed', still=None, prompt=False)), [], 'waiting for you in the chat'),        # the layout drawing's card
     (lambda s: (s['guides'].update(S1=guide(still='candidate', prompt=False)), s['guides']['S1']['stills'][0].update(check_look={'sha256': 's' * 64, 'lines': []})), [], 'waiting for you in the chat'),   # the still's card, once Claude looked at it (release 1, A1)
     (lambda s: s['guides'].update(S1=guide()), [], 'waiting for you in the chat'),                                                  # the word to make the take
-    (lambda s: s['guides'].update(S1=guide(still=None, prompt=False)), [], 'being made'),
+    (lambda s: s['guides'].update(S1=guide(still=None, prompt=False)), [], 'first frame ready: the still can be ordered'),          # release 4 (until then: "being made")
     (lambda s: s['guides'].update(S1=guide()), [job('j1', status='running')], 'being made'),
     (lambda s: (s['guides'].update(S1=guide()), s['take_checks'].update(j1=rec())), [job('j1')], 'being checked by Claude'),
     (lambda s: (s['guides'].update(S1=guide()), s['take_checks'].update(j1=rec(look=look()))), [job('j1')], 'made and checked'),

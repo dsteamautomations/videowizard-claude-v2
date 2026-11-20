@@ -75,6 +75,7 @@ W = {
     # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
     'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: a layout is shown to the operator, and its guide is rendered, only after its check passes)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
     'start_words': "the writers of the take's words of {ids} ({n}) (`vw guide prompt --shot S --file take.txt`)",
+    'video_wait': ' Everything else for its take is ready: its word to shoot is asked when the video is ready; go on with the other shots.',   # release 4
     'start_scenes': 'the writers of the scene descriptions of {ids} ({n})',
     'start_rebuild': ("the writers of the scene descriptions of {ids} ({n}), each rebuilt after its check or the operator's correction: read `vw guide status --shot S` first, "
                       'it holds what must change'),
@@ -114,8 +115,9 @@ PAGE = {   # layout.words.takes: the page's chrome (the page holds no words of i
     'help': 'How this works', 'keys': 'Keys: the left and right arrows move between the shots. Escape closes what is open.'}
 
 STATE = {'none': 'not started', 'chat': 'waiting for you in the chat', 'making': 'being made', 'checking': 'being checked by Claude', 'redo': 'being redone',
-         'done': 'made and checked', 'answered': 'answered', 'failed': 'could not be made', 'stale': 'must be made again (the plan changed)'}
-ORDER = ('done', 'answered', 'checking', 'making', 'redo', 'stale', 'chat', 'failed', 'none')   # the order of the counts in the line
+         'done': 'made and checked', 'answered': 'answered', 'failed': 'could not be made', 'stale': 'must be made again (the plan changed)',
+         'video': 'waiting for the layout video', 'still': 'first frame ready: the still can be ordered'}   # release 4: the layout video renders behind the still
+ORDER = ('done', 'answered', 'checking', 'making', 'still', 'video', 'redo', 'stale', 'chat', 'failed', 'none')   # the order of the counts in the line
 COMPLETE = (STATE['done'], STATE['answered'], STATE['failed'], STATE['stale'])   # a take that could not be made never keeps the page closed; the critic's S4: nor one made for an earlier plan (it is on the page with Make another and Reject)
 
 
@@ -229,7 +231,7 @@ def starts(session, plan, take_rows):
     """Release 1, D1 (SK, 20 Nov 2026): the helpers of step 7 that can start now, to be started together in one message, in film order: the writers
     of the scene descriptions (a shot with no guide yet), the checkers of the stills and of the takes that wait for Claude's look. '' when none.
     The critic's point 4: the line is complete: also the guides whose check frames wait for their fresh checker, the stills that can be ordered
-    (the layout approved, the guide rendered, no still yet) and the takes' words that can be written (the still approved); each group is named
+    (the layout approved, the guide's first frame rendered, no still yet) and the takes' words that can be written (the still approved); each group is named
     only when the server's own gate takes it (`guide.verdict`, `guide.request_still`, `guide.set_prompt`). Point 10c: a shot that shows a
     person of the footage about whom the operator was never asked is not named for its still: that question is said first, in the same line."""
     if not plan or not V.round_v2(session):
@@ -248,10 +250,8 @@ def starts(session, plan, take_rows):
     # (`chat_flow._drawing_items` offers the card only when the check passed). Never for a scene that has a verdict: passed (its card, its render) or
     # failed (the scene changes first). (Until this release: only after the operator approved the layout; design/35 row 281.)
     check = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('frames') or {}).get('status') == 'ready' and not guides[sid].get('verdicts') and not guide.rebuild(guides[sid])]
-    order = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('render') or {}).get('status') == 'ready' and (guides[sid].get('render') or {}).get('frame1_key')
-             and (guides[sid].get('drawing') or {}).get('status') == 'approved' and (guides[sid].get('drawing') or {}).get('sha256') == guides[sid].get('sha256')
-             and not any(st.get('status') == 'generating' or (mine(guides[sid], st) and st.get('status') in ('candidate', 'approved')) for st in guides[sid].get('stills') or [])
-             and not jobs_of(take_rows, sid)]
+    # release 4: a still is named as soon as the first frame of its layout exists; its video renders behind it (until then: only once the video was rendered too)
+    order = [sid for sid in shots if sid in guides and open_(sid) and _still_due(guides[sid]) and not jobs_of(take_rows, sid)]
     hold = P.ask_shots(session, plan) if order else ()   # point 10c: the question is said by `pictures.waits_words` (`faces_to_ask`), first in the same next-step line
     order = [sid for sid in order if sid not in hold]
     words = [sid for sid in shots if sid in guides and open_(sid) and not guides[sid].get('take_prompt') and any(mine(guides[sid], st) and st.get('status') == 'approved' for st in guides[sid].get('stills') or [])]
@@ -315,6 +315,34 @@ def _ready_to_shoot(g):
     return bool((g.get('render') or {}).get('status') == 'ready' and still and still.get('overlay_key') and g.get('take_prompt'))
 
 
+def _still_due(g):
+    """Release 4: the still can be ordered: the first frame of the layout exists, the operator approved this scene's layout, and no still of it is
+    being made, waits or was approved (`guide.request_still` gates the same; the video may still be rendering)."""
+    d = g.get('drawing') or {}
+    return bool((g.get('render') or {}).get('frame1_key') and d.get('status') == 'approved' and d.get('sha256') == g.get('sha256')
+                and not any(st.get('status') == 'generating' or (st.get('guide_sha256') == g.get('sha256') and st.get('status') in ('candidate', 'approved')) for st in g.get('stills') or []))
+
+
+def _video_waits(g):
+    """Release 4: everything for the take is there but the layout video (it renders behind the still, or it failed)."""
+    return (g.get('render') or {}).get('status') != 'ready' and _ready_to_shoot({**g, 'render': {'status': 'ready'}})
+
+
+def render_due(session, plan):
+    """Release 4: what the next-step line says of the renders: a first frame or a layout video that failed, with how it is made again; and a shot
+    that waits only for its video (its word-to-shoot card comes when the video is ready)."""
+    from . import guide
+    out = []
+    for g, sh, n, of in video_shots(plan, session) if plan else []:
+        e = (session.get('guides') or {}).get(sh['id']) or {}
+        r = e.get('render') or {}
+        if not r or sh['id'] in (session.get('selections') or {}) or guide.rebuild(e):
+            continue
+        if r.get('status') == 'failed' or (r.get('frame1_error') and not r.get('frame1_key')) or _video_waits(e):
+            out.append(f"{name_of(g, sh, n, of)} ({sh['id']}): " + guide.render_line(sh['id'], e) + (W['video_wait'] if r.get('status') != 'failed' and _video_waits(e) else ''))
+    return ' '.join(out)
+
+
 def _card_waits(g):
     """A card of this shot waits in the chat: its layout drawing (release 1: only once the scene's check passed), or a still to approve."""
     from . import guide
@@ -373,6 +401,10 @@ def _state(session, plan, sh, take_rows, now):
         return 'checking', None, False   # release 1: the layout is with its fresh checker; its card comes only when it passes
     if _card_waits(g) or _ready_to_shoot(g):
         return 'chat', None, False   # a card waits in the chat: the layout drawing, the still, or the word to make the take
+    if _video_waits(g):
+        return 'video', None, False   # release 4: the still is approved and the words are written: only the layout video is awaited (until then such a shot read "being made")
+    if _still_due(g):
+        return 'still', None, False   # release 4: its first frame is ready, its still can be ordered (until then such a shot read "being made")
     return 'making', None, False
 
 
