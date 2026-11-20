@@ -44,8 +44,8 @@ def test_b4_the_fixture_has_the_shape_of_a_real_step_6_session():
         _, gap, _, shot = VS.locate(store, s, sid)
         assert VS.continues_from(plan, s, gap, shot) == before
     assert [p['id'] for p in s['motion_parts_approved']['parts']] == [p['id'] for p in SHAPE['parts']]
-    with pytest.raises(Problem, match='D2 continues from D1: build and pass D1 first'):
-        build(store, 'D2')
+    with pytest.raises(Problem, match="D2 continues from D1: its still end-frame opens on D1's approved still end-frame, and D1 has none now"):
+        build(store, 'D2')   # fix set, the critic's point 7: D2's still waits for D1's approved still; its motion for D1's passed project
     out = play(store, 'D1', *SECTION)   # the still round, the approval, the animated round
     assert out['still']['next'].startswith('The still end-frame passed') and out['animated']['next'].startswith('Passed, 1 note')
     assert [bool(c.get('still')) for c in saved(store)['motion_checks']['D1']] == [True, False]

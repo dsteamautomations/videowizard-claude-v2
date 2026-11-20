@@ -356,21 +356,31 @@ def palette_due(session, plan):
     return answer_warnings(plan, palette_warnings(plan, session.get('added_colours')))
 
 
-CAMERA_CLOSER = re.compile(r'\b(?:push(?:es|ed|ing)?[- ]in|zoom(?:s|ed|ing)?(?: in| out)?|doll(?:y|ies|ying)|pull(?:s|ed|ing)?[- ]back|punch(?:es|ing)?[- ]in)\b', re.I)
-CAMERA_SIDEWAYS = re.compile(r'\b(?:pan(?:s|ned)?\s+(?:slowly\s+)?(?:along|across|left|right|up|down|over|to|from|with)|panning|'
-                             r'track(?:s|ed|ing)?\s+(?:along|across|with|past)|tilt(?:s|ed|ing)?\s+(?:up|down)|whip(?:s|ping)?\s+(?:to|pan))\b', re.I)
-LARGE_CHANGE = re.compile(r'\b(?:whole|entire|all of the|most of|more than half|two[- ]thirds|three[- ]quarters|throughout|everywhere)\b', re.I)   # fix set M4: a change an edit region (a third at most) cannot hold
+# The critic's point 9 (19 Nov 2026): a move is the camera's only in a sentence whose subject is the camera or the view (CAMERA_SUBJECT), or when the
+# words are a camera term whatever the subject (the *_BARE lists): "the lid tilts up" and "a pan on the stove" are the things, not the camera.
+# ponytail: word lists, a warning only; a thing named "frame" or "shot" that moves in its own sentence is flagged too.
+CAMERA_SUBJECT = re.compile(r'\b(?:camera|view|frame|shot|we)\b', re.I)
+CLOSER_BARE = r'push(?:es|ed|ing)?[- ]in(?:to)?|zoom(?:s|ed|ing)?[- ](?:in|out)(?:to)?|doll(?:y|ies|ying)'
+SIDEWAYS_BARE = r'orbit(?:s|ed|ing)?|tracking\s+shot'
+CAMERA_CLOSER = (re.compile(rf'\b(?:{CLOSER_BARE})\b', re.I),
+                 re.compile(rf'\b(?:{CLOSER_BARE}|zoom(?:s|ed|ing)?|pull(?:s|ed|ing)?[- ]back|punch(?:es|ing)?[- ]in|mov(?:es?|ed|ing)\s+(?:closer|in|back|away))\b', re.I))
+CAMERA_SIDEWAYS = (re.compile(rf'\b(?:{SIDEWAYS_BARE})\b', re.I),
+                   re.compile(rf'\b(?:{SIDEWAYS_BARE}|pan(?:s|ned)?\s+(?:slowly\s+)?(?:along|across|left|right|up|down|over|to|from|with)|pans|panned|panning|'
+                              r'track(?:s|ed|ing)?\s+(?:along|across|with|past)|tilt(?:s|ed|ing)?\s+(?:up|down)|whip(?:s|ping)?\s+(?:to|pan))\b', re.I))
+LARGE_CHANGE = re.compile(r'\b(?:whole|entire|all\s+of\s+the|most\s+of\s+the|more\s+than\s+half(?:\s+of)?\s+the|(?:half|two[- ]thirds|three[- ]quarters)\s+of\s+the)\s+'
+                          r'(?:frame|picture|image|scene|room)\b', re.I)   # fix set M4: a change an edit region (a third at most) cannot hold; the critic's point 9: of the frame as a whole, not of one part
 
 
 def camera_words(shot):
     """Fix set M1 (19 Nov 2026): the words of a drawn shot that ask for a camera move its camera_flow does not allow, else '': a fixed flow (none
     named is fixed) allows none; a flow that scales the picture allows no sideways move; Pan along allows no move closer or back."""
     flow = shot.get('camera_flow') or 'fixed'
-    text = ' '.join(str(shot.get(k) or '') for k in ('depicts', 'purpose', 'message', 'framing', 'information_progression', 'camera', 'camera_move'))
-    for no, words in (('pan_along', CAMERA_SIDEWAYS), ('step_closer pull_back follow slow_push_in', CAMERA_CLOSER)):
-        m = None if flow in no.split() else words.search(text)
-        if m:
-            return m.group(0)
+    text = '. '.join(str(shot.get(k) or '') for k in ('depicts', 'purpose', 'message', 'framing', 'information_progression', 'camera', 'camera_move'))
+    for sentence in re.split(r'[.;!?\n]+', text):
+        for no, (bare, moved) in (('pan_along', CAMERA_SIDEWAYS), ('step_closer pull_back follow slow_push_in', CAMERA_CLOSER)):
+            m = None if flow in no.split() else (moved if CAMERA_SUBJECT.search(sentence) else bare).search(sentence)
+            if m:
+                return m.group(0)
     return ''
 
 
@@ -2816,8 +2826,9 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
     if up.get('picture_key') and not up.get('rejected') and not parts_ready(session):   # design/221 row 1: one card in the chat, before any drawn shot's items
         add(-1, f"Shared parts · {len(up.get('parts') or [])} parts", 'pictures', 'parts', up['sha256'], 'shared parts to approve')
     stills = session.get('motion_stills') or {}   # design/221 row 3: a still end-frame with no failed must; the stills of one diagram in one card when ready together
-    pend = {sid for sid, st in stills.items() if sid in shots and st.get('frame_key') and not st.get('rejected') and not still_approved(st)}
     gap_of = {sh['id']: g_ for g_, sh in _accepted_shots(plan, session)}
+    pend = {sid for sid, st in stills.items() if sid in shots and st.get('frame_key') and not st.get('rejected') and not still_approved(st)
+            and not opens_changed(session, continues_from(plan, session, gap_of[sid], shots[sid]), st)}   # the critic's point 7: a still built on an earlier still that was replaced is made again, not asked
     carded = set()   # fix set A1.3: each still on one card, the cards in the order of the film
     for sid in sorted(pend, key=lambda s: shots[s]['start_frame']):
         if sid in carded:
@@ -5983,7 +5994,13 @@ def still_answer(store, user, run, outputs, shot_ids, ok, quote, words=''):
         st['approved' if ok else 'rejected'] = {'png': st['png'], 'quote': quote, 'by': user['id'], 'at': at, **({} if ok else {'words': str(words).strip()})}
     save_session(store, run, session)
     names = ', '.join(shot_ids)
-    return {'recorded': True, 'for_the_assistant': f'The still end-frame of {names} is approved: build its motion now without changing what the still shows, and upload it without --still.'
+    waits = ''   # the critic's point 7: a drawing that continues another builds its motion on that drawing's passed project
+    for sid in shot_ids if ok else []:
+        plan, gap, _, shot = guarded(lambda sid=sid: locate(store, session, sid))
+        prev = continues_from(plan, session, gap, shot)
+        if prev and not passed_project(session, guarded(lambda: locate(store, session, prev))[3]):
+            waits += CHAIN_WAIT.format(shot=sid, prev=prev)
+    return {'recorded': True, 'for_the_assistant': f'The still end-frame of {names} is approved: build its motion now without changing what the still shows, and upload it without --still.' + waits
             if ok else ' '.join(STILL_REJECTED.format(shot=sid, words=str(words).strip()) for sid in shot_ids)}
 
 
@@ -5995,7 +6012,7 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     from . import motion
     _motion_run(run)
     session = session_of(store, run, outputs)
-    shot = guarded(lambda: locate(store, session, shot_id))[3]
+    _, gap, _, shot = guarded(lambda: locate(store, session, shot_id))
     need(re.search(r'\.zip$', name or '', re.I), 'The project is one .zip file of the shot\'s folder (index.html at its root).')
     need(content and len(content) <= motion.MAX_ZIP, f'The project zip is empty or over {motion.MAX_ZIP // 1_000_000} MB: pictures come from assets/ref, not inside the zip.')
     try:
@@ -6007,8 +6024,8 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     names = _motion_fonts(store, session, run)[1]
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    st = (session.get('motion_stills') or {}).get(shot_id) or {}
     if not still:   # design/221 row 3: the still end-frame first, approved by the operator in the chat, checked with the parts in force
-        st = (session.get('motion_stills') or {}).get(shot_id) or {}
         need(st, STILL_FIRST.format(shot=shot_id))
         need(not st.get('rejected'), STILL_REJECTED.format(shot=shot_id, words=(st.get('rejected') or {}).get('words')))
         need(still_approved(st), STILL_WAIT.format(shot=shot_id))
@@ -6018,6 +6035,10 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
     need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
     plan = guarded(lambda: current_plan(store, session))
+    prev = continues_from(plan, session, gap, shot)   # the critic's point 7: the still opens on the earlier drawing's approved still; the motion is built on its passed project
+    if prev and not still:
+        need(not opens_changed(session, prev, st), STILL_OPENS.format(shot=shot_id, prev=prev))
+        need(passed_project(session, guarded(lambda: locate(store, session, prev))[3]), CHAIN_FIRST.format(shot=shot_id, prev=prev))
     els = {e['id']: e for e in plan.get('elements') or []}
     placed = lambda ids: any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in ids)
     for p in shared:   # fix set A1.1: a shape that is no thing of the plan, drawn once: the drawings its part names place it
@@ -6037,23 +6058,29 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
                                                                                             for k, v in brief_lines.items())),
          'brief-lines.json is not the brief\'s lines as `vw motion brief` wrote them: run `vw motion brief --shot ' + shot_id + '` again, read the rules again, then upload.')
     lines = brief_lines or motion_brief(store, run, outputs, shot_id)['lines']   # design/221 S3: the brief the rules were written from, line by line
+    held = pictures.rules_of(rules_text)
+    cmp = comparing(session, plan, held)
+    lost = next((c for c in cmp.values() if c['state'] == 'closed' and c['with'] not in ever_drawn(store, session)), None)   # the critic's point 3: a mistyped id never drops a must
+    need(not lost, WITH_UNKNOWN.format(shot=shot_id, rule=(lost or {}).get('rule'), other=(lost or {}).get('with'), ids=', '.join(drawn_ids(plan, session))))
+    idle = {i for i, c in cmp.items() if c['state'] != 'ready'}
+    on = opens_on(session, prev) if prev and still else {}
     sha = hashlib.sha256(content).hexdigest()
     k = f"{run['id']}/visuals/motion/projects/{sha}.zip"
     store.put(k, content, 'application/zip')
-    held = pictures.rules_of(rules_text)
     session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
-                                                      **({'rules': held, 'brief': lines} if held else {}), **({'still': True} if still else {})}
-    if not still or sha != ((session.get('motion_stills') or {}).get(shot_id) or {}).get('sha256'):   # fix set A3.5: a new still of a bound shot is a redraw: its old project is no longer
+                                                      **({'rules': held, 'brief': lines} if held else {}), **({'still': True} if still else {}),
+                                                      **({'left_out': sorted(idle)} if idle else {}),   # the critic's point 1: the comparisons this upload's checker was not given
+                                                      **({'opens_on': on['png'], 'opens_from': prev} if on else {})}   # the critic's point 7: the picture of the earlier drawing this still opens on
+    if not still or sha != st.get('sha256'):   # fix set A3.5: a new still of a bound shot is a redraw: its old project is no longer
         (session.get('motion_bound') or {}).pop(shot_id, None)   # the drawing (the count says "being redone"; a drawing that continues it waits). design/221 (the critic's A1): a later upload is bound only by its own clean verdict
     save_session(store, run, session)
-    cmp = comparing(session, plan, held)
-    idle = {i for i, c in cmp.items() if c['state'] != 'ready'}
     held = [h for h in held if h['id'] not in idle]   # fix set A1.2: a comparison with nothing to compare with yet waits as a note: no checker is asked for it
     frames = compare_frames(cmp)
     with_ = {'compare': frames} if frames else {}
     told = ''.join(f" {len([c for c in cmp.values() if c['with'] == f['shot_id'] and c['state'] == 'ready'])} rule(s) compare with {f['shot_id']}: {f['shot_id']}'s approved still "
                    f"end-frame is saved in work/motion/{shot_id}/with-{f['shot_id']}/last-frame.png for the checker." for f in frames)
     again = round_rules(session, shot_id, sha, cmp)   # fix set A1.6: from round 2 of the animated project, the rules the round before left open
+    passed = round_rules(session, shot_id, sha, cmp, passed=True) if again is not None else []   # the critic's point 6: and the musts that passed, answered only when this upload broke one
     if still:
         last = last_second(shot, fps)
         mine = still_rules(held)   # fix set B3: the still's checker is given the musts a still can show and no other rule
@@ -6069,11 +6096,12 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
             **({'finish': effects, 'finish_note': motion.finish_note(files, effects) or 'The server adds this finish at snapshot and render; the drawing must be complete without it.'} if effects else {}),
-            **({'round_rules': again} if again is not None else {}), **with_,
+            **({'round_rules': again, 'round_passed': passed} if again is not None else {}), **with_,
             'next': f"Project stored. Check it with `vw motion check --shot {shot_id} --sha {sha}`, then snapshot it for the fact check; a clean verdict binds it to {shot_id} "
                     f"(nothing goes in the plan), then `vw motion render --shot {shot_id}`."
                     + (f" The {len(again)} rules the round before left open are in work/motion/{shot_id}/rules-round.md: the checker answers those, and looks at the whole frame "
-                       "for a must-kind fault." if again is not None else '') + told}
+                       "for a must-kind fault" + (f"; below them are the {len(passed)} musts that passed before: the checker answers one of those only when this upload broke it "
+                                                  '("pass": false, with where).' if passed else '.') if again is not None else '') + told}
 
 
 def comparing(session, plan, held):
@@ -6094,6 +6122,56 @@ def comparing(session, plan, held):
     return out
 
 
+WITH_UNKNOWN = ('{shot}: the rule "{rule}" compares with {other}, which is not a drawn shot of this plan and was in no earlier version of it. The drawn shots are {ids}: '
+                "correct the id in the rule's mark (`with <shot id>`) in rules.md, then upload again.")
+
+
+def ever_drawn(store, session):
+    """The critic's point 3 (19 Nov 2026): the ids of the drawn shots of every stored version of the plan. A comparison is `closed` only for a
+    shot that was one of them and was cut; an id that never was (a mistyped one) is refused at the upload, so its must is not dropped."""
+    out = set()
+    for v in session.get('versions') or []:
+        try:
+            doc = load_json(store, v['file']['key'])['document']
+        except (Problem, KeyError, TypeError, ValueError):
+            continue
+        out |= {s['id'] for g_ in doc.get('gaps') or [] for sc in g_.get('scenes') or [] for s in sc.get('shots') or [] if s.get('visual_type') == 'drawn'}
+    return out
+
+
+def left_out(session, shot_id, sha):
+    """The critic's point 1 (19 Nov 2026): the comparing rules the checker of this upload was not given (the other drawing had no approved still
+    end-frame at the upload). They stay a note until a verdict of this upload is clean, whatever was approved meanwhile; after that they come due."""
+    done = any(c.get('sha256') == sha and not open_rules(c) for c in (session.get('motion_checks') or {}).get(shot_id) or [])
+    return set() if done else set(((session.get('motion_projects') or {}).get(sha) or {}).get('left_out') or [])
+
+
+STILL_OPENS = ("{shot}: {prev}'s still end-frame, which {shot}'s still opens on, was replaced since {shot}'s still was built. Once {prev}'s new still is approved, run "
+               "`vw motion brief --shot {shot}` again and build {shot}'s still again from it (`vw motion upload --shot {shot} --still`).")
+CHAIN_STILL = ("{shot} continues from {prev}: its still end-frame opens on {prev}'s approved still end-frame, and {prev} has none now: have {prev}'s still built, "
+               'checked and approved first, then brief {shot}.')
+CHAIN_FIRST = "{shot} continues from {prev}: build and pass {prev} first (a clean fact check), then brief {shot}: this drawing is built on {prev}'s project."
+CHAIN_WAIT = (" {shot} continues from {prev}: its motion waits until {prev}'s project has passed its fact check; then run `vw motion brief --shot {shot}` again (it brings "
+              "{prev}'s project) and build {shot}'s motion on it.")
+
+
+def opens_on(session, shot_id):
+    """The critic's point 7 (19 Nov 2026): the approved still end-frame of a drawing, the picture the drawing that continues it opens on:
+    {png, key, project_key}; {} while it has none in force (not approved, or a newer still of it is uploaded and not yet checked and approved)."""
+    st = (session.get('motion_stills') or {}).get(shot_id) or {}
+    rows = session.get('motion_projects') or {}
+    if not (still_approved(st) and st.get('frame_key')) or any(p.get('shot_id') == shot_id and p.get('still') and sha != st.get('sha256') and (p.get('at') or '') > (st.get('at') or '')
+                                                              for sha, p in rows.items()) or opens_changed(session, st.get('opens_from'), st):   # or it is itself to be made again (a chain)
+        return {}
+    return {'png': st['png'], 'key': st['frame_key'], 'project_key': (rows.get(st.get('sha256')) or {}).get('key') or ''}
+
+
+def opens_changed(session, prev, st):
+    """The critic's point 7: the still `st` of a drawing that continues `prev` was built on a still of `prev` that is not the one in force now:
+    it is made again. A still recorded before this (no `opens_on`) is not marked."""
+    return bool(prev) and 'opens_on' in (st or {}) and st['opens_on'] != opens_on(session, prev).get('png')
+
+
 def compare_frames(cmp):
     """Fix set A1.2: the other drawings' approved still end-frames the checker of a drawing is given, [{shot_id, key}], one per drawing."""
     return list({c['with']: {'shot_id': c['with'], 'key': c['key']} for c in cmp.values() if c['state'] == 'ready'}.values())
@@ -6111,20 +6189,27 @@ def compared(session, plan, shot_id):
     from . import pictures
     cmp = comparing(session, plan, row['rules'])
     said = {pictures.rule_id(r.get('rule')): r for r in rec.get('rules') or []}
+    redone = (session.get('motion_bound') or {}).get(shot_id) != rec.get('sha256')   # the critic's point 5: unbound by a newer upload (A3.5): the comparison is the new upload's
     for i, c in cmp.items():
         if c['state'] != 'ready':
             out[c['state']].append(c)
-        elif said.get(i, {}).get('with_png') != c['png']:
+        elif said.get(i, {}).get('with_png') != c['png'] and not redone:
             out['due'].append(c)
     return out
 
 
-def round_rules(session, shot_id, sha, cmp=None):
+REDONE = ('{shot} is being redone: a newer upload of it came after this project, so this project is not the drawing any more and no verdict is taken on it. A comparison '
+          'with another drawing is judged on the new upload.')
+
+
+def round_rules(session, shot_id, sha, cmp=None, passed=False):
     """Fix set A1.6 (19 Nov 2026): the rules the checker of an animated project's later round is given, as lines: the rules of this upload that
     the drawing's last verdict left failed or not seen or did not answer (a rule written anew; a comparison not answered against the other
     drawing's picture as it is now: `cmp`, comparing()), and the faults that verdict's checker added and left failed. Only when that verdict
     answered the same brief lines: None in a first round, after a clean verdict, after a verdict of the still, and when the brief changed since;
-    then every rule is answered again. (The still's own list is short: still_rules.)"""
+    then every rule is answered again. (The still's own list is short: still_rules.)
+    The critic's point 6: `passed`, the second part of the list: the musts that verdict passed, which the checker answers only when this
+    upload broke one (a false on one of them is a failed must, as on any rule)."""
     from . import pictures
     row, cmp = (session.get('motion_projects') or {}).get(sha) or {}, cmp or {}
     prev = ((session.get('motion_checks') or {}).get(shot_id) or [None])[-1]
@@ -6135,6 +6220,9 @@ def round_rules(session, shot_id, sha, cmp=None):
         return None
     mine = [h for h in row['rules'] if cmp.get(h['id'], {'state': 'ready'})['state'] == 'ready'
             and (said.get(h['id'], {}).get('pass') is not True or (h['id'] in cmp and said[h['id']].get('with_png') != cmp[h['id']]['png']))]
+    if passed:
+        return [f"must: {h['rule']}" for h in row['rules'] if h not in mine and h.get('class') != 'should' and said.get(h['id'], {}).get('pass') is True
+                and cmp.get(h['id'], {'state': 'ready'})['state'] == 'ready']
     return [f"{h.get('class') or 'must'}: {h['rule']}" for h in mine] + [f"{r.get('class') or 'must'}: {r['rule']}" for i, r in said.items()
                                                                         if i not in {h['id'] for h in row['rules']} and r.get('pass') is not True]
 
@@ -6154,16 +6242,6 @@ GROUND_WORDS = re.compile(r'\b(back)?ground\b|\bpaper\b|\bcanvas\b|\bpage\b|\bba
 def corner_note(spec):
     """design/221 row 9: the words the server draws in the corner: the label of a spec that carries "not to scale" (illustrative), else ''."""
     return str((spec or {}).get('label') or '').strip() if (spec or {}).get('illustrative') else ''
-
-
-def note_or_logo_only(plan, shot):
-    """Fix set A3.3 (19 Nov 2026): the plan says this drawn shot shows no words of its own (its scene_motion is written and lists no label) and
-    what it does show to read is the server's corner note or a logo picture (an element of the shot named as a logo). Such a shot carries no
-    text for the labels gate, whatever its `carries_text` says. A shot whose texts are not written yet (no scene_motion) is still asked."""
-    if shot.get('scene_motion') is None or (shot['scene_motion'].get('labels') or []):
-        return False
-    names = {e['id']: str(e.get('name') or '') for e in plan.get('elements') or []}
-    return bool(corner_note(shot.get('drawing_spec'))) or any(re.search(r'\blogo\b', names.get(e, ''), re.I) for e in shot.get('element_ids') or [])
 
 
 def ground_colour(plan, run):
@@ -6266,6 +6344,16 @@ def motion_texts(files):
     return motion._texts(files)
 
 
+def shown_twice(plan, shots):
+    """design/221 row 1: the things of the plan that two or more of these drawn shots show, as one line: "E1 Block (D1, D2); …"; '' for none."""
+    twice = [(e, [s['id'] for s in shots if e['id'] in (s.get('element_ids') or [])]) for e in plan.get('elements') or []]
+    return '; '.join(f"{e['id']} {e.get('name') or e['id']} ({', '.join(ids)})" for e, ids in twice if len(ids) >= 2)
+
+
+PARTS_EMPTY = ('The parts file is empty, and these things are shown by two or more drawings: {things}. Draw each once as a shared part (one <symbol id="part-…"> each) '
+               'and upload the file again; an empty file is only for a film where nothing repeats.')   # the critic's point 2
+
+
 def parts_brief(store, run, outputs):
     """design/221 row 1: what the `vw-motion-parts` helper reads: the things two or more drawings show, then every drawn shot's brief (its spec, the
     sizes confirmed on its things, the palette, the fonts, the shared look, the pictures to look at); and the operator's words on a rejected file."""
@@ -6279,8 +6367,7 @@ def parts_brief(store, run, outputs):
     bare = [sid for sid in ids if shots[sid].get('drawing_spec') and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(shots[sid]['drawing_spec'])]
     need(not bare, f"The shared parts are drawn from the approved specs: approve the drawing spec of {', '.join(bare)} first (on the page, `vw visuals page`).")
     els = {e['id']: e for e in plan.get('elements') or []}
-    twice = [(e, [sid for sid in ids if e in (shots[sid].get('element_ids') or [])]) for e in els]
-    twice = '; '.join(f"{e} {els[e].get('name') or e} ({', '.join(s)})" for e, s in twice if len(s) >= 2)
+    twice = shown_twice(plan, shots.values())
     head = ['# Shared parts of the drawn graphics', '', f"Things shown by two or more drawings (each is a part to draw once): {twice or 'none'}.",
             'Things of the plan (data-element names the id): ' + '; '.join(f"{e} {x.get('name') or e}" for e, x in els.items()) + '.',
             PARTS_EVERY.format(ids=', '.join(ids))]   # fix set A1.1: every shape that repeats, not only the plan's things
@@ -6303,6 +6390,8 @@ def set_parts(store, user, run, outputs, name, content):
         text = ''
     parts, problems = motion.read_parts(text, {e['id'] for e in plan.get('elements') or []}, drawn_ids(plan, session)) if text else ([], ['the parts file is not UTF-8 text'])
     need(not problems, 'The parts file breaks the rules: ' + '; '.join(problems[:6]))
+    twice = '' if parts else shown_twice(plan, [guarded(lambda sid=sid: locate(store, session, sid))[3] for sid in drawn_ids(plan, session)])
+    need(not twice, PARTS_EMPTY.format(things=twice))   # the critic's point 2: an empty file stands only when the server's own list of what repeats is empty
     sha = hashlib.sha256(content).hexdigest()
     base = f"{run['id']}/visuals/motion/parts/{sha}"
     store.put(base + '.svg', content, 'image/svg+xml')
@@ -6838,8 +6927,8 @@ def drawn_turn(session, plan, gap, shot, shots):
     if not mine:
         if len(drawn_ids(plan, session)) >= 2 and not parts_ready(session):
             return '', ''
-        prev = continues_from(plan, session, gap, shot)
-        return ('', prev) if prev and not (prev in shots and passed_project(session, shots[prev])) else ('still', '')
+        prev = continues_from(plan, session, gap, shot)   # the critic's point 7: its still opens on the earlier drawing's approved still (or its passed project, the older order)
+        return ('', prev) if prev and not (opens_on(session, prev) or (prev in shots and passed_project(session, shots[prev]))) else ('still', '')
     _, sha, row = mine[-1]
     rec = next((c for c in reversed((session.get('motion_checks') or {}).get(sid) or []) if c.get('sha256') == sha), None)
     kind = 'still' if row.get('still') else 'motion'
@@ -6848,8 +6937,14 @@ def drawn_turn(session, plan, gap, shot, shots):
     if held_rules(rec):   # a failed must: its redo, unless the drawing is held after its last round
         return ('' if not row.get('still') and int(rec.get('round') or 1) >= HELD_ROUNDS + bool((session.get('motion_more') or {}).get(sid)) else kind), ''
     st = (session.get('motion_stills') or {}).get(sid) or {}
-    if row.get('still') and st.get('sha256') == sha and (st.get('rejected') or still_approved(st)):
-        return ('still' if st.get('rejected') else 'motion'), ''   # the operator's Reject: the still again; their Approve: its motion
+    if row.get('still') and st.get('sha256') == sha:
+        prev = continues_from(plan, session, gap, shot)
+        if prev and opens_changed(session, prev, st):   # the critic's point 7: the earlier still was replaced: this still is made again, once the new one is approved
+            return ('still', '') if opens_on(session, prev) else ('', prev)
+        if st.get('rejected'):
+            return 'still', ''   # the operator's Reject: the still again
+        if still_approved(st):   # their Approve: its motion, which a continuing drawing builds on the earlier drawing's passed project
+            return ('', prev) if prev and not (prev in shots and passed_project(session, shots[prev])) else ('motion', '')
     return '', ''   # the operator's card, or the render
 
 
@@ -6886,8 +6981,14 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     held = ((session.get('motion_projects') or {}).get(sha) or {}).get('rules') or []
     was = ((session.get('motion_projects') or {}).get(sha) or {}).get('brief')
     still = bool(((session.get('motion_projects') or {}).get(sha) or {}).get('still'))   # design/221 row 3: a verdict is the still's by its project's mark
+    at = session['motion_projects'][sha].get('at') or ''   # the critic's point 5: an animated project that a newer upload replaced (a redraw) and that is not the bound one takes no verdict: nothing is bound on it again
+    st_ = (session.get('motion_stills') or {}).get(shot['id']) or {}
+    kept = st_.get('sha256') if (st_.get('at') or '') <= at else None   # the still this project was built from, uploaded again unchanged, is no redraw
+    need(still or (session.get('motion_bound') or {}).get(shot['id']) == sha
+         or not any(p.get('shot_id') == shot['id'] and s_ not in (sha, kept) and (p.get('at') or '') > at for s_, p in session['motion_projects'].items()), REDONE.format(shot=shot['id']))
     cmp = comparing(session, plan, held)   # fix set A1.2: the rules that compare with another drawing
     idle = {i for i, c in cmp.items() if c['state'] != 'ready'}   # nothing to compare with yet (or the other drawing left the plan): a note, not this verdict's
+    idle |= left_out(session, shot['id'], sha)   # the critic's point 1: nor a comparison that turned ready after the upload: its checker was not given the frame
     bare = still and still_rules([h for h in held if h['id'] not in idle]) == []   # the carry-over c2: no rule of the list is one a still can show: an empty verdict passes the still
     need((rules or bare) and all(isinstance(r, dict) and (r.get('pass') is True or r.get('pass') is False or r.get('pass') == NOT_SEEN) and str(r.get('rule') or '').strip() for r in rules),
          'The verdict lists the rules checked; every rule has pass true or false (or "not seen", with the frame it needs in `need`) and its words (`rule`).')
@@ -6913,7 +7014,7 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
     need(still or rnd <= top, HELD_LIMIT.format(shot=shot['id'], rnd=rnd, top=top))
     prev = ((session.get('motion_checks') or {}).get(shot['id']) or [None])[-1]
     said = {pictures.rule_id(r.get('rule')): r for r in (prev or {}).get('rules') or []}
-    fresh = {i for i, c in cmp.items() if c['state'] == 'ready' and said.get(i, {}).get('with_png') != c['png']}   # fix set A1.2: a comparison not yet answered against the other drawing's picture as it is now
+    fresh = {i for i, c in cmp.items() if c['state'] == 'ready' and said.get(i, {}).get('with_png') != c['png']} - idle   # fix set A1.2: a comparison not yet answered against the other drawing's picture as it is now
     same = (bool(prev) and prev.get('sha256') == sha and int(prev.get('round') or 1) == rnd
             and (any(r.get('pass') == NOT_SEEN for r in prev.get('rules') or []) or bool(fresh)))   # row 12: the frames a "not seen" asked for, answered in the same round; A1.2: a comparison that came due
     later = bool(prev) and not same and rnd >= 2 and rnd > int(prev.get('round') or 1)   # row 13: round 2 or 3 answers what failed and what the fix touched
@@ -6965,7 +7066,7 @@ def motion_verdict(store, user, run, outputs, body, conn=None):
                 png = frame
             was_st = (session.get('motion_stills') or {}).get(shot['id']) or {}
             st = {'sha256': sha, 'frame_key': frame, 'png': png, 'parts': parts_in_force(session, motion.unpack(store.get(session['motion_projects'][sha]['key']))).get('used') or {},
-                  'at': rec['at']}
+                  'at': rec['at'], **{k: v for k, v in session['motion_projects'][sha].items() if k in ('opens_on', 'opens_from')}}   # the critic's point 7
             if png and (was_st.get('approved') or {}).get('png') == png:   # the same picture made again (the parts changed elsewhere): its approval stays
                 st['approved'] = was_st['approved']
             session.setdefault('motion_stills', {})[shot['id']] = st
@@ -7045,20 +7146,24 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     if build:   # design/221 (the critic's A1): the labels and cues of every drawn shot are in the plan before the first brief, so no render is made stale by them later
         bare = [s['id'] for g_ in plan['gaps'] for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots']
                 if s.get('visual_type') == 'drawn' and not (s.get('scene_motion') or {}).get('labels')
-                and ((s.get('carries_text') and not note_or_logo_only(plan, s))   # design/221 phase 3c: a shot's message is its point, not text on screen; fix set A3.3
+                and (s.get('carries_text')   # design/221 phase 3c: a shot's message is its point, not text on screen. The critic's point 4: the server cannot know a shot's own words, so every such shot is asked
                      or _flat((s.get('drawing_spec') or {}).get('label')) not in ('', _flat(corner_note(s.get('drawing_spec')))))]
         one = len(bare) == 1
         need(not bare, f"Before the first brief, the texts of every drawn shot go in the plan: {', '.join(bare)} {'carries' if one else 'carry'} text and {'has' if one else 'have'} "
                        'no scene_motion.labels: add scene_motion: {labels: [every text the viewer reads, word for word, never the corner note], cues: [{selector: "#id", word or at_s}]} '
-                       f"to {'it' if one else 'each'} in the plan, then propose the plan.")
+                       f"to {'it' if one else 'each'} in the plan, then propose the plan. If the only text of a shot is the corner note or a logo picture, set carries_text to "
+                       'false on that shot in the plan.')
         need_parts(plan, session)   # design/221 row 1: two or more drawn graphics: their shared parts, drawn once and approved, before any brief
         if prev:   # design/221 row 2: built on the earlier drawing's passed project and its last frame
             before = guarded(lambda: locate(store, session, prev))[3]
-            sha = passed_project(session, before)
-            need(sha, f"{shot['id']} continues from {prev}: build and pass {prev} first (a clean fact check), then brief {shot['id']}: this drawing is built on {prev}'s project.")
+            sha, on = passed_project(session, before), opens_on(session, prev)
+            own = (session.get('motion_stills') or {}).get(shot['id']) or {}
+            moves = still_approved(own) and not opens_changed(session, prev, own)   # the critic's point 7: its own still stands, so this brief is for its motion; else for
+            need(sha if moves else (on or sha), (CHAIN_FIRST if moves else CHAIN_STILL).format(shot=shot['id'], prev=prev))   # its still, which opens on the earlier approved still
             last = last_second(before, fps)
-            continues = {'shot_id': prev, 'sha256': sha, 'project_key': session['motion_projects'][sha]['key'],
-                         'last_frame_key': last_frame_key(conn, run, prev, sha, last) if conn is not None else '', 'last_second': last}
+            continues = {'shot_id': prev, **({'sha256': sha, 'project_key': session['motion_projects'][sha]['key'],
+                                              'last_frame_key': last_frame_key(conn, run, prev, sha, last) if conn is not None else '', 'last_second': last} if sha
+                                             else {'project_key': on['project_key']} if on['project_key'] else {}), **({'opens_on_key': on['key']} if on and not moves else {})}
     if spec:
         lines += [('Drawing spec', f"Drawing spec, view {view_words(spec)}: {spec_words({**spec, 'label': ''} if note else spec) or 'nothing stated'}"
                    + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.'))]
@@ -7081,7 +7186,8 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
                                                                          for e, rs in look.items()) + '.' if look else ''),   # design/221 row 5: each thing's footage picture and approved pictures, opened first
               ('Pictures', 'Pictures you may place (approved): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.'),
               ('Continues from', f"Continues from {prev}: this drawing is built on {prev}'s project: start from a copy of {prev}'s files and from {prev}'s last frame, and open "
-                                 f"exactly as {prev} ends (same framing, same size, same parts). It is started only after {prev}'s project has passed its fact check." if prev else ''),   # design/221 row 2
+                                 f"exactly as {prev} ends (same framing, same size, same parts). Its still end-frame comes first, built from {prev}'s approved still end-frame "
+                                 f"(from-{prev}/opens-on.png, with that still's files); the motion is started only after {prev}'s project has passed its fact check." if prev else ''),   # design/221 row 2; the critic's point 7
               ('Palette', palette_line(plan, session)),   # design/218: the plan's palette and the colours added since, the same for every drawing
               ('Fonts', f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
                + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "

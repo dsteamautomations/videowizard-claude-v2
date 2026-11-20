@@ -27,6 +27,7 @@ VW_HELPERS = ('vw:vw-scene-review', 'vw-scene-review', 'vw:vw-plan-gaps', 'vw-pl
               'vw:vw-motion-shot', 'vw-motion-shot', 'vw:vw-motion-rules', 'vw-motion-rules', 'vw:vw-motion-check', 'vw-motion-check',   # design/130
               'vw:vw-motion-parts', 'vw-motion-parts',   # design/221 row 1: the drawer of the film's shared parts
               'vw:vw-still-prompts', 'vw-still-prompts',   # fix set A2.1: the writer of the still pictures' prompts (out/images.json)
+              'vw:vw-picture-look', 'vw-picture-look', 'vw:vw-take-look', 'vw-take-look',   # fix set, the critic's point 11: Claude's check of the step 6 pictures (design/217) and of the takes (design/222); both were blocked here
               'vw:vw-guide-scene', 'vw-guide-scene', 'vw:vw-guide-check', 'vw-guide-check',
               'vw:vw-drawing', 'vw-drawing',
               'vw:vw-reference-finder', 'vw-reference-finder', 'vw:vw-set-look', 'vw-set-look')   # design/211: the finder of the footage pictures, the looker at the made sets; design/200: the drawer of one thing's drawing set   # integration steps B to D: the builder and the fresh checker of an AI video shot's guide

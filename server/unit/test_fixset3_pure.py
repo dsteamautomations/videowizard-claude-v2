@@ -3,7 +3,8 @@
 A2.1: the reminder for the stills names the batch command and one call for all of them; one helper writes the prompts. A2.2: a picture another
 picture is made from is an early decision: one chat card while the page is closed, and its approval is also the answer to "use it as the parent".
 A2.3: a depth word in a still's prompt (what is nearer or further from the camera) places nothing. A3.1: the names on the parts picture are
-wrapped to their cells, in the film's font. A3.3: the corner note and a logo picture are not text a drawn shot carries. A3.4: a finished drawing
+wrapped to their cells, in the film's font. A3.3: the corner note and a logo picture are not text a drawn shot carries (the automatic pass was
+taken out again by the critic's point 4: such a shot has carries_text false; test_fixset4_pure.py). A3.4: a finished drawing
 is shown with the next answer too. A3.5: a new still of a shot with a bound project unbinds it at once and the shot is being redone. A3.6, M5:
 the frame limit is the server's own sentence, with what to do. M6: the three refusals of the run end with the next step. The investigation: which
 render of a drawn shot the page offers. Without a database."""
@@ -205,21 +206,7 @@ def bare(d, *ids, **over):
         s.update(carries_text=True, scene_motion={'labels': [], 'cues': []}, **over)
 
 
-def test_a33_a_drawn_shot_whose_only_text_is_the_corner_note_is_not_asked_for_labels():
-    store = load()
-    edit_plan(store, lambda d: bare(d, 'D2'))   # D2's spec is illustrative: the server draws its corner note
-    assert 'Text on screen, word for word, and only these: "Block"; "Rod".' in build(store, 'D1')['brief']   # the gate does not hold the brief
-
-
-def test_a33_a_drawn_shot_whose_only_text_is_a_logo_picture_is_not_asked_for_labels():
-    store = load()
-
-    def change(d):
-        d['elements'].append({'id': 'E9', 'name': "The maker's logo", 'kind': 'graphic', 'identity': 'exact', 'requirements': 'the logo file'})
-        bare(d, 'D2', drawing_spec=None, element_ids=['E1', 'E2', 'E9'])
-    edit_plan(store, change)
-    assert build(store, 'D1')['brief']
-
+# The two tests of the automatic pass (a corner note or a logo with `labels: []` was not asked) went with it: the critic's point 4, test_fixset4_pure.py.
 
 def test_a33_a_shot_that_really_carries_words_is_still_asked():
     store = load()
@@ -286,8 +273,8 @@ def test_a35_a_new_still_of_a_bound_shot_unbinds_it_at_once_and_the_shot_is_bein
     item = drawn(store, jobs)['D1']
     assert item['state'] == 'being redone' and 'job' not in item   # the old render is not the drawing any more: the line of counts is right
     assert P.status_line(P.expected(*plan_of(store), jobs)).startswith('Drawn graphics: 1 being redone')
-    with pytest.raises(Problem, match='D2 continues from D1: build and pass D1 first'):
-        build(store, 'D2')   # a drawing that continues it is not handed the old project
+    with pytest.raises(Problem, match="D2 continues from D1: its still end-frame opens on D1's approved still end-frame, and D1 has none now"):
+        build(store, 'D2')   # a drawing that continues it is handed neither the old project nor the old still (the critic's point 7)
 
 
 def test_a35_the_same_still_uploaded_again_keeps_the_binding_and_the_redone_drawing_counts_again_when_rendered():
@@ -355,7 +342,8 @@ def visuals():
 def test_the_served_text_and_the_helpers_say_it_and_the_older_ways_are_named():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import fixset3_wording as W
-    stage = visuals()
+    import fixset4_wording as FIX4   # fix set, the critic's points: the sentence on the corner note and a logo is replaced (carries_text false)
+    stage = FIX4.before(visuals())
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     texts = {p['name']: p['text'] for p in stage['parts']}
@@ -375,7 +363,7 @@ def test_the_served_text_and_the_helpers_say_it_and_the_older_ways_are_named():
     shot_ = (ROOT / 'plugin' / 'agents' / 'vw-motion-shot.md').read_text(encoding='utf-8')
     assert 'A refused call is never sent again unchanged: read the refusal and change the call.' in shot_
     helper = (ROOT / 'plugin' / 'agents' / 'vw-still-prompts.md').read_text(encoding='utf-8')
-    assert helper.startswith('---\nname: vw-still-prompts\n') and 'tools: Read, Write\nmodel: opus\neffort: high\n---\n' in helper and 'out/images.json' in helper
+    assert helper.startswith('---\nname: vw-still-prompts\n') and 'tools: Read, Write, Glob\nmodel: opus\neffort: high\n---\n' in helper and 'out/images.json' in helper   # Glob: the critic's point 10
     everything = stage['prompt'] + ''.join(p['text'] for p in stage['parts'])
     retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     assert W.RETIRED and all(s in retired and s not in everything for s in W.RETIRED)

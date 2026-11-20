@@ -18,7 +18,7 @@ def test_the_guard_allows_the_still_prompts_helper(tmp_path):
     for helper in ('vw:vw-still-prompts', 'vw-still-prompts'):
         assert run_hook('guard.py', {'tool_name': 'Agent', 'tool_input': {'subagent_type': helper, 'prompt': 'IM1, IM2'}}, tmp_path)[0] == 0, helper
     text = (PLUGIN / 'agents' / 'vw-still-prompts.md').read_text(encoding='utf-8')
-    assert text.startswith('---\nname: vw-still-prompts\n') and 'tools: Read, Write\nmodel: opus\neffort: high\n---\n' in text
+    assert text.startswith('---\nname: vw-still-prompts\n') and 'tools: Read, Write, Glob\nmodel: opus\neffort: high\n---\n' in text   # Glob: the critic's point 10 (it lists the folder it reads)
 
 
 def test_m7_the_example_of_the_batch_file_is_sent_with_every_field_as_text_and_the_route_takes_it(harness, monkeypatch, capsys):

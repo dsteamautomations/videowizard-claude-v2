@@ -47,7 +47,7 @@ def test_the_plan_names_labels_and_cues_without_a_sha():
 
 
 def test_the_brief_before_a_build_is_refused_while_a_drawn_shot_with_text_has_no_labels():
-    for over in ({'carries_text': True, 'drawing_spec': None},   # design/221 phase 3c: a shot's message alone is its point, not text on screen; fix set A3.3: with a corner note (an illustrative spec) and `labels: []` it is not asked
+    for over in ({'carries_text': True},   # design/221 phase 3c: a shot's message alone is its point, not text on screen
                  {'drawing_spec': {**motion_shot()['drawing_spec'], 'illustrative': False, 'label': 'Sill course'}}):
         store = motion_store(sh=motion_shot(scene_motion={'labels': [], 'cues': []}, **over))
         with pytest.raises(Problem) as e:
@@ -160,7 +160,8 @@ def test_no_verdict_without_a_finished_check_of_the_project():
 # ---------- row 2 (A7): a drawing that continues an earlier one ----------
 
 LINE = ("Continues from MO1: this drawing is built on MO1's project: start from a copy of MO1's files and from MO1's last frame, and open exactly as MO1 "
-        "ends (same framing, same size, same parts). It is started only after MO1's project has passed its fact check.")
+        "ends (same framing, same size, same parts). Its still end-frame comes first, built from MO1's approved still end-frame (from-MO1/opens-on.png, with that "
+        "still's files); the motion is started only after MO1's project has passed its fact check.")   # fix set, the critic's point 7: the last sentence
 
 
 def continuing():
@@ -168,6 +169,7 @@ def continuing():
     two_drawn(store)
     no_sha(store)
     edit_session(store, lambda s: s.update(motion_parts_approved={'sha256': 'p', 'key': 'k', 'parts': []}, motion_parts={'sha256': 'p'}))   # design/221 phase 3c: two drawn graphics, their parts approved
+    edit_session(store, lambda s: s['motion_stills'].update(MO2={'sha256': 'f' * 64, 'frame_key': 'k2', 'png': 'p2', 'parts': {}, 'approved': {'png': 'p2'}}))   # fix set, the critic's point 7: MO2's still is approved, so its brief is for its motion (its still waits only for MO1's still)
     return store
 
 
@@ -206,7 +208,8 @@ def test_the_texts_say_labels_first_the_binding_and_the_order_of_a_diagram():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221d_wording_v3 as W
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
-    stage = FIX2.before(visuals())
+    import fixset4_wording as FIX4   # fix set, the critic's points: the still of a continuing drawing is started on the earlier still's approval (inside this script's sentence)
+    stage = FIX2.before(FIX4.before(visuals()))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)
@@ -215,7 +218,7 @@ def test_the_texts_say_labels_first_the_binding_and_the_order_of_a_diagram():
     for where, old, new in W.PAIRS:
         assert texts[where].count(new) == 1 and olds[where].count(old) == 1, old[:50]
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(new) == 1, file
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').count(FIX4.now(file, new)) == 1, file   # the files of the earlier still come inside this script's sentence of the skill
     later = texts['later']
     assert 'propose the revision, then `vw motion render --shot S`' not in later and 'Put `scene_motion: {sha256, labels, cues}`' not in later
     assert 'the server binds the project that passed to its shot' in later and 'shots of one diagram are built in order' in later

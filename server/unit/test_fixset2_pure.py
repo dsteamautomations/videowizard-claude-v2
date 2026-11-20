@@ -117,6 +117,7 @@ def test_a11_a_part_that_names_no_drawing_is_listed_in_every_brief_as_before():
 
 def test_a11_a_film_where_no_shape_repeats_has_no_shared_parts_and_is_not_held():
     store = load(parts=False)
+    edit_plan(store, lambda d: [s.update(element_ids=ids) for s, ids in zip(shots_of(d)[:3] + shots_of(d, 1)[:1], (['E1'], ['E2'], ['E3'], []))])   # the critic's point 2: no thing is shown by two drawings (else an empty file is refused)
     with pytest.raises(Problem, match='their shared parts are drawn once, before any brief'):
         build(store, 'D1')
     out = g(lambda: VS.set_parts(store, USER, NEW, [], 'parts.svg', b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'))
@@ -207,7 +208,8 @@ def test_a12_with_an_approved_still_to_compare_with_the_rule_is_a_must_from_the_
 def test_a12_a_comparison_whose_other_drawing_is_cut_from_the_plan_is_closed_and_said():
     store = load()
     sha, _ = bound(store, 'D1', SECTION, comparing('D4'))
-    edit_plan(store, lambda d: shots_of(d, 1).pop(0))   # D4 leaves the plan
+    from test_fixset4_pure import cut
+    cut(store, 1, 0)   # D4 leaves the plan: a new version without it (the critic's point 3: an id that was in no version is refused at the upload)
     item = drawn(store, [rendered('D1')])['D1']
     assert item['state'] == 'made and checked'   # not held
     assert item['due'] == 'D1: its comparison with D4 is closed (1 rule): D4 is no drawn graphic of the plan now.'
@@ -267,11 +269,12 @@ def test_a14_the_next_step_line_names_what_can_start_now_and_which_drawing_waits
     still_verdict(store, sha, answers(STILL_OK), shot='D1', key=frame('D1'))
     assert line() == waits.strip()   # its card is the operator's turn
     approve(store, 'D1')
-    assert line() == 'Start now, together in one message: the builders of the motion of D1 (1).' + waits
+    chain = ' Waiting on another drawing: D3 on D2.'   # the critic's point 7: D1's still is approved, so the stills of D2 and D4 can start; the motion comes after the stills
+    assert line() == 'Start now, together in one message: the builders of the still end-frames of D2, D4 (2). The motion of D1 comes after the still end-frames.' + chain
     sha = upload(store, 'D1', *SECTION, more='b {}')['sha256']
-    assert line() == 'Start now, together in one message: the checkers of D1 (1).' + waits
+    assert line() == 'Start now, together in one message: the builders of the still end-frames of D2, D4 (2); the checkers of D1 (1).' + chain
     verdict(store, 'D1', sha, {**ALL_OK, '1': False})
-    assert line() == 'Start now, together in one message: the builders of the motion of D1 (1).' + waits   # a failed must: its redo
+    assert line() == 'Start now, together in one message: the builders of the still end-frames of D2, D4 (2). The motion of D1 comes after the still end-frames.' + chain   # a failed must: its redo
     verdict(store, 'D1', upload(store, 'D1', *SECTION, more='c {}')['sha256'], ALL_OK, rnd=2)
     assert line() == 'Start now, together in one message: the builders of the still end-frames of D2, D4 (2). Waiting on another drawing: D3 on D2.'
 
@@ -401,8 +404,7 @@ def test_m3_the_labels_gate_names_every_drawn_shot_that_lacks_labels_in_one_refu
     store = load()
     def bare(d):
         for s in (shots_of(d)[1], shots_of(d)[2], shots_of(d, 1)[0]):
-            s.update(carries_text=True)
-            s.pop('scene_motion', None)   # fix set A3.3: their texts are not written yet (with `labels: []` and a corner note they would not be asked)
+            s.update(carries_text=True, scene_motion={'labels': [], 'cues': []})
     edit_plan(store, bare)
     with pytest.raises(Problem) as e:
         build(store, 'D1')
@@ -414,13 +416,13 @@ def test_m4_the_plan_check_flags_an_exact_end_picture_whose_change_is_larger_tha
     change = lambda what: edit_plan(store, lambda d: shots_of(d, 1)[1].update(end_state_exact=True, changes=[{'what': what, 'beat_id': 'B1'}]))
     change('the rod is set down on the base')
     assert warnings(store, 'end_change_large') == []
-    change('the whole ceiling is now plastered')
+    change('the whole frame is now plastered ceiling')   # the critic's point 9: the frame as a whole, not the whole of one part
     hit = warnings(store, 'end_change_large')
     assert len(hit) == 1 and hit[0]['shot_id'] == 'VS1'
     assert hit[0]['message'] == ('shot VS1 ends on an exact end picture, which is an edit inside one region of its start, a third of the frame at most; its change reads as '
-                                 'larger ("the whole ceiling is now plastered"). Plan it start-only (end_state_exact false), so the motion carries the change, or as a new '
+                                 'larger ("the whole frame is now plastered ceiling"). Plan it start-only (end_state_exact false), so the motion carries the change, or as a new '
                                  'picture of its own.')
-    change('three quarters of the floor is laid')
+    change('three quarters of the frame is laid floor')
     assert len(warnings(store, 'end_change_large')) == 1
     edit_plan(store, lambda d: shots_of(d, 1)[1].update(end_state_exact=False))
     assert warnings(store, 'end_change_large') == []   # no end picture: nothing to flag

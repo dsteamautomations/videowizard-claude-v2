@@ -62,7 +62,7 @@ def build(store, shot='MO1'):
 def test_a_message_alone_is_not_text_on_screen_for_the_labels_gate():
     quiet = motion_store(sh=motion_shot(scene_motion={'labels': [], 'cues': []}, message='The course spreads the load.'))
     assert 'Text on screen, word for word, and only these: none.' in build(quiet)['brief']
-    for over in ({'carries_text': True, 'drawing_spec': None}, {'drawing_spec': {**SPEC, 'illustrative': False, 'label': 'Sill course'}}):   # fix set A3.3: with a corner note and `labels: []`, carries_text alone is not asked
+    for over in ({'carries_text': True}, {'drawing_spec': {**SPEC, 'illustrative': False, 'label': 'Sill course'}}):
         with pytest.raises(Problem, match='carries text and has no scene_motion.labels'):
             build(motion_store(sh=motion_shot(scene_motion={'labels': [], 'cues': []}, message='The point.', **over)))
 

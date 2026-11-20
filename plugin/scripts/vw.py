@@ -984,12 +984,18 @@ def cmd_motion(a):
             import zipfile
             base_ = folder / f"from-{c['shot_id']}"
             shutil.rmtree(base_, ignore_errors=True)
-            with zipfile.ZipFile(_download(m, c['project_key'], f'work/motion/{a.shot}/from-{c["shot_id"]}.zip')) as z:
-                for n in z.namelist():
-                    if not n.endswith('/') and '..' not in Path(n).parts and not Path(n).is_absolute():
-                        (base_ / n).parent.mkdir(parents=True, exist_ok=True)
-                        (base_ / n).write_bytes(z.read(n))
-            if c.get('last_frame_key'):
+            if c.get('project_key'):
+                with zipfile.ZipFile(_download(m, c['project_key'], f'work/motion/{a.shot}/from-{c["shot_id"]}.zip')) as z:
+                    for n in z.namelist():
+                        if not n.endswith('/') and '..' not in Path(n).parts and not Path(n).is_absolute():
+                            (base_ / n).parent.mkdir(parents=True, exist_ok=True)
+                            (base_ / n).write_bytes(z.read(n))
+            if c.get('opens_on_key'):   # fix set, the critic's point 7: the earlier drawing's approved still end-frame, which this drawing's still opens on
+                _download(m, c['opens_on_key'], f'work/motion/{a.shot}/from-{c["shot_id"]}/opens-on.png')
+            if not c.get('sha256'):   # the earlier project has not passed yet: the files are its approved still's, for this drawing's still end-frame
+                line = (f" {c['shot_id']}'s approved still end-frame (opens-on.png) and that still's files are in work/motion/{a.shot}/from-{c['shot_id']}/: build "
+                        f"{a.shot}'s still end-frame from them; its motion waits for {c['shot_id']}'s passed project.")
+            elif c.get('last_frame_key'):
                 _download(m, c['last_frame_key'], f'work/motion/{a.shot}/from-{c["shot_id"]}/last-frame.png')
                 line = f" {c['shot_id']}'s passed project and its last frame are in work/motion/{a.shot}/from-{c['shot_id']}/ (last-frame.png)."
             else:
@@ -1014,7 +1020,10 @@ def cmd_motion(a):
         else:
             (folder / 'rules-still.md').unlink(missing_ok=True)
         if out.get('round_rules') is not None:   # fix set A1.6: from round 2, the rules the round before left open: what the round's checker reads in place of rules.md
-            (folder / 'rules-round.md').write_text(''.join(f'{n}. {r}\n' for n, r in enumerate(out['round_rules'], 1)), encoding='utf-8')
+            passed = out.get('round_passed') or []   # fix set, the critic's point 6: below the open rules, the musts that passed: answered only when this upload broke one
+            (folder / 'rules-round.md').write_text(''.join(f'{n}. {r}\n' for n, r in enumerate(out['round_rules'], 1)) + ''.join(
+                ['\nPassed before. Answer one of these ONLY if this upload broke it ("pass": false, with where); leave the others out:\n']
+                + [f'{n}. {r}\n' for n, r in enumerate(passed, len(out['round_rules']) + 1)] if passed else []), encoding='utf-8')
         else:
             (folder / 'rules-round.md').unlink(missing_ok=True)
         for c in out.get('compare') or []:   # fix set A1.2: the other drawing's approved still end-frame, for a rule that compares with it
