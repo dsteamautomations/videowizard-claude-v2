@@ -1459,6 +1459,7 @@ WARNING_PLAIN = {
     'all_graphics': 'Every shot of this gap is a graphic, with nothing from the footage or a scene.',
     'graphics_run': 'Graphics run for more than 8 seconds here without a camera picture.',
     'claim_visible_graphic': 'This graphic shows something a camera could film.',
+    'supplied_missing': 'This shot shows a logo or a brand picture, and its file has not been given yet.',   # release 3, C3 (SK, 20 Nov 2026): raised by the visuals stage, at the plan
 }
 WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missing', 'carries_over_missing', 'changes_missing', 'claims_missing', 'depicts_missing',
                      'element_size_missing', 'end_state', 'evidence_missing', 'facts_missing', 'footage_identity', 'frozen_share', 'light_missing', 'min_s_missing',
@@ -1467,7 +1468,8 @@ WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missi
                      'size_open', 'size_repeat', 'size_close_first', 'look_alike', 'look_only',   # design/207 (SK, 16 Nov 2026): moved from the operator's list; look_only and passer_by are no longer raised, kept so old answers load
                      'material_bare', 'compare_not_person', 'view_missing', 'look_wide', 'extra_repeated', 'animals_many', 'same_setup',
                      'people_alike', 'palette_missing',   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
-                     'camera_words', 'continues_apart', 'end_change_large')   # fix set M1, M2, M4 (19 Nov 2026): settled with the plan, not at the build
+                     'camera_words', 'continues_apart', 'end_change_large',   # fix set M1, M2, M4 (19 Nov 2026): settled with the plan, not at the build
+                     'labels_missing')   # release 3, C4 (SK, 20 Nov 2026): a drawn shot that carries text and lists no labels, named at the plan
 
 
 def answer_warnings(plan, warnings):

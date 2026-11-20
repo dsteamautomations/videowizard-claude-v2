@@ -213,6 +213,7 @@ class Note(Write):
 
 class VisualPlan(Write):
     plan: dict[str, Any]
+    answers: str = Field(default='', max_length=200)   # release 3, C2: the item of a question the operator answered; the proposal that follows it (`vw visuals propose --answers`)
 
 
 class VisualSelect(Write):
@@ -1369,7 +1370,7 @@ def visuals_check(run_id: UUID, body: VisualPlan, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(plan_size_guard)])
 def visuals_propose(run_id: UUID, body: VisualPlan, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan, body.answers))
 
 
 @app.post('/api/runs/{run_id}/visuals/select')

@@ -348,6 +348,29 @@ def stand_in_shots(session, plan):
     return out
 
 
+def supplied_missing(session, plan):
+    """Release 3, C3 (SK, 20 Nov 2026): {shot id: [(element id, name)]}: the first counted shot that shows each thing named as a logo or a brand
+    mark for which the run holds no picture given by the operator (supplied, from the web or a footage frame; a rejected one is none). Read
+    from the session as it stands now, so the line goes once the file is given. What the server cannot see, the run folder, the tool adds."""
+    given = {r.get('element_id') for r in (session.get('references') or {}).values() if r.get('kind') in ('supplied', 'web', 'frame') and r.get('status') != 'rejected'}
+    logos = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or [] if LOGO.search(str(e.get('name') or '')) and e['id'] not in given}
+    out, told = {}, set()
+    for gap in plan.get('gaps') or []:
+        for sh in _counted_shots(gap):
+            for eid in sh.get('element_ids') or []:
+                if eid in logos and eid not in told:
+                    told.add(eid)
+                    out.setdefault(sh['id'], []).append((eid, logos[eid]))
+    return out
+
+
+def text_no_labels(shot):
+    """design/221 (the critic's A1, point 4): a drawn shot that carries text (`carries_text`, or a spec label that is not the corner note) and
+    lists no labels. Release 3, C4: one rule for the warning at the plan and the gate before the first brief."""
+    return (shot.get('visual_type') == 'drawn' and not (shot.get('scene_motion') or {}).get('labels')
+            and bool(shot.get('carries_text') or _flat((shot.get('drawing_spec') or {}).get('label')) not in ('', _flat(corner_note(shot.get('drawing_spec'))))))
+
+
 def palette_due(session, plan):
     """design/218 B: the palette warning only while no gap was ever accepted; after that the approved palette is never edited (an edit sends the
     accepted gaps back to the operator) and a drawing that needs a colour gets a recorded neutral (`vw motion colour`)."""
@@ -394,7 +417,7 @@ def carried_warnings(session, run, plan, outputs):
     fps = float(Fraction(str(session['source'].get('fps') or 25)))
     agreed = {e.get('gap_id'): e for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
     words_spoken = not film.older(run) and film.category(run) == 'documentary-explainer'   # a film with no category recorded (an older film too) gets no warning
-    stand_ins = stand_in_shots(session, plan)
+    stand_ins, to_give, labelled = stand_in_shots(session, plan), supplied_missing(session, plan), drawn_route(run) == 'motion'
     out, pictures, first = [], 0.0, None
     for gap in plan['gaps']:
         shots = _counted_shots(gap)
@@ -419,6 +442,16 @@ def carried_warnings(session, run, plan, outputs):
                 out.append({'kind': 'stand_in_real', 'shot_id': sh['id'],
                             'message': f"shot {sh['id']} shows {name}, a real person, as a stand-in: the picture is made from the description, not from their own photo. "
                                        'To show them as they are, the operator gives a photo and records their permission.'})
+            for eid, name in to_give.get(sh['id']) or []:   # release 3, C3: found at the plan, not hours later at the build; a warning, never a refusal
+                out.append({'kind': 'supplied_missing', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']} shows {name} ({eid}) and no file of it has been given. Ask the operator for it now, with the plan: the file goes in the run "
+                                       'folder under in/brand/ (`vw brand fetch` saves the logo files the client directory holds there), then '
+                                       f"`vw visuals supply --element {eid} --file in/brand/<name>`. If the film goes on without it, say so in the shot's warning_answers."})
+            if labelled and text_no_labels(sh):   # release 3, C4: named with the plan; the gate before the first brief stays (motion_brief)
+                out.append({'kind': 'labels_missing', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']} is a drawn graphic that carries text and lists no labels. Add scene_motion: {{labels: [every text the viewer reads, word for word, "
+                                       'never the corner note], cues: [{selector: "#id", word or at_s}]} to it now, in the plan; if its only text is the corner note or a logo '
+                                       'picture, set carries_text to false on it. `vw motion brief` is refused for every drawn shot until then.'})
             if sh['visual_type'] == 'drawn' and not film.camera_allowed(run, sh.get('camera_flow')):   # design/221 section 10 point 4: a warning, never a refusal
                 out.append({'kind': 'camera_flow', 'shot_id': sh['id'],
                             'message': f"shot {sh['id']}: the camera flow {film.CAMERA[sh.get('camera_flow') or 'fixed'][0]} is not one the film's motion style allows "
@@ -498,7 +531,7 @@ def check(store, run, outputs, document):
             'budget': {'planned_inr': planned, 'cap_inr': cap_of(session), 'sets': sets['sets'], 'sets_inr': sets['inr']}, 'look_alike': alike}   # design/45 10.2
 
 
-def propose(conn, store, user, run, outputs, document):
+def propose(conn, store, user, run, outputs, document, answers=''):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
     plan, warnings = guarded(lambda: validate_plan(_with_direction(session, document), session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
@@ -509,24 +542,120 @@ def propose(conn, store, user, run, outputs, document):
     need(not departed, '\n'.join(departed))
     warnings = warnings + carried_warnings(session, run, plan, outputs)   # design/207: the same as the check returns
     warnings = warnings + palette_due(session, plan)   # design/218 B
-    new = new_version(store, run, session, plan, user, warnings)
+    new = guarded(lambda: new_version(store, run, session, plan, user, warnings, answers))
     version, identity = new['version'], new['plan_digest']
     save_session(store, run, session)
     from . import runlog
     for e in plan_log(run, plan, version):   # design/145 L3
         runlog.write(conn, e)
+    said = []
+    for q in new['quiet']:   # release 3, C1 and C2: a change that asked nothing is a line of the log: the operator's decision when their answer carried it, else the assistant's change
+        mine = q['why'] == 'answer'
+        entry = (_short_text(f"the plan change that follows the operator's answer on {q['item']} (\"{q['question']}\"): " + '; '.join(q['changes']), 3800) + ': accepted with that answer, no second question'
+                 if mine else f"{', '.join(q['shots'])}: {QUIET[q['why']]}")
+        runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f"gap {q['gap']}", 'rule': f'visual plan v{version}', 'entry': entry,
+                            'by_kind': 'operator' if mine else 'assistant', 'by_name': (user.get('name') or '') if mine else '', 'quote': q['answer'] if mine else '', 'request_id': None})
+        said.append(f"gap {q['gap']}: " + (f"accepted with the operator's answer on {q['item']}" if mine else entry))
     if new['kept_recorded']:   # design/191 A5
         runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'gap ' + ', '.join(new['kept_recorded']), 'rule': f'visual plan v{version}',
                             'entry': 'already recorded into the film and its own shots unchanged: the acceptance is kept through a change of the shared part, without asking again',
                             'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
     shared = sorted(session.get('shared_pending') or {})
     return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']],
+            **({'kept_without_asking': said} if said else {}),
+            **({'asked_again': [f"gap {g}: a label in words the plan does not hold ({'; '.join(w)}): new wording on screen is the operator's to accept (`vw visuals next`)" for g, w in new['asked'].items()]
+                                + [f"gap {g}: its change is larger than what the question on {answers} names: the operator is asked for it (`vw visuals next`)" for g in new['asked_beyond']]}
+               if new['asked'] or new['asked_beyond'] else {}),
             **({'shared_change': f"The part every gap shares changed. {len(shared)} gap(s) the operator had accepted keep their own shots ({', '.join(shared)}): the operator is asked ONE question for all of them "
                                  '(`vw visuals next`). Do not ask them gap by gap.'} if shared else {})}
 
 
-def new_version(store, run, session, plan, user, warnings):
-    """A validated plan stored as the next version, and every approval carried into it (design/191). The session is changed, not saved."""
+QUIET = {'labels': "labels added in the plan's own words: no decision; the acceptance is kept",   # release 3, C1 and C2: a change that asks the operator nothing, as the log says it
+         'no_text': 'carries_text set to false (its only text is the corner note or a logo): no decision; the acceptance is kept'}
+LOGO = re.compile(r'\b(?:logo|wordmark|brand\s*mark)\b', re.I)   # an element named as a logo: a picture the operator supplies
+
+
+def _answered_for(session, item):
+    """Release 3, C2: the operator's answer to the question on this item that no plan change has used yet; refused when there is none."""
+    record = next((r for r in reversed(session.get('answered') or []) if r.get('item') == item and r.get('answer') and not r.get('plan_version')), None)
+    need(record, f"No answered question on {item} waits for its plan change: `--answers` names the item of a question the operator answered (`vw visuals ask`, answered in the chat) "
+                 'and is used once. Propose the plan without it; the operator is then asked for the gaps that changed.')
+    return record
+
+
+def _named(session, plan, old, gap, item):
+    """Release 3, C2: what the answered question names in this gap: (its shots, its thing). A question on a shot names that shot; on a thing, the
+    thing and the shots that show it (before or after the change); on a picture, the shot or the thing the picture is of."""
+    ref = (session.get('references') or {}).get(item) or {}
+    item = ref.get('shot_id') or ref.get('element_id') or item
+    shots = [s for g_ in (old, gap) for sc in all_scenes(g_) for s in sc['shots']]
+    if any(e['id'] == item for e in plan.get('elements') or []):
+        return {s['id'] for s in shots if item in (s.get('element_ids') or [])}, item
+    return {s['id'] for s in shots if s['id'] == item}, None
+
+
+def _own_without(plan, gap, shots, element):
+    """The gap's own content (as `gap_own_digest`) without these shots and this thing."""
+    g = note_free_gap(gap)
+    strip = lambda scenes: [{**sc, 'shots': [s for s in sc['shots'] if s['id'] not in shots]} for sc in scenes]
+    g = {**g, **({'scenes': strip(g['scenes'])} if g.get('scenes') else {}), **({'choices': [{**c, 'scenes': strip(c['scenes'])} for c in g['choices']]} if g.get('choices') else {})}
+    used = {eid for sc in all_scenes(g) for s in sc['shots'] for eid in s['element_ids']} - {element}
+    return digest({'gap': g, 'elements': note_free_elements([e for e in plan['elements'] if e['id'] in used])})
+
+
+def _shot_labels(shot):
+    return [l for l in (shot.get('scene_motion') or {}).get('labels') or [] if _flat(l) != _flat(corner_note(shot.get('drawing_spec')))]
+
+
+def _leaf_words(x):
+    """Every word of every text inside a value of the plan, lower case."""
+    if isinstance(x, dict):
+        return {w for k, v in x.items() if k != 'scene_motion' for w in _leaf_words(v)}
+    if isinstance(x, list):
+        return {w for v in x for w in _leaf_words(v)}
+    return set(re.findall(r'\w+', x.casefold())) if isinstance(x, str) else set()
+
+
+def new_labels(prev, old, gap):
+    """Release 3, C1: (the drawn shots of this gap that got a label in this version, the labels among them with a word that is neither in the
+    shot's text in the plan in force nor in the name of a thing it shows, as 'shot: "label"'). Case and spacing do not count."""
+    before = {s['id']: s for sc in all_scenes(old) for s in sc['shots']}
+    names = {e['id']: e.get('name') or '' for e in prev.get('elements') or []}
+    added, strange = [], []
+    for s in (s for sc in all_scenes(gap) for s in sc['shots'] if s.get('visual_type') == 'drawn' and s['id'] in before):
+        had = {_flat(l) for l in _shot_labels(before[s['id']])}
+        fresh = [l for l in _shot_labels(s) if _flat(l) not in had]
+        known = _leaf_words(before[s['id']]) | _leaf_words([names.get(e, '') for e in before[s['id']].get('element_ids') or []])
+        added += [s['id']] if fresh else []
+        strange += [f'{s["id"]}: "{l}"' for l in fresh if not set(re.findall(r'\w+', l.casefold())) <= known]
+    return list(dict.fromkeys(added)), strange
+
+
+def no_text_now(plan, old, gap):
+    """Release 3, C1: the drawn shots of this gap whose `carries_text` went from true to false in this version and whose only text is the server's
+    corner note or a logo picture: they list no label of their own and have a corner note or a thing named as a logo. The server cannot see the
+    drawing: this is what the plan says."""
+    before = {s['id']: s for sc in all_scenes(old) for s in sc['shots']}
+    names = {e['id']: str(e.get('name') or '') for e in plan.get('elements') or []}
+    return [s['id'] for sc in all_scenes(gap) for s in sc['shots']
+            if s.get('visual_type') == 'drawn' and not s.get('carries_text') and (before.get(s['id']) or {}).get('carries_text') and not _shot_labels(s)
+            and (corner_note(s.get('drawing_spec')) or any(LOGO.search(names.get(e, '')) for e in s.get('element_ids') or []))]
+
+
+def _with_text(gap, shots):
+    """The gap with `carries_text` true again on these shots: what it was before they were marked as carrying no text."""
+    mark = lambda scenes: [{**sc, 'shots': [{**s, 'carries_text': True} if s['id'] in shots else s for s in sc['shots']]} for sc in scenes]
+    return {**gap, **({'scenes': mark(gap['scenes'])} if gap.get('scenes') else {}), **({'choices': [{**c, 'scenes': mark(c['scenes'])} for c in gap['choices']]} if gap.get('choices') else {})}
+
+
+def new_version(store, run, session, plan, user, warnings, answers=''):
+    """A validated plan stored as the next version, and every approval carried into it (design/191). The session is changed, not saved.
+    answers (release 3, C2): the item of a question the operator answered; a change inside what it names is accepted with that answer."""
+    answer = _answered_for(session, answers) if answers else None
+    try:
+        prev = current_plan(store, session) if session.get('current') else None   # the plan in force, for what this version changes
+    except (Problem, StopIteration, KeyError, TypeError, ValueError):
+        prev = None   # it cannot be read: carried and asked as before this release
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'source_plan_digest': session['source']['plan_digest'], 'document': plan,
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
@@ -534,16 +663,22 @@ def new_version(store, run, session, plan, user, warnings):
     identity = digest(plan)
     session['versions'].append({'version': version, 'file': pk, 'plan_digest': identity, 'warnings': warnings})
     session['current'] = identity
-    return {'version': version, 'plan_digest': identity, 'kept_recorded': _carry_acceptances(session, plan, version)}
+    was = set(session.get('was_accepted') or {})
+    kept, quiet, asked = _carry_acceptances(session, plan, version, prev, answer)
+    if answer:
+        answer['plan_version'] = version   # used once
+    return {'version': version, 'plan_digest': identity, 'kept_recorded': kept, 'quiet': quiet, 'asked': asked,
+            'asked_beyond': sorted(g for g in set(session.get('was_accepted') or {}) - was if g not in asked) if answer else []}
 
 
-def _carry_acceptances(session, plan, version):
+def _carry_acceptances(session, plan, version, prev=None, record=None):
     """design/191: what a new plan version does to the operator's approvals. A gap's acceptance stands when nothing it covers changed. When only the
     part every gap shares changed (the foundation, the sequence rules) and the gap's own shots are as accepted, the acceptance waits behind ONE
     question for all such gaps (`shared_pending`): until it is answered the gap counts as not accepted. When the gap's own content changed it is
     asked again by itself, and the version it was accepted in is kept (`was_accepted`) so the question can say what changed. An acceptance from
     before this release (no `own` fingerprint) is asked again on any change, as before.
-    Returns the gaps kept without asking: already recorded into the film, own content unchanged (section 11, A5)."""
+    Returns the gaps kept without asking: already recorded into the film, own content unchanged (section 11, A5); and (release 3, C1 and C2,
+    against `prev`, the plan in force) the changes that ask nothing (`quiet`) and the gaps asked again for a label in new words (`asked`)."""
     gaps = {g['gap_id']: g for g in plan['gaps']}
     shared = shared_digest(plan)
     for gid, cs in list(session['choice_selections'].items()):   # section 11, B1: a chosen way the gap no longer offers is not a choice any more; it is asked again
@@ -553,14 +688,37 @@ def _carry_acceptances(session, plan, version):
     before = {**pending, **session['accepted']}
     session['accepted'].clear()
     pending.clear()
+    quiet, asked, olds = [], {}, {g['gap_id']: g for g in (prev or {}).get('gaps') or []}
     for gid, acc in before.items():
         gap = gaps.get(gid)
         if not gap:
             continue
-        full = gap_digest(plan, gap)
+        full, own, old, why = gap_digest(plan, gap), gap_own_digest(plan, gap), olds.get(gid), None
+        added, strange = new_labels(prev, old, gap) if old else ([], [])
+        if strange:   # release 3, C1: a label in words the plan does not hold is new wording on screen: the gap is asked again, and its card names the words
+            asked[gid] = strange
+            if acc.get('version'):
+                was[gid] = acc['version']
+            continue
+        if old and acc['digest'] != full and acc.get('own') and acc['own'] != own:   # release 3: its own content changed; is it a change that asks nothing?
+            shots, thing = _named(session, plan, old, gap, record['item']) if record else (set(), None)
+            bare = no_text_now(plan, old, gap)
+            if shots and _own_without(prev, old, shots, thing) == _own_without(plan, gap, shots, thing):   # C2: inside what the answered question names
+                why = {'gap': gid, 'why': 'answer', 'shots': sorted(shots), 'item': record['item'], 'question': record.get('question') or '', 'answer': record['answer'],
+                       'changes': _diff(note_free_gap(old), note_free_gap(gap), '') + _diff(note_free_elements([e for e in prev['elements'] if e['id'] == thing]),
+                                                                                                 note_free_elements([e for e in plan['elements'] if e['id'] == thing]), 'Elements')}
+                acc = {**acc, 'own': own, 'quote': record['answer'], 'by': record.get('answered_by') or acc.get('by'), 'answer_to': record['item']}
+            elif bare and gap_own_digest(plan, _with_text(gap, bare)) == acc['own']:   # C1: only `carries_text`, on shots whose only text is the corner note or a logo
+                why, acc = {'gap': gid, 'why': 'no_text', 'shots': bare}, {**acc, 'own': own}
+            if why and acc.get('shared') == shared:   # the part every gap shares is as accepted: the acceptance stands under this version (else the one shared question, below)
+                _restamp_bindings(session, gap, acc['digest'], full)
+                acc = {**acc, 'digest': full, 'version': version, 'kept': why['why']}
+                quiet.append(why)
         if acc['digest'] == full:
             session['accepted'][gid] = acc
-        elif acc.get('own') and acc['own'] == gap_own_digest(plan, gap):
+            if added and not why:
+                quiet.append({'gap': gid, 'why': 'labels', 'shots': added})
+        elif acc.get('own') and acc['own'] == own:
             if gid in session['recorded_gaps']:
                 session['accepted'][gid] = {**acc, 'digest': full, 'shared': shared, 'version': version, 'kept': 'recorded before; only the shared part changed'}
                 _restamp_bindings(session, gap, acc['digest'], full)
@@ -577,7 +735,7 @@ def _carry_acceptances(session, plan, version):
             session['revisions'].pop(gid)
     if not pending or (session.get('shared_revision') or {}).get('shared') != shared:   # the shared part was proposed changed: the operator's words on it are answered
         session.pop('shared_revision', None)
-    return kept
+    return kept, quiet, asked
 
 
 def _restamp_bindings(session, gap, old, new):
@@ -651,7 +809,8 @@ def gap_changes(store, session, plan, gap, cache=None):
         old = _plan_version(store, session, version, cache)
         before = next(g for g in old['gaps'] if g['gap_id'] == gap['gap_id'])
         used = {eid for scene in all_scenes(gap) + all_scenes(before) for sh in scene['shots'] for eid in sh['element_ids']}
-        return (_diff(note_free_gap(before), note_free_gap(gap), '')
+        texts = lambda g_: [{'id': sh['id'], 'text on screen': _shot_labels(sh)} for scene in all_scenes(g_) for sh in scene['shots'] if sh.get('visual_type') == 'drawn']   # release 3, C1: a label is a note of the shot, so it is listed here
+        return (_diff(note_free_gap(before), note_free_gap(gap), '') + _diff(texts(before), texts(gap), 'Shots')
                 + _diff(note_free_elements([e for e in old['elements'] if e['id'] in used]), note_free_elements([e for e in plan['elements'] if e['id'] in used]), 'Elements')
                 + (['The film\'s shared rules changed as well.'] if shared_digest(old) != shared_digest(plan) else [])) or ['It differs from the version you accepted.']
     except (Problem, StopIteration, KeyError, TypeError, ValueError):
@@ -1408,6 +1567,8 @@ def plain_warnings(session, gap, plan=None):
         answers = {w['shot_id']: w.get('answer') for w in stored if w['kind'] == 'stand_in_real'}
         stored = [w for w in stored if w['kind'] != 'stand_in_real'] + [
             {'kind': 'stand_in_real', 'shot_id': sid, **({'answer': answers[sid]} if answers.get(sid) else {})} for sid in stand_in_shots(session, plan) if sid in shots]
+        missing = supplied_missing(session, plan)   # release 3, C3: the same for a logo or brand file: the line goes once the file is given
+        stored = [w for w in stored if w['kind'] != 'supplied_missing' or w.get('shot_id') in missing]
     return [{'kind': w['kind'], **({'shot_id': w['shot_id']} if w.get('shot_id') else {}), 'plain': WARNING_PLAIN[w['kind']], **({'answer': w['answer']} if w.get('answer') else {})} for w in stored]
 
 
@@ -7306,9 +7467,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     continues = {}
     if build:   # design/221 (the critic's A1): the labels and cues of every drawn shot are in the plan before the first brief, so no render is made stale by them later
         bare = [s['id'] for g_ in plan['gaps'] for sc in chosen_scenes(g_, session['choice_selections'].get(g_['gap_id'])) for s in sc['shots']
-                if s.get('visual_type') == 'drawn' and not (s.get('scene_motion') or {}).get('labels')
-                and (s.get('carries_text')   # design/221 phase 3c: a shot's message is its point, not text on screen. The critic's point 4: the server cannot know a shot's own words, so every such shot is asked
-                     or _flat((s.get('drawing_spec') or {}).get('label')) not in ('', _flat(corner_note(s.get('drawing_spec')))))]
+                if text_no_labels(s)]   # design/221 phase 3c: a shot's message is its point, not text on screen. The critic's point 4: the server cannot know a shot's own words, so every such shot is asked. Release 3, C4: the plan check names them first (`labels_missing`)
         one = len(bare) == 1
         need(not bare, f"Before the first brief, the texts of every drawn shot go in the plan: {', '.join(bare)} {'carries' if one else 'carry'} text and {'has' if one else 'have'} "
                        'no scene_motion.labels: add scene_motion: {labels: [every text the viewer reads, word for word, never the corner note], cues: [{selector: "#id", word or at_s}]} '

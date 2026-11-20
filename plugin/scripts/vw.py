@@ -2143,7 +2143,7 @@ _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'digest': set(), 'trial': {'file', 'element', 'clip', 'at'}, 'look': {'file'},   # design/211 part A: the digest of the footage, trial frames, the looks
-    'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
+    'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file', 'answers'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record', 'uploaded', 'pictures_again'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back', 'rest', 'rewrite', 'looks', 'things'},   # design/177: the page's step-2 actions; design/211 part B: the second go, the rewrite, the looks at the sets
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
@@ -2404,7 +2404,7 @@ def cmd_visuals(a):
         out = write(base + '/footage', {'camera': a.camera, 'support': a.support, 'look': a.look, 'quote': a.quote})
         emit(out, 0, f"Corrected with the operator's words. {out.get('line')}")
     if a.what in ('check', 'propose'):
-        out = write(base + '/' + a.what, {'plan': _json_file(m, a.file)})
+        out = write(base + '/' + a.what, {'plan': _json_file(m, a.file), **({'answers': a.answers} if a.what == 'propose' and getattr(a, 'answers', None) else {})})   # release 3, C2: the question whose answer this plan follows
         line = f"{a.what}: {out.get('status', 'saved')}"
         r = out.get('routes') or {}
         if r:   # design/65 C2: the routes, the images and the cost against the cap
@@ -2419,6 +2419,16 @@ def cmd_visuals(a):
         if out.get('warnings'):
             open_ = sum(1 for w in out['warnings'] if not w.get('answered'))
             line += f"; {len(out['warnings'])} warning(s), {open_} unanswered: answer each in its shot's warning_answers (kind and answer), never in the purpose"
+        absent = [w.get('shot_id') or '' for w in out.get('warnings') or [] if w.get('kind') == 'supplied_missing' and not w.get('answered')]
+        if absent:   # release 3, C3: the server names the missing file; only this computer sees the run folder
+            there = sorted(f.name for f in (ws / 'in' / 'brand').glob('*') if f.is_file()) if (ws / 'in' / 'brand').is_dir() else []
+            line += (f"; A logo or brand file is not given yet ({', '.join(absent)}). in/brand/ of the run folder " +
+                     (f"holds {', '.join(there)}: give the right one with `vw visuals supply --element E --file in/brand/<name>`, or ask the operator for the file now" if there
+                      else f"is empty: run `vw brand fetch`, or ask the operator now to put the file in {ws / 'in' / 'brand'}, then `vw visuals supply --element E --file in/brand/<name>`")
+                     + '; this is a warning, the plan is not held')
+        for k, lead in (('kept_without_asking', 'Kept without asking the operator'), ('asked_again', 'Asked again')):   # release 3, C1 and C2
+            if out.get(k):
+                line += f"; {lead}: {'; '.join(out[k])}."
         if out.get('shared_change'):   # design/191: one question for every gap whose own shots are unchanged
             line += '; ' + out['shared_change']
         if a.what == 'propose' and out.get('status') != 'rejected' and a.file and (ws / a.file).resolve() == (ws / 'out' / 'visual-plan.json').resolve():
@@ -4047,7 +4057,7 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded', '--answers'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--rest', action='store_true', help="round: make the other sets, on the operator's word (design/211)"); s.add_argument('--rewrite', help='round: the file of the rewritten requests, rows {element_id, prompt} (design/211)')
