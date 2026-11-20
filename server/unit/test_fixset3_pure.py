@@ -309,9 +309,9 @@ def test_a36_the_frame_limit_is_the_servers_own_refusal_and_says_what_to_do():
 def test_m6_the_refusals_seen_on_the_run_end_with_the_next_step():
     again = ' Change the drawing, then upload it again: the same file is refused again.'
     assert VS.PARTS_USE_ONE.endswith(again) and VS.PARTS_USE.endswith(again) and VS.PARTS_USE_VIEW.endswith(again)
-    assert core.DEFECT_OPEN.format(n=7) == ('defect 7 is open on this run; the builder resolves it, then the run continues. Do not send this call again now: tell the '
-                                            'operator, and send it once the builder says the defect is fixed.')
-    assert 'DEFECT_OPEN.format(n=opened[0])' in (ROOT / 'server' / 'app' / 'core.py').read_text(encoding='utf-8')   # the write refused while a defect is open says it
+    assert core.defect_open({'defect': 7, 'stage': 'visuals'}) == ('defect 7 is open on this run and holds the visuals step; the builder resolves it, then the run continues. '   # release 3, C6: it says what it holds
+                                                                   'Do not send this call again now: tell the operator, and send it once the builder says the defect is fixed.')
+    assert "raise Problem(409, 'DEFECT_OPEN', defect_open(opened[0])" in (ROOT / 'server' / 'app' / 'core.py').read_text(encoding='utf-8')   # the write refused while a defect is open says it
     store = still_ends(load(), ('D1', *SECTION), ('D2', *SECTION))   # release 2, F1: D3 continues D2, so its still comes after theirs
     with pytest.raises(Problem) as e:
         upload(store, 'D3', 'part-base', still=True)   # D3 shows the block and places none of its three views

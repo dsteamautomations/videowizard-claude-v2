@@ -180,8 +180,36 @@ def is_admin(user):
     return user['role'] == 'Admin'
 
 
+SHOT_LINE = 'holds shot: '   # release 3, C6: the shot a defect names is the first line of its log excerpt (no new column; a row without it names no shot)
+
+
+def defect_shot(row):
+    """The shot an open defect names, '' when it names none (a row of the older server, a defect about a step)."""
+    first = str(row.get('log_excerpt') or '').split('\n', 1)[0]
+    return first[len(SHOT_LINE):].strip() if first.startswith(SHOT_LINE) else ''
+
+
+def open_defect_rows(conn, run_id):
+    """Release 3, C6: the run's open defects with what each holds: its shot, else its step, else (a row with neither) every step."""
+    rows = conn.execute("select id, stage, log_excerpt from vw2_defects where run_id=%s and status='open' order by id", (run_id,)).fetchall()
+    return [{'defect': r['id'], **({'shot': defect_shot(r)} if defect_shot(r) else {'stage': r['stage']} if r.get('stage') else {})} for r in rows]
+
+
 def open_defects(conn, run_id):
-    return [r['id'] for r in conn.execute("select id from vw2_defects where run_id=%s and status='open' order by id", (run_id,)).fetchall()]
+    return [d['defect'] for d in open_defect_rows(conn, run_id)]
+
+
+def holds(defects, stage=None, shots=()):
+    """Release 3, C6 (SK, 20 Nov 2026: "Block only what it names"): the open defects that hold a write. A defect that names a shot holds the
+    writes that name that shot; one that names a step holds the writes of that step, and a write that states no step; a row with neither
+    (the older server) holds every write."""
+    stages = stage if isinstance(stage, tuple) else (stage,) if stage else ()
+    return [d for d in defects if (d['shot'] in shots if d.get('shot') else not d.get('stage') or not stages or d['stage'] in stages)]
+
+
+def holding(nxt, stage):
+    """The defects that close a step's page: those that hold the whole step, never one about a single shot."""
+    return [d['defect'] for d in holds([d for d in nxt.get('held') or [] if not d.get('shot')], stage)]
 
 
 def try_lock(conn, run_id):
@@ -190,20 +218,29 @@ def try_lock(conn, run_id):
     return bool(row and row['got'])
 
 
-def load_run(conn, user, run_id, lock=False):
+def load_run(conn, user, run_id, lock=False, stage=None, shots=()):
     row = conn.execute('select * from vw2_runs where id = %s', (run_id,)).fetchone()
     if not row or (row['owner_id'] != user['id'] and not is_admin(user)):
         raise Problem(404, 'NOT_FOUND', 'Run not found.')  # 404 so run ids are not probeable
     if lock:
         conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run_id),))
-        opened = open_defects(conn, run_id)   # design/48 O.2: every write waits for the builder while a defect is open
+        opened = holds(open_defect_rows(conn, run_id), stage, shots)   # design/48 O.2; release 3, C6: a write waits for the builder only when an open defect holds it
         if opened:
-            raise Problem(409, 'DEFECT_OPEN', DEFECT_OPEN.format(n=opened[0]), defect=opened[0], defects=opened)
+            raise Problem(409, 'DEFECT_OPEN', defect_open(opened[0]), defect=opened[0]['defect'], defects=[d['defect'] for d in opened],
+                          holds={k: opened[0][k] for k in ('shot', 'stage') if opened[0].get(k)})
     return row
 
 
-DEFECT_OPEN = ('defect {n} is open on this run; the builder resolves it, then the run continues. Do not send this call again now: tell the operator, and send it once the '
-               'builder says the defect is fixed.')   # fix set M6 (19 Nov 2026): the refusal ends with the next step
+DEFECT_OPEN = ('defect {n} is open on this run and holds {what}; the builder resolves it, then the run continues. Do not send this call again now: tell the operator, and '
+               'send it once the builder says the defect is fixed.')   # fix set M6 (19 Nov 2026): the refusal ends with the next step; release 3, C6: and says what it holds
+DEFECT_OPEN_SHOT = ('defect {n} is open on this run and holds shot {shot} only; the rest of the run goes on. Do not send this call again now: tell the operator, go on with '
+                    'the other shots, and send it once the builder says the defect is fixed.')
+
+
+def defect_open(d):
+    if d.get('shot'):
+        return DEFECT_OPEN_SHOT.format(n=d['defect'], shot=d['shot'])
+    return DEFECT_OPEN.format(n=d['defect'], what=f"the {d['stage']} step" if d.get('stage') else 'every step')
 
 
 def list_runs(conn, user):
@@ -284,7 +321,8 @@ def acceptance_quote(stage, quote, user):
 def next_for(conn, run):
     outputs = current_outputs(conn, run['id'])
     nxt = compute_next(run, stage_table(run['procedure_version']), outputs, attempts_for(conn, run['id']))
-    nxt = {**nxt, 'open_defects': open_defects(conn, run['id'])}   # design/48 O.2
+    held = open_defect_rows(conn, run['id'])
+    nxt = {**nxt, 'open_defects': [d['defect'] for d in held], 'held': held}   # design/48 O.2; release 3, C6: `held` says what each one holds
     if nxt.get('stage') in ('assembly', 'delivery'):   # handover (11 Nov 2026): what is done inside the stage and the one next thing to do
         try:
             from .stage3 import assembly
@@ -453,7 +491,11 @@ def claim(conn, user, run, machine):
     return conn.execute('update vw2_runs set active_machine=%s where id=%s returning *', (machine, run['id'])).fetchone()
 
 
-def file_defect(conn, user, run, stage, error, log_excerpt):
+def file_defect(conn, user, run, stage, error, log_excerpt, shot=None):
+    """Release 3, C6: the defect holds the shot it names (kept as the first line of the log excerpt), else the step it names, else the step it
+    was filed in."""
+    stage = stage or next_for(conn, run).get('stage')
+    shot = ' '.join(str(shot or '').split())
     row = conn.execute('insert into vw2_defects(run_id, stage, error, log_excerpt, by_user) values (%s,%s,%s,%s,%s) returning id',
-                       (run['id'], stage, error, (log_excerpt or '')[:8000], user['id'])).fetchone()
-    return {'ticket': row['id']}
+                       (run['id'], stage, error, ((SHOT_LINE + shot + '\n' if shot else '') + (log_excerpt or ''))[:8000], user['id'])).fetchone()
+    return {'ticket': row['id'], 'holds': {'shot': shot} if shot else {'stage': stage}}

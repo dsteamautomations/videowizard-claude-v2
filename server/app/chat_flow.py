@@ -2240,6 +2240,10 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan))) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
+        from . import core
+        held = V.held_line(plan, session, core.open_defect_rows(conn, run['id']) if conn is not None else [])   # release 3, C6: a defect about one shot: it and what continues from it wait, and why
+        if held:
+            out['then'] = held + (' ' + out['then'] if out.get('then') else '')
         show = _finished({'session': session, 'store': store}, six) if out.get('item') or out.get('card') or out.get('group') else []   # fix set A3.4: a finished drawing is shown with the next answer too (with nothing waiting: `_next_item`), once
         if show:
             V.save_session(store, run, session)

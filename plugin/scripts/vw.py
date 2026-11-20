@@ -546,6 +546,8 @@ def finish(payload, code):
     if code == 3:
         emit(payload, 3, 'The server needs the operator to decide: ' + ', '.join(payload.get('options', [])))
     if isinstance(payload, dict) and payload.get('code') == 'DEFECT_OPEN':   # design/48 O.2
+        if payload.get('holds'):   # release 3, C6: the server says what the defect holds (one shot, or a step) and what goes on
+            emit(payload, 2, str(payload.get('message') or ''))
         emit(payload, 2, f"A defect is open on this run ({payload.get('defect')}); the builder is on it. Nothing more can be recorded until it is fixed. "
                          'Do not send this call again now: tell the operator, and send it once the builder says the defect is fixed.')   # fix set M6: the refusal ends with the next step
     emit(payload, code)
@@ -676,7 +678,9 @@ def next_line(nxt):
         return 'All stages done; close the run.'
     line = f"Next: {nxt['stage']}." + (f" This step uses a paid provider ({nxt['paid']}); tell the operator, do not ask." if nxt.get('paid') else '')
     if nxt.get('open_defects'):   # design/48 O.2
-        line += ' · ' + ', '.join(f'defect {d} open' for d in nxt['open_defects'])
+        held = {h['defect']: f" (holds shot {h['shot']} only)" if h.get('shot') else f" (holds the {h['stage']} step)" if h.get('stage') else ' (holds every step)'
+                for h in nxt.get('held') or []}   # release 3, C6; an older server sends no `held`
+        line += ' · ' + ', '.join(f'defect {d} open' + held.get(d, '') for d in nxt['open_defects'])
     page = nxt.get('voice_page')
     if page:   # design/52 B: what the voices page holds
         bits = [f"picked {page['pick'].get('name') or page['pick'].get('voice_id')} on the voices page" if page.get('pick') else 'nothing picked on the voices page',
@@ -1262,8 +1266,15 @@ def cmd_defect(a):
             log = path.read_text(encoding='utf-8', errors='replace')[-4000:]
         except OSError:
             pass
-    emit(write(f"/api/runs/{m['run_id']}/defects", {'stage': a.stage, 'error': a.error, 'log_excerpt': log}), 0,
-         'Defect filed. Tell the operator the ticket number and stop; the builder takes it from here.')
+    out = write(f"/api/runs/{m['run_id']}/defects", {'stage': a.stage, 'error': a.error, 'log_excerpt': log, **({'shot': a.shot} if getattr(a, 'shot', None) else {})})
+    holds = out.get('holds') or {}   # release 3, C6: what the server holds for it; an older server says nothing
+    emit(out, 0, f"Defect filed. It holds shot {holds['shot']} only: go on with everything else. Tell the operator the ticket number; the builder takes that shot from here." if holds.get('shot')
+         else f"Defect filed. It holds the {holds['stage']} step: tell the operator the ticket number and stop; the builder takes it from here." if holds.get('stage')
+         else 'Defect filed. Tell the operator the ticket number and stop; the builder takes it from here.')
+
+
+DEFECT_HELP = ('File a defect for the builder. Name the shot it is about (--shot S): the server then holds only that shot and the rest of the run '
+               'goes on. With no shot the defect holds the whole step (--stage, else the step the run is in).')
 
 
 def favourites():
@@ -4001,7 +4012,7 @@ def build_parser():
     s = sub.add_parser('view'); s.add_argument('--stage', required=True); s.set_defaults(fn=cmd_view)
     s = sub.add_parser('revise'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--confirm'); s.set_defaults(fn=cmd_revise)
     s = sub.add_parser('decide'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--decision', required=True, choices=['retry', 'revise', 'defect', 'stop']); s.add_argument('--note'); s.set_defaults(fn=cmd_decide)
-    s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
+    s = sub.add_parser('defect', help=DEFECT_HELP, description=DEFECT_HELP); s.add_argument('--stage'); s.add_argument('--shot'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('clients'); s.add_argument('--search'); s.set_defaults(fn=cmd_clients)
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--category', help='intake record: the category the operator chose with the title (design/192)'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')

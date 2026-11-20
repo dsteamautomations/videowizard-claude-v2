@@ -724,6 +724,7 @@ class Defect(Write):
     stage: str | None = None
     error: str
     log_excerpt: str | None = None
+    shot: str | None = Field(default=None, max_length=80)   # release 3, C6: the shot the defect is about; it holds only that shot
 
 
 def body_dict(model):
@@ -850,7 +851,10 @@ def _close_with_retention(conn, user, run):
 @app.post('/api/runs/{run_id}/defects', status_code=201)
 def post_defect(run_id: UUID, body: Defect, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, core.file_defect(conn, user, run, body.stage, body.error, body.log_excerpt)))
+    if body.shot:   # release 3, C6: a name that is no shot of the plan would hold nothing
+        visuals_stage.guarded(lambda: visuals_stage.need(visuals_stage.is_shot(storage(), run, core.current_outputs(conn, run['id']), body.shot),
+                                                         f'{body.shot} is not a shot of this run\'s plan: name the shot as the plan does, or leave the shot out and the defect holds the step.'))
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, core.file_defect(conn, user, run, body.stage, body.error, body.log_excerpt, body.shot)))
     return Response(resp, status_code=status)
 
 
@@ -905,7 +909,7 @@ def run_brand(run_id: UUID, user=User, conn=DB):
 # ---------- a run's voice page (design/52 B) ----------
 
 def _voice_write(run_id, body, user, conn, fn, status=200):
-    run = core.load_run(conn, user, run_id, lock=True)
+    run = core.load_run(conn, user, run_id, lock=True, stage='voice')
     outputs = core.current_outputs(conn, run['id'])
     st, resp = core.with_receipt(conn, user, body_dict(body), lambda: (status, fn(run, outputs)))
     return Response(resp, status_code=st)
@@ -1100,7 +1104,7 @@ def resolve_job(run_id: UUID, job_id: UUID, body: Resolve, user=User, conn=DB):
 # ---------- analysis ----------
 
 def _analysis_run(conn, user, run_id, stage_check=True):
-    run = core.load_run(conn, user, run_id, lock=True)
+    run = core.load_run(conn, user, run_id, lock=True, stage='analysis')
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     if stage_check:
@@ -1300,8 +1304,14 @@ def planning_retired(run_id: UUID, rest: str = ''):
 
 # ---------- visuals ----------
 
-def _visuals_run(conn, user, run_id):
-    run = core.load_run(conn, user, run_id, lock=True)
+def shots_of(body):
+    """Release 3, C6: the shots a request names (`shot_id`, `shots`), for the open-defect gate: a defect about one shot holds only these."""
+    one, many = getattr(body, 'shot_id', None), getattr(body, 'shots', None)
+    return ([one] if isinstance(one, str) and one else []) + ([s for s in many if isinstance(s, str)] if isinstance(many, list) else [])
+
+
+def _visuals_run(conn, user, run_id, shots=()):
+    run = core.load_run(conn, user, run_id, lock=True, stage='visuals', shots=shots)
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     nxt = core.next_for(conn, run)
@@ -1311,7 +1321,7 @@ def _visuals_run(conn, user, run_id):
 
 
 def _visuals_call(conn, user, run_id, body, fn, status=200):
-    run, outputs = _visuals_run(conn, user, run_id)
+    run, outputs = _visuals_run(conn, user, run_id, shots_of(body))
     st, resp = core.with_receipt(conn, user, body_dict(body), lambda: (status, visuals_stage.guarded(lambda: fn(run, outputs))))
     return Response(resp, status_code=st)
 
@@ -1578,7 +1588,7 @@ def visuals_motion_finish(run_id: UUID, body: MotionFinish, user=User, conn=DB):
 
 @app.get('/api/runs/{run_id}/visuals/motion/brief/{shot_id}')
 def visuals_motion_brief(run_id: UUID, shot_id: str, user=User, conn=DB):   # design/130 §4 step 1
-    run, outputs = _visuals_run(conn, user, run_id)
+    run, outputs = _visuals_run(conn, user, run_id, [shot_id])
     return Response(visuals_stage.guarded(lambda: visuals_stage.motion_brief(storage(), run, outputs, shot_id, build=True, conn=conn)))   # design/221: the gates before a build
 
 
@@ -2153,7 +2163,7 @@ def visuals_record(run_id: UUID, body: GapBody, user=User, conn=DB):
 # ---------- stage 2: options / master / first cut ----------
 
 def _stage_run(conn, user, run_id, stage):
-    run = core.load_run(conn, user, run_id, lock=True)
+    run = core.load_run(conn, user, run_id, lock=True, stage=stage)
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     nxt = core.next_for(conn, run)

@@ -6896,6 +6896,36 @@ def continues_from(plan, session, gap, shot):
     return next((s['id'] for s in diagram_shots(plan, session, gap, shot)[1] if s['id'] == shot.get('return_of')), '')
 
 
+def is_shot(store, run, outputs, shot_id):
+    """Release 3, C6: whether this is a shot of the run's current plan (a defect names its shot by the plan's id)."""
+    try:
+        return _item_kind(store, session_of(store, run, outputs), shot_id) == 'shot'
+    except (ValueError, KeyError, Problem):
+        return False
+
+
+def held_line(plan, session, defects):
+    """Release 3, C6: the next-step sentence for each open defect that names a shot: the shot is held, the drawings that continue from it wait
+    for it too, everything else goes on. '' when no open defect names a shot (a defect about a step refuses the call itself)."""
+    out = []
+    for d in defects:
+        if not d.get('shot'):
+            continue
+        wait, grown = [d['shot']], True
+        while grown:   # a chain: each drawing that continues one that waits
+            grown = False
+            for gap in plan['gaps']:
+                for sc in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])) if not gap.get('choices') or session['choice_selections'].get(gap['gap_id']) else []:
+                    for s in sc['shots']:
+                        if s.get('visual_type') == 'drawn' and s['id'] not in wait and continues_from(plan, session, gap, s) in wait:
+                            wait.append(s['id'])
+                            grown = True
+        out.append(f"Defect {d['defect']} is open on {d['shot']}: nothing more is sent for {d['shot']} until the builder says it is fixed. "
+                   + (f"{', '.join(wait[1:])} continue{'s' if len(wait) == 2 else ''} from it and wait{'s' if len(wait) == 2 else ''} for it too. " if wait[1:] else '')
+                   + 'Everything else goes on.')
+    return ' '.join(out)
+
+
 def apart(shots):
     """Fix set M2: the drawn shots of one gap (its shots in film order) that follow an earlier drawing with another shot between them and name no
     return: [(the shot, the earlier drawing, the shots between)]. Such a drawing does not continue the earlier one."""

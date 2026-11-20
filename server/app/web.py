@@ -368,7 +368,7 @@ def visuals_page(request: Request, code: str, vw2_session: str | None = Cookie(d
 def _visuals_payload(conn, store, run, repair=True):
     from . import visuals_stage
     nxt = core.next_for(conn, run)
-    return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
+    return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': core.holding(nxt, 'visuals')},   # release 3, C6: only a defect that holds the whole step closes the page
             **visuals_stage.page_view(conn, store, run, core.current_outputs(conn, run['id']), run['code'], repair)}
 
 
@@ -522,13 +522,13 @@ def review_data(request: Request, code: str, vw2_session: str | None = Cookie(de
 def _review_payload(conn, store, run):
     from .stage2 import stage as stage2
     nxt = core.next_for(conn, run)
-    return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
+    return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': core.holding(nxt, nxt.get('stage'))},   # release 3, C6
             **stage2.review_view(conn, store, run)}
 
 
 def _run_at(conn, user, code, stage):
     """The run, locked, when its next step is `stage`: the same gate the API applies (main._stage_run), so the page can never act at the wrong stage."""
-    run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True)
+    run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True, stage=stage)
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     nxt = core.next_for(conn, run)
@@ -704,7 +704,7 @@ def _voices2_act(code, vw2_session, body):
             return JSONResponse({'voice_id': v['voice_id'], 'name': v.get('name')})
         if action == 'preview':
             return JSONResponse({'url': voices.preview_link(conn, provider, body['voice_id'])})
-        run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True)
+        run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True, stage='voice')
         outputs = core.current_outputs(conn, run['id'])
         store = storage()
         if action == 'step':

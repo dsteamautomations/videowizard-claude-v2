@@ -206,7 +206,7 @@ def test_next_carries_the_report_at_assembly_and_never_raises(film, monkeypatch)
     monkeypatch.setattr(core, 'stage_table', lambda v: [])
     monkeypatch.setattr(core, 'current_outputs', lambda c, rid: OUTPUTS)
     monkeypatch.setattr(core, 'attempts_for', lambda c, rid: {})
-    monkeypatch.setattr(core, 'open_defects', lambda c, rid: [])
+    monkeypatch.setattr(core, 'open_defect_rows', lambda c, rid: [])
     monkeypatch.setattr(ST, 'storage', lambda: store)
     monkeypatch.setattr(core, 'compute_next', lambda *a: {'stage': 'assembly'})
     assert '`vw assembly fetch`' in core.next_for(conn, RUN)['stage3']['do_next']
