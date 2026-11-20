@@ -280,7 +280,6 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .snm{flex:1;min-width:0;line-height:1.3;overflow-wrap:anywhere}
 .sdot{width:22px;height:22px;border-radius:50%;background:var(--bg);color:var(--muted);flex:none;display:grid;place-items:center;font-size:12px;font-style:normal;font-weight:600;line-height:1}
 .srow.done .sdot{background:var(--ok);color:var(--surface)} .srow.against .sdot{background:var(--chg);color:var(--surface)}
-.sst{font-size:12px;color:var(--muted);white-space:nowrap} .srow.against .sst{color:var(--chg)}
 #sets .sfold{display:flex;width:100%;justify-content:space-between;border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:8px 10px;color:var(--muted);font-weight:400}
 .sfold::before{content:"▸ "} .sfold[aria-expanded="true"]::before{content:"▾ "} .sfold span{flex:1;text-align:left}
 #sets .squiet .srow{color:var(--muted);padding:6px 10px}
@@ -1340,8 +1339,9 @@ function sEnd(){   // A13: what will happen, thing by thing, before the operator
 function sRail(){
   const w=SW(), it=sItems(), kids=[mk('h2',{},w.todo)];
   if(TK()) kids.push(...kRail(it)); else kids.push(mk('ul',{},it.map((l,i)=>{ const d=sDone(l), ag=l.key!=='sets:rest'&&sAgainst(l), a=sAns(l), b=a&&sBtn(l,a);
+    const say=(d?(ag?w.against:b?((w.done||{})[b.act]||b.label):l.kept):w.todo)||null;   // release 2, B2: the state in words is the badge's title, never a word beside the name
     return mk('li',{},mk('button',{class:'srow'+(d?(ag?' against':' done'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},
-      mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},[l.kind_words,l.film_at].filter(Boolean).join(' · '))),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
+      mk('i',{class:'sdot',role:'img',title:say,'aria-label':say},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},[l.kind_words,l.film_at].filter(Boolean).join(' · '))))); })));
   const coming=(PIC()||TK())&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
   const earlier=PIC()&&(round.layout||{}).recorded||[];   // fix set (20 Nov 2026): what was answered earlier, in the chat: shown as recorded, in a folded row of its own
   [['coming',w.coming,coming],['recorded',w.recorded,earlier]].forEach(([g,title,rows])=>{ if(!rows.length) return; const o=!!S.fold[g];

@@ -179,12 +179,12 @@ def test_approving_against_advice_asks_once_and_undo_takes_the_mark_away(browser
     got = answers(pg)[DECK['line']]
     assert got['choice'] == a[1]['choice'] and got['key'] == DECK['key'] and got['item'] == DECK['item']   # the contract: the same answer as before
     row = pg.locator('#srail .srow', has=pg.locator('.snm', has_text=DECK['name']))
-    assert 'against' in row.get_attribute('class') and row.locator('.sst').text_content() == W['against']
+    assert 'against' in row.get_attribute('class') and row.locator('.sdot').get_attribute('title') == W['against'] and row.locator('.sst').count() == 0   # release 2, B2: the badge alone, the words its title
     text = pg.locator('#sanswer').text_content()
     assert a[1]['say'] in text and W['against_say'] in text and a[1]['say'] == 'All 3 pictures approved as one set. Later pictures start from picture B.'
     pg.locator('#sundo').click()
     pg.wait_for_function('() => Object.keys(window.__answers).length === 0')
-    assert 'against' not in (row.get_attribute('class') or '') and row.locator('.sst').count() == 0
+    assert 'against' not in (row.get_attribute('class') or '') and row.locator('.sdot').get_attribute('title') == W['todo']
     pg.close()
 
 
@@ -199,7 +199,7 @@ def test_a_person_one_answer_no_main_link_no_footage_and_the_count(browser):
     pg.locator('#smain [data-act="approve"]').click()                                                        # with the advice: no question
     assert answers(pg)[MASON['line']]['choice'] == 'yes'
     row = pg.locator('#srail .srow', has=pg.locator('.snm', has_text=MASON['name']))
-    assert 'done' in row.get_attribute('class') and row.locator('.sst').text_content() == W['done']['approve'] and row.locator('.sdot').text_content() == '✓'
+    assert 'done' in row.get_attribute('class') and row.locator('.sdot').get_attribute('title') == W['done']['approve'] and row.locator('.sdot').text_content() == '✓'
     assert foot(pg).startswith('1 of 4 answered.')                                                           # A11
     pg.wait_for_function('n => document.querySelector("#smain .sname").textContent !== n', arg=MASON['name'])   # the next that needs an answer opens
     pg.close()

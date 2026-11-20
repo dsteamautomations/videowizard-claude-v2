@@ -259,7 +259,7 @@ def test_a_question_of_claude(browser):
     got = saved(pg, 'l01', 'c2')
     assert got['key'] == QUESTION['key'] and got['item'] == QUESTION['item'] and got['notes'] == '' and set(got) == {'key', 'item', 'choice', 'notes', 'at'}
     row = pg.locator('#srail .srow[data-line="l01"]')
-    assert 'done' in row.get_attribute('class') and row.locator('.sst').text_content() == W['done']['answer']
+    assert 'done' in row.get_attribute('class') and row.locator('.sdot').get_attribute('title') == W['done']['answer']
     pg.wait_for_function('n => document.querySelector("#smain .sname").textContent !== n', arg=QUESTION['name'])   # the next opens
     assert pg.locator('#smain .sname').text_content() == STYLE['name']
     pg.close()
@@ -341,7 +341,7 @@ def test_a_failed_still_asks_once_and_is_marked_against_the_check(browser):
     got = saved(pg, 'l04', 'yes')
     assert set(got) == {'key', 'item', 'choice', 'notes', 'at'} and got['notes'] == ''          # the page writes nothing extra
     row = pg.locator('#srail .srow[data-line="l04"]')
-    assert 'against' in row.get_attribute('class') and row.locator('.sst').text_content() == W['against'] and row.locator('.sdot').text_content() == '!'
+    assert 'against' in row.get_attribute('class') and row.locator('.sdot').get_attribute('title') == W['against'] and row.locator('.sdot').text_content() == '!'
     assert W['against'] in pg.locator('#sanswer').text_content() and 'against' in pg.locator('#sanswer').get_attribute('class')
     pg.locator('#sundo').click()
     pg.wait_for_function('() => !window.__answers.l04')
@@ -367,7 +367,7 @@ def test_the_earlier_try_with_its_reason_and_correct_it_with_claudes_lines(brows
     pg.locator('#sfixsend').click()
     got = saved(pg, 'l04', 'correct')
     assert got['notes'] == 'Two distant workers.' and fix['say'].replace('{words}', 'Two distant workers.') in pg.locator('#sanswer').text_content()
-    assert pg.locator('#srail .srow[data-line="l04"] .sst').text_content() == W['done']['fix']
+    assert pg.locator('#srail .srow[data-line="l04"] .sdot').get_attribute('title') == W['done']['fix']
     pg.close()
 
 
@@ -445,7 +445,7 @@ def test_a_drawn_graphic_plays_on_a_loop_with_no_sound_its_frames_one_click_away
     pg.locator('#sfootage [data-role="after"]').click()                                   # footage beside the video
     assert pg.locator('#sbig figure').evaluate_all('f => f.map(x => x.getAttribute("data-role"))') == ['video', 'after']
     pg.locator('#pbar [data-choice="plain"]').click()                                     # D8: no confirmation
-    assert saved(pg, 'l06', 'plain')['notes'] == '' and pg.locator('#srail .srow[data-line="l06"] .sst').text_content() == W['done']['plain']
+    assert saved(pg, 'l06', 'plain')['notes'] == '' and pg.locator('#srail .srow[data-line="l06"] .sdot').get_attribute('title') == W['done']['plain']
     pg.close()
 
 
