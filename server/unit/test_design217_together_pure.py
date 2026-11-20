@@ -164,7 +164,7 @@ def test_the_servers_round_has_the_fixtures_shape(server):
             assert set(line['video']) == set(want[kind]['video'])
     assert set(pg['layout']) == set(FIXTURE['layout']) and pg['layout']['words']['pictures'] == FIXTURE['layout']['words']['pictures']
     assert pg['layout']['help'] == FIXTURE['layout']['help'] and 'made' not in pg['layout']   # not shown by the page: `end_foot` says it
-    assert set(FIXTURE) - {'layout', 'lines'} <= set(pg) and set(pg) - set(FIXTURE) <= {'how', 'pictures', 'videos', 'pictures_failed', 'pic_docs', 'zoom_docs'}
+    assert set(FIXTURE) - {'layout', 'lines'} <= set(pg) and set(pg) - set(FIXTURE) <= {'how', 'pictures', 'videos', 'pictures_failed', 'pic_docs', 'zoom_docs', 'loading'}   # fix set (a): what the page says while its pictures are sent
     assert [(c['name'], c['state']) for c in pg['layout']['coming']] == [('The brick kiln at dusk', 'failed'), ('The kiln at night', 'failed')]   # design/221: shown as could not be made
     # the video page copy: `videos` [{code, key}] for the one that was made; "" and `none` for the one that was not
     d1, d2 = (l for l in pg['lines'] if l['kind'] == 'drawn')

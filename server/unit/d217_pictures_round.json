@@ -16,6 +16,7 @@
    "Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.",
    "This page opens when everything of the step is made. Claude checked each picture and drawing first."
   ],
+  "count": "10 of 10 pictures and drawn graphics are on this page.",
   "coming": [
    {"name": "Two walls under the same load", "kind_words": "A drawn graphic", "state": "failed", "note": "It could not be made. Claude tells you in the chat what happens to it."},
    {"name": "Less soil, less fuel", "kind_words": "A drawn graphic", "state": "failed", "note": "It could not be made. Claude tells you in the chat what happens to it."},
@@ -26,6 +27,7 @@
    "pictures": {
     "todo": "Needs your answer",
     "coming": "Could not be made",
+    "recorded": "Answered earlier",
     "nothing": "Nothing waits for you now.",
     "against": "Against the check",
     "done": {"answer": "Answered", "approve": "Approved", "again": "Made again", "fix": "Made again, your words", "select": "Selected", "reject": "Rebuilt, your words", "plain": "Made again, no effect"},

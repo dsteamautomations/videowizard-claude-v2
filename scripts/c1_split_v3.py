@@ -174,6 +174,8 @@ if __name__ == '__main__':
         prompt = fixset3(prompt, parts)
         from fixset4_wording import apply as fixset4   # fix set, the critic's points: carries_text false for a corner note or a logo, the round list's passed musts, the stills of a chain on the approvals
         prompt = fixset4(prompt, parts)
+        from fixset5_wording import apply as fixset5   # fix set, 20 Nov 2026: the page's link only from `vw visuals page --shown`, a page of an older tool published again early, never a new page
+        prompt = fixset5(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

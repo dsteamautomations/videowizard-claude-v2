@@ -79,6 +79,7 @@ W = {
     'say_failed_one': '1 could not be made: it is listed apart.', 'say_done': 'Then say done here.', 'say_nothing': 'Nothing waits for you on the page now.',
     'summary': '{n} to answer, {c} could not be made.', 'note': 'Answer each line, then say done in the chat.', 'nothing': 'Nothing waits for you now.',
     'failed': 'It could not be made. Claude tells you in the chat what happens to it.',
+    'count': '{n} of {m} pictures and drawn graphics are on this page.', 'answered_note': 'Answered earlier, in the chat.',   # fix set (f), SK 20 Nov 2026
     'help': ['Each line on the left needs one answer. Answer them in any order, then say done in the chat.',
              'A still is a picture that fills one shot of the film. A graphic in steps is shown as it plays: step 1, then step 2. A drawn graphic is a short video; its frames are one click away.',
              'Your footage before and after the shot is shown so you can judge whether the new picture fits between them. It needs no answer.',
@@ -121,7 +122,7 @@ W = {
     'comp_unopened': 'Claude could not open it ({why}).',
 }
 PAGE = {   # layout.words.pictures: the page's chrome
-    'todo': 'Needs your answer', 'coming': 'Could not be made', 'nothing': W['nothing'], 'against': 'Against the check',
+    'todo': 'Needs your answer', 'coming': 'Could not be made', 'recorded': 'Answered earlier', 'nothing': W['nothing'], 'against': 'Against the check',
     'done': {'answer': 'Answered', 'approve': 'Approved', 'again': 'Made again', 'fix': 'Made again, your words', 'select': 'Selected', 'reject': 'Rebuilt, your words', 'plain': 'Made again, no effect'},
     'undo': 'Undo', 'cancel': 'Cancel', 'details': 'Details', 'more': 'See all {n}', 'fewer': 'Show fewer', 'compare': 'Compare with the earlier try', 'stop': 'Stop comparing',
     'frames': 'Show its frames', 'video': 'Show the video', 'video_bad': 'The video could not be shown here; these are its frames.',

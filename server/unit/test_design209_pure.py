@@ -338,7 +338,8 @@ def test_the_instructions_send_the_drawings_and_materials_to_the_page_and_the_ch
     import d215_wording_v3 as D215   # design/215: a later script that changes sentences of this one (the step's new name): the text as it was before it
     import d216_wording_v3 as D216   # design/216: a later script that adds a sentence after one of this script's
     import d218_wording_v3 as D218   # design/218: a later script that adds a sentence before one of this script's
-    was = D215.before(D216.before(D218.before(st)))
+    import fixset5_wording as FIX5   # fix set, 20 Nov 2026: a later script that adds sentences after design/216's (the link only from `--shown`)
+    was = D215.before(D216.before(D218.before(FIX5.before(st))))
     parts = copy.deepcopy(was['parts'])
     assert W.apply(was['prompt'], parts) == was['prompt'] and parts == was['parts'], 'applying twice changes nothing'
     src = Path(V.__file__).read_text(encoding='utf-8')   # the tool's own lines point to the page first

@@ -155,7 +155,7 @@ def test_pictures_again_and_a_new_link_offer_every_picture_once_more(harness, mo
     assert 'picture_batches' not in run(args(what='page', record=False), capsys)[1]
     run(args(what='page', url=URL, record=False), capsys)   # the same link again (published again in place): its pictures are still there
     assert 'picture_batches' not in run(args(what='page', record=False), capsys)[1]
-    run(args(what='page', url='https://claude.ai/artifact/new', record=False), capsys)   # another page: it holds no picture yet
+    run(args(what='page', url='https://claude.ai/artifact/new', record=False, new_page=True), capsys)   # another page: it holds no picture yet (fix set, 20 Nov: only with --new-page; without it another link is refused)
     assert len(run(args(what='page', record=False), capsys)[1]['picture_batches'][0]) == 2
 
 
@@ -172,7 +172,7 @@ def test_a_round_with_no_pictures_is_as_before(harness, monkeypatch, capsys):
     got = fake(monkeypatch, lambda: page('r1'))
     rc, out, err = run(args(what='page', record=False), capsys)
     assert rc == 0 and got == [] and not {'picture_batches', 'zoom_uploads', 'uploaded_file', 'pictures_failed'} & set(out) and 'Pictures first' not in err
-    assert sorted(p.name for p in (ws / 'work' / 'page').iterdir()) == ['current.txt', 'r1.json']
+    assert sorted(p.name for p in (ws / 'work' / 'page').iterdir()) == ['capabilities.json', 'current.txt', 'handed.json', 'r1.json']   # fix set (20 Nov): the page's capabilities kept for a republish, and the round handed out until --shown confirms it
 
 
 def test_the_round_after_a_record_carries_its_new_pictures(harness, monkeypatch, capsys):

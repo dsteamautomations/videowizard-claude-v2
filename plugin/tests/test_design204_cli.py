@@ -31,7 +31,7 @@ def test_the_pages_link_is_kept_for_the_run_and_given_back(harness, monkeypatch,
     code, out, err = run(args(what='page', url='https://claude.ai/artifact/abc', record=False), capsys)
     assert code == 0 and out == {'url': 'https://claude.ai/artifact/abc'}
     code, out, err = run(args(what='page', record=False), capsys)
-    assert out['url'] == 'https://claude.ai/artifact/abc' and 'Page: https://claude.ai/artifact/abc' in err
+    assert out['url'] == 'https://claude.ai/artifact/abc' and 'https://claude.ai/artifact/abc' not in err and '`vw visuals page --shown`' in err   # fix set (20 Nov): given back for the tool calls; the line no longer prints it ("Page: <link>" before): the operator gets it from --shown
 
 
 def test_record_sends_what_the_answer_files_hold_once_and_writes_the_next_round(harness, monkeypatch, capsys):

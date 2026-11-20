@@ -498,8 +498,8 @@ def older_view(state):
     return json.loads(WHEN.sub('T', json.dumps(view, sort_keys=True, default=str)))
 
 
-OLDER = {'step1': '84a30c468b418155a91e69c28a311dd67462c1f5c3087ef9fdf4587c415abbaf', 'making': '429a73c51c3efb9970c259ac805ef6318d63f25058d0084eb98d26b0f641e690',
-         'step2': '7161a38b49acab8d64c4f349f7866cbecc2104a8fe30fe2accdc4312e17e79bd', 'complete': '405814646f1e6961a8df8e40717da122ef5c4ec726b2540b0d04637b44f8f837'}   # design/216 re-took all four: the page's `how` asks the assistant to post `say` (B1), and 'Leave it out' reads 'No reference needed' / 'Go on without a reference' (B6); nothing else   # taken on main at d255486, before the three parts; design/215: 'complete' again, only the step's new name and its sentence differ ("Sizes, materials and graphic specs")
+OLDER = {'step1': '6c712f3455b12e4ca6058fd49e1bc934b80d2b450d6fd33ff30bdc1a2a64bf60', 'making': 'b877fc72059567af0993ad709c6df07bf0b408f663643befc22f40e76bb35176',
+         'step2': '3c0a5cafa0d24a4fddaeba21f4599cf69332409e35cc8e1a5e29d52585de6a18', 'complete': 'ac2edffb51040afbcf0215fe540697cdca9df473dcaa537424e93b1d2bd20a6a'}   # fix set (20 Nov) re-took all four: the page's `how` (the loading note first, the link last, one path for a failed publish) and, on a round with pictures, `loading`; checked: with the `how` of before and no `loading` each view hashes as before; nothing else. Before that: design/216 re-took all four: the page's `how` asks the assistant to post `say` (B1), and 'Leave it out' reads 'No reference needed' / 'Go on without a reference' (B6); nothing else   # taken on main at d255486, before the three parts; design/215: 'complete' again, only the step's new name and its sentence differ ("Sizes, materials and graphic specs")
 
 
 @pytest.mark.parametrize('state', sorted(OLDER))

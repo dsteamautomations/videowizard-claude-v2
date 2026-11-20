@@ -27,15 +27,21 @@ HOW = ('The operator answers this step on a page, not on a card. '
        '1. If `url` is empty, publish the page with the Artifact tool: `file_path` is `page_file`, the title is `title`, `capabilities` exactly as given, an icon of your choice; '
        'then run `vw visuals page --url "<the link it gives>"`. If there is no Artifact tool, or it fails, run `vw visuals next` and show the card instead, and say once that the page is not available. '
        'If `republish` is true, the page at the link was published by an older tool: publish it again to the same link (the Artifact tool with `file_path` `page_file`, `url` the link '
-       'and `capabilities` again, exactly as given), then run `vw visuals page --url` with that link. '
-       '2. Send the pictures before the round, when there are any (design/210). For each batch in `picture_batches`: ArtifactData, action "batch", `url` the page\'s link, `writes` the batch, '
+       'and `capabilities` again, exactly as given), then run `vw visuals page --url` with that link; do this as soon as an answer of the tool says so (`republish_now`), '
+       'while things are still being made, so the operator never waits for it. '
+       'If a publish fails, or its answer names another link than `url`, stop: never go on with a new page. Tell the operator that the page is not available, '
+       'run `vw visuals next` and ask this step in the chat. '
+       '2. If `loading_write` is given, send it first (ArtifactData, action "batch", `url` the page\'s link, `writes` it, unchanged): the page then says that its pictures are being loaded. '
+       'Send the pictures before the round, when there are any (design/210). For each batch in `picture_batches`: ArtifactData, action "batch", `url` the page\'s link, `writes` the batch, '
        'unchanged. If a batch fails, or a picture stays grey on the page, run `vw visuals page --pictures-again` and send what it gives; if that fails too, stop here, '
        'run `vw visuals next` and ask this step in the chat. Then for each list in `zoom_uploads`: the Artifact tool, '
        'action "publish", `url` the page\'s link, `asset` true, `file_paths` the list; save its answer, exactly as it came, to `uploaded_file` with the Write tool, and run '
        '`vw visuals page --uploaded "<that file>"`: it gives one more batch in `picture_batches`, sent the same way. If an upload fails, go on, and tell the operator that the large pictures '
        'are not available on the page. '
        '3. Write this round to the page with the ArtifactData tool: action "set", `url` the page\'s link, collection "rounds", doc_id `round`, file_path `round_file`. Type none of its content. '
-       '4. Say to the operator `say`, exactly as it is, then the link: add nothing to it, no count and no summary of your own (design/216). Then wait. Do not post the lines in the chat as well. '
+       'If `after_round` is given, do what it says next: it reads the round back from the page and gives the link. '
+       '4. Say to the operator `say`, exactly as it is, then the link (when `after_round` is given: only once `vw visuals page --shown` has printed it; until then say '
+       'one progress line, without the link): add nothing to it, no count and no summary of your own (design/216). Then wait. Do not post the lines in the chat as well. '
        '5. When the operator says done: ArtifactData, action "list", collection `answers_collection`, out_dir `answers_dir`; then run `vw visuals page --record`. '
        'If it lists pictures the operator added on the page (`own_fetch`), fetch each one: the Artifact tool, action "read", `url` the page\'s link, `path` the picture\'s id, '
        '`out_dir` `own_dir`; then run `vw visuals page --record` again: their lines are recorded then (design/210). '
@@ -169,7 +175,10 @@ def _with_pictures(store, page):
     if found:
         page['pictures'] = [v for v in found.values() if v]
         n = len(page['pictures'])   # design/216 (B2): said before the laptop fetches them, about two copies a picture at two seconds each
-        page['preparing'] = CF.WORDS['preparing'].format(pictures=CF._n(n, 'picture'), minutes=CF._n(max(1, -(-n * PREPARE_SECONDS // 60)), 'minute'))
+        minutes = max(1, -(-n * PREPARE_SECONDS // 60))
+        page['preparing'] = CF.WORDS['preparing'].format(pictures=CF._n(n, 'picture'), minutes=CF._n(minutes, 'minute'))
+        waits = len([l for l in page['lines'] if l.get('state') == 'open'])   # fix set (a), (e): what the page says from the first moment, and after twice the minutes stated
+        page['loading'] = {'note': CF.WORDS['loading'].format(lines=CF._n(waits, 'line'), minutes=CF._n(minutes, 'minute')), 'late': CF.WORDS['loading_late'], 'minutes': minutes, 'expected': waits}
     if failed:
         page['pictures_failed'] = failed
     return page
@@ -975,6 +984,36 @@ def _takes_lines(ctx):
     return out + [{**l, 'pics': _coded(l)} for l in T.recorded(ctx)]
 
 
+NOT_ON_PAGE = 'Not on the page: {names}. Tell the operator which, and ask about them in the chat (`vw visuals next`): never leave them out silently.'
+
+
+def _counted(session, page, things, words, quiet):
+    """Fix set (f), SK 20 Nov 2026: the round says how many of the step's things are on the page (`layout.count`), and the answer names each
+    one that is not (`not_on_page`): never a silent short round. A thing is on the page when a line is its own (read from the line's item: a
+    render or a take by its job, a still by its picture, a graphic in steps by its shot) or its state is one of `quiet` (shown apart, with no
+    line). A round with no list of the step is left as it is."""
+    if not things:
+        return page
+    jobs = {str(i['job']['id']): i['id'] for i in things if i.get('job')}
+    on = set()
+    for l in page['lines']:
+        kind, _, rest = str(l.get('item') or '').partition(':')
+        if kind == 'take':
+            on.add(jobs.get(rest.split(':')[0]))
+        elif kind == 'take-done':
+            on.add(rest)
+        elif kind == 'graphics':
+            on.add(rest.rsplit(':', 1)[0])
+        elif kind == 'picture':
+            ref = (session.get('references') or {}).get(rest.rsplit(':', 1)[0])
+            on.add(V.made_for(session, ref) if ref else None)
+    out = [i for i in things if i['id'] not in on and i['state'] not in quiet]
+    page['layout']['count'] = words.format(n=len(things) - len(out), m=len(things))
+    if out:
+        page['not_on_page'] = NOT_ON_PAGE.format(names=', '.join(f"{i['name']} ({i['state']})" for i in out))
+    return page
+
+
 def _takes_page(ctx, base, lines, seven):
     """design/222: the round of step 7. While a take is being made or checked (lines None) nothing is put on the page: the answer is the line of
     counts. A round over the document's size loses the details and the passed lines of its last lines first; a line is never cut."""
@@ -990,8 +1029,9 @@ def _takes_page(ctx, base, lines, seven):
             break
         l['takes'] = [{**t, 'details': [], 'check': {**t['check'], 'passed': []}} for t in l['takes']]
     n = len([l for l in lines if l['state'] == 'open'])
-    return {**base, 'step': T.W['step'], 'open': bool(n), 'lines': lines, 'say': T.say(lines, rows), 'summary': T.W['summary'].format(n=n), 'note': T.W['note'] if n else T.W['nothing'],
-            'layout': {'kind': 'takes', 'help': T.W['help'], 'coming': rows, 'words': {**page_words(), 'takes': T.PAGE}}}
+    return _counted(ctx['session'], {**base, 'step': T.W['step'], 'open': bool(n), 'lines': lines, 'say': T.say(lines, rows), 'summary': T.W['summary'].format(n=n),
+                                     'note': T.W['note'] if n else T.W['nothing'], 'layout': {'kind': 'takes', 'help': T.W['help'], 'coming': rows, 'words': {**page_words(), 'takes': T.PAGE}}},
+                    seven, T.W['count'], (T.STATE['failed'],))   # a take answered earlier is a line of its own (`takes.recorded`)
 
 
 def _pictures_page(ctx, base, lines, six):
@@ -1010,9 +1050,13 @@ def _pictures_page(ctx, base, lines, six):
             break
         l['details'] = []
     n = len(lines)
-    return {**base, 'step': P.W['step'], 'open': bool(n), 'lines': lines, 'say': P.say(lines, rows),
-            'summary': P.W['summary'].format(n=n, c=len(rows)) if rows else f'{n} to answer.', 'note': P.W['note'] if n else P.W['nothing'],
-            'layout': {'kind': 'pictures', 'help': P.W['help'], 'coming': rows, 'words': {**page_words(), 'pictures': P.PAGE}}}
+    things = [i for i in six if i['kind'] != 'component']   # a component is approved by the check: never a line
+    done = [{'name': i['name'], 'kind_words': P.W[P.KIND_WORDS[i['kind']]], 'state': 'answered', 'note': P.W['answered_note']} for i in things if i['state'] == P.STATE['answered']]
+    return _counted(ctx['session'], {**base, 'step': P.W['step'], 'open': bool(n), 'lines': lines, 'say': P.say(lines, rows),
+                                     'summary': P.W['summary'].format(n=n, c=len(rows)) if rows else f'{n} to answer.', 'note': P.W['note'] if n else P.W['nothing'],
+                                     'layout': {'kind': 'pictures', 'help': P.W['help'], 'coming': rows, **({'recorded': done} if done else {}),   # fix set (f): answered earlier, shown apart as recorded
+                                                'words': {**page_words(), 'pictures': P.PAGE}}},
+                    things, P.W['count'], (P.STATE['answered'], P.STATE['failed']))
 
 
 def _pictures_answer(ctx, a, choice, words):

@@ -17,14 +17,28 @@ import socket
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 
 REPUBLISH = ('The page at this link was published by an older tool and cannot draw these lines: publish it again to the same link first (Artifact tool: `file_path` the '
-             '`page_file`, `url` the link, `capabilities` again, exactly as given), then `vw visuals page --url "<the link>"`. ')
-PIC_BATCH, PIC_BATCH_BYTES, ZOOM_UPLOAD = 40, 900_000, 25   # design/210: under the page's limits (50 writes and 1 MiB a batch; 25 files an upload)
+             '`page_file`, `url` the link, `capabilities` again, exactly as given), then `vw visuals page --url "<the link>"`. If the publish fails, or its answer names '
+             'another link, stop: tell the operator that the page is not available and ask this step in the chat (`vw visuals next`); never a new page. ')
+# Fix set (SK, 20 Nov 2026): the page is never empty, and its link is given only when it is filled.
+REPUBLISH_NOW = ('The page of this run was published by an older tool: publish it again now, to the same link, while things are still being made, so the operator never waits '
+                 'for it (Artifact tool: `republish_now` holds `file_path` as `page_file`, the `url`{caps}), then `vw visuals page --url "<the link>"`. '
+                 'If the publish fails, or its answer names another link, stop and say so in the chat: never a new page. ')
+PAGE_OTHER_LINK = ('This run\'s page is at {url}, and the publish went to another link: a new page is empty, and the link the operator holds would no longer be the page that '
+                   'is filled. Nothing was changed. Publish again with `url` {url}; if that fails, stop: tell the operator that the page is not available and ask this step in '
+                   'the chat (`vw visuals next`). Only when the operator asks for a new page: `vw visuals page --url "<the new link>" --new-page`.')
+PAGE_UNCONFIRMED = ('The round of "{step}" ({lines} line(s)) was handed out and never confirmed on the page{large}: its pictures or the round itself did not arrive, or the '
+                    'call was stopped. Tell the operator so. {way}')
+AFTER_ROUND = ('Then read the round back from the page: ArtifactData, action "get", `url` the page\'s link, collection "rounds", doc_id `round`, out_dir `answers_dir`; '
+               'then run `vw visuals page --shown`: it checks that the round is on the page and prints the link for the operator. Until then give no link: say one progress line.')
+SHOWN_MISSING = ('The round {round} was not read back from the page (no file {file}): write it (step 3 of `how`), read it back (`after_round`), then run `vw visuals page --shown` '
+                 'again. If the page cannot be written, tell the operator that the page is not available and ask this step in the chat (`vw visuals next`). The link was not given.')
+PIC_BATCH, PIC_BATCH_BYTES, ZOOM_UPLOAD = 40, 900_000, 25  # design/210: under the page's limits (50 writes and 1 MiB a batch; 25 files an upload)
 PAGE_PATHS, PAGE_WAIT = ('/visuals/page', '/visuals/page/record'), 300   # design/210 review: the page calls may make both sizes of many pictures, so they wait this long (seconds)
 PAGE_SLOW = 'The page is still preparing its pictures on the server. Run `vw visuals page` again in a minute: nothing is lost.'
 
@@ -1836,6 +1850,35 @@ def _zoom_uploads(folder, sent):
     return [paths[i:i + ZOOM_UPLOAD] for i in range(0, len(paths), ZOOM_UPLOAD)]
 
 
+def _page_text(folder, name):
+    f = folder / name
+    return f.read_text(encoding='utf-8').strip() if f.is_file() else ''
+
+
+def republish_now(ws):
+    """Fix set (c): ({'republish_now': what to publish again}, the sentence) when this run's page was published by another version of the tool,
+    said at `vw visuals next`, at the status and at the line of counts, long before the page is wanted; ({}, '') otherwise."""
+    folder = ws / 'work' / 'page'
+    link = _page_text(folder, 'url.txt')
+    if not link or _page_text(folder, 'page-version.txt') == plugin_version():
+        return {}, ''
+    caps = load_json(folder / 'capabilities.json', None)   # kept from the last page answer; a folder from before has none: the page keeps its own
+    info = {'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'), 'url': link, **({'capabilities': caps} if isinstance(caps, dict) else {})}
+    return {'republish_now': info}, REPUBLISH_NOW.format(caps=' and the `capabilities`, exactly as given' if 'capabilities' in info else '; leave `capabilities` out, the page keeps its own')
+
+
+def page_unconfirmed(ws, way):
+    """Fix set (e): ({'page_unconfirmed': …}, the sentence) when a round with lines to answer was handed out and `vw visuals page --shown` never
+    confirmed it on the page (an upload failed, the call was stopped); `way` is what to do now."""
+    folder = ws / 'work' / 'page'
+    h = load_json(folder / 'handed.json', {})
+    if not isinstance(h, dict) or not h.get('round') or h['round'] == _page_text(folder, 'shown.txt'):
+        return {}, ''
+    large = sum(len(u) for u in _zoom_uploads(folder, _pictures_sent(folder)))
+    info = {'round': h['round'], 'step': str(h.get('step') or ''), 'lines': int(h.get('waiting') or 0), 'large_not_uploaded': large}
+    return {'page_unconfirmed': info}, PAGE_UNCONFIRMED.format(step=info['step'], lines=info['lines'], large=f'; {large} large files were not uploaded' if large else '', way=way) + ' '
+
+
 def page_pictures(m, folder, pictures, videos=None):
     """design/210: the pictures of a round, for the page. Each picture not yet in the run folder is fetched in its two sizes: the small one
     becomes a database document `pics/<code>.json` ({"code", "data"}, the JPEG as a data link), the large one a file `zoom/<code>.jpg`. Returns
@@ -2445,7 +2488,9 @@ def cmd_visuals(a):
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
         out = write(base + '/chat/next', {'one': bool(a.one)})
-        emit(out, 0, chat_line(out) + (' ' + out['then'] if out.get('then') and not out.get('item') else ''))   # design/211: a v2 round that waits for the assistant (the looks, a rewrite): the server's sentence
+        said = chat_line(out) + (' ' + out['then'] if out.get('then') and not out.get('item') else '')   # design/211: a v2 round that waits for the assistant (the looks, a rewrite): the server's sentence
+        early, lost = republish_now(ws), page_unconfirmed(ws, 'Ask this step in the chat: what follows is its next decision.')   # fix set (c), (e)
+        emit({**out, **early[0], **lost[0]}, 0, lost[1] + early[1] + said)
     if a.what == 'card':   # design/190: every answer of one card in one call. The answers file is the copy kept here until the server has them; then it is marked sent
         given = Path(a.file or '')
         path = given if given.is_absolute() else ws / given
@@ -2472,6 +2517,8 @@ def cmd_visuals(a):
         folder.mkdir(parents=True, exist_ok=True)
         url_file, current, made_by = folder / 'url.txt', folder / 'current.txt', folder / 'page-version.txt'   # design/206: which tool's page file is published at the link
         if getattr(a, 'url', None) and url_file.is_file() and url_file.read_text(encoding='utf-8').strip() != a.url.strip():
+            if not getattr(a, 'new_page', False):   # fix set (d): a publish that did not go to the run's own link is never taken silently as a new page
+                emit({'action': 'refused', 'message': PAGE_OTHER_LINK.format(url=url_file.read_text(encoding='utf-8').strip())}, 2)
             (folder / 'pictures.json').unlink(missing_ok=True)   # design/210: a page published anew holds no picture yet: every picture is offered again
         elif getattr(a, 'pictures_again', False):   # design/210 review: the same page: every picture is offered again, under new document names (the page refuses a second write to a document that exists)
             (folder / 'pictures.json').write_text(json.dumps({'again': _pictures_sent(folder)['again'] + 1, 'thumbs': [], 'zoom': {}}, indent=1) + '\n', encoding='utf-8')
@@ -2485,15 +2532,32 @@ def cmd_visuals(a):
             design/216 (B2): with many pictures still to fetch, the server's sentence `preparing` is said first and nothing is fetched or written
             until `--fetch`."""
             todo = [c for c in _pic_codes(page.get('pictures')) if not (folder / 'pics' / f'{c}.json').is_file() or not (folder / 'zoom' / f'{c}.jpg').is_file()]
+            now = datetime.now(timezone.utc)
+            if isinstance(page.get('capabilities'), dict):   # fix set (c): kept, so a page of an older tool can be published again before the page is wanted
+                (folder / 'capabilities.json').write_text(json.dumps(page['capabilities']) + '\n', encoding='utf-8')
+
+            def loading(at):
+                """Fix set (a): the note the page shows while its pictures are sent, as one ready write: a document of `rounds` older than the
+                round, which takes its place. Not on `--fetch`: it was handed with the sentence `preparing`."""
+                L = page.get('loading')
+                if not isinstance(L, dict) or getattr(a, 'fetch', False):
+                    return {}
+                lid = 'loading-' + at.strftime('%Y%m%d-%H%M%S-%f')
+                doc = {'round': lid, 'at': at.isoformat(), 'run': m['code'], 'step': page['step'], 'open': False, 'summary': '', 'note': str(L.get('note') or ''), 'lines': [],
+                       'loading': {'minutes': L.get('minutes'), 'expected': L.get('expected'), 'late': str(L.get('late') or '')}}
+                (folder / f'{lid}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+                return {'loading_write': [{'op': 'set', 'collection': 'rounds', 'doc_id': lid, 'file_path': str(folder / f'{lid}.json')}]}
             if len(todo) >= PREPARE_MIN and page.get('preparing') and not getattr(a, 'fetch', False):
-                emit({'preparing': page['preparing'], 'pictures_to_fetch': len(todo), **{k: v for k, v in (more or {}).items() if k != 'then'}}, 0,
-                     said + f'Say this to the operator first, as it is: "{page["preparing"]}" Then run `vw visuals page --fetch`: it fetches the pictures and gives the round. '
-                            'Nothing was written to the page yet.')
+                first = loading(now)
+                emit({'preparing': page['preparing'], 'pictures_to_fetch': len(todo), **first, **{k: v for k, v in (more or {}).items() if k != 'then'}}, 0,
+                     said + f'Say this to the operator first, as it is: "{page["preparing"]}" '
+                     + ('Then, when the page has a link, send `loading_write` to it (ArtifactData, action "batch", `writes` it, unchanged): the page then says its pictures are being loaded. ' if first else '')
+                     + 'Then run `vw visuals page --fetch`: it fetches the pictures and gives the round. Nothing was written to the page yet.')
             rnd = page['round']
             suffix = _doc_suffix(_pictures_sent(folder))
             vcodes = [str(v.get('code')) for v in page.get('videos') or [] if re.fullmatch(r'v[0-9a-f]{12}', str(v.get('code') or ''))]   # design/217: a drawing's video page copy, offered again with them
             names = {c: c + suffix for c in _pic_codes(page.get('pictures')) + vcodes} if suffix else {}   # design/210 review: pictures offered again are in other documents; the round says which
-            doc = {'round': rnd, 'at': datetime.now(timezone.utc).isoformat(), 'run': m['code'], 'step': page['step'], 'open': page['open'], 'summary': page.get('summary') or '',
+            doc = {'round': rnd, 'at': now.isoformat(), 'run': m['code'], 'step': page['step'], 'open': page['open'], 'summary': page.get('summary') or '',
                    'note': page.get('note') or '', 'lines': page['lines'], **({'pic_docs': names, 'zoom_docs': names} if names else {}),
                    **({'layout': page['layout']} if isinstance(page.get('layout'), dict) else {})}   # design/212: how the page lays this step out (step 1 of the references: one thing at a time beside the list)
             (folder / f'{rnd}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
@@ -2503,6 +2567,16 @@ def cmd_visuals(a):
             old = bool(link) and (made_by.read_text(encoding='utf-8').strip() if made_by.is_file() else '') != plugin_version()   # published from an older page file: it cannot draw today's lines
             more = {**(more or {}), **({'republish': True} if old else {}), **page_pictures(m, folder, page.get('pictures'), page.get('videos')),   # design/210: the round's pictures, fetched and ready to send
                     **({'pictures_failed': page['pictures_failed']} if page.get('pictures_failed') else {})}
+            if more.get('picture_batches') or more.get('zoom_uploads'):   # fix set (a): something is sent before the round: the page says so meanwhile
+                more.update(loading(now - timedelta(seconds=1)))
+            if page.get('not_on_page'):   # fix set (f): the server names a thing that is made and has no line
+                more['not_on_page'] = page['not_on_page']
+            if waiting:   # fix set (b), (e): the link is printed by `--shown` once this round is read back from the page; until then the round counts as not confirmed
+                (folder / 'handed.json').write_text(json.dumps({'round': rnd, 'at': now.isoformat(), 'step': page['step'], 'lines': len(page['lines']), 'waiting': waiting,
+                                                               'say': page.get('say') or ''}, ensure_ascii=False) + '\n', encoding='utf-8')
+                more['after_round'] = AFTER_ROUND
+            else:
+                (folder / 'handed.json').unlink(missing_ok=True)
             return {'url': link, 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
                     'title': page['title'], 'capabilities': page['capabilities'], 'round': rnd, 'round_file': str(folder / f'{rnd}.json'),
                     'answers_collection': f'rounds/{rnd}/answers', 'answers_dir': str(folder / 'answers'), 'waiting': waiting, 'note': doc['note'], 'how': page['how'],
@@ -2511,7 +2585,9 @@ def cmd_visuals(a):
         def pictures_line(info):
             """design/210: what the assistant sends before the round, in words."""
             n, z = sum(len(b) for b in info.get('picture_batches') or []), sum(len(u) for u in info.get('zoom_uploads') or [])
-            return ((f"Pictures first (step 2 of `how`): {n} small in {len(info.get('picture_batches') or [])} batch(es), {z} large in {len(info.get('zoom_uploads') or [])} upload(s). " if n or z else '')
+            return (('Before the pictures, send `loading_write` first (ArtifactData, action "batch", `writes` it, unchanged): the page then says its pictures are being loaded. ' if info.get('loading_write') else '')
+                    + (info['not_on_page'] + ' ' if info.get('not_on_page') else '')
+                    + (f"Pictures first (step 2 of `how`): {n} small in {len(info.get('picture_batches') or [])} batch(es), {z} large in {len(info.get('zoom_uploads') or [])} upload(s). " if n or z else '')
                     + (f"These pictures could not be prepared, so their lines cannot be answered on the page: {'; '.join(info['pictures_failed'])}; tell the operator, and ask those lines "
                        'in the chat (`vw visuals next`). ' if info.get('pictures_failed') else ''))
 
@@ -2528,6 +2604,25 @@ def cmd_visuals(a):
                     'again with the next round' if out['not_uploaded'] else '')
                  + ('. Send the batch in `picture_batches` (ArtifactData, action "batch", `writes` the batch, unchanged), then' if out.get('picture_batches') else '. Now')
                  + f" write the round to the page (step 3 of `how`): {folder / f'{rnd}.json'}.")
+        if getattr(a, 'shown', False):   # fix set (b): the link is given here and nowhere earlier: once the round was written to the page and read back from it
+            h = load_json(folder / 'handed.json', {})
+            if not isinstance(h, dict) or not h.get('round'):
+                emit({'action': 'refused', 'message': 'No round waits for its link: run `vw visuals page` first.'}, 2)
+            back = folder / 'answers' / 'rounds' / f"{h['round']}.json"   # where ArtifactData's get saved the round's document (`after_round`)
+            d = load_json(back, {}) if back.is_file() else {}
+            d = d.get('data') if isinstance(d, dict) and isinstance(d.get('data'), dict) else d
+            if not isinstance(d, dict) or d.get('round') != h['round']:
+                emit({'action': 'refused', 'message': SHOWN_MISSING.format(round=h['round'], file=back)}, 2)
+            got = len(d.get('lines') or [])
+            if got != h.get('lines'):
+                emit({'action': 'refused', 'message': f"The round on the page holds {got} lines, not {h.get('lines')}: write it again from its file (step 3 of `how`), read it back, then "
+                                                      '`vw visuals page --shown` again. If that fails too, tell the operator and ask this step in the chat (`vw visuals next`). The link was not given.'}, 2)
+            link = _page_text(folder, 'url.txt')
+            if not link:
+                emit({'action': 'refused', 'message': 'This run has no page link yet: publish the page and run `vw visuals page --url "<the link>"` first (step 1 of `how`).'}, 2)
+            (folder / 'shown.txt').write_text(h['round'] + '\n', encoding='utf-8')
+            emit({'shown': True, 'url': link, 'round': h['round'], 'say': h.get('say') or ''}, 0,
+                 f"The round is on the page ({got} lines). Now say `say` to the operator, exactly as it is, then this link: {link}")
         if getattr(a, 'record', False):
             rnd = current.read_text(encoding='utf-8').strip() if current.is_file() else ''
             if not rnd:
@@ -2562,13 +2657,19 @@ def cmd_visuals(a):
             if out['page'].get('closed'):   # design/221 row 18: step 6 is still being made: nothing is written to the page
                 emit({k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out}, 0, done + out['then'] + ' ' + out['page']['how'])
             info = hand(out['page'], {k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out}, said=done + (out.get('then') or '') + ' ')
-            emit(info, 0, done + f"{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
+            emit(info, 0, done + f"{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}."
+                          + (' Then do `after_round`: the link is given again only by `vw visuals page --shown`.' if info.get('after_round') else ''))
         out = write(base + '/page', {'one': False}, wait=PAGE_WAIT)
         if out.get('closed'):   # design/221 row 18: the answer is the line of counts, not a page; nothing is published or written
-            emit({'closed': True, 'say': out.get('say') or '', 'then': out['then']}, 0, out['then'] + ' ' + out['how'])
-        info = hand(out,{'then': out['then']} if out.get('then') else None)   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
-        emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} " + (out['then'] + ' ' if out.get('then') else '')
-                      + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ")
+            if isinstance(out.get('capabilities'), dict):
+                (folder / 'capabilities.json').write_text(json.dumps(out['capabilities']) + '\n', encoding='utf-8')
+            early = republish_now(ws)   # fix set (c): while things are still being made, long before the page is wanted
+            emit({'closed': True, 'say': out.get('say') or '', 'then': out['then'], **early[0]}, 0, early[1] + out['then'] + ' ' + out['how'])
+        lost = page_unconfirmed(ws, 'This call gives the round anew: fill the page as `how` says; if it cannot be filled, ask this step in the chat (`vw visuals next`).')   # fix set (e)
+        info = hand(out, {**lost[0], **({'then': out['then']} if out.get('then') else {})} or None, said=lost[1])   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
+        emit(info, 0, lost[1] + f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} " + (out['then'] + ' ' if out.get('then') else '')
+                      + ('Publish the page first (step 1 of `how`). ' if not info['url'] else 'The page has its link (`url`): it is for your tool calls only; the operator gets it from `vw visuals page --shown`, '
+                                                                                             'once the round is on the page. ' if info.get('after_round') else 'The page has its link (`url`). ')
                       + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"Round {info['round']}: {info['round_file']}. " + out['how'])
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
         if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
@@ -2976,7 +3077,8 @@ def cmd_visuals(a):
                         + f"ask {'the others' if paged else 'them'} one at a time with `vw visuals next` (design/188), never from this list")) if wt else ''
         due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
         six = (f"; step 6 (say this to the operator each time it changes, as it is, and ask nothing with it): {st['step6']}" if st.get('step6') else '')   # design/221 row 18
-        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + six + '; one line per job above, the whole status in work/visuals/status.json')
+        early = republish_now(ws)   # fix set (c): said while things are being made, long before the page is wanted
+        emit({**_short_status(st, a.shot, a.gap), **early[0]}, 0, early[1] + 'Visuals: ' + line + round_line + due_line + waiting_line + six + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)
@@ -3924,6 +4026,8 @@ def build_parser():
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
     s.add_argument('--things', nargs='?', const=True, default=None, help="round: with no file, what to read to name the things shown in each place; with a file, rows {element_id, things, reason} (design/216b)")
     s.add_argument('--fetch', action='store_true', help='page: fetch the pictures now, after saying the sentence `preparing` (design/216)')
+    s.add_argument('--shown', action='store_true', help='page: the round was written to the page and read back: check it and print the link for the operator (fix set, 20 Nov 2026)')
+    s.add_argument('--new-page', dest='new_page', action='store_true', help='page --url: the link is a NEW page, on the operator\'s word (a link other than the run\'s own is refused without it)')
     s.add_argument('--every-picture', dest='every_picture', action='store_true', help='round --answer with --verdict correct: the words apply to every picture of this thing (design/216; the page\'s tick)')
     s.add_argument('--pictures-again', dest='pictures_again', action='store_true', help='page: offer every picture of the round again, under new document names: for a batch that failed or a picture that stays grey on the page (design/210)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')

@@ -55,6 +55,7 @@ W = {
     'summary': '{n} to answer.', 'note': 'Answer each take, then say done in the chat.', 'nothing': 'Nothing waits for you now.',
     'failed': 'It could not be made. Claude tells you in the chat what happens to it.',
     'page_later': 'The page opens when every take is made and checked.',
+    'count': '{n} of {m} AI video shots are on this page.',   # fix set (f), SK 20 Nov 2026
     'page_now': ('Every take is made and checked: the operator answers them on the page, in one visit: run `vw visuals page` instead; ask here only where the page '
                  'cannot be shown. '),
     'help': ['Each shot on the left has one take to judge. Play it, then select it for the film, ask for another with your words, or reject it. Answer in any order, then say done in the chat.',

@@ -62,7 +62,7 @@ def test_a_page_published_at_a_new_link_starts_from_the_code_again(harness, monk
     run(args(what='page', url='https://claude.ai/artifact/abc', record=False), capsys)
     run(args(what='page', record=False), capsys)
     assert ids(run(args(what='page', record=False, pictures_again=True), capsys)[1]) == [code(1) + '-1']
-    run(args(what='page', url='https://claude.ai/artifact/new', record=False), capsys)
+    run(args(what='page', url='https://claude.ai/artifact/new', record=False, new_page=True), capsys)   # fix set (20 Nov): a new page only with --new-page
     rc, out, err = run(args(what='page', record=False), capsys)
     assert ids(out) == [code(1)] and 'pic_docs' not in round_doc(out)
 

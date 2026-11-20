@@ -455,7 +455,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
 const MAX=2000, OWN_MAX=15*1024*1024, OWN_TYPES=['image/png','image/jpeg','image/webp'];   // design/210 part 2: what the server takes as the operator's own picture
-let db=null, assets=null, round=null, answers={}, stopAnswers=null, ready=false;
+let db=null, assets=null, round=null, answers={}, stopAnswers=null, ready=false, lateTimer=0;
 const editing={}, drafts={}, nodes={}, folded={};   // per line: the choice being typed for, its text (and, under 'c:' and 'p:' with the line, its comment and its words of permission), and the block on screen with what it was drawn from
 const comment=line=>String(drafts['c:'+line.line]||'').trim().slice(0,MAX);
 
@@ -755,11 +755,21 @@ function heading(name,g,shut){   // design/211: the heading of a group of lines;
 function draw(force){
   const list=$('list');
   if(!ready){return;}
+  clearTimeout(lateTimer);   // fix set: the loading note's timer never redraws a round that has arrived
   const kind=round&&round.layout&&round.layout.kind, things=kind==='things', sets=kind==='sets'||kind==='pictures'||kind==='takes';   // design/212: step 1 of the references has its own layout; design/216: step 2, the sets, the trial SK corrected; design/217: step 6 in the sets screen's frame
   $('things').hidden=!things; $('sets').hidden=!sets; $('wrap').hidden=things||sets;
   if(things){ tDraw(); return; }
   if(sets){ sDraw(); return; }
   if(!round){ list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); list.appendChild(el('div','state','Nothing to decide yet. The assistant writes the lines here when a step is ready.')); $('dots').textContent=''; $('msg').textContent='Nothing to decide yet'; return; }
+  if(round.loading){   // fix set (SK, 20 Nov 2026): a step is being loaded: the page says so, in the server's words, and fills itself when the round arrives (it listens to `rounds`); after twice the minutes stated it says to ask the assistant
+    const L=round.loading, due=Date.parse(round.at)+2*(Number(L.minutes)||1)*60000, late=!(Date.now()<due);
+    list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); $('dots').textContent=''; $('summary').textContent='';
+    $('step').textContent='VideoWizard · '+(round.run||'')+' · '+(round.step||''); $('title').textContent=(round.step||'Your')+': your decisions';
+    const box=el('div','state',round.note||'Loading…'); box.id='loading'; list.appendChild(box);
+    if(late&&L.late){ const more=el('div','state',L.late); more.id='loadinglate'; list.appendChild(more); }
+    $('msg').textContent=late&&L.late?L.late:'Loading…';
+    if(!late) lateTimer=setTimeout(()=>draw(true),Math.min(due-Date.now()+250,2147483647));
+    return; }
   $('step').textContent='VideoWizard · '+(round.run||'')+' · '+(round.step||''); $('title').textContent=(round.step||'Your')+': your decisions'; $('summary').textContent=round.summary||'';
   const lines=round.lines||[], seen={};
   if(list.firstChild&&list.firstChild.className==='state') list.textContent='';
@@ -1326,14 +1336,16 @@ function sRail(){
     return mk('li',{},mk('button',{class:'srow'+(d?(ag?' against':' done'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},
       mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},[l.kind_words,l.film_at].filter(Boolean).join(' · '))),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
   const coming=(PIC()||TK())&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
-  if(coming.length){ const o=!!S.fold.coming;
-    kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':'coming',on:{click:()=>{ S.fold.coming=!o; sRail(); }}},mk('span',{},w.coming),String(coming.length)));
-    if(o) kids.push(mk('ul',{class:'pcoming',id:'pcoming'},coming.map(c=>mk('li',{'data-state':c.state},c.name,mk('small',{},[c.kind_words,c.note].filter(Boolean).join(' · ')))))); }
+  const earlier=PIC()&&(round.layout||{}).recorded||[];   // fix set (20 Nov 2026): what was answered earlier, in the chat: shown as recorded, in a folded row of its own
+  [['coming',w.coming,coming],['recorded',w.recorded,earlier]].forEach(([g,title,rows])=>{ if(!rows.length) return; const o=!!S.fold[g];
+    kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':g,on:{click:()=>{ S.fold[g]=!o; sRail(); }}},mk('span',{},title||''),String(rows.length)));
+    if(o) kids.push(mk('ul',{class:'pcoming',id:'p'+g},rows.map(c=>mk('li',{'data-state':c.state},c.name,mk('small',{},[c.kind_words,c.note].filter(Boolean).join(' · ')))))); });
   const covered=(sRest()||{}).covers||[];
   (TK()?[]:[['settled',w.settled,sLines().filter(l=>l.case==='settled')],['busy',w.busy,sLines().filter(l=>l.state!=='open'&&l.case!=='settled'&&covered.indexOf(l.key)<0)]]).forEach(([g,title,rows])=>{
     if(!rows.length) return; const o=!!S.fold[g];
     kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':g,on:{click:()=>{ S.fold[g]=!o; sRail(); }}},mk('span',{},title),String(rows.length)));
     if(o) kids.push(mk('ul',{class:'squiet'},rows.map(l=>mk('li',{},mk('button',{class:'srow',type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},mk('span',{class:'snm'},l.name||l.title)))))); });
+  if((PIC()||TK())&&(round.layout||{}).count) kids.push(mk('p',{class:'pkw',id:'scount'},round.layout.count));   // fix set: how many of the step's things are on this page ("19 of 19 …"), the server's sentence
   $('srail').replaceChildren(...kids); }
 function sCount(){ const w=SW(), it=sItems(), n=it.filter(sDone).length;   // A11: the one count
   if((PIC()||TK())&&!it.length) return $('sfoot').replaceChildren(mk('span',{},w.nothing));
