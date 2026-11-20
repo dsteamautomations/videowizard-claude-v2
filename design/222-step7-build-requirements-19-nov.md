@@ -2,7 +2,7 @@
 
 Revision 3, 19 Nov 2026 (evening): the frames test is done and SK kept Claude's check ("the claude checks can be retained"); SK found the trial page too cluttered and the trial is redone with less in view (section 1a). Before that, revision 2: revised for SK's answers to the twelve decisions (relayed from the builder thread; a relay of his click answers, not yet his word to build).
 Nothing is built. No code is written before SK approves this list.
-Read at commit e86344d. The study is in `step7-what-to-show.md` (same folder).
+Read at commit e86344d. The study is in `222-step7-what-to-show-19-nov.md` (same folder).
 
 **What changed in revision 2:** section 7 (the answers), new section 8 ("Make another" on the page), new section 9 (Claude checks each take from frames), new section 10 (where the answers conflict with other rules of SK), more edge cases (E21 to E32), more failure modes (F8 to F13), more tests, a larger size. The trial page is updated at the same link.
 
@@ -289,7 +289,7 @@ Where it is said (the redone trial, section 1a): in view the check is one short 
 - **The cheap test, before the build is released (no money, about an hour):** take the 17 takes of VW-12; make the frames as 9.1 says; a helper that has not seen Gemini's results judges each take against the same lines Gemini had that day; then compare, line by line: (a) of Gemini's 19 failed lines, how many Claude also fails; (b) what Claude fails that Gemini passed; (c) for the one take SK rejected (shot 1, take 1, which Gemini passed on every line), whether Claude finds a fault. SK looks at the disagreements only (I expect 10 to 20 lines) on one page. If Claude misses more than a few of (a), the half second becomes a quarter second, or the server adds one measured line for a sudden change between neighbouring frames. Limit of this test: VW-12's takes are of the older way; the five lines of a guide take get their first real test on the first new film.
 
 ### 9.7a The test's result (19 Nov) and SK's decision
-The test was run on VW-12's 17 takes: `step7-take-check-test-result.md`, page https://claude.ai/artifact/WaL36EQAXtzNPrVE5JXxft. 197 lines: 150 both passed, 8 both failed, 6 only Gemini failed, 33 only Claude failed; Claude found a jump to another view in three takes that Gemini passed (one is the take SK rejected); Claude missed three things Gemini saw. SK, having seen the page: "the claude checks can be retained." So: the half second, the sheet at four a second required, the measured line "one continuous shot", and the two rules of 9.3a.
+The test was run on VW-12's 17 takes: `222-step7-take-check-test-result-19-nov.md`, page https://claude.ai/artifact/WaL36EQAXtzNPrVE5JXxft. 197 lines: 150 both passed, 8 both failed, 6 only Gemini failed, 33 only Claude failed; Claude found a jump to another view in three takes that Gemini passed (one is the take SK rejected); Claude missed three things Gemini saw. SK, having seen the page: "the claude checks can be retained." So: the half second, the sheet at four a second required, the measured line "one continuous shot", and the two rules of 9.3a.
 Also to fix in the build (found by reading, never run): `guide_worker.take_checks` reads the frame rate with `float()` on the text "24/1"; it must be read as a fraction, or the sheet is never made for a guide take.
 
 ### 9.8 The gap: a take shown before its check is stored

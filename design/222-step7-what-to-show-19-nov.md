@@ -1,10 +1,10 @@
 # Step 7, AI video: what to show and what to ask
 
 19 Nov 2026. A study and a trial only.
-Note of the same evening: SK answered the twelve decisions. Three change what this file describes: "Make another" is on the page (D4), Claude checks each take from frames in place of Gemini (D5), a recorded answer is shown without buttons (D8). The current statement is `step7-build-requirements.md`, revision 2, sections 7 to 10.
+Note of the same evening: SK answered the twelve decisions. Three change what this file describes: "Make another" is on the page (D4), Claude checks each take from frames in place of Gemini (D5), a recorded answer is shown without buttons (D8). The current statement is `222-step7-build-requirements-19-nov.md`, revision 2, sections 7 to 10.
  Nothing in the application, the database or the repository was changed.
 Read at commit e86344d (live server 0.117.0 plus a hotfix).
-Trial page (private): see the link in `step7-build-requirements.md`, section 1.
+Trial page (private): see the link in `222-step7-build-requirements-19-nov.md`, section 1.
 
 ## 1. Two findings before anything else
 
@@ -43,7 +43,7 @@ Not operator's things, and not shown: the scene description, the guide video's r
 ## 4. The take on the page (item 6), in detail
 
 ### What is in view (redone on 19 Nov evening, after SK found the first trial too cluttered)
-The current statement is section 1a of `step7-build-requirements.md`. In short: in view are only the shot's name and the words under it, the take large, the check as one short line ("Check passed", or the first fault), the buttons Select, Make another, Reject, and two links. Two takes are two tabs. The film order ("See it in the film") and everything else ("Details") open over the page on one click. The left list is a name and a dot. The check is Claude's, from frames, with one line measured by the server ("one continuous shot").
+The current statement is section 1a of `222-step7-build-requirements-19-nov.md`. In short: in view are only the shot's name and the words under it, the take large, the check as one short line ("Check passed", or the first fault), the buttons Select, Make another, Reject, and two links. Two takes are two tabs. The film order ("See it in the film") and everything else ("Details") open over the page on one click. The left list is a name and a dot. The check is Claude's, from frames, with one line measured by the server ("one continuous shot").
 
 What follows in this section is the first trial's layout, kept for the record.
 

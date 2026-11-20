@@ -123,9 +123,7 @@ def test_slides_prints_the_review_page_link(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'slides': [{'slide': '1', 'type': 'option', 'needs_answer': True, 'answer': None}], 'answered': 0, 'of': 1, 'waiting': ['1']})
     code, out, err = run(args(what='slides'), capsys)
     assert code == 0 and out['review_page_url'] == 'https://x.example/runs/VW-9/review' and 'Review page: https://x.example/runs/VW-9/review' in err
-    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'slides': [], 'answered': 2, 'of': 2, 'waiting': [], 'both_kept': [{'scene': 'Scene 2: Mixing', 'slides': ['1', '2']}]})
-    code, out, err = run(args(what='slides'), capsys)
-    assert code == 0 and 'Both cuts kept: Scene 2: Mixing (#1, #2): reject one' in err   # design/63
+    # release 3, E5: the "Both cuts kept" line of design/63 went with design/127 (the review by scene and shot; `both_kept` is nowhere in the server or the tool); the link above is live
 
 
 def test_next_carries_the_review_page_link_at_the_options_and_master_stages(harness, monkeypatch, capsys):
@@ -141,11 +139,12 @@ def test_next_carries_the_review_page_link_at_the_options_and_master_stages(harn
     with pytest.raises(SystemExit):
         vw.cmd_next(argparse.Namespace(take_over=False))
     assert 'review_page_url' not in json.loads(capsys.readouterr()[0])
-    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'visuals', 'paid': 'openai'})   # design/65: the visuals page
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'visuals', 'paid': 'openai'})   # release 3, E5: design/65's link to the server's visuals page went with design/188 and 207: the visuals stage is answered on the artifact page and in the chat
     with pytest.raises(SystemExit):
         vw.cmd_next(argparse.Namespace(take_over=False))
     out, err = capsys.readouterr()
-    assert json.loads(out)['visuals_page_url'] == 'https://x.example/runs/VW-9/visuals' and 'Visuals page: https://x.example/runs/VW-9/visuals' in err
+    assert 'visuals_page_url' not in json.loads(out) and 'review_page_url' not in json.loads(out) and 'Visuals page:' not in err
+    assert json.loads(out)['visuals_in_chat'] in err and '`vw visuals page`' in err and '`vw visuals next`' in err
 
 
 def test_review_fetch_names_the_page(harness, monkeypatch, capsys, tmp_path):

@@ -2,7 +2,7 @@
 
 19 Nov 2026. Approved by SK in the builder thread ("Yes, build it", 19 Nov, relayed). Built on the branch `step7-page`; not released: no version bump, no deploy.
 
-The approved requirement list, with the trial, SK's answers and the conflicts between them: `design/_work/step7-build-requirements-19-nov.md` (revision 3, sections 1a and 1b are what the page shows). The study: `design/_work/step7-what-to-show-19-nov.md`. The test of Claude's check: `design/_work/step7-take-check-test-result-19-nov.md`. The contract and its frozen fixture: `design/222-contract.md`, `server/unit/d222_takes_round.json`. The trial page and the evidence (videos, frames, screenshots) are outside the repository, in `ux1-mockup/step7-trial/` on the builder PC.
+The approved requirement list, with the trial, SK's answers and the conflicts between them: `design/222-step7-build-requirements-19-nov.md` (revision 3, sections 1a and 1b are what the page shows). The study: `design/222-step7-what-to-show-19-nov.md`. The test of Claude's check: `design/222-step7-take-check-test-result-19-nov.md`. The contract and its frozen fixture: `design/222-contract.md`, `server/unit/d222_takes_round.json`. The trial page and the evidence (videos, frames, screenshots) are outside the repository, in `ux1-mockup/step7-trial/` on the builder PC.
 
 ## The requirement, in short
 

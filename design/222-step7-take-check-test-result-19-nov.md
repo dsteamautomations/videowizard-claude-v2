@@ -62,7 +62,7 @@ So of Gemini's 14 failed lines: 8 found, 1 found under other lines, 2 probably n
 4. **Two small changes to what Claude is asked,** to cut the noise: what the start picture already shows is not a fault of the take (the two light lines); "the surroundings move" is not asked of frames (the guide take's five lines do not have it anyway).
 5. **Not recommended now:** a second checker (Gemini kept beside Claude). It would catch the three misses, and it doubles what the operator must read. Decide after the first film made the new way.
 
-If SK agrees, sections 9.1, 9.3 and 9.4 of `step7-build-requirements.md` get points 3 and 4 (about 40 more lines of code and 4 more tests); nothing else in the approved list changes.
+If SK agrees, sections 9.1, 9.3 and 9.4 of `222-step7-build-requirements-19-nov.md` get points 3 and 4 (about 40 more lines of code and 4 more tests); nothing else in the approved list changes.
 
 ## Found while testing (not fixed, not verified)
 
