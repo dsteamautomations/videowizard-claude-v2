@@ -581,9 +581,11 @@ def process_take(job):
     remote = (job.get('result') or {}).get('provider_id')
     attempted = intent.exists() or remote is not None
     try:
-        provider = provider_factory(snapshot['provider'])
+        saved = json.loads(response_path.read_text(encoding='utf-8')) if response_path.exists() else {}
+        # hotfix (SK, 21 Nov 2026): the key that sent the take is used for every later call of it (`video_providers.Provider.poll` says why)
+        provider = provider_factory(snapshot['provider']) if saved.get('key_index') is None else provider_factory(snapshot['provider'], key_index=saved['key_index'])
         provider.model = snapshot['model']
-        result = json.loads(response_path.read_text(encoding='utf-8'))['result'] if response_path.exists() else None
+        result = saved.get('result')
         if result is not None and not remote:
             remote = provider.identity(result)
         if not remote and not attempted:
@@ -591,7 +593,7 @@ def process_take(job):
             durable(intent, json.dumps({'preparation_id': req['preparation_id'], 'at': datetime.now(timezone.utc).isoformat()}).encode())
             attempted = True
             result = provider.submit(wire, jid)
-            durable(response_path, json.dumps({'preparation_id': req['preparation_id'], 'result': result}).encode())
+            durable(response_path, json.dumps({'preparation_id': req['preparation_id'], 'result': result, 'key_index': getattr(provider, 'key_index', None)}).encode())
             remote = provider.identity(result)
             receipt_key = f"{job['run_id']}/visuals/takes/{jid}.submission.json"
             store.put(receipt_key, response_path.read_bytes(), 'application/json')
@@ -599,7 +601,7 @@ def process_take(job):
             return 'submission_unknown', {'phase': 'submit'}, 'No provider identity is retained for a dispatched submit; recover or resolve, never resubmit automatically.', None, None
         if result is None or provider.state(result) == 'in_progress':
             result = provider.poll(remote)
-            durable(response_path, json.dumps({'preparation_id': req['preparation_id'], 'provider_id': remote, 'result': result}).encode())
+            durable(response_path, json.dumps({'preparation_id': req['preparation_id'], 'provider_id': remote, 'result': result, 'key_index': getattr(provider, 'key_index', None)}).encode())
         state = provider.state(result)
         if state == 'in_progress':
             polls = ((job.get('result') or {}).get('polls') or 0) + 1

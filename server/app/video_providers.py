@@ -76,8 +76,19 @@ def transfer(url,method='GET',data=None,headers=None,limit=MAX_VIDEO):
     finally:connection.close()
 
 
+def pool_keys():
+    from . import keys as _keys
+    return _keys.pool('gemini',settings())
+
+
 class Provider:
-    def __init__(self,name):self.name=name;self.key=configured(name);self.key_index=getattr(configured,'last_index',None)
+    def __init__(self,name,key_index=None):
+        # hotfix (SK, 21 Nov 2026): `key_index`, the key that sent a take: every later call of that take uses it (only that key can read the take).
+        # Without it, or when the pool no longer has that number: the next key of the pool, as before.
+        self.name=name
+        keys=pool_keys() if isinstance(key_index,int) and not isinstance(key_index,bool) else []
+        if keys and 0<=key_index<len(keys):self.key,self.key_index=keys[key_index],key_index
+        else:self.key=configured(name);self.key_index=getattr(configured,'last_index',None)
 
     def request(self,method,url,body=None,identity=None,paid=False):
         headers={'x-goog-api-key':self.key,'Api-Revision':'2026-05-20'}
@@ -87,7 +98,7 @@ class Provider:
                     if self.key_index is not None and response.status_code in (429,401,403):   # design/114: the key cools; the next attempt takes another
                         from . import keys as _keys;_keys.cool('gemini',self.key_index,_keys.reason_of(response.status_code))
                     code='VIDEO_REJECTED' if paid and 400<=response.status_code<500 and response.status_code not in (408,429) else 'VIDEO_UNKNOWN' if paid else 'VIDEO_PROVIDER'
-                    raise Problem(502,code,'Provider request was not accepted or could not be confirmed. Review this saved attempt; no automatic resubmission.')
+                    raise Problem(502,code,'Provider request was not accepted or could not be confirmed. Review this saved attempt; no automatic resubmission.',http_status=response.status_code)
                 raw=bytearray()
                 for chunk in response.iter_bytes():
                     raw.extend(chunk)
@@ -148,8 +159,22 @@ class Provider:
         return value
 
     def poll(self,identity):
+        """The take's state. hotfix (SK, 21 Nov 2026): only the key that sent a take can read it; another key answers 404. On a 404 the take is
+        looked for once with each other key of the pool (free requests), and the key that finds it is kept; when none does, the first error stands.
+        (Until then every call took the next key of the pool: a finished take waited up to two hours for the right one to come up.)"""
         self.identity({'id':identity})
-        return self.request('GET',GOOGLE+'/'+identity)
+        try:return self.request('GET',GOOGLE+'/'+identity)
+        except Problem as first:
+            if first.extra.get('http_status')!=404:raise
+            mine=(self.key,self.key_index)
+            for index,key in enumerate(pool_keys()):
+                if key==mine[0]:continue
+                self.key,self.key_index=key,index
+                try:return self.request('GET',GOOGLE+'/'+identity)
+                except Problem as exc:
+                    if exc.extra.get('http_status')!=404:break
+            self.key,self.key_index=mine
+            raise first
 
     def cancel(self,identity):
         self.identity({'id':identity})
