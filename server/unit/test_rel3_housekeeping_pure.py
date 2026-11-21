@@ -34,4 +34,5 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
         assert n in rows, n
     assert 'GUIDE_VIDEO_LOOK' in rows['310'] and 'layout B' in rows['310']   # layout B (20 Nov) is row 310
     assert "stripes on for every person in flat mode" in rows['311'] and 'Marks only where facing matters' in rows['312']   # layout B, second part (20 Nov)
-    assert '313' not in rows
+    assert 'max_prompt' not in rows['313'] and 'B1 shorten' in rows['313'] and 'HTTP 400' in rows['313']   # the still's length hotfix (21 Nov)
+    assert '314' not in rows

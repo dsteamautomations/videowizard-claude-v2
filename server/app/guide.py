@@ -206,12 +206,21 @@ def _people_of(plan, shot):
 
 # ---------- step B: the scene, the checks before spend, the check frames ----------
 
+TOO_LONG_PROMPT = ("The still's request would be {n:,} characters; OpenAI takes at most {max:,}. The parts: {parts}, the server's fixed lines {rest:,}. "
+                   'Nothing was ordered or paid. Shorten the largest part (your words in the still\'s file, or the scene: fewer, larger background pieces) '
+                   'and send it again (`vw guide still --shot {shot} --file …`).')   # hotfix 21 Nov 2026
+
+
+def _things(store, session):
+    """The approved drawing sets of the film's things: {element id: its drawing set}."""
+    return {eid: VS.load_json(store, r['key']) for eid, r in (session.get('drawings') or {}).items() if r.get('status') == 'approved'}
+
+
 def _draw(store, run, session, spec, sha):
     """design/200: the shot's drawing, from the scene's own numbers: through the camera and from above, both sheets of each stored. Free. It waits for the operator."""
     import hashlib
     from . import drawings
-    things = {eid: VS.load_json(store, r['key']) for eid, r in (session.get('drawings') or {}).items() if r.get('status') == 'approved'}
-    d, notes = guide_drawing.description(spec, things)
+    d, notes = guide_drawing.description(spec, _things(store, session))
     wrong = draw3d.problems(d)
     need(not wrong, 'The shot cannot be drawn: ' + ' '.join(wrong[:4]))
     views = []
@@ -415,6 +424,7 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
              'A repair names its region: {"left", "top", "width", "height"} as fractions of the picture.')
         inputs, jobs_ = [{'id': base['id'], 'key': base['key'], 'sha256': base['sha256']}], []
         effective = REPAIR_OPEN.format(words=words)
+        parts = {'your words': len(words)}
     else:
         need(isinstance(parents, list), 'parents: a list of {"id", "job", "crop"?}.')
         people = VS.people_of(VS.guarded(lambda: VS.current_plan(store, session)))
@@ -426,11 +436,26 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         need(len(inputs) <= still['max_inputs'], TOO_MANY.format(n=len(inputs), max=still['max_inputs']))
         roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2 + len(sheets))]
         facts = _drawn_facts(session, parents)
-        effective = '\n'.join(x for x in [STILL_OPEN, marks_line(spec.get('marks'), 'image', fronts=G.fronted(spec)), d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
-                                          VS.size_line(*VS.guarded(lambda: VS.locate(store, session, shot_id))[::3]),   # design/207: (plan, shot): the size sentence, when size is the message
-                                          RIGHT_HAND_WORDS if any(p.get('hands') for p in spec.get('people') or []) else '',
-                                          ('What must be true:\n' + '\n'.join(f'- {f}' for f in facts)) if facts else '',
-                                          LOOK_WORDS.format(n=len(inputs)) if looks else ''] if x)
+        size = VS.size_line(*VS.guarded(lambda: VS.locate(store, session, shot_id))[::3])   # design/207: (plan, shot): the size sentence, when size is the message
+
+        def build(how, block):
+            return '\n'.join(x for x in [STILL_OPEN, marks_line(spec.get('marks'), 'image', fronts=G.fronted(spec)), how, DIAGRAM_WORDS, words, block, ' '.join(roles), size,
+                                         RIGHT_HAND_WORDS if any(p.get('hands') for p in spec.get('people') or []) else '',
+                                         ('What must be true:\n' + '\n'.join(f'- {f}' for f in facts)) if facts else '',
+                                         LOOK_WORDS.format(n=len(inputs)) if looks else ''] if x)
+        how, block = d['how'], G.layout_block(spec)
+        effective = build(how, block)
+        if len(effective) > still['max_prompt']:   # hotfix (SK, 21 Nov 2026, "B1 shorten"): the least seen background pieces are summed up, five at a time
+            desc = guide_drawing.description(spec, _things(store, session))[0]
+            far = G.background(spec)
+            for n in range(5, len(far) + 5, 5):
+                how, block = draw3d.how_to_read(desc, [v['id'] for v in d['views']], first=2, drop=far[:n]), G.layout_block(spec, drop=far[:n])
+                effective = build(how, block)
+                if len(effective) <= still['max_prompt']:
+                    break
+        parts = {'the colour key': len(how), 'the layout block': len(block), 'your words': len(words)}
+    need(len(effective) <= still['max_prompt'], TOO_LONG_PROMPT.format(n=len(effective), max=still['max_prompt'], shot=shot_id,
+                                                                    parts=', '.join(f'{k} {v:,}' for k, v in parts.items()), rest=len(effective) - sum(parts.values())))
     VS.check_cap(conn, run, session, VS.image_price_inr(run, provider='openai'), 'this still')
     still_id = uuid.uuid4().hex
     request = {'kind': 'guide-still', 'op': 'edit', 'provider': 'openai', 'model': still['model'], 'prompt': effective, 'size': still['size'], 'quality': still['quality'],

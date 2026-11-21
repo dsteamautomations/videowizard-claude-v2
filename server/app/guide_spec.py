@@ -686,10 +686,22 @@ def layout(spec, t=0.0):
     return rows
 
 
-def layout_block(spec):
-    """The EXACT LAYOUT block for the still's prompt, written by the server from the scene (nothing typed by hand)."""
-    rows = layout(spec)
+def background(spec):
+    """Hotfix (21 Nov 2026): the pieces of the set a still's prompt may sum up when it is too long, the least seen first: pieces out of the
+    frame, then by their share of the frame. Never a person, a prop, the ground, or a piece that moves or turns."""
+    share = {r['id']: r['share'] for r in layout(spec) if r['kind'] == 'set'}
+    ids = [s['id'] for s in spec['set'] if not s.get('ground') and not s.get('path') and not s.get('spin')]
+    return sorted(ids, key=lambda i: share.get(i, 0.0))
+
+
+def layout_block(spec, drop=()):
+    """The EXACT LAYOUT block for the still's prompt, written by the server from the scene (nothing typed by hand). `drop` (hotfix 21 Nov 2026):
+    background pieces of the set summed up in one line instead of one line each."""
+    every = layout(spec)
+    rows = [r for r in every if not (r['kind'] == 'set' and r['id'] in set(drop))]
     out = ['EXACT LAYOUT, measured from the first image (0% = left or top edge, 100% = right or bottom edge). Draw each person and thing exactly this size and in exactly this place:']
+    if len(rows) < len(every):
+        out.append(f'- {len(every) - len(rows)} further background pieces of the set: each exactly where Image 1 shows it.')
     for r in rows:
         across = f"from {_pct(r['left'])} to {_pct(r['right'])} of the width"
         if r['kind'] == 'person':

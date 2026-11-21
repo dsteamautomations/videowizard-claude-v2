@@ -540,17 +540,24 @@ SLANT_WORDS = ("A drawing seen at an angle and drawn flat has no perspective, so
 CONVENTION_WORDS = 'Outlines, flat colours, the marks on a block figure and the plain background are drawing conventions, not things in the picture.'
 
 
-def how_to_read(d, view_ids, first=1):
+OTHER_COLOURS = 'The other colours are background pieces of the set: read them from Image 1.'
+
+
+def how_to_read(d, view_ids, first=1, drop=()):
     """The paragraph that tells the image model how to read the drawings it is sent: one line per drawing in the order sent (Image `first`, …),
-    then what each colour stands for, the block figure's marks when a person is drawn, the slant warning when a flat angled view is among them."""
+    then what each colour stands for, the block figure's marks when a person is drawn, the slant warning when a flat angled view is among them.
+    `drop` (hotfix 21 Nov 2026): ids of background pieces whose colours are not named one by one (a material `id` or `id.<part>`)."""
     views = {v['id']: v for v in d['views']}
     lines = ['How to read the drawings.']
     for k, vid in enumerate(view_ids, first):
         v = views[vid]
         lines.append(f"Image {k} is {v['name']}: {KINDS[v['kind']]}. It shows {v['shows']}. Use it for {v['for']}.")
     used = {p['material'] for p in d.get('pieces') or []}
-    if used:
-        lines.append('In the drawings one flat colour is one material: ' + '; '.join(f"{colour_name(m['colour'])} is {m['is']}" for name, m in d['materials'].items() if name in used) + '.')
+    named = [(name, m) for name, m in d['materials'].items() if name in used and name.split('.')[0] not in set(drop)]
+    if named:
+        lines.append('In the drawings one flat colour is one material: ' + '; '.join(f"{colour_name(m['colour'])} is {m['is']}" for name, m in named) + '.')
+    if len(named) < len([n for n in d['materials'] if n in used]):
+        lines.append(OTHER_COLOURS)
     if d.get('people'):
         lines.append(PERSON_WORDS)
     if any(views[v]['kind'] == 'three-quarter' for v in view_ids):

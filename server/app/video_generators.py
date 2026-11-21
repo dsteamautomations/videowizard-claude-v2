@@ -18,7 +18,8 @@ CATALOG = [   # design/124 A4 decision 5: Gemini Omni only; every take 3-10 s, a
 from . import guide_spec as _guide
 GUIDE = {'provider': 'google', 'model': 'gemini-omni-1.2-flash', 'label': 'Gemini Omni 1.2 · edit of a guide', 'min_seconds': _guide.MIN_S, 'max_seconds': _guide.MAX_S,
          'duration_control': 'request', 'guide': True, 'aspect_ratio': '16:9', 'resolution': '720p'}
-STILL = {'model': 'gpt-image-2.6-sunburst', 'size': '1536x864', 'quality': 'high', 'max_inputs': 16}
+STILL = {'model': 'gpt-image-2.6-sunburst', 'size': '1536x864', 'quality': 'high', 'max_inputs': 16,
+         'max_prompt': 32000}   # hotfix 21 Nov 2026: OpenAI's limit on the prompt, in characters (VW-24's BEAT_11-B1-S3 was refused at 52,545)
 OMNI_ONLY = 'Gemini Omni only: every take is Gemini Omni, 3–10 s; split the shot. No other video generator is offered.'
 KLING_SEEDANCE_RETIRED = 'Kling and Seedance are retired; every video take is Gemini Omni'   # design/35 Old ways 7
 

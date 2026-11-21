@@ -339,9 +339,9 @@ def refusal(r, req=None):
     anything else keeps the plain message. Returns (result, error). design/211: `req`, the job's request: a refusal of Google's image model
     is named as such, with its model and its own words."""
     try:
-        err = (r.json() or {}).get('error') or {}
+        err, text = (r.json() or {}).get('error') or {}, None
     except ValueError:
-        err = {}
+        err, text = {}, (r.text or '').strip()[:300]   # hotfix 21 Nov 2026: a body that is not JSON is said as it is
     kind = err.get('type') or err.get('code') or ''
     result = {'failure': kind if kind in ('moderation_blocked', 'image_generation_user_error') else 'provider', 'http_status': r.status_code, 'detail': r.text[:300]}
     if kind == 'moderation_blocked':
@@ -353,7 +353,10 @@ def refusal(r, req=None):
         return result, f"OpenAI refused the request: the prompt or the pictures are the problem; do not resend unchanged. ({err.get('message') or r.text[:120]})"
     if (req or {}).get('provider') == 'gemini':
         return result, f"{_who(req)} rejected the request (HTTP {r.status_code}){': ' + str(err.get('message'))[:160] if err.get('message') else ''}."
-    return result, f'OpenAI rejected the request (HTTP {r.status_code}).'
+    # hotfix (SK, 21 Nov 2026): OpenAI's own code and message, so the log says why (until then: "OpenAI rejected the request (HTTP 400)." only;
+    # VW-24's still was refused for a prompt over 32,000 characters and the log did not say so). The body stays in `result['detail']`.
+    code, said = str(err.get('code') or ''), text if text is not None else str(err.get('message') or '')[:300]
+    return result, f"OpenAI rejected the request (HTTP {r.status_code}{', ' + code if code else ''}){': ' + said if said else '.'}"
 
 
 def region_mask(parent_png, region):
