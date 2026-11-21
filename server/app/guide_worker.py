@@ -23,7 +23,9 @@ from .storage import storage
 SCRIPT = Path(__file__).resolve().parents[1] / 'blender' / 'guide_scene.py'
 LENGTH_SLACK_S = 0.6        # a take is as long as its guide, give or take; double length is the guide followed by new footage
 SAME_AS_GUIDE = 0.04        # mean difference of small grey frames, 0 to 1, under which the clip is the guide itself; set on our own runs' box guides
-FIRST_FRAME_SHIFT, FIRST_FRAME_ZOOM = 0.03, 0.03   # the take's first frame against the still: 3 % of the width, 3 % of zoom; starting values at 720p
+# hotfix (SK, 21 Nov 2026: "the upper limit as 30% shift and 30% zoom so that this doesn't initiate any retakes"): the take's first frame against
+# the still. (Until then 3 % of the width and 3 % of zoom, "starting values at 720p": on VW-24 they set aside 8 of 18 takes, at 0.8 to 6.7 %.)
+FIRST_FRAME_SHIFT, FIRST_FRAME_ZOOM = 0.30, 0.30
 
 
 def spool():
@@ -267,7 +269,7 @@ def first_frame_line(first, still):
     from . import image_check as IC
     a, b = _grey(first), _grey(still)
     m = IC._match(IC._fft(np.asarray(a, dtype=float)), lambda z, im=b: IC._scaled(im, z))
-    ok = m['shift'] <= FIRST_FRAME_SHIFT and abs(m['scale'] - 1) <= FIRST_FRAME_ZOOM
+    ok = round(m['shift'], 4) <= FIRST_FRAME_SHIFT and round(abs(m['scale'] - 1), 4) <= FIRST_FRAME_ZOOM   # rounded: exactly at the limit is within it
     return {'check': 'first frame matches the still', 'weight': 'must', 'pass': ok, 'pass_when': "the take's first frame is the still: nothing moved, nothing pushed in",
             'seen': f"shifted {m['shift'] * 100:.1f} % of the width, zoom {abs(m['scale'] - 1) * 100:.1f} %" + ('' if ok else ': the fault is before the video, in the still or the guide; look at the overlay'),
             'shift_pct': round(m['shift'] * 100, 2), 'zoom_pct': round(abs(m['scale'] - 1) * 100, 2)}
@@ -325,6 +327,24 @@ def blocked_by(lines):
     if 'first frame matches the still' in failed:
         return 'the first frame does not match the still (' + failed['first frame matches the still']['seen'].split(':')[0] + ')'
     return None
+
+
+def released(rec):
+    """Hotfix (21 Nov 2026): a take's check record written under the older first-frame limits, brought to today's: when the take was set aside
+    for its first frame only and its measured shift and zoom are within the limits, the line passes, the block is gone and the scorecard is
+    rebuilt (Claude's look, when one is there, is kept in it). Returns whether the record changed. Nothing else of the record is touched."""
+    lines = rec.get('code_lines') or []
+    line = next((l for l in lines if l.get('check') == 'first frame matches the still'), None)
+    if not line or line.get('pass') is not False or blocked_by(lines) != rec.get('blocked'):
+        return False
+    if any(l.get('pass') is False for l in lines if l is not line) or line.get('shift_pct') is None or line.get('zoom_pct') is None:
+        return False
+    if line['shift_pct'] / 100 > FIRST_FRAME_SHIFT or line['zoom_pct'] / 100 > FIRST_FRAME_ZOOM:
+        return False
+    line.update({'pass': True, 'seen': str(line.get('seen') or '').split(':')[0]})
+    rec['blocked'] = None
+    rec['scorecard'], rec['watch'] = scorecard(lines, rec.get('look'))
+    return True
 
 
 SCORECARD = ('real footage and length', 'first frame', 'one continuous shot', 'people', 'the action', 'objects', 'bodies and contact', 'the place and the light')   # design/222: "the join" is retired (the page's film order is how it is judged); one continuous shot is measured

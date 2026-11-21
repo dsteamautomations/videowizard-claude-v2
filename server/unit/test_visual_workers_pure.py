@@ -66,6 +66,6 @@ def test_the_take_text_follows_the_librarys_omni_house_shape():
     assert one.startswith('[# Sources <FIRST_FRAME>@Image1]') and 'LAST_FRAME' not in one and 'Image2' not in one
 
 
-def test_another_400_keeps_todays_message(tmp_path, monkeypatch):
+def test_another_400_says_openais_own_message(tmp_path, monkeypatch):   # hotfix of 21 Nov 2026 (design/35 row 313): until then "OpenAI rejected the request (HTTP 400)." only
     status, result, error, cost, retry = refused(tmp_path, monkeypatch, {'error': {'type': 'invalid_request_error', 'message': 'size is wrong'}})
-    assert status == 'failed' and result['failure'] == 'provider' and error == 'OpenAI rejected the request (HTTP 400).'
+    assert status == 'failed' and result['failure'] == 'provider' and error == 'OpenAI rejected the request (HTTP 400): size is wrong'
