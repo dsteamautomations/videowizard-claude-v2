@@ -165,3 +165,25 @@ def test_a_first_cut_event_of_a_library_clip_carries_its_key_into_every_render()
     lib_item, own_item = S2._event_items(session, {}, [{**ev, 'sub_clip_id': 'L9:SUB_01'}, {**ev, 'sub_clip_id': 'c1:SUB_01'}], rows)
     assert lib_item['clip']['key'] == 'r0/media/yard.mp4' and lib_item['clip']['name'] == 'yard.mp4' and 'key' not in own_item['clip']
     assert AS.S2._event_items is S2._event_items   # the assembly builds its camera events with the same function
+
+
+def test_the_library_round_keeps_the_fingerprint_of_the_package_file_it_wrote(monkeypatch):
+    """Defect 61 (VW-24, 22 Nov 2026): the library round writes the options package again with its library rows, and the first-cut record kept the
+    fingerprint of the file as `prepare` had written it. The full package then listed Plans/options-package.json with the older size and
+    fingerprint, and the download on the editing computer refused the file. The plan's own digest stays as `prepare` set it."""
+    import hashlib
+    import json
+    from app import brandlib
+    from app.stage2 import stage as S2
+    from test_visuals_stage_pure import FakeStore
+    key = 'run-1/stage2/package.json'
+    store = FakeStore({key: {'sub_clips': []}, 'run-1/stage2/session.json': {'package': {'key': key, 'sha256': 'older', 'bytes': 17, 'digest': 'plan-digest', 'clips': {}}}})
+
+    def round_(conn, store_, run, outputs, session, save_package):
+        save_package({'sub_clips': [{'sub_clip_id': 'L9:SUB_01', 'library': True}]})   # the round adds its rows and saves the file
+        return {'candidates': [{'sub_clip_id': 'L9:SUB_01'}]}
+    monkeypatch.setattr(brandlib, 'library_round', round_)
+    assert S2.library(None, store, USER, RUN, [])['candidates']
+    kept, raw = json.loads(store.files['run-1/stage2/session.json'])['package'], store.files[key]
+    assert b'L9:SUB_01' in raw and kept['sha256'] == hashlib.sha256(raw).hexdigest() and kept['bytes'] == len(raw) and kept['key'] == key
+    assert kept['digest'] == 'plan-digest'   # the library adds rows; it is not a new prepare

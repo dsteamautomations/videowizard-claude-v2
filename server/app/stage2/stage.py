@@ -135,7 +135,8 @@ def library(conn, store, user, run, outputs):
     """design/147 L4: the library round, after the second look; one flow for the tool and a page."""
     from .. import brandlib
     session = session_of(store, run)
-    out = brandlib.library_round(conn, store, run, outputs, session, lambda pk: save_json(store, key(run, 'package.json'), pk))
+    # defect 61: the file is written again with the library rows, so the record keeps its new size and fingerprint (the plan's digest stays as prepare set it)
+    out = brandlib.library_round(conn, store, run, outputs, session, lambda pk: session['package'].update(save_json(store, key(run, 'package.json'), pk)))
     save_session(store, run, session)
     return out
 
