@@ -517,16 +517,14 @@ def name_of(session, plan, ref):
 def looks_due(store, run, outputs, take_rows=None):
     """`GET /api/runs/{run_id}/visuals/pictures/looks`: {pictures: [{ref, sha10, kind, name, shot_id, n?, key, inputs: [{ref, role, key}],
     request, lines}], then, how}. The keys are the 1600 px copies. Stamps the pictures that waited for the model's check at the deploy.
-    design/222: the AI video takes that wait for Claude's check are in the same list (kind `take`: `key` is the sheet at four a second, `inputs`
-    the frames with their second and the still), judged by `how_take`."""
-    from . import takes
+    design/223 (SK, 22 Nov 2026): an AI video take is not in this list: nobody checks a take (until then: kind `take`, judged by `how_take`; design/35 row 317)."""
     session = V.session_of(store, run, outputs)
     if not V.round_v2(session):
         return {'pictures': [], 'then': PIC_LOOK_NONE, 'how': LOOK_HOW}
     plan = V.guarded(lambda: V.current_plan(store, session))
-    if stamp(session, plan) | asked(session, plan) | takes.asked(session, plan, take_rows):
+    if stamp(session, plan) | asked(session, plan):
         V.save_session(store, run, session)
-    out = takes.listed(session, plan, take_rows)
+    out = []
     for r in due(session, plan):
         inputs = [{'ref': p.get('id'), 'role': 'step before' if r.get('kind') == 'state' and (session['references'].get(p.get('id')) or {}).get('kind') == 'state' else
                    'scene' if (session['references'].get(p.get('id')) or {}).get('kind') == 'frame' else 'parent'} for p in (r.get('generation') or {}).get('parents') or [] if p.get('id')]
@@ -544,9 +542,7 @@ def looks_due(store, run, outputs, take_rows=None):
                               + [{'ref': i['id'], 'role': 'parent', 'key': _big(store, session, i['id']) if i['id'] in session['references'] else made[i['id']]}
                                  for i in st.get('inputs') or [] if i.get('id') in session['references'] or i.get('id') in made],
                     'request': st.get('prompt') or '', 'lines': start_lines(session, plan, sh, st)})
-    some =any(p['kind'] == 'take' for p in out)   # the critic's S8: the takes have their own helper, named in this answer
-    then = ' '.join(x for x in (LOOKS_THEN if any(p['kind'] != 'take' for p in out) else '', takes.W['looks_then'] if some else '') if x) or LOOKS_NONE
-    return {'pictures': out, 'then': then, 'how': LOOK_HOW, **({'how_take': TAKE_LOOK_HOW} if some else {})}
+    return {'pictures': out, 'then': LOOKS_THEN if out else LOOKS_NONE, 'how': LOOK_HOW}
 
 
 def _fault(name, want, sent):
@@ -571,17 +567,6 @@ def _fault(name, want, sent):
         if len(words) > LOOK_SAY or (not words and (a['pass'] is False or w.get('say'))):
             return PIC_LOOK_WORDS.format(name=name, check=w['check'], id=w['id'], max=LOOK_SAY)
     return None
-
-
-TAKE_LOOK_HOW = {
-    'judge': ['A row of kind `take` is a video take. You cannot play it: judge it from its frames. `picture` is the sheet at four frames a second (small pictures in order, the time under each); '
-              'each `frame` input is one frame, every half second, with its second (`at_s`), then the last frame; the `still` input is the approved picture the take started from; `request` is what the take was asked to show.',
-              'Look at every frame, in order, and at the sheet: the sheet shows what happens between two half-second frames. Answer every line of `lines`, pass or fail, from what the frames show, never from the request.',
-              'With a fail, say in one plain sentence what you saw, in words the operator can send back, and give `at_s`: the second of the frame that shows it.',
-              'What the still already shows is not a fault of the take: judge the take against the still where the request and the still differ.',
-              'You are not asked how things move between the frames (speed, a jerk): the operator plays the take. A thing present in one frame and gone in the next with no hand near it fails its line.',
-              'A take whose frames you could not open is `not_checked`, with why, and then has no lines. Never pass a line you did not look at.', V.NA_HOW],
-    'file': 'The same file as for pictures: one row per take with its `ref`, its `sha10` as listed, and one answer per line: {id, pass, seen, at_s}; `pass` is true, false or "na".'}
 
 
 def _look(sha, want, sent, who, at):
@@ -614,15 +599,9 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
     for p in pictures or []:
         p = p if isinstance(p, dict) else {}
         rid = str(p.get('ref') or '')
-        if rid not in session['references'] and any(str(j['id']) == rid for j in take_rows or []):   # design/222: an AI video take's look
+        if rid not in session['references'] and any(str(j['id']) == rid for j in take_rows or []):   # design/223: a look sent for an AI video take is refused by name
             from . import takes
-            name = next((takes.name_of(*row[:4]) for row in takes.due(session, plan, take_rows) if str(row[4]['id']) == rid), rid)
-            fault = takes.record(session, plan, take_rows, p, who, at)
-            if fault:
-                refused[rid] = fault
-            else:
-                recorded.append(rid)
-                na += na_said(name, session['take_checks'][rid]['look'])
+            refused[rid] = takes.W['look_retired']
             continue
         start = next((x for x in starts_due(session, plan) if x[3]['id'] == rid), None) if rid not in session['references'] else None
         if start:   # release 1, A1: the look of step 7's still, kept on the still
@@ -654,12 +633,10 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             # D4: a component is a part of a drawn graphic, judged with it: it is approved when Claude's check and the program's lines pass, and never asked of the operator
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
-    from . import takes as takes_
-    takes_left = [str(row[4]['id']) for row in takes_.due(session, plan, take_rows)]   # the critic's S8: the takes still due are counted
     left = [r['id'] for r in due(session, plan)] + [x[3]['id'] for x in starts_due(session, plan)]
     failed = components_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent
-    return {'recorded': recorded, 'refused': refused, 'left': left + takes_left, **na_log(na),
-            'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else '' if takes_left else LOOKS_NONE] + ([takes_.waits_words(session, plan, take_rows)] if takes_left else []) + failed).strip()}
+    return {'recorded': recorded, 'refused': refused, 'left': left, **na_log(na),
+            'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE] + failed).strip()}
 
 
 # ---------- the check as the page and the chat say it (F1, contract 3.8) ----------

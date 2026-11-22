@@ -904,7 +904,14 @@ def _short_text(text, n=160):
     return t if len(t) <= n else t[:n - 1] + '…'
 
 
+GUIDE_KINDS = ('guide', 'edit', 'remake')   # design/223: a take made from a guide, and its versions (an edit, a remake): one family for the film
 RERUN_SHARE = 0.3   # integration step E: about 1.3 takes for every AI video shot made (the consultant's two films: 1.25 to 1.4); replaced by this film's own figure in step F
+
+
+def shot_second_price():
+    """design/223: what one second of an AI video shot costs when it is accepted as it is: its first take (small) and its full-size video."""
+    from . import corrections, video_generators
+    return video_price(video_generators.GUIDE['resolution']) + video_price(corrections.VERSION_SIZE)
 
 
 def rerun_allowance(video_seconds, pr):
@@ -914,7 +921,15 @@ def rerun_allowance(video_seconds, pr):
 
 def prices():
     s = settings()
-    return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S), 'usd_inr': float(s.VISUALS_USD_INR)}
+    return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S), 'video_360p_inr_per_s': float(s.VISUALS_PRICE_VIDEO_360P_INR_PER_S),
+            'usd_inr': float(s.VISUALS_USD_INR)}
+
+
+def video_price(resolution=None):
+    """design/223 (SK, 22 Nov 2026: "the price by size"): what one second of AI video is counted at, by the size it is made at: a 360p second at its own
+    figure, every other size (720p, and a take made before this, which names no size) at the 720p figure. (Until then: one price a second; design/35 row 329.)"""
+    pr = prices()
+    return pr.get('video_360p_inr_per_s', pr['video_inr_per_s']) if str(resolution or '') == '360p' else pr['video_inr_per_s']
 
 
 IMAGE_JOB_PROVIDERS = ('openai', 'gemini-image')   # design/120: the two image job families
@@ -962,8 +977,9 @@ def visuals_spend(conn, run):
     ref = lambda r: (r.get('request') or {}).get('reference') or {}
     fixes = sum(1 for r in pics if ref(r).get('fix_of') or str(ref(r).get('name') or '').endswith('-fix'))   # design/96 X3; an old fix by its name
     image_inr = sum(image_cost_inr(r.get('cost'), pr) for r in pics)
-    seconds = float(sum(float((r.get('request') or {}).get('duration_seconds') or 0) for r in live if r['provider'] == 'video'))
-    return {'images': images, 'fixes': fixes, 'take_seconds': seconds, 'spent_inr': round(image_inr + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
+    takes = [(float((r.get('request') or {}).get('duration_seconds') or 0), (r.get('request') or {}).get('resolution')) for r in live if r['provider'] == 'video']
+    seconds = float(sum(s for s, _ in takes))
+    return {'images': images, 'fixes': fixes, 'take_seconds': seconds, 'spent_inr': round(image_inr + sum(s * video_price(size) for s, size in takes), 2), 'prices': pr}   # design/223: each take at the price of its size
 
 
 def cap_of(session):
@@ -993,6 +1009,9 @@ def set_cap(conn, store, user, run, outputs, inr, quote):
     was = cap_of(session)
     session.update(cap_inr=float(inr), cap_from='owner', cap_by=user['id'], cap_at=datetime.now(timezone.utc).isoformat(), cap_quote=quote)
     save_session(store, run, session)
+    from . import corrections
+    if corrections.go_waiting(conn, store, run, session):   # design/223 (E12): the videos that waited for the limit are sent, with nothing answered again
+        save_session(store, run, session)
     from . import runlog
     runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'the cost limit', 'rule': 'visuals/cap',
                         'entry': f"the cost limit of this film's visuals set by the owner: ₹{was:,.0f} → ₹{float(inr):,.0f}", 'by_kind': 'operator', 'by_name': str(user.get('name') or ''),
@@ -1002,7 +1021,7 @@ def set_cap(conn, store, user, run, outputs, inr, quote):
 
 def plan_estimate(run, r):
     """What a plan's pictures and takes are likely to cost, from its counted routes: the one sum the check, the budget and the plan page show."""
-    return round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * prices()['video_inr_per_s'], 2)
+    return round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * shot_second_price(), 2)
 
 
 def set_estimate(run, session, plan):
@@ -1270,7 +1289,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         totals['frozen_share'] = round(totals['frozen_seconds'] / (film / float(Fraction(str(session['source'].get('fps') or 25)))), 3)
         totals['frozen_limit'] = float(session.get('frozen_limit') or FROZEN_SHARE)
     pr = prices()
-    estimate = round(totals['images'] * image_price_inr(run) + video_seconds * pr['video_inr_per_s'], 2)
+    estimate = round(totals['images'] * image_price_inr(run) + video_seconds * shot_second_price(), 2)   # design/223: the first take and its full-size video
     record = {'gaps': entries, 'totals': totals, 'reasons_missing': unreasoned, 'estimate_inr': estimate, 'rerun_allowance_inr': rerun_allowance(video_seconds, pr), 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
               **direction}   # design/124 Change 3; design/203
     if not str(quote or '').strip():   # the draft the page shows for approval
@@ -3040,9 +3059,10 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
         if j['unit'] not in counted:
             counted[j['unit']] = pictures._drawn_state(session, sh, take_rows, plan)[1]
         return not counted[j['unit']] or str(counted[j['unit']]['id']) != str(j['id'])
+    newest = {j['unit']: str(j['id']) for j in take_rows if j.get('provider') == 'video' and j['status'] == 'ready'}   # design/223: of an AI video shot the newest video is the one to answer, whatever was said of the ones before it (they are tabs of its line)
     for j in take_rows:   # design/207 (D2): a reuse no longer waits for the operator (the older way, retired: "Reuse · <shot>", reuse to approve)
         sh, reviews = shots.get(j['unit']), session['reviews'].get(str(j['id'])) or []
-        if sh and j['status'] == 'ready' and not superseded(j, sh) and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected') \
+        if sh and j['status'] == 'ready' and not superseded(j, sh) and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and (newest.get(j['unit']) == str(j['id']) if j.get('provider') == 'video' else not (reviews and reviews[-1]['decision'] == 'rejected')) \
                 and not (j.get('provider') == 'video' and j['unit'] in session['selections']):   # design/222: an AI video shot with a take selected is not asked about again
             if held_drawing(session, j['unit']):   # design/221 row 18: a drawing held after its rounds is an early decision, a card in the chat
                 add(sh['start_frame'], f"Held drawing · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']), 'held drawing')
@@ -3059,7 +3079,7 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
         if not takes.complete(takes.expected(session, plan, take_rows, now)) or not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # the critic's S1: nor while step 6 is still being made
             items = [(a, i) for a, i in items if not video(i)]
         else:   # the second critic's points 1, 9: the page is open: each take only with its check (a remake too), and none of a shot with an open question
-            items = [(a, i) for a, i in items if not video(i) or takes.answerable(session, i['group'], by_id[i['item']], now)]
+            items = [(a, i) for a, i in items if not video(i) or takes.answerable(session, plan, take_rows, i['group'], by_id[i['item']], now)]   # design/223: the newest video of a shot that waits for an answer (a video the operator spoke of earlier stays on its line)
     return [i for _, i in sorted(items, key=lambda x: x[0])]
 
 
@@ -5296,7 +5316,7 @@ def _feedback_take(session, run, user, job, prep, verdict, quote, notes):
     answer = (prep or {}).get('answer') or {}
     inputs = [{'picture_id': (prep or {}).get(role, {}).get('reference_id'), 'tag': tag} for role, tag in (('start_image', 'first-frame'), ('end_image', 'last-frame')) if (prep or {}).get(role)]
     _feedback(session, run, user, kind='take', ident=job['id'], owner=job['unit'], step='take', verdict=verdict, quote=quote, notes=notes,
-              prompt=(prep or {}).get('effective_prompt' if (prep or {}).get('kind') == 'guide' else 'motion_prompt') or '', checklist=answer.get('checklist'), suggestion=answer.get('suggestion'), model=(prep or {}).get('model'), inputs=inputs)
+              prompt=(prep or {}).get('effective_prompt' if (prep or {}).get('kind') in GUIDE_KINDS else 'motion_prompt') or '', checklist=answer.get('checklist'), suggestion=answer.get('suggestion'), model=(prep or {}).get('model'), inputs=inputs)
 
 
 def _prep_of(store, job):
@@ -5851,7 +5871,7 @@ def take_in_point(prep, job, in_s):
     dur = float(((job.get('result') or {}).get('evidence') or {}).get('duration_seconds') or 0)
     slot = float(((prep or {}).get('placement') or {}).get('exact_seconds') or 0)
     if in_s is None or str(in_s).strip() == '':
-        return {'in_s': round(max(0.0, (dur - slot) / 2), 2)} if (prep or {}).get('kind') == 'guide' and dur > slot > 0 else {}
+        return {'in_s': round(max(0.0, (dur - slot) / 2), 2)} if (prep or {}).get('kind') in GUIDE_KINDS and dur > slot > 0 else {}
     try:
         at = float(in_s)
     except (TypeError, ValueError):
@@ -5891,7 +5911,7 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     if decision == 'rejected':   # design/74 L7
         prep = _prep_of(store, job)
         _feedback_take(session, run, user, job, prep, 'reject', quote, notes)
-        if prep.get('kind') == 'guide':   # integration step D: the attempt of the record ends with its verdict and the operator's words; the next step opens a new attempt
+        if prep.get('kind') in GUIDE_KINDS:   # integration step D: the attempt of the record ends with its verdict and the operator's words; the next step opens a new attempt
             generations.closed(conn, run['id'], job['unit'], 'guide', 'rejected', {'kind': 'take rejected', 'job_id': str(job_id), 'notes': notes or '', 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
     save_session(store, run, session)
     return review
@@ -5908,7 +5928,7 @@ def take_held(store, run, outputs, session, job):
             return False
         checks = motion_rounds(session, job['unit'], prep.get('sha256'))
         return not checks or bool(open_rules(checks[-1])) or bool(stale_brief(store, run, outputs, session, prep.get('sha256'), job['unit']))
-    return prep.get('kind') == 'guide' and (any(r['state'] == 'Fail' for r in check.get('scorecard') or []) or bool(check.get('not_read')))
+    return False   # design/223 (SK, 22 Nov 2026): a take made from a guide has no check and no scorecard; nothing holds it (until then: a failed scorecard line, or "not read"; design/35 row 320)
 
 
 def select_by_tool(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes='', in_s=None):
@@ -5961,13 +5981,11 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
             need(not changed or str(notes or '').strip(), MOTION_BRIEF_CHANGED.format(shot=job['unit'], names=', '.join(f'"{k}"' for k in changed))
                  + ' Or select it with --notes saying why it is taken anyway.')
         context = prep['plan_digest']
-    elif prep.get('kind') == 'guide':   # integration step D: a take made from a guide stands on the plan it was shot for; its checks decide what the operator must say
+    elif prep.get('kind') in GUIDE_KINDS:   # integration step D: a take made from a guide stands on the plan it was shot for. design/223: nobody checks it, so nothing of a check is asked;
+        # and only a video at the version size goes into the film (a 360p take gets its full-size copy first)
         need(prep.get('plan_digest') == digest(current_plan(store, session)), f"The plan changed since this take was shot; make the shot again from its guide (`vw guide status --shot {job['unit']}`).")
-        check = (session.get('take_checks') or {}).get(str(job_id)) or {}
-        need(not check.get('blocked'), f"This clip is not a take: {check.get('blocked')}. It cannot be selected.")
-        failed = [r['line'] for r in check.get('scorecard') or [] if r['state'] == 'Fail']
-        need(not failed or str(notes or '').strip(), f"The scorecard fails on: {', '.join(failed)}. Select the take with --notes saying why it is taken anyway (the departure is recorded), or reject it.")
-        need(not check.get('not_read') or str(notes or '').strip(), 'This take was not read by the tool (the reading did not run): it is not known to be clean. Select it with --notes saying what you checked yourself, or reject it.')
+        from . import corrections
+        need(corrections.final(job), f"This take is {corrections.size_of(job)}: the film takes its {corrections.VERSION_SIZE} video. Accept it on the page (or `vw visuals decide`): its full-size video is made and shown first.")
         context = prep['plan_digest']
     else:
         live = packet(store, run, outputs, job['unit'], session)
@@ -5977,10 +5995,8 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id'],
                                           **take_in_point(prep, job, in_s)}
     _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
-    ((session.get('guides') or {}).get(job['unit']) or {}).pop('again', None)   # design/222: the shot is resolved: a take ordered on the page ("Make another") is no longer made
-    if prep.get('kind') == 'guide':
-        failed = [r['line'] for r in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('scorecard') or [] if r['state'] == 'Fail']
-        generations.closed(conn, run['id'], job['unit'], 'guide', 'accepted', {'kind': 'take accepted', 'job_id': str(job_id), 'departs_on': failed, 'notes': notes or '', 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
+    if prep.get('kind') in GUIDE_KINDS:
+        generations.closed(conn, run['id'], job['unit'], 'guide', 'accepted', {'kind': 'take accepted', 'job_id': str(job_id), 'notes': notes or '', 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
     save_session(store, run, session)
     shot = guarded(lambda: locate(store, session, job['unit']))[3]
     return {**session['selections'][job['unit']], 'next': f"Take selected: in the film at {film_time(session, shot)} ({job['unit']})."}   # design/97 A4

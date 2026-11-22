@@ -123,7 +123,7 @@ def test_the_round_of_step_7_counts_its_takes_and_the_ones_answered_earlier_are_
              {'kind': 'take', 'id': 'S3', 'name': 'Shot three', 'state': T.STATE['done'], 'job': {'id': 'j3'}}]
     lines = [{**line('take:j1:abcdef12', 'Shot one'), 'takes': []}, {'key': 'pic:take-done:S2', 'item': 'take-done:S2', 'state': 'recorded', 'name': 'Shot two', 'takes': [], 'pics': []}]
     page = PF._takes_page({'session': {}}, {}, lines, seven)
-    assert page['layout']['count'] == '2 of 3 AI video shots are on this page.' and 'Not on the page: Shot three (made and checked).' in page['not_on_page']
+    assert page['layout']['count'] == '2 of 3 AI video shots are on this page.' and 'Not on the page: Shot three (made).' in page['not_on_page']
     full = PF._takes_page({'session': {}}, {}, lines + [{**line('take:j3:abcdef12', 'Shot three'), 'takes': []}], seven)
     assert full['layout']['count'] == '3 of 3 AI video shots are on this page.' and 'not_on_page' not in full
 

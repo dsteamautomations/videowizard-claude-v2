@@ -576,15 +576,9 @@ def ready_card(session, shot_id, price_per_s):
             'look_for': 'On the overlay: every person and thing of the still sits on the red outlines of the guide.' + (' Before you pay: ' + ' '.join(warnings) if warnings else '')}
 
 
-def word_for(g, quote):
-    """design/222: the operator's word for this take: their words (--quote), else the word they gave on the page ("Make another") when it is not
-    used yet; with neither, the take is refused. Returns (the page's order or None, the words)."""
-    ordered = g.get('again') if not (g.get('again') or {}).get('sent') else None
-    if ordered and not str(quote or '').strip():
-        from . import takes
-        quote = takes.W['again_word'].format(words=ordered['words'])
-    need(str(quote or '').strip(), "A take is paid for on the operator's word: give their words (--quote).")
-    return ordered, str(quote).strip()
+def take_price():
+    """design/223: what one second of the first take is counted at: the price of its size (360p)."""
+    return VS.video_price(video_generators.GUIDE['resolution'])
 
 
 def same_of(render_sha, still_sha, prompt, plan_digest):
@@ -592,72 +586,40 @@ def same_of(render_sha, still_sha, prompt, plan_digest):
     return digest({'guide': render_sha, 'still': still_sha, 'prompt': prompt, 'plan': plan_digest})
 
 
-def cap_or_drop(conn, store, run, session, shot_id, ordered, amount, what):
-    """The film's cost limit, before the take is paid for. The critic's S6: when it refuses a take ordered on the page, that order is dropped and why
-    is kept, so the shot does not stay "being redone" for ever; the refusal is raised as it is."""
-    try:
-        VS.check_cap(conn, run, session, amount, what)
-    except Problem as exc:
-        if ordered:
-            g = session['guides'][shot_id]
-            g.pop('again', None)
-            g['again_refused'] = str(getattr(exc, 'message', '') or exc)
-            VS.save_session(store, run, session)
-        raise
-
-
-def cancel_order(conn, store, user, run, outputs, shot_id, quote):
-    """The critic's S6: the operator withdraws, in the chat, the take they ordered on the page. Nothing is made. A decision in the run's log."""
-    session = VS.session_of(store, run, outputs)
-    g = entry_of(session, shot_id)
-    need(g.get('again') and not g['again'].get('sent'), f'No take of {shot_id} is ordered from the page: nothing to withdraw.')
-    need(str(quote or '').strip(), "Give the operator's words (--quote).")
-    g.pop('again')
-    VS.save_session(store, run, session)
-    if conn is not None:
-        from . import runlog, takes
-        runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'shot {shot_id}', 'rule': 'design/222 (Make another, withdrawn)', 'entry': takes.W['log_cancel'],
-                            'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': str(quote).strip(), 'request_id': None})
-    return {'shot_id': shot_id, 'next': f'The order for another take of {shot_id} is withdrawn: nothing is made. Ask the operator what happens to the shot: cut it into shorter shots, another angle, or leave it out.'}
-
-
-def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
-    """The operator's go-ahead: one Gemini edit of the guide. Refused while anything of the card is missing, while a take is open, and when nothing
-    changed since the last take (the same request is never sent twice; `again` only after a take that came back as the guide itself or at the wrong length)."""
+def shoot(conn, store, user, run, outputs, shot_id, quote, again=False, same=False):
+    """The operator's go-ahead: one Gemini edit of the guide: the first take, made once, at `video_generators.GUIDE`'s size (design/223: 360p), and shown
+    as it is. Refused while anything of the card is missing, while a take is open, and when nothing changed since the last take: the same request is
+    never sent twice, except `again`, once, after a call that failed at the provider (design/223, E9), and `same`, the third route of a correction
+    (nothing of the take is usable: `corrections.send`), each time on the operator's words.
+    (Until design/223: 720p; a cause had to be named for a rejected take; at most two takes from one camera; design/35 rows 316, 321, 322.)"""
     VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     plan, gap, scene, shot = VS.guarded(lambda: VS.locate(store, session, shot_id))
     VS._no_question(session, shot_id)
     g = entry_of(session, shot_id)
     need(shot_id not in (session.get('selections') or {}), f'{shot_id} has a take selected: no new take is made while it stands. To make another, the operator rejects the selected take first.')   # design/222, the second critic's point 3
-    card = ready_card(session, shot_id, VS.prices()['video_inr_per_s'])
+    card = ready_card(session, shot_id, take_price())
     need(card['missing'] != ['the rendered guide'],   # release 4: only the video is awaited: said plainly; no take is ever sent without the whole video
          render_line(shot_id, g) + f' No take is sent without it: send this again when `vw guide status --shot {shot_id}` says it is ready.')
     need(card['ready'], 'Not ready to shoot; still missing: ' + ', '.join(card['missing']) + '.')
-    ordered, quote = word_for(g, quote)
+    need(str(quote or '').strip(), "A take is paid for on the operator's word: give their words (--quote).")
     render, still = g['render'], card['still']
     camera = digest(VS.load_json(store, g['key'])['camera'])
-    rejected = _rejected(session, g)
-    if rejected:
-        last = rejected[-1]
-        need(last.get('cause'), f"Say what was wrong with the last take before another is paid for: `vw guide cause --shot {shot_id} --cause still|guide|words|model --notes \"<what was wrong>\" --fix \"<the one thing that changes>\"`.")
-        here = [t for t in rejected if t.get('camera') == camera]
-        need(not (here and here[-1]['cause']['cause'] == 'model'), 'The last take from this camera failed with no cause that can be named in the guide, the still or the words. ' + LADDER)
-        need(len(here) < 2, f'{len(here)} takes from this camera were rejected. ' + LADDER)
     open_job = conn.execute("select id from vw2_jobs where run_id=%s and stage='visuals' and unit=%s and provider='video' and status in ('queued','running','submitted','submission_unknown','storage_pending')",
                             (run['id'], shot_id)).fetchone()
     if open_job:
         raise Problem(409, 'JOB_OPEN', 'A take for this shot is still open; wait, recover or resolve it first.', job_id=str(open_job['id']))
     prompt = card['prompt']
-    same = same_of(render['sha256'], still['sha256'], prompt, digest(plan))
-    before = [t for t in g.get('takes') or [] if t.get('same') == same]
-    if before:
-        blocked = (session.get('take_checks') or {}).get(before[-1].get('job_id') or '', {}).get('blocked')
-        need(again and blocked, 'Nothing changed since the last take of this shot: the same request is never sent twice. Change the guide, the still or the words (one thing), or cut the shot.'
-             if not blocked else 'The last take came back unusable (' + str(blocked) + '). To send the same request once more, the operator says so: `vw guide shoot --again --quote "…"`.')
-        need(sum(1 for t in before) < 2, 'This request was already sent twice; change the guide, the still or the words.')
+    same_id = same_of(render['sha256'], still['sha256'], prompt, digest(plan))
+    before = [t for t in g.get('takes') or [] if t.get('same') == same_id]
+    if before and not same:
+        was = next((j for j in VS.take_jobs(conn, run, shot_id) if str(j['id']) == str(before[-1].get('job_id'))), None)
+        failed = bool(was and was['status'] in ('failed', 'cancelled'))
+        need(again and failed, 'Nothing changed since the last take of this shot: the same request is never sent twice. Change the guide, the still or the words (one thing), or cut the shot.'
+             if not failed else 'The last take could not be made at the provider. To send the same request once more, the operator says so: `vw guide shoot --again --quote "…"`.')
+        need(len(before) < 2, 'This request was already sent twice; change the guide, the still or the words.')
     seconds = int(g['seconds'])
-    cap_or_drop(conn, store, run, session, shot_id, ordered, seconds * VS.prices()['video_inr_per_s'], f'a {seconds} s take')
+    VS.check_cap(conn, run, session, seconds * take_price(), f'a {seconds} s take')
     gen = video_generators.GUIDE
     fps = float(session['source']['fps'])
     record = {'contract': 'videowizard-guide-take-v1', 'kind': 'guide', 'run_id': str(run['id']), 'shot_id': shot_id, 'plan_digest': digest(plan), 'attempt': len(g.get('takes') or []) + 1,
@@ -672,14 +634,12 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     VS.save_json(store, k, record)
     session['preparations'][shot_id] = {'preparation_id': identity, 'key': k, 'guide': True}
     job_id = _queue(conn, run, shot_id, 'video', {'kind': 'take', 'preparation_id': identity, 'request_key': k, 'provider': gen['provider'], 'model': gen['model'], 'duration_seconds': seconds,
-                                                  'plan_digest': record['plan_digest']})   # design/222: the page counts a take shot for another plan as "must be made again"
-    g.setdefault('takes', []).append({'job_id': job_id, 'same': same, 'camera': camera, 'preparation_id': identity, 'quote': str(quote).strip(), 'by': user['id'], 'at': now()})
-    if ordered:
-        ordered['sent'] = job_id   # the word is used: the next take needs a new one
+                                                  'resolution': gen['resolution'], 'plan_digest': record['plan_digest']})   # design/222: the page counts a take shot for another plan as "must be made again"
+    g.setdefault('takes', []).append({'job_id': job_id, 'same': same_id, 'camera': camera, 'preparation_id': identity, 'quote': str(quote).strip(), 'by': user['id'], 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'take sent', 'job_id': job_id, 'model': gen['model'], 'seconds': seconds, 'prompt': prompt, 'guide_sha256': render['sha256'], 'still_sha256': still['sha256'],
                                                     'request_key': k, 'quote': str(quote).strip(), 'again': bool(before), 'by': user['id'], 'by_name': user.get('name') or ''})
-    return {'shot_id': shot_id, 'job_id': job_id, 'seconds': seconds, 'model': gen['model'], 'next': 'The take is being made (one to three minutes). Then it is checked and shown with its scorecard: `vw visuals status`.'}
+    return {'shot_id': shot_id, 'job_id': job_id, 'seconds': seconds, 'model': gen['model'], 'next': 'The take is being made (one to three minutes). It is shown to the operator as it is, on the page, when every take is made: `vw visuals status`.'}
 
 
 # ---------- what the worker writes back (under the run's lock) ----------
@@ -733,7 +693,7 @@ def view(session, shot_id, url):
                         'url': url(s['key']) if s.get('key') else None, 'overlay_url': url(s['overlay_key']) if s.get('overlay_key') else None,
                         'current': s.get('guide_sha256') == g['sha256']} for s in g.get('stills') or [] if s.get('status') != 'superseded'],
             'drawing': {k: (g.get('drawing') or {}).get(k) for k in ('status', 'sha256', 'changes', 'notes')},
-            'take_prompt': (g.get('take_prompt') or {}).get('prompt'), 'card': {k: v for k, v in ready_card(session, shot_id, VS.prices()['video_inr_per_s']).items() if k in ('ready', 'missing', 'seconds', 'cost_inr', 'prompt', 'look_for')}}
+            'take_prompt': (g.get('take_prompt') or {}).get('prompt'), 'card': {k: v for k, v in ready_card(session, shot_id, take_price()).items() if k in ('ready', 'missing', 'seconds', 'cost_inr', 'prompt', 'look_for')}}
 
 
 def status(conn, store, run, outputs, shot_id):
@@ -818,45 +778,20 @@ def older_start_picture_retired(store, run, outputs, body):
         raise Problem(410, 'RETIRED', START_PICTURE_RETIRED)
 
 
-# ---------- when a take is wrong: the cause, then the ladder (SK, 10 Nov 2026: fix once, then cut shots, then hide the detail) ----------
+# ---------- when a take is wrong (design/223, SK 22 Nov 2026) ----------
+# The operator says what is wrong, in plain words; the assistant chooses the route of the correction (`corrections.RULE`, `corrections.send`); there is
+# no limit on rounds. The older way is retired by name: a cause named for a rejected take (still, guide, words, model), "change one thing", at most two
+# takes from one camera and the ladder after them (design/35 rows 321, 322).
 
-LADDER = ('A third try of the same shot is not made. Choose with the operator: cut the shot into shorter shots, each showing one thing (revise the plan); '
-          'or move the camera closer or to another angle so the detail need not be shown (a new camera in the scene); or leave the shot out.')
-CAUSES = {'still': 'the still (the take\'s first frame did not match it, or the still itself was wrong)', 'guide': 'the guide (a reach, a path, a speed, an entry, a missing support)',
-          'words': 'the words (only what the guide and the still cannot carry)', 'model': 'none of these: the model\'s own limit'}
-
-
-def _rejected(session, g):
-    """The shot's takes whose latest review is a rejection, oldest first. A clip that was never a take (blocked) is not counted."""
-    out = []
-    for t in g.get('takes') or []:
-        reviews = (session.get('reviews') or {}).get(t.get('job_id') or '') or []
-        blocked = ((session.get('take_checks') or {}).get(t.get('job_id') or '') or {}).get('blocked')
-        if reviews and reviews[-1].get('decision') == 'rejected' and not blocked:
-            out.append(t)
-    return out
+CAUSE_RETIRED = ('Naming a cause for a rejected take is retired (design/223). The operator says what is wrong with a take, and you choose the route of its '
+                 'correction: `vw guide corrections` gives the rule, the frames and the pictures; then `vw guide correct --shot S --file work/guide/S/correction.json`.')
+ORDER_RETIRED = ('"Make another" and its withdrawal are retired (design/223). To withdraw a correction the operator asked for: '
+                 '`vw guide correct --shot S --withdraw --reason "<their words>"`.')
 
 
-def set_cause(conn, store, user, run, outputs, shot_id, cause, notes, fix):
-    """Why the last rejected take was wrong, asked in order: the first frame against the still, then the guide, only then the words; else the model's own limit.
-    Kept on the take and in the record; the next take is refused until it is said, and a redo changes one thing."""
-    session = VS.session_of(store, run, outputs)
-    g = entry_of(session, shot_id)
-    rejected = _rejected(session, g)
-    need(rejected, 'No take of this shot has been rejected; a cause is said of a rejected take.')
-    last = rejected[-1]
-    need(cause in CAUSES, 'The cause is one of: ' + '; '.join(f'{k} = {v}' for k, v in CAUSES.items()) + '.')
-    need(len(str(notes or '').split()) >= 3, 'Say what was wrong, in a sentence.')
-    need(len(str(fix or '').split()) >= 2, 'Say the one thing that changes next (or "cut the shot", "another angle", "leave it out").')
-    check = (session.get('take_checks') or {}).get(last['job_id']) or {}
-    first = next((r for r in check.get('scorecard') or [] if r['line'] == 'first frame'), None)
-    need(not (cause == 'words' and first and first['state'] == 'Fail'), "The take's first frame did not match the still: the fault is before the video, in the still or the guide. No wording fixes that.")
-    last['cause'] = {'cause': cause, 'notes': str(notes).strip(), 'fix': str(fix).strip(), 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
-    if cause == 'model' or len([t for t in rejected if t.get('camera') == last.get('camera')]) >= 2:
-        g.pop('again', None)   # design/222: no take is made (the ladder): the word given on the page for one more is dropped
-    VS.save_session(store, run, session)
-    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'cause of the last take', 'job_id': last['job_id'], 'cause': cause, 'notes': str(notes).strip(), 'fix': str(fix).strip(), 'by': user['id'], 'by_name': user.get('name') or ''})
-    here = [t for t in rejected if t.get('camera') == last.get('camera')]
-    nxt = LADDER if cause == 'model' or len(here) >= 2 else {'still': 'Repair the still (`vw guide repair`) or make it again; then shoot.', 'guide': 'Change the scene (one thing) and send it again: `vw guide scene`. It is free.',
-                                                              'words': 'Change the words (one thing): `vw guide prompt`; then shoot.'}[cause]
-    return {'shot_id': shot_id, 'job_id': last['job_id'], 'cause': cause, 'rejected_from_this_camera': len(here), 'next': nxt}
+def cause_retired(*_):
+    raise Problem(410, 'RETIRED', CAUSE_RETIRED)
+
+
+def order_retired(*_):
+    raise Problem(410, 'RETIRED', ORDER_RETIRED)

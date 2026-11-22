@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response as RawResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from . import analysis_jobs, auth, brandlib, connect, core, drawings, elevenlabs, film, files, guide, jobs, library, runlog, visuals_stage, voices, web, worker
+from . import analysis_jobs, auth, brandlib, connect, core, corrections, drawings, elevenlabs, film, files, guide, jobs, library, runlog, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -1726,13 +1726,37 @@ def visuals_guide_prompt(run_id: UUID, body: GuidePrompt, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/guide/cause')
 def visuals_guide_cause(run_id: UUID, body: GuideCause, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.set_cause(conn, storage(), user, run, outputs, body.shot_id, body.cause, body.notes, body.fix))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.cause_retired())   # design/223: retired by name
 
 
 @app.post('/api/runs/{run_id}/visuals/guide/shoot', status_code=201)
 def visuals_guide_shoot(run_id: UUID, body: GuideShoot, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.cancel_order(conn, storage(), user, run, outputs, body.shot_id, body.quote) if body.cancel
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.order_retired() if body.cancel
                          else guide.shoot(conn, storage(), user, run, outputs, body.shot_id, body.quote, body.again), 201)
+
+
+class GuideCorrect(Write):   # design/223: the assistant's route for a correction (`corrections.send`), or a correction of a shot already accepted (`reopen`)
+    shot_id: str
+    correction: dict = Field(default_factory=dict)
+    reopen: str = ''
+    quote: str = ''
+
+
+@app.get('/api/runs/{run_id}/visuals/guide-corrections')
+def visuals_guide_corrections(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)   # a read never waits for the lock
+    store = storage()
+
+    def go():
+        session = visuals_stage.session_of(store, run, core.current_outputs(conn, run['id']))
+        return corrections.listed(store, session, visuals_stage.current_plan(store, session), visuals_stage.take_jobs(conn, run))
+    return Response(visuals_stage.guarded(go))
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/correct', status_code=201)
+def visuals_guide_correct(run_id: UUID, body: GuideCorrect, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: corrections.reopen(conn, storage(), user, run, outputs, body.shot_id, body.reopen, body.quote) if body.reopen.strip()
+                         else corrections.send(conn, storage(), user, run, outputs, body.shot_id, body.correction), 201)
 
 
 class DrawingSet(Write):   # design/200: a thing's drawing set (app/drawings.py); free, nothing is queued

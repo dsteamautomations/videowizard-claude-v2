@@ -21,9 +21,10 @@ You write data and words. You never run Blender, never call a picture or video m
 | 5. The still | `vw guide still --shot S --file still.json`; then `vw guide look --shot S` | paid (one picture) |
 | 6. The overlay | the operator looks at the overlay and approves the exact file, or it is repaired or rejected | free |
 | 7. The take's words | `vw guide prompt --shot S --file take.txt` | free |
-| 8. Shoot | only on the operator's word: `vw guide shoot --shot S --quote "<their words>"` | paid (one take) |
-| 9. Claude's check | `vw visuals pictures --looks`: a `vw-take-look` helper judges the take from its frames (one every half second, the sheet at four a second, the still); the server measures real footage, the length, the first frame and one continuous shot | free |
-| 10. Review | on the page (`vw visuals page`), all takes together, once every take is made and checked: Select, Make another, or Reject. Until then say step 7's line of counts as it is and ask nothing | free |
+| 8. Shoot | only on the operator's word: `vw guide shoot --shot S --quote "<their words>"`. The first take is made once, small (360p) | paid (one take) |
+| 9. The operator's answer | on the page (`vw visuals page`), all takes together, once every take is made: Accept, or Say what is wrong. Nobody checks a take first: not you, not a helper. Until the page opens say step 7's line of counts as it is and ask nothing | free |
+| 10. The full-size video | made by the server when the operator accepts a small take; they see the two side by side and accept it before it goes in the film | paid |
+| 11. A correction | you choose the route: `vw guide corrections`, then `vw guide correct --shot S --file work/guide/S/correction.json`. No limit on rounds | paid |
 
 One helper builds one shot. The checker is always a different, fresh helper. A scene gets one verdict. After the third failed check in a row the server holds the shot and asks the operator in the chat (`vw visuals next`): build nothing more for it until they answer.
 
@@ -170,16 +171,28 @@ Never: camera gear words; mood words; "Do not…" or "Keep…" sentences; a plac
 
 ## When a take is wrong
 
-Ask in this order, and change one thing:
+The operator says what is wrong, in plain words, on the page. Never ask them for seconds, a cause or a way to correct. You do not judge a take: the frames you are given are only for choosing the route and placing a cut.
 
-1. Is it real footage, and as long as the guide? If not, the server has already set it aside; the operator may send the same request once more.
-2. Does its first frame match the still? If not, the fault is the still or the guide.
-3. Is the fault in the guide (a reach, a path, a speed, a missing support)? Fix the scene. It is free.
-4. Only then the words, and only for what the guide and the still cannot carry.
+`vw guide corrections` writes `work/guide/corrections.json`: every correction that waits, with the operator's words, the video's frames (one every half second) and its sheet, the take words and the still's words, the shot's approved pictures, and `rule`. **`rule` is the one place the choice is written; read it each time and follow it.** In short:
 
-A second take is ordered by the operator on the page ("Make another", with their words): that is their word, so no card is shown again. Say the cause first (`vw guide cause`), change that one thing, then `vw guide shoot --shot S` (no `--quote`). If the cause is the still or the layout, its card comes first; if it is the model's own limit, no take is made. If the operator withdraws the order in the chat: `vw guide shoot --shot S --cancel --quote "<their words>"`; if the cost limit refuses it, the order is dropped: tell the operator the spend. A take rejected with no new one ordered: ask the operator what happens to the shot (cut it, another angle, or leave it out).
+| The fault | Route |
+|---|---|
+| The video is fine, and certain things in it must be corrected, added or removed | `edit`: the whole video and words; no picture |
+| The first seconds are usable and what happens after them must change | `remake`: a clip cut before the fault (1 to 3 s; in doubt, earlier), up to 6 approved pictures, a short prompt |
+| Both | `both`: the edit, then the remake from the edited video, in a row |
+| Nothing of the video is usable, and the still and the layout are right | `first_take`: the first take is made again |
+| The words are about the still, the layout or the camera; the shot should be cut or left out; or the words do not say what should change | `none`: nothing is made; say it to the operator in one plain sentence |
 
-The same request is never sent twice. After a second failure, do not try a third time: propose cutting the shot into shorter cuts, a closer angle, or leaving the detail out, and let the operator choose.
+Write `work/guide/<shot>/correction.json` in the shape `file` gives, and send it: `vw guide correct --shot S --file work/guide/S/correction.json`. Read what the server refuses and correct that. Say the server's line of what was ordered to the operator as it is, and ask nothing with it.
+
+- An edit: each change as one plain, exact line (what, where, what is there instead), then what must stay. The server writes the fixed opening and closing.
+- A remake's prompt, short, in this order: what the shot is for; what stays as in the clip; what happens, in plain terms; the result seen at the end. No second for each move, no box or layout words; say what is there, not what is missing; be exact where physics depends on it (which hand, which ends).
+- A remake's pictures: only approved ones, clean and cropped close; never one that shows the action being removed. What the film has no picture of goes in the words.
+- Read the take words and the still's words. When our own words asked for the fault, say so in `our_words.what` and give the corrected take words in `our_words.take_words`. The still and the plan are not changed.
+- When the still itself shows the fault and the rest is fine, the route is `edit` (it sends no still). `first_take` would bring the fault back.
+- The operator withdraws a correction: `vw guide correct --shot S --withdraw --reason "<their words>"`. They correct a shot they had accepted: `vw guide correct --shot S --reopen "<what is wrong>" --quote "<their words>"`.
+- A video that could not be made at the provider is shown with what the provider answered. The operator may send the same request once more ("Send it again"); never send it again yourself.
+- When the cost limit holds a video, tell the operator the spend. It is sent when the owner sets another limit; nothing is answered again.
 
 ## A person stands where a real person would do the job
 

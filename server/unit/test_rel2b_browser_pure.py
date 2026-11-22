@@ -138,12 +138,12 @@ def test_step_7_the_same_list(browser, size, scheme):
     W = B7.W
     fits(pg, 'nothing answered')
     B7.go(pg, B7.TWO)
-    pg.locator('#pbar [data-choice="select"]').click()                                                       # take 2 failed its check: against it
+    pg.locator('#pbar [data-choice="select"]').click()
     B7.saved(pg, 'l01', 'select')
     B7.go(pg, B7.ONE)
     pg.locator('#pbar [data-choice="select"]').click()
     B7.saved(pg, 'l02', 'select')
     got = fits(pg, 'two answered')
-    assert (got['l01']['badge'], got['l01']['words']) == ('!', W['against']) and (got['l02']['badge'], got['l02']['words']) == ('✓', W['done']['select'])
+    assert (got['l01']['badge'], got['l01']['words']) == ('✓', W['done']['select']) == (got['l02']['badge'], got['l02']['words'])   # design/223: a take has no check, so no answer goes against one (until then: '!' and "Against the check" for take 2)
     assert pg.errors == []
     pg.close()

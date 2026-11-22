@@ -861,9 +861,9 @@ def cmd_guide(a):
     m = active()
     base = f"/api/runs/{m['run_id']}/visuals"
     ws = workspace(m['code'])
-    if not a.shot:
+    if not a.shot and a.what != 'corrections':
         emit({'action': 'refused', 'message': f'Give the AI video shot: `vw guide {a.what} --shot S`.'}, 2)
-    folder = ws / 'work' / 'guide' / a.shot
+    folder = ws / 'work' / 'guide' / (a.shot or '')
     if a.what == 'status':
         out = call('GET', f'{base}/guide/{a.shot}')
         emit(out, 0, out.get('next'))
@@ -928,12 +928,40 @@ def cmd_guide(a):
             emit({'action': 'refused', 'message': f'{a.file} is not a file of this run folder.'}, 2)
         out = write(base + '/guide/prompt', {'shot_id': a.shot, 'prompt': path.read_text(encoding='utf-8')})
         emit(out, 0, f"{out['words']} words kept. " + str(out.get('next') or ''))
-    if a.what == 'cause':
-        if not (a.cause and a.notes and a.fix):
-            emit({'action': 'refused', 'message': 'Say what was wrong with the last rejected take: `vw guide cause --shot S --cause still|guide|words|model --notes "<what was wrong>" --fix "<the one thing that changes>"`. '
-                                                  'Ask in order: did the first frame match the still; is the fault in the guide; only then the words; else the model\'s own limit.'}, 2)
-        out = write(base + '/guide/cause', {'shot_id': a.shot, 'cause': a.cause, 'notes': a.notes, 'fix': a.fix})
-        emit(out, 0, out.get('next'))
+    if a.what == 'cause':   # design/223 (SK, 22 Nov 2026): retired by name; the server refuses it too
+        emit({'action': 'refused', 'message': 'Naming a cause for a rejected take is retired (design/223). The operator says what is wrong with a take, and you choose the route of its '
+                                              'correction: `vw guide corrections` gives the rule, the frames and the pictures; then `vw guide correct --shot S --file work/guide/S/correction.json`.'}, 2)
+    if a.what == 'corrections':   # design/223: every correction that waits for its route, with the rule, the video's frames and the shot's approved pictures
+        out = call('GET', base + '/guide-corrections')
+        for c in out.get('corrections') or []:
+            where = f"work/guide/{re.sub(r'[^A-Za-z0-9._-]', '-', str(c.get('shot_id')))}/correction"
+            for f in c.get('frames') or []:
+                f['file'] = f"{where}/frame-{int(round(float(f.get('at_s') or 0) * 10)):04d}.jpg"
+                _download(m, f['key'], f['file'])
+            if c.get('sheet'):
+                c['sheet_file'] = where + '/sheet.jpg'
+                _download(m, c['sheet'], c['sheet_file'])
+            for p in c.get('pictures') or []:
+                p['file'] = f"{where}/picture-{re.sub(r'[^A-Za-z0-9._-]', '-', str(p.get('id')))}{'.png' if str(p.get('key') or '').endswith('.png') else '.jpg'}"
+                _download(m, p['key'], p['file'])
+        (ws / 'work' / 'guide').mkdir(parents=True, exist_ok=True)
+        (ws / 'work' / 'guide' / 'corrections.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+        emit({'file': 'work/guide/corrections.json', 'corrections': [c.get('shot_id') for c in out.get('corrections') or []], 'then': out.get('then')}, 0, out.get('then'))
+    if a.what == 'correct':   # design/223: the route of a shot's correction (--file), its withdrawal (--withdraw), or a correction of a shot already accepted (--reopen)
+        if getattr(a, 'reopen', None):
+            out = write(base + '/guide/correct', {'shot_id': a.shot, 'reopen': a.reopen, 'quote': a.quote or ''})
+            emit(out, 0, out.get('next'))
+        if getattr(a, 'withdraw', False):
+            body = {'route': 'none', 'withdrawn': True, 'reason': a.reason or a.quote or ''}
+        else:
+            if not a.file:
+                emit({'action': 'refused', 'message': 'Give the correction as a file: `vw guide correct --shot S --file work/guide/S/correction.json` (its shape is in `work/guide/corrections.json`, '
+                                                      'made by `vw guide corrections`); or `--withdraw --reason "<the operator\'s words>"`; or `--reopen "<what is wrong>"` for a shot already accepted.'}, 2)
+            body = _json_file(m, a.file)
+            if not isinstance(body, dict):
+                emit({'action': 'refused', 'message': f'{a.file} must be one object with `route` and `reason`; nothing was sent.'}, 2)
+        out = write(base + '/guide/correct', {'shot_id': a.shot, 'correction': body})
+        emit(out, 0, out.get('tell'))
     if a.what == 'shoot':
         out = write(base + '/guide/shoot', {'shot_id': a.shot, 'quote': a.quote or '', 'again': bool(a.again), **({'cancel': True} if getattr(a, 'cancel', False) else {})})   # design/222: with no --quote the server uses the word the operator gave on the page ("Make another"), and refuses when there is none
         emit(out, 0, out.get('next'))
@@ -4092,12 +4120,13 @@ def build_parser():
     s.add_argument('--still', action='store_true', help='upload: the still end-frame, the picture at the end of the shot with no motion, approved before the motion (design/221 row 3)')
     s.add_argument('--wait', action='store_true', help='render, status: wait inside the tool until that job is ready (release 3; check and snapshot always wait)')
     s.set_defaults(fn=cmd_motion)
-    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'drawing', 'drawing-approve', 'drawing-reject', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
-    for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix'):
+    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'drawing', 'drawing-approve', 'drawing-reject', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause', 'corrections', 'correct'])   # integration steps B to E; design/223: corrections, correct (cause is retired and refused by name)
+    for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix', '--reason', '--reopen'):
         s.add_argument(flag)
-    s.add_argument('--cause', choices=['still', 'guide', 'words', 'model'])
-    s.add_argument('--again', action='store_true', help='shoot: send the same request once more, only after a clip that came back unusable, on the operator\'s word')
-    s.add_argument('--cancel', action='store_true', help='shoot: withdraw the take the operator ordered on the page ("Make another"), with their words in --quote; nothing is made (design/222)')
+    s.add_argument('--withdraw', action='store_true', help='correct: withdraw the correction the operator asked for, with their words in --reason; nothing is made (design/223)')
+    s.add_argument('--cause')   # retired (design/223): `vw guide cause` is refused by name
+    s.add_argument('--again', action='store_true', help='shoot: send the same request once more, only after a take that failed at the provider, once, on the operator\'s word (design/223)')
+    s.add_argument('--cancel', action='store_true', help='retired (design/223): the server refuses it by name; withdraw a correction with `vw guide correct --shot S --withdraw`')
     s.set_defaults(fn=cmd_guide)
     s = sub.add_parser('drawing'); s.add_argument('what', choices=['set', 'show', 'approve', 'reject'])   # design/200: a thing's drawing set
     for flag in ('--element', '--file', '--sha', '--quote', '--notes'):

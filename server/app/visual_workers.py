@@ -607,7 +607,10 @@ def process_take(job):
             polls = ((job.get('result') or {}).get('polls') or 0) + 1
             return 'submitted', {'provider_id': remote, 'polls': polls}, None, None, backoff_minutes(polls)
         if state != 'completed':
-            return ('cancelled' if state in ('canceled', 'cancelled') else 'failed'), {'provider_id': remote, 'provider_status': state}, f'Provider reported {state}. No automatic regeneration.', None, None
+            from .video_providers import provider_message   # design/223 (R3): the provider's own status and message, kept and shown
+            said = provider_message(result)
+            return ('cancelled' if state in ('canceled', 'cancelled') else 'failed'), {'provider_id': remote, 'provider_status': state, **({'provider_message': said} if said else {})}, (
+                f'The provider ended the call as {state}' + (f': {said}' if said else '.') + ' Nothing is made again by itself.'), None, None
         data = video_path.read_bytes() if video_path.exists() else provider.output(result)
         if not data:
             raise ValueError('Empty provider output.')
@@ -624,66 +627,44 @@ def process_take(job):
     except (Problem, ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as exc:
         rejected = isinstance(exc, Problem) and exc.code == 'VIDEO_REJECTED'
         if not attempted or rejected:
-            return 'failed', {'phase': 'submit'}, ('Provider rejected the request; inspect the saved attempt before another authorized take.' if rejected else f'Preparation failed ({exc.__class__.__name__}: {exc}).'), None, None
+            said = str((getattr(exc, 'extra', None) or {}).get('provider_message') or '')   # design/223 (R3)
+            return 'failed', {'phase': 'submit', **({'provider_message': said, 'http_status': exc.extra.get('http_status')} if rejected else {})}, (
+                f"The provider refused the call (HTTP {exc.extra.get('http_status')})" + (f': {said}' if said else '.') + ' Nothing was made or charged.' if rejected else f'Preparation failed ({exc.__class__.__name__}: {exc}).'), None, None
         if remote or video_path.exists():
             return 'storage_pending', {'provider_id': remote, 'phase': 'retain'}, f'Retained response/output pending storage ({exc.__class__.__name__}).', None, 10
         return 'submission_unknown', {'phase': 'submit'}, 'Provider acceptance is unknown. Reconcile the retained attempt before any replacement.', None, None
 
 
-def take_reading(snapshot, video_path, sha256, transport_factory):
-    """design/222 (SK, 19 Nov 2026): a take made from a guide is checked by Claude from frames (`takes.record`), so Gemini 3.8 Flash no longer watches
-    it: only the camera's drift is measured here. Any other take keeps the reading it had."""
-    from . import image_check
-    if snapshot.get('kind') != 'guide':
-        return image_check.run_take_check(snapshot, video_path, sha256, transport_factory)
-    record = {'lines': [], 'must_failed': [], 'model': None}
-    try:
-        drift = image_check.take_drift(video_path, snapshot)
-        if drift:
-            record['lines'].append(drift)
-    except Exception as exc:   # the take is never held back by its measurement
-        record['drift_error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
-    return record
-
-
-def merged_check(before, record, sha256):
-    """A take's check record written again (a re-run of the worker's check): Claude's look of the same file and when Claude was asked are kept, and
-    the scorecard carries the look's lines again."""
-    look = (before or {}).get('look') or {}
-    if look.get('sha256') != sha256:
-        return dict(record)
-    out = {**record, 'look': look, **({'asked_at': before['asked_at']} if before.get('asked_at') else {})}
-    if record.get('guide') and look.get('lines'):
-        from . import guide_worker
-        out['scorecard'], out['watch'] = guide_worker.scorecard(record.get('code_lines') or [], {'lines': look['lines']})
-        out['not_read'] = False
-    return out
-
-
 def check_take(job, result):
-    """design/91 N3: the ready take measured before the operator watches it; the record on the session, under the run's lock. Never raises.
-    design/222: Claude's look from frames joins the record later (`takes.record`); a look recorded before a re-run of this check is kept."""
-    from . import image_check
-    from .analysis_jobs import transport_factory
-    store = storage()
+    """After a take is stored; the record on the session, under the run's lock. Never raises.
+    design/223 (SK, 22 Nov 2026): a take made from a guide, and every version of it, is not checked and not measured: the server keeps its frames (one
+    every half second, and the sheet) for the assistant to choose a correction's route and to place a cut, and for both kinds of fault the remake is
+    sent here, when the edit is back (`corrections.landed`). (Until then: the measured lines, a take set aside, the camera's drift, and Claude's look
+    joined to the record later; design/35 rows 317 to 319 and 327.) Any other take keeps the reading it had."""
+    from . import visuals_stage as VS
+    store, jid = storage(), str(job['id'])
     try:
         snapshot = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
-        record = take_reading(snapshot, SPOOL / str(job['id']) / 'output.mp4', result['sha256'], transport_factory)
-        if snapshot.get('kind') == 'guide':   # integration step D: the two checks that block, the sheets and the scorecard
+        made = snapshot.get('kind') in VS.GUIDE_KINDS
+        if made:
             from . import guide_worker
-            record.update(guide_worker.take_checks(snapshot, SPOOL / str(job['id']) / 'output.mp4', store, job['run_id'], str(job['id']), record))
+            record = guide_worker.take_frames(SPOOL / jid / 'output.mp4', store, job['run_id'], jid)
+        else:
+            from . import image_check
+            from .analysis_jobs import transport_factory
+            record = image_check.run_take_check(snapshot, SPOOL / jid / 'output.mp4', result['sha256'], transport_factory)
         with connect() as conn:
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             k = f"{job['run_id']}/visuals/session.json"
             session = json.loads(store.get(k).decode('utf-8'))
-            session.setdefault('take_checks', {})[str(job['id'])] = merged_check((session.get('take_checks') or {}).get(str(job['id'])) or {}, record, result['sha256'])
+            session.setdefault('take_checks', {})[jid] = record
+            if made:
+                from . import corrections, generations
+                corrections.landed(conn, store, {'id': job['run_id']}, session, {**job, 'result': {**(job.get('result') or {}), **result}}, True)
+                generations.add(conn, job['run_id'], snapshot['shot_id'], 'guide', {'kind': 'take made', 'job_id': jid, 'key': result.get('key'), 'sha256': result.get('sha256'),
+                                                                                    'route': snapshot.get('route') or 'first take', 'resolution': snapshot.get('resolution'), 'sheet_key': record.get('sheet_key')})
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
-            if snapshot.get('kind') == 'guide':
-                from . import generations
-                generations.add(conn, job['run_id'], snapshot['shot_id'], 'guide', {'kind': 'take checked', 'job_id': str(job['id']), 'key': result.get('key'), 'sha256': result.get('sha256'),
-                                                                                    'blocked': record.get('blocked'), 'scorecard': record.get('scorecard'), 'watch': record.get('watch'), 'not_read': record.get('not_read'),
-                                                                                    'sheet_key': record.get('sheet_key'), 'pair_key': record.get('pair_key')})
-    except Exception:   # a take is never held back by its check
+    except Exception:   # a take is never held back by what follows it
         return
 
 

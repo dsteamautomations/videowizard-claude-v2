@@ -1,5 +1,5 @@
 """The worker side of the guide route (integration steps B to D, SK 12 Nov 2026): Blender renders on the server, the overlay of a still on its
-guide frame, and the checks on a returned take that block it before anyone is shown it.
+guide frame, and the frames kept of a returned take (design/223: nothing is measured on a take and nothing is set aside).
 
 Renders are free and slow (about 4 s a frame on the VM, software graphics): one at a time, at low priority, in chunks with the job's claim
 renewed between them; the frame folders are deleted when the job ends, whatever happened.
@@ -21,11 +21,6 @@ from .db import connect
 from .storage import storage
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'blender' / 'guide_scene.py'
-LENGTH_SLACK_S = 0.6        # a take is as long as its guide, give or take; double length is the guide followed by new footage
-SAME_AS_GUIDE = 0.04        # mean difference of small grey frames, 0 to 1, under which the clip is the guide itself; set on our own runs' box guides
-# hotfix (SK, 21 Nov 2026: "the upper limit as 30% shift and 30% zoom so that this doesn't initiate any retakes"): the take's first frame against
-# the still. (Until then 3 % of the width and 3 % of zoom, "starting values at 720p": on VW-24 they set aside 8 of 18 takes, at 0.8 to 6.7 %.)
-FIRST_FRAME_SHIFT, FIRST_FRAME_ZOOM = 0.30, 0.30
 
 
 def spool():
@@ -242,38 +237,11 @@ def tick():
     return busy
 
 
-# ---------- the checks on a returned take that block it (step D) ----------
-
-def _grey(im):
-    from .image_check import ALIGN_H, ALIGN_W
-    return im.convert('L').resize((ALIGN_W, ALIGN_H), Image.BILINEAR)
-
-
-def length_line(take_seconds, guide_seconds):
-    ok = abs(float(take_seconds) - float(guide_seconds)) <= LENGTH_SLACK_S
-    return {'check': 'as long as the guide', 'weight': 'must', 'pass': ok, 'pass_when': 'the clip is as long as its guide',
-            'seen': f'the clip is {float(take_seconds):.1f} s, the guide {float(guide_seconds):.1f} s' + ('' if ok else ' (the guide followed by new footage comes back at double length)')}
-
-
-def same_line(take_frames, guide_frames):
-    import numpy as np
-    pairs = list(zip(take_frames, guide_frames))
-    diff = float(np.mean([np.abs(np.asarray(a, dtype=float) - np.asarray(b, dtype=float)).mean() for a, b in pairs])) / 255 if pairs else 1.0
-    ok = diff > SAME_AS_GUIDE
-    return {'check': 'real footage', 'weight': 'must', 'pass': ok, 'pass_when': 'the clip is new footage, not the box guide sent back',
-            'seen': f'the clip differs from its guide by {diff * 100:.1f} % on {len(pairs)} frames' + ('' if ok else ': it is the guide itself, unedited'), 'difference': round(diff, 4)}
-
-
-def first_frame_line(first, still):
-    import numpy as np
-    from . import image_check as IC
-    a, b = _grey(first), _grey(still)
-    m = IC._match(IC._fft(np.asarray(a, dtype=float)), lambda z, im=b: IC._scaled(im, z))
-    ok = round(m['shift'], 4) <= FIRST_FRAME_SHIFT and round(abs(m['scale'] - 1), 4) <= FIRST_FRAME_ZOOM   # rounded: exactly at the limit is within it
-    return {'check': 'first frame matches the still', 'weight': 'must', 'pass': ok, 'pass_when': "the take's first frame is the still: nothing moved, nothing pushed in",
-            'seen': f"shifted {m['shift'] * 100:.1f} % of the width, zoom {abs(m['scale'] - 1) * 100:.1f} %" + ('' if ok else ': the fault is before the video, in the still or the guide; look at the overlay'),
-            'shift_pct': round(m['shift'] * 100, 2), 'zoom_pct': round(abs(m['scale'] - 1) * 100, 2)}
-
+# ---------- the frames of a take ----------
+# design/223 (SK, 22 Nov 2026): nothing is measured on a take and nothing is set aside: every take goes to the operator as it is. The server only keeps
+# frames of it, for the assistant to choose a correction's route and to place a cut; they are no check. (Until then: "real footage", "as long as the
+# guide", "first frame matches the still" and "one continuous shot" were measured, the first three set a clip aside, and a scorecard was kept;
+# design/35 rows 319 and 327.)
 
 def frame_rate(value):
     """A file's frame rate as a number: ffprobe gives it as text like "24/1" (design/222: `float()` of that raised, and no sheet was ever made)."""
@@ -284,29 +252,11 @@ def frame_rate(value):
         return 24.0
 
 
-JUMP_SCORE = 0.25   # ffmpeg's scene score between two neighbouring frames above which the picture has jumped to another view; on VW-12's 17 takes it marks exactly the three with a jump (0.51 to 0.60) and no other
-FRAME_EVERY_S, FRAME_WIDTH = 0.5, 960   # design/222: the frames Claude judges a take from: one every half second, the first and the last, this wide
-
-
-def jumps(video_path):
-    """The seconds at which the picture jumps to another view (a sudden change between two neighbouring frames), measured from the file."""
-    import re
-    r = subprocess.run([settings().FFMPEG_EXECUTABLE, '-hide_banner', '-i', str(video_path), '-vf', f"select='gt(scene,{JUMP_SCORE})',metadata=print", '-an', '-f', 'null', '-'],
-                       capture_output=True, timeout=120)
-    if r.returncode:   # a measurement that did not run is never read as "no jump": the line is left out
-        raise RuntimeError('ffmpeg: ' + r.stderr.decode('utf-8', 'replace')[-200:])
-    return [float(x) for x in re.findall(r'pts_time:([0-9.]+)', r.stderr.decode('utf-8', 'replace'))]
-
-
-def continuous_line(at):
-    """design/222: one continuous shot, measured. It marks the take's line; the take is not set aside."""
-    line = {'check': 'one continuous shot', 'weight': 'must', 'pass': not at, 'pass_when': 'the clip is one shot from its first frame to its last: the picture never jumps to another view',
-            'seen': 'no jump to another view' if not at else 'the picture jumps to another view at ' + ' and at '.join(f'{t:.1f} s' for t in at[:4])}
-    return {**line, 'at_s': round(at[0], 1)} if at else line
+FRAME_EVERY_S, FRAME_WIDTH = 0.5, 960   # the frames of a take: one every half second, the first and the last, this wide
 
 
 def half_second_frames(video_path, seconds, folder):
-    """The frames Claude judges the take from: [(second, jpeg file)], one every FRAME_EVERY_S, then the last frame."""
+    """The frames of a take: [(second, jpeg file)], one every FRAME_EVERY_S, then the last frame."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     ff = settings().FFMPEG_EXECUTABLE
@@ -317,106 +267,24 @@ def half_second_frames(video_path, seconds, folder):
     return out + ([(round(float(seconds), 1), last)] if last.is_file() and (not out or round(float(seconds), 1) > out[-1][0]) else [])
 
 
-def blocked_by(lines):
-    """Why a clip is not shown as a take, in the operator's words; None when it may be shown."""
-    failed = {l['check']: l for l in lines if l.get('pass') is False}
-    if 'real footage' in failed:
-        return 'the guide came back unedited'
-    if 'as long as the guide' in failed:
-        return failed['as long as the guide']['seen']
-    if 'first frame matches the still' in failed:
-        return 'the first frame does not match the still (' + failed['first frame matches the still']['seen'].split(':')[0] + ')'
-    return None
-
-
-def released(rec):
-    """Hotfix (21 Nov 2026): a take's check record written under the older first-frame limits, brought to today's: when the take was set aside
-    for its first frame only and its measured shift and zoom are within the limits, the line passes, the block is gone and the scorecard is
-    rebuilt (Claude's look, when one is there, is kept in it). Returns whether the record changed. Nothing else of the record is touched."""
-    lines = rec.get('code_lines') or []
-    line = next((l for l in lines if l.get('check') == 'first frame matches the still'), None)
-    if not line or line.get('pass') is not False or blocked_by(lines) != rec.get('blocked'):
-        return False
-    if any(l.get('pass') is False for l in lines if l is not line) or line.get('shift_pct') is None or line.get('zoom_pct') is None:
-        return False
-    if line['shift_pct'] / 100 > FIRST_FRAME_SHIFT or line['zoom_pct'] / 100 > FIRST_FRAME_ZOOM:
-        return False
-    line.update({'pass': True, 'seen': str(line.get('seen') or '').split(':')[0]})
-    rec['blocked'] = None
-    rec['scorecard'], rec['watch'] = scorecard(lines, rec.get('look'))
-    return True
-
-
-SCORECARD = ('real footage and length', 'first frame', 'one continuous shot', 'people', 'the action', 'objects', 'bodies and contact', 'the place and the light')   # design/222: "the join" is retired (the page's film order is how it is judged); one continuous shot is measured
-
-
-def scorecard(code_lines, reading):
-    """The lines of the review, each Pass, Fail or Not sure, with one thing to watch and the second it happens. Not sure is never rounded up.
-    design/222: `reading` is Claude's look from frames ({lines: [{check, pass, seen, at_s}]}), None before it comes."""
-    by = {l['check']: l for l in code_lines}
-    read = {l['check']: l for l in (reading or {}).get('lines') or []}
-
-    def state(*ls):
-        if any(l is None or l.get('pass') is None for l in ls):
-            return 'Not sure'
-        if any(l['pass'] == 'na' for l in ls):   # release 1, A3 (visuals_stage.NA): the line does not apply to this take: never a fail, never a pass
-            return 'Does not apply'
-        return 'Pass' if all(l['pass'] for l in ls) else 'Fail'
-    rows = [{'line': 'real footage and length', 'state': state(by.get('real footage'), by.get('as long as the guide')), 'seen': '; '.join(l['seen'] for l in (by.get('real footage'), by.get('as long as the guide')) if l)},
-            {'line': 'first frame', 'state': state(by.get('first frame matches the still')), 'seen': (by.get('first frame matches the still') or {}).get('seen', '')}]
-    if by.get('one continuous shot'):
-        rows.append({'line': 'one continuous shot', 'state': state(by['one continuous shot']), 'seen': by['one continuous shot'].get('seen', ''), 'at_s': by['one continuous shot'].get('at_s')})
-    for name in SCORECARD[3:]:
-        l = read.get(name)
-        rows.append({'line': name, 'state': state(l), 'seen': (l or {}).get('seen') or ('not read' if not l else ''), 'at_s': (l or {}).get('at_s')})
-    worst = next((r for r in rows if r['state'] == 'Fail'), None) or next((r for r in rows if r['line'] in SCORECARD[3:] and r['state'] == 'Not sure'), None)
-    watch = {'line': worst['line'], 'what': worst['seen'], 'at_s': worst.get('at_s')} if worst else {'line': 'the action', 'what': 'the one action of the shot, from its first move to its last', 'at_s': None}
-    return rows, watch
-
-
-def take_checks(snapshot, video_path, store, run_id, jid, reading):
-    """Everything a guide take is checked for in code, the sheets the operator looks at, and the scorecard. Never raises: a fault here is 'not checked', said so."""
+def take_frames(video_path, store, run_id, jid):
+    """The frames of a take or of a version, stored beside it: the sheet at four a second and one frame every half second. Never raises: a fault
+    here leaves the take without frames, said in `frames_error`; the take is shown all the same."""
     from . import drawn, motion
-    from .image_check import _frames
     from .visual_workers import probe
-    lines, out = [], {'guide': True}
+    out = {'guide': True, 'frames': [], 'sheet_key': None}
     try:
         ev = probe(video_path)
-        lines.append(length_line(ev['duration_seconds'], snapshot['guide']['seconds']))
-        guide_path = Path(video_path).with_name('guide.mp4')
-        guide_path.write_bytes(store.get(snapshot['guide']['key']))
-        take_frames = _frames(video_path, per_second=1, limit=8)
-        lines.append(same_line(take_frames, _frames(guide_path, per_second=1, limit=8)))
-        still = Image.open(BytesIO(store.get(snapshot['start_image']['key'])))
-        first_png = motion.frames_png(video_path, [0])[0]
-        first = Image.open(BytesIO(first_png))
-        lines.append(first_frame_line(first, still))
-        try:   # design/222: one continuous shot, measured; a fault here leaves the line out, never the take
-            lines.append(continuous_line(jumps(video_path)))
-        except Exception:
-            pass
         fps = frame_rate(ev.get('fps'))
         n = max(1, int(round(ev['duration_seconds'] * fps)))
         idx = sorted(set(range(0, n, max(1, int(round(fps / 4))))) | {n - 1})
         sheet = drawn.sheet(motion.frames_png(video_path, idx), fps, ev.get('width') or 1280, ev.get('height') or 720)
         out['sheet_key'] = f'{run_id}/visuals/takes/{jid}-sheet-4fps.jpg'
         store.put(out['sheet_key'], sheet, 'image/jpeg')
-        pair = Image.new('RGB', (1280, 360), (20, 20, 20))
-        pair.paste(first.convert('RGB').resize((640, 360), Image.LANCZOS), (0, 0))
-        pair.paste(still.convert('RGB').resize((640, 360), Image.LANCZOS), (640, 0))
-        buf = BytesIO()
-        pair.save(buf, format='JPEG', quality=88)
-        out['pair_key'] = f'{run_id}/visuals/takes/{jid}-first-frame-and-still.jpg'
-        store.put(out['pair_key'], buf.getvalue(), 'image/jpeg')
-        out['frames'] = []   # design/222: what Claude judges the take from, stored beside it
         for at, path in half_second_frames(video_path, ev['duration_seconds'], Path(video_path).with_name('frames')):
             k = f'{run_id}/visuals/takes/{jid}-f-{int(round(at * 10)):04d}.jpg'
             store.put(k, path.read_bytes(), 'image/jpeg')
             out['frames'].append({'at_s': at, 'key': k})
     except Exception as exc:
-        out['code_error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
-    out['blocked'] = blocked_by(lines) or ('the checks could not be run (' + out['code_error'] + ')' if out.get('code_error') and len([l for l in lines if l['check'] != 'one continuous shot']) < 3 else None)
-    out['code_lines'] = lines
-    out['scorecard'], out['watch'] = scorecard(lines, reading)
-    out['not_read'] = bool((reading or {}).get('error')) or not (reading or {}).get('lines')
+        out['frames_error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
     return out

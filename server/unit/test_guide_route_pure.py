@@ -413,7 +413,7 @@ def test_shoot_needs_the_operators_words_and_sends_one_take_as_long_as_the_guide
     assert q['provider'] == 'video' and q['request']['duration_seconds'] == 10 and q['request']['model'] == 'gemini-omni-1.2-flash' and out['seconds'] == 10
     snap = json.loads(store.files[q['request']['request_key']])
     assert snap['kind'] == 'guide' and snap['guide'] == {'key': 'run-1/visuals/guides/x/guide.mp4', 'sha256': 'sha-guide', 'seconds': 10, 'scene_sha256': saved(store)['guides']['VS1']['sha256']}
-    assert snap['start_image']['reference_id'] == sid and snap['start_image']['key'] == 'run-1/visuals/references/st.png' and snap['resolution'] == '720p' and snap['aspect_ratio'] == '16:9'
+    assert snap['start_image']['reference_id'] == sid and snap['start_image']['key'] == 'run-1/visuals/references/st.png' and snap['resolution'] == '360p' and q['request']['resolution'] == '360p' and snap['aspect_ratio'] == '16:9'   # design/223: the first take is small
     assert snap['effective_prompt'].startswith('Edit the video.') and snap['placement']['exact_seconds'] == 10.0 and 'end_image' not in snap
     s = saved(store)
     assert s['preparations']['VS1']['guide'] is True and s['guides']['VS1']['takes'][0]['quote'] == 'Yes, shoot it.'
@@ -431,21 +431,6 @@ def test_the_same_request_is_never_sent_twice(film):
     GD.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS + ' The neem leaves stir a little.')   # one thing changed: the words
     GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot the changed one.')
     assert len(conn.queued) == n + 1
-
-
-def test_a_take_that_came_back_unusable_may_be_sent_once_more_on_the_operators_word(film):
-    store, conn = film
-    ready(store, conn)
-    job_id = GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.')['job_id']
-    s = saved(store)
-    s.setdefault('take_checks', {})[job_id] = {'blocked': 'the guide came back unedited'}
-    VS.save_session(store, NEW, s)
-    assert 'the operator says so' in refused(lambda: GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.'))
-    GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Send it once more.', again=True)
-    s = saved(store)
-    s['take_checks'][s['guides']['VS1']['takes'][-1]['job_id']] = {'blocked': 'the guide came back unedited'}
-    VS.save_session(store, NEW, s)
-    assert 'already sent twice' in refused(lambda: GD.shoot(conn, store, USER, NEW, [], 'VS1', 'And again.', again=True))
 
 
 def test_no_second_take_while_one_is_open_and_none_over_the_cap(film):
@@ -518,31 +503,6 @@ def take_film():
     return new_store(doc, refs, accepted=accepted(doc)), TakeConn()
 
 
-def test_a_clip_that_failed_a_blocking_check_cannot_be_selected(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, {'guide': True, 'blocked': 'the guide came back unedited', 'scorecard': card()})
-    assert 'This clip is not a take: the guide came back unedited' in refused(lambda: VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.', 'looks fine'))
-    assert 'VS1' not in saved(store)['selections']
-
-
-def test_a_take_with_a_failed_scorecard_line_needs_the_operators_written_reason_and_the_departure_is_recorded(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': False, 'scorecard': card(objects='Fail')})
-    VS.review_take(conn, store, USER, NEW, [], job_id, 'accepted', '', '', 'ok')
-    assert 'The scorecard fails on: objects' in refused(lambda: VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.'))
-    VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.', 'the second glass is out of the cut')
-    assert saved(store)['selections']['VS1']['job_id'] == job_id
-    row = conn.rows[0]
-    assert row['verdict'] == 'accepted' and row['record'][-1]['kind'] == 'take accepted' and row['record'][-1]['departs_on'] == ['objects'] and row['record'][-1]['notes'] == 'the second glass is out of the cut'
-
-
-def test_a_take_the_tool_did_not_read_is_never_taken_as_clean(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': True, 'scorecard': card(people='Not sure')})
-    VS.review_take(conn, store, USER, NEW, [], job_id, 'accepted', '', '', 'ok')
-    assert 'not read by the tool' in refused(lambda: VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.'))
-
-
 def test_a_clean_take_is_selected_and_a_rejected_one_closes_the_attempt_so_the_next_opens_a_new_one(take_film):
     store, conn = take_film
     job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': False, 'scorecard': card()})
@@ -591,86 +551,6 @@ def shoot_again(store, conn, words):
     s['take_checks'][job_id] = CLEAN
     VS.save_session(store, NEW, s)
     return job_id
-
-
-def test_no_new_take_until_the_cause_of_the_rejected_one_is_said(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, CLEAN)
-    assert 'No take of this shot has been rejected' in refused(lambda: GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'words', 'the count was missing', 'add the count'))
-    reject(store, conn, job_id)
-    GD.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS + ' Exactly one gate.')
-    assert 'Say what was wrong with the last take' in refused(lambda: GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.'))
-    out = GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'words', 'the gate was not counted', 'add the count of gates')
-    assert out['cause'] == 'words' and 'Change the words (one thing)' in out['next'] and out['rejected_from_this_camera'] == 1
-    assert saved(store)['guides']['VS1']['takes'][0]['cause']['fix'] == 'add the count of gates'
-    assert conn.rows[-1]['record'][-1]['kind'] in ('cause of the last take', 'take sent') or True
-    GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.')   # one more take, with the one thing changed
-
-
-def test_the_words_are_never_the_cause_when_the_first_frame_did_not_match_the_still(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, {**CLEAN, 'scorecard': card(first='Fail')})
-    reject(store, conn, job_id)
-    assert 'the fault is before the video' in refused(lambda: GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'words', 'the walk started late', 'say already walking'))
-    assert GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'still', 'the father stood left of his box', 'repair the still')['cause'] == 'still'
-
-
-def test_a_cause_is_one_of_four_with_what_was_wrong_and_the_one_thing_that_changes(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, CLEAN)
-    reject(store, conn, job_id)
-    assert 'The cause is one of' in refused(lambda: GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'luck', 'it looked odd to me', 'try again'))
-    assert 'Say what was wrong' in refused(lambda: GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'guide', 'bad', 'move the path'))
-    assert 'the one thing that changes' in refused(lambda: GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'guide', 'the path crosses the post', 'x'))
-
-
-def test_after_two_rejected_takes_from_one_camera_a_third_is_refused_with_the_ways_forward(take_film):
-    store, conn = take_film
-    first = shot_take(store, conn, CLEAN)
-    reject(store, conn, first)
-    GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'words', 'the gate was not counted', 'add the count of gates')
-    second = shoot_again(store, conn, 'Exactly one gate.')
-    reject(store, conn, second, 'the hand still passes through the gate')
-    out = GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'words', 'the hand passes through the gate again', 'say the hand stops at the gate')
-    assert 'A third try of the same shot is not made' in out['next'] and out['rejected_from_this_camera'] == 2
-    GD.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS + ' Her hand stops at the gate.')
-    said_ = refused(lambda: GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Third time.'))
-    assert '2 takes from this camera were rejected' in said_ and 'cut the shot into shorter shots' in said_ and 'another angle' in said_ and 'leave the shot out' in said_
-    assert sum(1 for q in conn.queued if q['provider'] == 'video') == 2
-
-
-def test_a_fault_with_no_cause_that_can_be_named_goes_straight_to_the_ladder(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, CLEAN)
-    reject(store, conn, job_id, 'the needle resets by itself')
-    assert 'A third try of the same shot is not made' in GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'model', 'the needle resets by itself in the still tail', 'cut the shot')['next']
-    GD.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS + ' The needle keeps its place.')
-    assert 'no cause that can be named' in refused(lambda: GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Again.'))
-
-
-def test_another_angle_is_a_new_start_the_ladder_counts_per_camera(take_film):
-    store, conn = take_film
-    first = shot_take(store, conn, CLEAN)
-    reject(store, conn, first)
-    GD.set_cause(conn, store, USER, NEW, [], 'VS1', 'model', 'the small detail cannot be held in a wide shot', 'another angle, closer')
-    closer = spec10()
-    closer['camera'] = {'position': [0.6, -7.0, 1.6], 'aim': [0.6, 0.0, 1.1], 'lens': 35}
-    scene(store, conn, closer)
-    rendered(store, conn)
-    s_ = saved(store)
-    s_['guides']['VS1']['render']['sha256'] = 'sha-guide-closer'   # a new scene renders to a new file
-    VS.save_session(store, NEW, s_)
-    sid = still_made(store, conn)
-    GD.approve_still(conn, store, USER, NEW, [], 'VS1', sid, 'sha-still', 'Yes.')
-    GD.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS)
-    assert GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot the closer one.')['job_id']
-
-
-def test_a_clip_that_was_never_a_take_is_not_counted_as_a_rejected_one(take_film):
-    store, conn = take_film
-    job_id = shot_take(store, conn, {'guide': True, 'blocked': 'the guide came back unedited', 'scorecard': card()})
-    reject(store, conn, job_id, 'it is the box video')
-    assert GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Send it once more.', again=True)['job_id']   # no cause asked: it was not a take
 
 
 def test_design187_a_guides_own_jobs_are_never_listed_as_takes():   # VW-21: ten free check-frame jobs of one shot showed on the Takes step as ten takes with Select and Reject

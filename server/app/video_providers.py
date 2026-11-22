@@ -81,6 +81,13 @@ def pool_keys():
     return _keys.pool('gemini',settings())
 
 
+def provider_message(result):
+    """design/223 (R3): what the provider said of a call it ended as failed: its error's code or status and message; '' when it gave none."""
+    e=(result or {}).get('error')
+    if isinstance(e,dict):return ': '.join(str(x) for x in (e.get('status') or e.get('code'),e.get('message')) if x)[:600]
+    return ' '.join(str(e).split())[:600] if e else ''
+
+
 class Provider:
     def __init__(self,name,key_index=None):
         # hotfix (SK, 21 Nov 2026): `key_index`, the key that sent a take: every later call of that take uses it (only that key can read the take).
@@ -95,10 +102,12 @@ class Provider:
         try:
             with httpx.stream(method,url,json=body,headers=headers,timeout=60,follow_redirects=False) as response:
                 if not response.is_success:
+                    try:said=' '.join(response.read().decode('utf-8','replace').split())[:600]   # design/223 (R3): what the provider answered, kept and shown; it never holds a key
+                    except Exception:said=''
                     if self.key_index is not None and response.status_code in (429,401,403):   # design/114: the key cools; the next attempt takes another
                         from . import keys as _keys;_keys.cool('gemini',self.key_index,_keys.reason_of(response.status_code))
                     code='VIDEO_REJECTED' if paid and 400<=response.status_code<500 and response.status_code not in (408,429) else 'VIDEO_UNKNOWN' if paid else 'VIDEO_PROVIDER'
-                    raise Problem(502,code,'Provider request was not accepted or could not be confirmed. Review this saved attempt; no automatic resubmission.',http_status=response.status_code)
+                    raise Problem(502,code,'Provider request was not accepted or could not be confirmed. Review this saved attempt; no automatic resubmission.',http_status=response.status_code,provider_message=said)
                 raw=bytearray()
                 for chunk in response.iter_bytes():
                     raw.extend(chunk)
@@ -137,6 +146,16 @@ class Provider:
             raise Problem(502,'VIDEO_PROVIDER',"The guide's upload was interrupted. Nothing was charged; no take was made.") from None
 
     def build(self,snapshot,store):
+        if snapshot.get('kind') in ('edit','remake'):   # design/223 (SK, 22 Nov 2026): a version of a take. An edit: the whole video and the words, no picture, no task
+            # (the request of the trial's `oe_edit.py`). A remake: the clip, the pictures and the words, task `reference_to_video` (`oe_ref3.py`). The same length as the take.
+            from . import corrections
+            remake=snapshot['kind']=='remake'
+            video=corrections.clip(store,snapshot) if remake else store.get(snapshot['source']['key'])
+            images=[{'type':'image','mime_type':p['mime_type'],'data':base64.b64encode(store.get(p['key'])).decode()} for p in (snapshot.get('pictures') or [])] if remake else []
+            return {'model':snapshot['model'],'background':True,'store':True,
+                'input':[{'type':'video','uri':self.upload(video)}]+images+[{'type':'text','text':snapshot['effective_prompt']}],
+                **({'generation_config':{'video_config':{'task':'reference_to_video'}}} if remake else {}),
+                'response_format':{'type':'video','aspect_ratio':snapshot['aspect_ratio'],'resolution':snapshot['resolution'],'duration':f"{int(snapshot['duration_seconds'])}s"}}
         if snapshot.get('guide'):   # integration step D: the guide first, then the still, then the words; the length in the request, equal to the guide's
             still=snapshot['start_image']
             return {'model':snapshot['model'],'background':True,'store':True,

@@ -129,74 +129,9 @@ def test_the_overlay_draws_the_guides_edges_in_red_over_the_still_with_both_pict
     assert out.getpixel((10, 200))[0] < 80   # below: the guide frame, small
 
 
-# ---------- the checks that block a returned clip ----------
-
-def test_a_clip_as_long_as_its_guide_passes_and_double_length_fails():
-    assert W.length_line(7.04, 7)['pass'] is True
-    line = W.length_line(14.0, 7)
-    assert line['pass'] is False and 'the clip is 14.0 s, the guide 7.0 s' in line['seen'] and 'double length' in line['seen']
-
-
-def test_the_guide_sent_back_unedited_is_caught_and_real_footage_is_not():
-    guide = [Image.new('L', (256, 144), 60 + 10 * i) for i in range(4)]
-    assert W.same_line([g.copy() for g in guide], guide)['pass'] is False
-    footage = [Image.effect_noise((256, 144), 60) for _ in range(4)]
-    line = W.same_line(footage, guide)
-    assert line['pass'] is True and line['difference'] > 0.04
-
-
-def test_the_first_frame_is_measured_against_the_still():
-    base = Image.effect_noise((512, 288), 80).convert('RGB')
-    same = W.first_frame_line(base, base.copy())
-    assert same['pass'] is True and same['shift_pct'] < 1
-    pushed = base.crop((60, 34, 452, 254)).resize((512, 288))   # pushed in by about 1.3 times
-    moved = Image.new('RGB', (512, 288))
-    moved.paste(base, (60, 0))                                  # the whole picture moved by 12 % of the width
-    # hotfix (SK, 21 Nov 2026): the limits are 30 % of the width and 30 % of zoom (until then 3 %: this picture, moved by 12 %, was set aside)
-    line = W.first_frame_line(moved, base)
-    assert line['pass'] is True and line['shift_pct'] > 3 and 'before the video' not in line['seen']
-    assert W.first_frame_line(pushed, base)['pass'] in (True, False)   # measured; what is set aside is in test_hotfix_first_frame_limit_pure.py
-
-
-def test_why_a_clip_is_not_shown_as_a_take():
-    ok = [W.length_line(7, 7), {'check': 'real footage', 'pass': True, 'seen': ''}, {'check': 'first frame matches the still', 'pass': True, 'seen': ''}]
-    assert W.blocked_by(ok) is None
-    assert W.blocked_by([{'check': 'real footage', 'pass': False, 'seen': 'x'}] + ok[:1]) == 'the guide came back unedited'
-    assert 'the clip is 14.0 s' in W.blocked_by([W.length_line(14, 7)])
-    assert W.blocked_by([{'check': 'first frame matches the still', 'pass': False, 'seen': 'shifted 9.0 % of the width, zoom 0.0 %: the fault is before the video'}]).startswith('the first frame does not match the still (shifted 9.0 %')
-
-
-# ---------- the scorecard ----------
-
-CODE = [W.length_line(7, 7), {'check': 'real footage', 'pass': True, 'seen': 'differs by 30 %'}, {'check': 'first frame matches the still', 'pass': True, 'seen': 'shifted 0.4 %'}]
-
-
-def reading(**passes):
-    return {'lines': [{'check': c['check'], 'pass': passes.get(c['check'].split()[0], True), 'seen': 'seen ' + c['check'], 'at_s': 2.5} for c in IC.GUIDE_TAKE_LINES]}
-
-
-def test_the_scorecard_has_eight_lines_and_one_thing_to_watch():
-    # design/222: "the join" is retired (the page's film order is how it is judged); "one continuous shot" is measured and joins the card when its line was made
-    rows, watch = W.scorecard(CODE + [W.continuous_line([])], reading())
-    assert [r['line'] for r in rows] == list(W.SCORECARD) and [r['state'] for r in rows] == ['Pass'] * 8
-    assert 'the join' not in W.SCORECARD and watch['line'] == 'the action'
-    assert [r['line'] for r in W.scorecard(CODE, reading())[0]] == [l for l in W.SCORECARD if l != 'one continuous shot']   # a record made before design/222 has no such line
-    jumped, watch = W.scorecard(CODE + [W.continuous_line([1.08])], reading())
-    assert jumped[2] == {'line': 'one continuous shot', 'state': 'Fail', 'seen': 'the picture jumps to another view at 1.1 s', 'at_s': 1.1} and watch['line'] == 'one continuous shot'
-
-
-def test_a_failed_line_is_the_thing_to_watch_with_its_second():
-    rows, watch = W.scorecard(CODE, reading(objects=False))
-    assert next(r for r in rows if r['line'] == 'objects')['state'] == 'Fail'
-    assert watch == {'line': 'objects', 'what': 'seen objects', 'at_s': 2.5}
-
-
-def test_a_take_the_tool_could_not_read_is_not_sure_never_pass():
-    rows, watch = W.scorecard(CODE, {'lines': [], 'error': 'no Gemini key on the server'})
-    assert [r['state'] for r in rows[2:7]] == ['Not sure'] * 5 and rows[2]['seen'] == 'not read' and watch['line'] == 'people'
-    rows, _ = W.scorecard([], None)
-    assert rows[0]['state'] == 'Not sure' and rows[1]['state'] == 'Not sure'
-
+# ---------- design/223 (SK, 22 Nov 2026): nothing is measured on a take ----------
+# The tests of the checks that set a returned clip aside (as long as the guide, real footage, the first frame against the still) and of the
+# scorecard are removed with the code they tested (design/35 rows 319, 320, 327); `test_design223_take_process_pure` pins that they are gone.
 
 def test_a_guide_take_is_read_against_its_own_lines_never_frozen_person_or_surroundings_move():
     lines = IC.take_lines_for({'kind': 'guide', 'ambient': 'leaves stir', 'camera_move': ''})

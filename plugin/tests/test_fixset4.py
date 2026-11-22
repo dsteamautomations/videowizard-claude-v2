@@ -59,7 +59,7 @@ def test_p11_the_guard_allows_every_helper_the_texts_tell_the_assistant_to_start
     said = ''.join(p.read_text(encoding='utf-8') for p in [REPO / 'server' / 'procedures' / 'v3.json', *sorted((REPO / 'server' / 'app').glob('*.py')),
                                                            PLUGIN / 'commands' / 'vw.md', *sorted((PLUGIN / 'skills').glob('*/SKILL.md'))])
     named = [p.stem for p in sorted((PLUGIN / 'agents').glob('*.md')) if p.stem in said]
-    assert {'vw-picture-look', 'vw-take-look', 'vw-motion-parts', 'vw-still-prompts', 'vw-motion-shot', 'vw-motion-check'} <= set(named)
+    assert {'vw-picture-look', 'vw-motion-parts', 'vw-still-prompts', 'vw-motion-shot', 'vw-motion-check'} <= set(named) and 'vw-take-look' not in named   # design/223: the take checker is retired
     blocked = [helper for name in named for helper in (name, 'vw:' + name)
                if run_hook('guard.py', {'tool_name': 'Agent', 'tool_input': {'subagent_type': helper, 'prompt': 'the run folder'}}, tmp_path)[0] != 0]
     assert blocked == []

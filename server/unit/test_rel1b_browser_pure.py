@@ -165,28 +165,6 @@ def test_a_round_of_the_older_server_keeps_the_second_box_it_was_written_with(br
 
 # ---------- B3 and B1, step 7 ----------
 
-def test_a_takes_check_is_the_same_closed_box_and_select_records_at_once(browser):
-    pg = B7.page(browser, B7.doc(now7))
-    B7.go(pg, B7.ONE)
-    b = box(pg)
-    assert b['line'] == 'Passed' and b['open'] == 'false' and 'bad' not in b['cls']
-    B7.go(pg, B7.TWO)
-    k, b = B7.TWO['takes'][1]['check'], box(pg)
-    assert b['line'].startswith('2 warnings: ') and 'bad' in b['cls'] and b['open'] == 'false' and k['faults'][1]['text'] not in pg.locator('#pcheck').inner_text()
-    pg.locator('#pcheckb').click()
-    b = box(pg)
-    assert b['open'] == 'true' and [k['faults'][0]['text'] in b['items'][0], k['faults'][1]['text'] in b['items'][1]] == [True, True] and k['by'] in b['more'] and k['not_judged'] in b['more']
-    assert pg.locator('#pcheckx [data-seek]').count() == len([f for f in k['faults'] if f['at_s'] is not None])   # "Go to N s" beside each warning that has a second
-    assert pg.locator('#pna summary').text_content() == NA['head']
-    pg.locator('#ptabs [data-take="1"]').click()
-    assert box(pg)['open'] == 'false' and box(pg)['line'] == 'Passed'                                         # the other take's box is its own
-    pg.locator('#ptabs [data-take="2"]').click()
-    assert box(pg)['open'] == 'true'
-    pg.locator('#pbar [data-choice="select"]').click()
-    assert B7.saved(pg, 'l01', 'select')['notes'] == '' and pg.locator('#sfix').count() == 0                  # one click against the check: no typed reason
-    assert '(' + B7.W['against'] + ')' in pg.locator('#sanswer').text_content() and pg.errors == []
-    pg.close()
-
 
 def test_a_step_7_round_of_the_older_server_shows_check_and_its_first_fault_and_keeps_its_typed_reason(browser):
     pg = B7.page(browser)

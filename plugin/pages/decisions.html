@@ -381,6 +381,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .kwords{margin-top:3px;font-size:15px;line-height:1.45;max-height:2.9em;overflow:hidden}   /* at most two lines; a longer caption follows the word being spoken (kWords) */
 .pvbox.ksheet{background:var(--line)}
 .kwords .ctx{color:var(--muted);opacity:.75} .kwords .w{border-radius:4px;padding:0 1px} .kwords .w.now{background:var(--accent);color:var(--surface)} .kwords .w.next{color:var(--muted)}
+.kpair{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px} .kpair figure{margin:0;display:flex;flex-direction:column;min-height:0;gap:4px} .kpair figcaption{flex:none;font-size:12px;opacity:.75} .kboth{margin:0 0 10px}   /* design/223: a version beside the video it was made from */
 .ktabs{flex:none;display:flex;gap:6px}
 #sets .ktab{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 12px;font-weight:600;font-size:13px}
 #sets .ktab[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
@@ -1048,7 +1049,7 @@ const sWaiting=()=>{ const r=sRest(); return r?sLines().filter(l=>(r.covers||[])
 const sItems=()=>sLines().filter(l=>l.state==='open').concat(sRest()&&sWaiting().length?[sRest()]:[]);   // what needs an answer, then the other sets (A10)
 const sJudged=()=>sLines().every(l=>l.case!=='judge'||sDone(l));
 const sBtn=(l,a)=>a.choice==='own'?{act:'own',label:(l.own||{}).label,say:(l.own||{}).say}:(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{};
-const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); if(TK()){ const t=b&&(l.takes||[]).find(x=>x.n===b.take); return !!(b&&b.act==='select'&&t&&(t.check||{}).state!=='pass'); } if(PIC()) return !!(b&&(b.against||b.sure)); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
+const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); if(TK()) return false;   /* design/223: a take has no check, so no answer goes against one */ if(PIC()) return !!(b&&(b.against||b.sure)); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
 function sMain(l){ const m=sMade(l), a=sAns(l), c=S.pick[l.line]; return m.find(p=>c?p.code===c:!!a&&!!p.choice&&p.choice===a.choice)||m[0]; }   // A7: A, unless another is made the main picture
 function sSays(l){   // the answer as it stands, in the server's words: the main picture's sentence, else the button's
   const a=sAns(l), w=SW(); if(!a) return l.kept?[w.kept,l.kept]:['',''];
@@ -1268,7 +1269,7 @@ function kRail(it){   // the name and a dot for its state, the state in words as
   return [mk('ul',{},it.map(row))].concat(rec.length?[mk('h2',{},w.answered_head),mk('ul',{},rec.map(row))]:[]); }
 function kSeek(k,f){ const v=()=>PV[(k.video||{}).code];   // "Go to N s": the sheet closes, the player moves there and stops
   return typeof f.at_s==='number'?mk('button',{class:'slink',type:'button','data-seek':String(f.at_s),on:{click:()=>{ kSheet(null); const p=v(); if(p){ p.currentTime=f.at_s; p.pause(); } }}},String(SW().seek||'').replace('{s}',f.at_s)):null; }
-function kCheck(k){ return cBox(k.check||{},S.cur+'|'+k.n,k); }   // release 1, B3: the same closed box as a picture's; each warning with its "Go to N s"
+function kCheck(k){ return k.check?cBox(k.check,S.cur+'|'+k.n,k):null; }   // design/223: a take has no check (a round of an older server may still carry one)   // release 1, B3: the same closed box as a picture's; each warning with its "Go to N s"
 function kWords(l,k,v){   // the words spoken during the shot, the one being spoken marked as the take plays (also when dragged); a word is a whole unit; its time in the take is in_s + its second
   const c=l.caption;
   if(!c||!(c.words||[]).length) return l.words?mk('p',{class:'kwords',id:'pwords'},l.words):null;
@@ -1297,7 +1298,7 @@ function kOver(){   // the film order or the details, over the page; Escape, Clo
   } else {
     const still=pics.find(p=>p.role==='still');
     title=w.details; body=mk('div',{class:'kdl'},
-      mk('div',{},mk('section',{},mk('h4',{},w.d_check),f.length?mk('ul',{id:'dfaults'},f.map(x=>mk('li',{},x.text,' ',kSeek(k,x)))):mk('p',{},c.head),c.by?mk('p',{class:'pby'},c.by):null,c.not_judged?mk('p',{class:'pby'},c.not_judged):null),
+      !k.check?null:mk('div',{},mk('section',{},mk('h4',{},w.d_check),f.length?mk('ul',{id:'dfaults'},f.map(x=>mk('li',{},x.text,' ',kSeek(k,x)))):mk('p',{},c.head),c.by?mk('p',{class:'pby'},c.by):null,c.not_judged?mk('p',{class:'pby'},c.not_judged):null),
         (c.passed||[]).length?mk('section',{},mk('h4',{},String(w.d_passed||'').replace('{n}',c.passed.length)),li(c.passed)):null),
       mk('div',{},(k.details||[]).map(d=>mk('section',{},mk('h4',{},d[0]),[].concat(d[1]||[]).map(x=>mk('p',{},x)))),still?mk('section',{},mk('h4',{},w.d_still),pic(still)):null));
   }
@@ -1310,12 +1311,18 @@ function kThing(l){
   if(v&&S.kplay!==l.line+'|'+k.n){ S.kplay=l.line+'|'+k.n; if(v.src&&v.paused){ const p=v.play(); if(p&&p.catch) p.catch(()=>{}); } }   // a take shown again plays again
   const sheet=!vb&&(l.pics||[]).find(p=>p.role==='sheet'&&p.take===k.n), why=(k.video||{}).code?w.video_bad:(k.video||{}).none||w.video_bad;   // design/222: no video here: its frames, with the round's sentence
   const box=vb||(sheet?mk('div',{class:'pvbox ksheet'},sBig(sheet,[sheet],()=>{})):mk('div',{class:'pvbox kbad'},mk('p',{class:'pnone',id:'pnone'},why))); box.id='sbig';
+  const cmp=l.compare&&k.n===l.compare.new&&vb?ts.find(t=>t.n===l.compare.from):null, vfb=cmp&&pVideo(cmp,()=>{ if(S.cur===l.line) sMainDraw(); }), vf=vfb&&PV[cmp.video.code];   // design/223: a version is shown beside the video it was made from
+  if(v) v.id='pvideo'; if(vf){ vf.id='pvideo2'; vfb.id='sbig2'; }
+  const both=vf?mk('button',{class:'sbtn',id:'kboth',type:'button',on:{click:()=>[vf,v].forEach(x=>{ x.currentTime=0; const p=x.play(); if(p&&p.catch) p.catch(()=>{}); })}},l.compare.play||w.play_both):null;
+  const stage=vf?mk('div',{class:'kpair',id:'kpair'},mk('figure',{},vfb,mk('figcaption',{},w.compare_from+' · '+cmp.label)),mk('figure',{},box,mk('figcaption',{},w.compare_new+' · '+k.label))):box;
   const tabs=ts.length>1?mk('div',{class:'ktabs',id:'ptabs',role:'tablist'},ts.map(t=>mk('button',{class:'ktab',type:'button',role:'tab','aria-selected':String(t===k),'data-take':String(t.n),on:{click:()=>{ S.view[l.line]=t.n; S.panel=null; S.msg=''; sMainDraw(); }}},t.tab))):null;
   side.push(kCheck(k));
+  if(both) side.push(mk('p',{class:'kboth'},both));
+  if(l.failed) side.push(mk('p',{class:'kshort',id:'pfailed'},l.failed));   // design/223: a new video that could not be made, with what the provider answered
   if(sheet) side.push(mk('p',{class:'kshort',id:'pnone'},why));
   if(k.short) side.push(mk('p',{class:'kshort',id:'pshort'},k.short));
   if(k.rejected) side.push(mk('p',{class:'kwas',id:'pwas'},k.rejected));
-  if(!rec){ const pass=(k.check||{}).state==='pass';
+  if(!rec){ const pass=!k.check||k.check.state==='pass';
     const bar=(l.buttons||[]).map((b,i)=>b.take===k.n&&mk('button',{class:'sbtn'+(pass&&b.act==='select'&&!b.sure?' primary':'')+(b.act==='reject'?' danger':''),type:'button','data-act':b.act,'data-choice':b.choice,
       'aria-expanded':b.sure||b.needs_words?String(S.panel==='b'+i):null,on:{click:()=>{ if(b.sure||b.needs_words) return sOpen(S.panel==='b'+i?null:'b'+i); sAnswer(l,b.choice,''); }}},b.label)).filter(Boolean);
     if(bar.length) side.push(mk('div',{class:'sbar',id:'pbar',role:'group','aria-label':l.ask||''},bar));
@@ -1326,11 +1333,11 @@ function kThing(l){
     a&&!rec?mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo):null));
   side.push(mk('p',{class:'klinks',id:'plinks'},(l.pics||[]).some(p=>p.role==='before'||p.role==='after')?mk('button',{class:'slink',id:'pfilm',type:'button',on:{click:()=>kSheet('film')}},w.film):null,
     mk('button',{class:'slink',id:'pdetails',type:'button',on:{click:()=>kSheet('details')}},w.details)));
-  return [mk('div',{class:'khd'},mk('h2',{class:'sname'},l.name),kWords(l,k,v)),mk('div',{class:'sstage kstage'},mk('div',{class:'sviewer'},tabs,box),mk('div',{class:'sside'},...side.flat(6).filter(Boolean)))]; }
+  return [mk('div',{class:'khd'},mk('h2',{class:'sname'},l.name),kWords(l,k,v)),mk('div',{class:'sstage kstage'},mk('div',{class:'sviewer'},tabs,stage),mk('div',{class:'sside'},...side.flat(6).filter(Boolean)))]; }
 function sEnd(){   // A13: what will happen, thing by thing, before the operator says done
   const w=SW(), it=sItems(), left=it.filter(l=>!sDone(l));
   if((PIC()||TK())&&!it.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.nothing),round.note&&mk('p',{},round.note))];   // design/217: nothing to answer now
-  const again=TK()?it.filter(l=>sBtn(l,sAns(l)||{}).act==='again').length:0;   // design/222: how many new takes "done" orders
+  const again=TK()?it.filter(l=>{ const b=sBtn(l,sAns(l)||{})||{}; return b.paid||b.act==='again'; }).length:0;   // design/223: how many new videos "done" orders (a correction, a full-size copy, a request sent again)
   if((PIC()||TK())&&!left.length) return [mk('div',{class:'scard'+(TK()?' kend':''),id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>{ const a=sAns(l)||{}, b=sBtn(l,a); return mk('li',{},mk('b',{},l.name+': '),TK()&&b.end?String(b.end).replace('{words}',a.notes||''):sSays(l)[1],sAgainst(l)?' ('+w.against+')':''); })),   // design/222: a take's row is its button's short `end`
     again?mk('p',{id:'eagain'},String(w.end_again||'').replace('{n}',again)):null,
     TK()&&it.some(l=>sBtn(l,sAns(l)||{}).choice==='reject')?mk('p',{id:'ereject'},w.end_reject):null,mk('p',{class:'sempty'},w.end_foot))];

@@ -48,25 +48,13 @@ def test_d1_the_next_step_line_names_the_checkers_and_writers_that_can_start_now
     s['take_checks'] = {'j3': rec()}
     held(s, p)
     said = T.starts(s, p, [job('j3', 'S3')])
-    assert said == 'Start now, together in one message: the writers of the scene descriptions of S1 (1); the checkers of the stills of S2 (1); the checkers of the takes of S3 (1).'
+    assert said == 'Start now, together in one message: the writers of the scene descriptions of S1 (1); the checkers of the stills of S2 (1).'   # design/223: a take has no checker
     s['guides']['S1'] = guide(still='candidate', prompt=False)
     s['guides']['S1']['stills'][0]['id'] = 'st0'
-    assert T.starts(s, p, [job('j3', 'S3')]).startswith('Start now, together in one message: the checkers of the stills of S1, S2 (2); ')
+    assert T.starts(s, p, [job('j3', 'S3')]) == 'Start now, together in one message: the checkers of the stills of S1, S2 (2).'
     s['guides']['S1']['stills'][0]['check_look'] = s['guides']['S2']['stills'][0]['check_look'] = LOOKED
     s['take_checks']['j3'] = rec(look=look())
     assert T.starts(s, p, [job('j3', 'S3')]) == ''                                                       # nothing to start: nothing said
-
-
-def test_d1_the_closed_page_and_the_looks_list_say_to_start_them_together(held, monkeypatch):
-    s, p = session(), three()
-    s['guides'] = {'S1': guide(takes=['j1']), 'S2': guide(takes=['j2']), 'S3': guide(takes=['j3'])}
-    s['take_checks'] = {j: rec() for j in ('j1', 'j2', 'j3')}
-    held(s, p)
-    rows = [job('j1', 'S1'), job('j2', 'S2'), job('j3', 'S3')]
-    monkeypatch.setattr(V, 'take_jobs', lambda conn, run, sid=None: rows)
-    page = PF._takes_page({'session': s, 'plan': p, 'conn': None, 'run': RUN}, {}, None, T.expected(s, p, rows, NOW))
-    assert 'Start now, together in one message: the checkers of the takes of S1, S2, S3 (3).' in page['then'] and page['closed']
-    assert 'started together, in one message' in T.W['looks_then'] and 'together, in one message' in P.LOOKS_THEN   # the answer of `vw visuals pictures --looks`
 
 
 # ---------- D2: the early cards in batches, in film order ----------
@@ -125,24 +113,6 @@ def test_d3_no_take_is_paid_for_before_the_layout_the_still_and_the_word_are_ans
     assert G.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.')['job_id'] and paid() == 1
 
 
-def test_d3_what_is_asked_after_a_take_is_about_that_take_only(film):
-    """Through the real items and gates (the critic's point 11): with a take made, the one decision that waits is the take's own; after a rejection
-    no new take is paid for before its cause is said, and what happens to the shot is the question the server names."""
-    store, conn, job_id, wrote = film
-    s = saved(store)
-    s['guides']['VS1']['shoot_asked'] = {'stamp': s['guides']['VS1']['sha256'] + str(s['guides']['VS1']['take_prompt']['at']), 'answer': 'shoot'}   # as the Shoot card's answer leaves it
-    V.save_session(store, NEW, s)
-    ctx = CF._ctx(conn, store, USER, NEW, [])
-    assert [i['kind'] for i in CF._waiting_items({**ctx, 'page': True}) + CF._guide_items(ctx) + CF._drawing_items(ctx)] == ['take']
-    on_page(store, conn, 'reject', 'The mother walks off the verandah.')
-    ctx = CF._ctx(conn, store, USER, NEW, [])
-    assert [i['kind'] for i in CF._waiting_items({**ctx, 'page': True}) + CF._guide_items(ctx) + CF._drawing_items(ctx)] == []   # nothing new is asked by a card
-    s = saved(store)
-    assert 'ask the operator what happens to the shot' in T.rejected_due(s, V.current_plan(store, s), conn.takes)
-    n = len(conn.queued)
-    assert 'Say what was wrong with the last take before another is paid for' in refused(lambda: G.shoot(conn, store, USER, NEW, [], 'VS1', 'Again.')) and len(conn.queued) == n
-
-
 # ---------- D4: every limit named where the assistant reads it; each refusal ends with the next step ----------
 
 def test_d4_each_limit_of_step_7_is_in_the_served_text_and_in_its_refusal_with_the_next_step(take_film):
@@ -150,35 +120,24 @@ def test_d4_each_limit_of_step_7_is_in_the_served_text_and_in_its_refusal_with_t
     served = stage['prompt'] + ' '.join(pt['text'] for pt in stage['parts']) + (ROOT / 'plugin' / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8')
     assert (guide_spec.MIN_S, guide_spec.MAX_S) == (3, 15) and 'every take is an edit of a guide, 3 to 15 s' in served                 # the take's length
     assert VG.STILL['max_inputs'] == 16 and 'at most 16 pictures' in served                                                          # the references of a still
-    assert 'after two rejected takes from one camera the shot is cut, re-angled or left out' in served                                 # takes per shot
-    assert 'one frame every half second' in served and 'four frames a second' in served and 'about three takes each' in served        # frames per look; takes per helper
-    assert T.LOOK_MINUTES == 30 and 'does not come within 30 minutes is shown as not checked' in served                                # the look's time-out
+    assert 'there is no limit on the rounds of correction' in served                                                                 # design/223: no limit of takes for a shot (until then: two from one camera)
+    assert (T.C.CLIP_MIN_S, T.C.CLIP_MAX_S, T.C.PICTURES_MAX) == (1.0, 3.0, 6) and '(1 to 3 s; in doubt, earlier), up to 6 approved pictures' in served   # design/223: a remake's clip and its pictures
+    assert '(360p)' in served and VG.GUIDE['resolution'] == '360p' and T.C.VERSION_SIZE == '720p'                                     # design/223: the sizes
     assert 'the cost limit of the film' in served and 'only the owner can change it' in served                                        # the cost limit
     store, conn = take_film
     bad = {**spec10(), 'seconds': 20}
     said = refused(lambda: G.set_scene(conn, store, USER, NEW, [], 'VS1', bad))
     assert 'seconds: a whole number from 3 to 15.' in said and said.endswith('Correct the scene file and send it again (`vw guide scene --shot VS1 --file work/guide/VS1/scene.json`).')
     assert G.TOO_MANY.format(n=17, max=16).endswith('Leave out the pictures the shot needs least and ask for the still again (`vw guide still`).')
-    assert G.LADDER.rstrip('.').endswith('or leave the shot out')                                                                      # two takes from one camera: the choices are the next step
     # the critic's point 11: each stated limit against what the code enforces
     secs = lambda n: [x for x in guide_spec.problems({**spec10(), 'seconds': n, 'action': {'start': 0, 'end': min(n, 3)}}) if x.startswith('seconds')]
     assert secs(3) == secs(15) == [] and secs(2) and secs(16)                                                                          # 3 to 15 s
     assert str(VG.STILL['max_inputs']) in G.TOO_MANY.format(n=17, max=VG.STILL['max_inputs']) and "still['max_inputs']" in Path(G.__file__).read_text(encoding='utf-8')
-    assert P.PICTURE_LOOK_MINUTES == T.LOOK_MINUTES == 30 and '30 minutes' in T.W['late'].format(m=T.LOOK_MINUTES)                     # the time-out the page says is the one counted
-    assert 'need(len(here) < 2' in Path(G.__file__).read_text(encoding='utf-8')                                                        # two rejected takes from one camera
+    assert P.PICTURE_LOOK_MINUTES == 30   # the time-out of a still's check; design/223: a take has no check and no time-out
     assert 'tell the operator to ask the owner' in Path(V.__file__).read_text(encoding='utf-8').split('def check_cap')[1][:1200]       # the cost limit's refusal
 
 
 # ---------- D5: "being redone" at once ----------
-
-def test_d5_being_redone_shows_at_once_in_the_line_of_counts_after_make_another(film):
-    store, conn, job_id, wrote = film
-    s = saved(store)
-    assert T.status_line(T.expected(s, V.current_plan(store, s), conn.takes)) == 'AI video: 1 made and checked.'
-    on_page(store, conn, 'again', 'He walks more slowly.')
-    s = saved(store)
-    assert T.status_line(T.expected(s, V.current_plan(store, s), conn.takes)) == 'AI video: 1 being redone.'   # with no other call in between
-    assert 'being redone' in V.status(conn, store, NEW, [])['next'] if isinstance(V.status(conn, store, NEW, []).get('next'), str) else True
 
 
 # ---------- D6: an answer that is neither pass nor fail never holds a take ----------
@@ -195,68 +154,7 @@ def answers(pass_, seen=''):
     return [{'id': l['id'], 'pass': pass_, 'seen': seen} for l in T.look_lines()]
 
 
-def test_d6_does_not_apply_on_every_line_is_not_a_fail_and_the_take_is_offered_as_not_checked(held):
-    s, p, rows = due_take(held)
-    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'lines': answers('na', 'The frames show no person.')}, 'helper') is None
-    v = T.check_view(s, rows[0], NOW)
-    assert v['state'] == 'not_checked' and v['faults'] == [] and v['na']['head'] == '5 lines did not apply' and 'does not apply' in v['head']
-    assert not [x for x in s['take_checks']['j1']['scorecard'] if x['state'] == 'Fail'] and T.offered(s, rows[0], NOW)
-    assert states(s, p, rows) == [('S1', 'made and checked')] and T.due(s, p, rows) == []                # offered, and not asked of Claude again: no loop
-
-
-def test_d6_one_line_that_does_not_apply_among_passes_is_a_pass_with_the_line_listed_apart(held):
-    s, p, rows = due_take(held)
-    sent = answers(True)
-    sent[0].update({'pass': 'na', 'seen': 'No person is in these frames.'})
-    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'lines': sent}, 'helper') is None
-    v = T.check_view(s, rows[0], NOW)
-    assert v['state'] == 'pass' and v['short'] == 'Passed' and v['na']['head'] == '1 line did not apply' and T.line(None, s, p, p['gaps'][0], p['gaps'][0]['scenes'][0]['shots'][0], 1, 1, rows, NOW)['buttons'][0].get('against') is None
-
-
-def test_d6_frames_that_could_not_be_opened_is_not_checked_never_a_fail(held):
-    s, p, rows = due_take(held)
-    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'not_checked': 'The sheet would not open.'}, 'helper') is None
-    v = T.check_view(s, rows[0], NOW)
-    assert v['state'] == 'not_checked' and v['faults'] == [] and T.offered(s, rows[0], NOW) and T.due(s, p, rows) == []
-
-
-@pytest.mark.parametrize('odd', ['not seen', 'not_seen', None, 'maybe'])
-def test_d6_an_answer_that_is_none_of_the_three_is_refused_with_the_way_out_and_holds_nothing(held, odd):
-    s, p, rows = due_take(held)
-    said = T.record(s, p, rows, {'ref': 'j1', 'sha10': 'a' * 10, 'lines': answers(odd, 'x')}, 'helper')
-    assert 'has no answer' in said and '`pass`: true, false or "na"' in said and 'send the file again' in said   # the refusal names the three answers and the next step
-    assert 'look' not in s['take_checks']['j1'] and T.check_view(s, rows[0], NOW)['state'] == 'not_checked'      # nothing recorded: never a fail
-    assert not T.offered(s, rows[0], NOW) and T.offered(s, rows[0], NOW + timedelta(minutes=31))                  # and never held longer than the look's 30 minutes
-    assert states(s, p, rows, NOW + timedelta(minutes=31)) == [('S1', 'made and checked')]
-
-
 # ---------- D7: no take waits on another shot's take ----------
-
-def test_d7_a_take_being_made_or_redone_for_one_shot_does_not_hold_another_shots_take(held):
-    s, p = session(), three()
-    s['guides'] = {sid: guide(takes=[f'j{n}']) for n, sid in enumerate(('S1', 'S2', 'S3'), 1)}
-    s['take_checks'] = {'j1': rec(look=look()), 'j2': rec(look=look()), 'j3': rec(look=look())}
-    held(s, p)
-    rows = [job('j1', 'S1'), job('j2', 'S2'), job('j3', 'S3')]
-    assert T.complete(T.expected(s, p, rows, NOW))
-    s['reviews']['j1'] = [{'decision': 'rejected', 'notes': 'x'}]                                        # S1: "Make another": its take is rejected and another is ordered
-    s['guides']['S1']['again'] = {'job_id': 'j1', 'words': 'slower'}
-    assert states(s, p, rows) == [('S1', 'being redone'), ('S2', 'made and checked'), ('S3', 'made and checked')]
-    assert T.complete(T.expected(s, p, rows, NOW))                                                       # the page stays open for S2 and S3
-    open_ = [w['group'] for w in V.waiting(s, p, 'VW-99', rows) if w['kind'] == 'take to select']
-    assert open_ == ['S2', 'S3']
-    s['reviews']['j2'] = [{'decision': 'rejected', 'notes': 'y'}]                                        # S2: a plain rejection, nothing ordered
-    assert T.complete(T.expected(s, p, rows, NOW)) and [w['group'] for w in V.waiting(s, p, 'VW-99', rows) if w['kind'] == 'take to select'] == ['S3']
-    rows.append(job('j4', 'S1', status='running'))                                                       # S1's new take is on its way
-    assert T.complete(T.expected(s, p, rows, NOW)) and states(s, p, rows)[0] == ('S1', 'being redone')
-
-
-def test_d7_through_the_pages_own_route_one_make_another_leaves_the_take_answerable_state_intact(film):
-    store, conn, job_id, wrote = film
-    on_page(store, conn, 'again', 'He walks more slowly.')
-    s = saved(store)
-    items = T.expected(s, V.current_plan(store, s), conn.takes)
-    assert [(i['id'], i['state'], i.get('aside')) for i in items] == [('VS1', 'being redone', True)] and T.complete(items)
 
 
 # ---------- a step 7 under way continues after the update ----------
@@ -286,11 +184,11 @@ def test_mid_flight_a_candidate_still_a_still_with_a_look_reference_and_a_take_w
     s['take_checks'] = {'j2': rec()}
     held(s, p)
     rows = [job('j2', 'S2')]
-    assert states(s, p, rows) == [('S1', 'being checked by Claude'), ('S2', 'being checked by Claude'), ('S3', 'waiting for you in the chat')]
+    assert states(s, p, rows) == [('S1', 'being checked by Claude'), ('S2', 'made'), ('S3', 'waiting for you in the chat')]   # design/223: a take is never checked
     assert cards(s, p, monkeypatch, rows) == []                                                          # S3's word waits for S1's still, which is given to Claude's look now
     said = P.waits_words(s, p)                                                                           # the first next-step line stamps the still: the 30 minutes count from the update
     assert "1 picture(s) wait for Claude's check" in said and s['guides']['S1']['stills'][0]['asked_at']
-    assert T.starts(s, p, rows) == 'Start now, together in one message: the checkers of the stills of S1 (1); the checkers of the takes of S2 (1).'
+    assert T.starts(s, p, rows) == 'Start now, together in one message: the checkers of the stills of S1 (1).'
     later = P._now() + timedelta(minutes=31)
     assert P.start_offered(s, s['guides']['S1']['stills'][0], later) and s['guides']['S1']['stills'][0]['look'] == 'R9'   # never held past the look's time; the reference untouched
     s['guides']['S1']['stills'][0]['asked_at'] = (P._now() - timedelta(minutes=31)).isoformat()

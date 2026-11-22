@@ -98,7 +98,7 @@ def test_two_ai_video_takes_of_a_shot_are_listed_as_before(held, monkeypatch):
     monkeypatch.setattr(VS, 'item_link', lambda *a: '')
     monkeypatch.setattr(P, '_drawn_state', lambda *a, **k: (_ for _ in ()).throw(AssertionError('a video take is not a drawn render')))
     rows = [job('j1'), job('j2', at='2026-11-19T11:00:00+00:00')]
-    assert [(w['kind'], w['item']) for w in VS.waiting(s, p, 'VW-99', rows, gate=False)] == [('take to select', 'j1')]   # as before this change
+    assert [(w['kind'], w['item']) for w in VS.waiting(s, p, 'VW-99', rows, gate=False)] == [('take to select', 'j2')]   # one line for the shot; design/223: its newest video is the one to answer (until then: the first with no rejection, 'j1'; design/35 row 328)
 
 
 def test_the_older_way_is_in_the_decision_log():

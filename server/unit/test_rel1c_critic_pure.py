@@ -201,23 +201,6 @@ def test_7_an_isolated_picture_made_for_a_still_shot_is_checked_by_claudes_look_
 
 # ---------- point 10: what the served text says is what happens ----------
 
-def test_10a_select_on_the_tool_needs_no_notes_for_a_held_take_and_records_the_fixed_note(take_film):
-    from test_design151_refs_pure import NEW
-    from test_guide_route_pure import card, shot_take
-    from test_visuals_stage_pure import USER, saved
-    store, conn = take_film
-    job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': False, 'scorecard': card(objects='Fail')})
-    V.select_by_tool(conn, store, USER, NEW, [], job_id, 'Take it.')                           # `vw visuals select --job J` with no `--notes`: the route's function
-    s = saved(store)
-    assert s['selections']['VS1']['job_id'] == job_id and s['reviews'][job_id][-1]['notes'] == P.W['against_note']
-    assert conn.rows[0]['record'][-1]['departs_on'] == ['objects']                              # the record keeps what it departs on
-    assert 'visuals_stage.select_by_tool(' in (ROOT / 'server' / 'app' / 'main.py').read_text(encoding='utf-8').split("'/api/runs/{run_id}/visuals/select-take'")[1][:400]
-    s['take_checks'][job_id]['blocked'] = 'the guide came back unedited'
-    s['selections'].pop('VS1')
-    V.save_session(store, NEW, s)
-    with pytest.raises(Exception, match='not a take'):                                           # what can never be selected stays refused
-        V.select_by_tool(conn, store, USER, NEW, [], job_id, 'Take it.')
-
 
 def test_10a_the_held_drawings_card_selects_with_one_click(monkeypatch):
     calls = []

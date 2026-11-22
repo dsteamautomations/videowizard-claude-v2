@@ -1771,26 +1771,24 @@ def _waiting_items(ctx):
             lines = [f"{l.get('line')}: {l.get('state')}" + (f" ({l.get('seen')})" if l.get('seen') else '') for l in (check.get('scorecard') or [])][:8]
             watch = check.get('watch') or {}
             look = [f"Look at: {watch.get('what')}" + (f" at {watch['at_s']} s" if watch.get('at_s') is not None else '')] if watch.get('what') else []
-            if check.get('blocked'):   # the guide came back unedited, or the wrong length: not a take, nothing to select; the word to send it again is asked with the shot
-                continue
             motion_take = (job.get('request') or {}).get('kind') == 'motion'
             drawn = job.get('provider') == 'drawn'
             if not drawn and V.round_v2(session):   # design/222: an AI video take: one item per shot (its newest take), the page's own line, words and answers
                 found = next(((g_, sh, k, of) for g_, sh, k, of in T.video_shots(plan, session) if sh['id'] == group), None)
                 if not found:
                     continue
-                left = V.cap_of(session) - V.visuals_spend(conn, run)['spent_inr']
-                line = T.line(store, session, plan, *found, take_rows, left_inr=left, price_inr_per_s=V.prices()['video_inr_per_s'])
+                line = T.line(store, session, plan, *found, take_rows)
                 if line['takes'][-1]['job'] != str(job['id']):
                     continue   # an earlier take of the shot: it is on the newest take's line
 
                 def run_(choice, quote, words, group=group):
                     out = T.answer(conn, store, user, run, outputs, group, V.take_jobs(conn, run), choice, quote, words)
-                    if choice == 'again' and not ctx.get('page'):   # the critic's S7: answered in the chat, the one line with the amount is said here (on the page: once, after done)
+                    if not ctx.get('page'):   # the critic's S7: answered in the chat, the one line with the amount is said here (on the page: once, after done). design/223: also for an accepted 360p take's full-size video
                         s_ = V.session_of(store, run, outputs)
-                        said = T.ordered(s_, V.current_plan(store, s_), V.prices()['video_inr_per_s'])
-                        V.save_session(store, run, s_)
-                        return {**(out or {}), 'tell': said}
+                        said = T.C.ordered(s_, V.current_plan(store, s_))
+                        if said:
+                            V.save_session(store, run, s_)
+                            return {**(out or {}), 'tell': said}
                     return out
                 buttons = [_button(b['label'], b['choice'], words=b['needs_words'], tell=b.get('hint') or '') for b in line['buttons']]
                 item = _item(T.item_id(session, job), 'take', where, f"{line['name']}: {line['ask'][0].lower()}{line['ask'][1:]}", run_, buttons[:4], more=buttons[4:], text=T.chat_text(line),   # the id carries the check as shown: an answer to an older view is stale
@@ -1871,17 +1869,16 @@ def _guide_items(ctx):
             continue
         if not g.get('take_prompt') or sid in session['selections']:
             continue
-        card = guide.ready_card(session, sid, V.prices()['video_inr_per_s'])
+        card = guide.ready_card(session, sid, guide.take_price())
         stamp = g['sha256'] + str((g.get('take_prompt') or {}).get('at') or (g.get('take_prompt') or {}).get('prompt'))
         takes = [j for j in V.take_jobs(conn, run, sid) if j['provider'] == 'video']
-        checks = session.get('take_checks') or {}
-        rejected = lambda j: (session['reviews'].get(str(j['id'])) or [{}])[-1].get('decision') == 'rejected'
-        unusable = lambda j: bool((checks.get(str(j['id'])) or {}).get('blocked'))
-        open_take = any(j['status'] in ('queued', 'running', 'storage_pending') or (j['status'] == 'ready' and not rejected(j) and not unusable(j)) for j in takes)
+        # design/223: the first take is made once. A shot that has a video gets no second Shoot card: a correction is asked on the page, and when nothing of the take is usable
+        # the assistant's route makes the first take again (`corrections.send`). A first take that failed at the provider may be sent once more, on the operator's word (E9).
+        open_take = any(j['status'] in T.OPEN or j['status'] == 'ready' for j in takes)
         last = takes[-1] if takes else None
-        again = bool(last and last['status'] == 'ready' and not rejected(last) and unusable(last))   # the clip that came back is not a take: the same request may go once more, on the operator's word
+        again = bool(last and last['status'] in T.GONE and not open_take)
         stamp = stamp + (':again:' + str(last['id']) if again else '')
-        if card['ready'] and not open_take and (g.get('shoot_asked') or {}).get('stamp') != stamp and not T.again_pending(g):   # design/222: "Make another" on the page gave the word: no second Shoot card
+        if card['ready'] and not open_take and (g.get('shoot_asked') or {}).get('stamp') != stamp:
             def run_(choice, quote, words, sid=sid, stamp=stamp, again=again):
                 out = guide.shoot(conn, store, user, run, outputs, sid, quote, again) if choice == 'shoot' else {'for_the_assistant': words}
                 s = V.session_of(store, run, outputs)
@@ -1889,9 +1886,9 @@ def _guide_items(ctx):
                 V.save_session(store, run, s)
                 return {**out, **({'tell': 'The take is being made. ' + NOTHING} if choice == 'shoot' else {})}
             show = [{'key': k, 'name': n} for k, n in ((card.get('guide_key'), f'{sid}-guide.mp4'), ((card.get('still') or {}).get('overlay_key'), f'{sid}-still-on-the-guide.png')) if k]
-            why = str((checks.get(str(last['id'])) or {}).get('blocked')) if again else ''
+            why = str(last.get('error') or '').strip() if again else ''
             words.append(_item(f"shoot:{sid}:{hashlib.sha256(stamp.encode()).hexdigest()[:10]}", 'shoot', 'Step 7, AI video: the take',
-                               (f"{title}: the clip that came back cannot be used ({why}). Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
+                               (f"{title}: the take could not be made. {why} Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
                                 else f"{title}: make the take now? It is {card['seconds']} s and costs about ₹{card['cost_inr']:g}."), run_,
                                [_button('Send it again' if again else 'Shoot', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
                                text=str(card.get('look_for') or ''), show=show))
@@ -2247,9 +2244,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if looks:
             out['then'] = looks + (' ' + out['then'] if out.get('then') else '')
         rows = V.take_jobs(conn, run)
-        if T.asked(session, plan, rows):   # design/222: Claude is asked to check the takes from now
-            V.save_session(store, run, session)
-        more = ' '.join(x for x in (T.waits_words(session, plan, rows), T.starts(session, plan, rows), T.again_due(session, plan, rows), T.rejected_due(session, plan, rows), T.held_due(session, plan), T.render_due(session, plan)) if x)   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
+        more = ' '.join(x for x in (T.starts(session, plan, rows), T.C.due(session, plan, rows), T.held_due(session, plan), T.render_due(session, plan)) if x)   # design/223: the corrections that wait for their route   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)

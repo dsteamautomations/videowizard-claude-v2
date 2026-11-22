@@ -214,26 +214,6 @@ def test_select_on_a_passed_take_writes_select(browser):
     pg.close()
 
 
-def test_select_on_a_failed_take_asks_a_reason_and_refuses_an_empty_box(browser):
-    pg = page(browser)
-    b = btn(TWO, 'select')
-    assert 'primary' not in (pg.locator('#pbar [data-choice="select"]').get_attribute('class') or '')
-    pg.locator('#pbar [data-choice="select"]').click()
-    assert pg.locator('#spanel label').text_content() == b['hint'] and pg.locator('#sfix').input_value() == b['prefill'] == ''
-    assert pg.locator('#sfixsend').text_content() == b['go'] and pg.locator('#scancel').text_content() == W['cancel'] and pg.locator('#pnote').count() == 0
-    pg.locator('#sfixsend').click()
-    assert pg.locator('#smsg').text_content() == b['need'] and answers(pg) == {}
-    pg.locator('#sfix').fill('The jump is cut in the edit.')
-    pg.locator('#sfixsend').click()
-    got = saved(pg, 'l01', 'select')
-    assert got['notes'] == 'The jump is cut in the edit.'
-    text = pg.locator('#sanswer').text_content()
-    assert b['say'].replace('{words}', got['notes']) in text and W['against'] in text and 'against' in pg.locator('#sanswer').get_attribute('class')
-    row = pg.locator('#srail .srow[data-line="l01"]')
-    assert row.locator('.sdot').text_content() == '!' and row.get_attribute('title') == W['against']
-    pg.close()
-
-
 def test_make_another_writes_again_with_the_words_and_shows_its_note(browser):
     pg = page(browser)
     go(pg, ONE)
@@ -372,29 +352,6 @@ def test_no_caption_shows_the_plain_words_and_nothing_when_both_are_empty(browse
 
 
 # ---------- the end ----------
-
-def test_the_end_card_lists_the_answers_and_the_again_count(browser):
-    pg = page(browser)
-    pg.locator('#pbar [data-choice="select"]').click()
-    pg.locator('#sfix').fill('The jump is cut in the edit.')
-    pg.locator('#sfixsend').click()
-    saved(pg, 'l01', 'select')
-    go(pg, ONE)
-    pg.locator('#pbar [data-choice="again"]').click()
-    pg.locator('#sfix').fill('Slower.')
-    pg.locator('#sfixsend').click()
-    saved(pg, 'l02', 'again')
-    pg.wait_for_selector('#send li')
-    items = [' '.join(t.split()) for t in pg.locator('#send li').all_text_contents()]
-    assert pg.locator('#send h2').text_content() == W['end_head'] and W['end_note'] in pg.locator('#send').text_content()
-    # a take's row in the end card is its button's short `end` (as on the approved trial), not the long `say`
-    assert items == [f"{TWO['name']}: " + btn(TWO, 'select')['end'] + f" ({W['against']})",
-                     f"{ONE['name']}: " + btn(ONE, 'again')['end'].replace('{words}', 'Slower.')]
-    assert pg.locator('#ereject').count() == 0
-    assert pg.locator('#eagain').text_content() == W['end_again'].replace('{n}', '1') and W['end_foot'] in pg.locator('#send').text_content()
-    assert foot(pg) == W['foot'].replace('{n}', '2').replace('{m}', '2') + ' ' + W['foot_done']
-    clean(pg)
-    pg.close()
 
 
 def test_the_end_card_says_what_happens_to_a_take_rejected_with_no_new_one(browser):

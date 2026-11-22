@@ -110,7 +110,7 @@ def test_treatment_is_recorded_with_the_words_totals_and_estimate(monkeypatch):
     assert sess['treatment']['quote'] == 'Yes, this treatment.' and sess['treatment']['by'] == 'u1' and sess['treatment']['digest']
     assert out['totals'] == {'gaps': 2, 'images': 4, 'routes': {'graphic_sequence': 1, 'video': 1}, 'seconds': {'graphic_sequence': 20.0, 'video': 10.0}, 'frozen_seconds': 0.0,
                              'still_seconds': 0.0, 'moving_seconds': 30.0}   # design/202: how much moves and how much stands still
-    assert out['estimate_inr'] == 4 * 20.0 + 10 * 8.0 and sess['treatment']['estimate_inr'] == out['estimate_inr']
+    assert out['estimate_inr'] == 4 * 20.0 + 10 * (8.0 + 8.0) and sess['treatment']['estimate_inr'] == out['estimate_inr']
 
 
 def test_the_treatment_totals_the_frozen_seconds_and_shows_the_share_of_the_film(monkeypatch):
@@ -212,7 +212,7 @@ def test_budget_reports_spend_cap_and_what_the_plan_still_needs(monkeypatch):
     doc = plan_doc([shot('AN1', 0, 500, 'animation', states=[{'what_appears': 'a', 'hold_s': 10}, {'what_appears': 'b', 'hold_s': 10}])], [shot('VS1', 900, 1150, 'video')])
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1')
     b = VS.budget(FakeConn([job('openai')]), store_with(sess, doc), RUN, [])
-    assert b['spent_inr'] == 20.0 and b['cap_inr'] == 5000.0 and b['planned'] == {'images': 3, 'video_seconds': 10.0, 'inr': 3 * 20.0 + 10 * 8.0}   # two states, a start image (design/112 S1: no end unless exact)
+    assert b['spent_inr'] == 20.0 and b['cap_inr'] == 5000.0 and b['planned'] == {'images': 3, 'video_seconds': 10.0, 'inr': 3 * 20.0 + 10 * (8.0 + 8.0)}   # design/223: the first take and its full-size video; two states, a start image (design/112 S1: no end unless exact)
     assert b['left_inr'] == 4980.0
 
 

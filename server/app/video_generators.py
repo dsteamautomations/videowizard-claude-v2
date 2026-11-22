@@ -17,7 +17,8 @@ CATALOG = [   # design/124 A4 decision 5: Gemini Omni only; every take 3-10 s, a
 # film's picture AI (SK, 10 Nov). The lengths live with the scene description (guide_spec.MIN_S, MAX_S: 3 to 15 s), read here so they are stated once.
 from . import guide_spec as _guide
 GUIDE = {'provider': 'google', 'model': 'gemini-omni-1.2-flash', 'label': 'Gemini Omni 1.2 · edit of a guide', 'min_seconds': _guide.MIN_S, 'max_seconds': _guide.MAX_S,
-         'duration_control': 'request', 'guide': True, 'aspect_ratio': '16:9', 'resolution': '720p'}
+         'duration_control': 'request', 'guide': True, 'aspect_ratio': '16:9',
+         'resolution': '360p'}   # design/223 (SK, 22 Nov 2026): the first take is made once, small; every version is `corrections.VERSION_SIZE` (until then: 720p; design/35 row 316)
 STILL = {'model': 'gpt-image-2.6-sunburst', 'size': '1536x864', 'quality': 'high', 'max_inputs': 16,
          'max_prompt': 32000}   # hotfix 21 Nov 2026: OpenAI's limit on the prompt, in characters (VW-24's BEAT_11-B1-S3 was refused at 52,545)
 OMNI_ONLY = 'Gemini Omni only: every take is Gemini Omni, 3–10 s; split the shot. No other video generator is offered.'

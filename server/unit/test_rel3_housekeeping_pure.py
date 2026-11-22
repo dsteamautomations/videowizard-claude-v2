@@ -37,4 +37,6 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert 'max_prompt' not in rows['313'] and 'B1 shorten' in rows['313'] and 'HTTP 400' in rows['313']   # the still's length hotfix (21 Nov)
     assert '30 %' in rows['314'] and 'released only by the script' in rows['314']   # the first-frame limits hotfix (21 Nov)
     assert 'sending key' in rows['315'] and '404' in rows['315']   # the same key for the same take (21 Nov)
-    assert '316' not in rows
+    # design/223, the new take process (22 Nov): rows 316 to 333
+    assert all('design/223' in rows[str(n)] for n in range(316, 334)) and '360p' in rows['316'] and 'price by size' in rows['329'] and 'Kept' in rows['332'] and 'Kept' in rows['333']
+    assert '334' not in rows

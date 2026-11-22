@@ -252,7 +252,7 @@ def test_a_mixed_gap_counts_its_seconds_per_route_from_its_shots(monkeypatch):
     VS.treatment(store, USER, RUN, [], t, 'Yes.')
     rec = saved(store)['treatment']
     assert rec['totals']['seconds'] == {'graphic_sequence': 28.0, 'footage': 16.0, 'video': 6.0}
-    assert rec['estimate_inr'] == (3 + 1) * 20.0 + 6 * 8.0
+    assert rec['estimate_inr'] == (3 + 1) * 20.0 + 6 * (8.0 + 8.0)   # design/223: each second of an AI video shot is its first take and its full-size video (these prices name no 360p figure: both at the one figure)
     t['gaps'][1].pop('shots')   # no seconds per shot: today's sum, the first route
     store = store_with(session())
     VS.treatment(store, USER, RUN, [], t, 'Yes.')

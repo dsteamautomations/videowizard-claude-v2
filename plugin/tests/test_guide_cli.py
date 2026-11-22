@@ -162,8 +162,38 @@ def test_the_skill_names_no_one_film(tmp_path):
         assert word not in skill, word
 
 
-def test_the_cause_of_a_rejected_take_names_one_of_four_what_was_wrong_and_the_one_change(harness, sent, capsys):
-    code, out, err = run(args(what='cause', shot='VS1', cause='guide'), capsys)
-    assert code == 2 and 'did the first frame match the still' in out['message'] and sent == []
+def test_the_cause_of_a_rejected_take_is_retired_and_refused_by_name(harness, sent, capsys):   # design/223
     code, out, err = run(args(what='cause', shot='VS1', cause='guide', notes='the path crosses the post', fix='move the path 0.5 m'), capsys)
-    assert code == 0 and sent == [('/api/runs/run-1/visuals/guide/cause', {'shot_id': 'VS1', 'cause': 'guide', 'notes': 'the path crosses the post', 'fix': 'move the path 0.5 m'})]
+    assert code == 2 and 'retired (design/223)' in out['message'] and 'vw guide correct --shot S' in out['message'] and sent == []
+
+
+def test_the_corrections_are_listed_with_their_frames_and_pictures_fetched_and_the_rule_kept(harness, capsys, monkeypatch):   # design/223
+    ws, _ = harness
+    listed = {'corrections': [{'shot_id': 'VS1', 'name': 'The walk home', 'words': 'There are poles on the left.', 'frames': [{'at_s': 0.0, 'key': 'k/f0.jpg'}, {'at_s': 2.5, 'key': 'k/f25.jpg'}],
+                               'sheet': 'k/sheet.jpg', 'pictures': [{'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'key': 'k/R1.png'}]}],
+              'rule': 'The route of a correction.', 'file': '{...}', 'then': 'For each: choose the route by the rule.'}
+    got = []
+    monkeypatch.setattr(vw, 'call', lambda method, path, *a, **k: listed if (method, path) == ('GET', '/api/runs/run-1/visuals/guide-corrections') else {})
+    monkeypatch.setattr(vw, '_download', lambda m, key, rel, expect=None: got.append((key, rel)))
+    code, out, err = run(args(what='corrections'), capsys)   # no --shot: every correction that waits
+    assert code == 0 and out['corrections'] == ['VS1'] and out['file'] == 'work/guide/corrections.json' and 'choose the route by the rule' in err
+    assert got == [('k/f0.jpg', 'work/guide/VS1/correction/frame-0000.jpg'), ('k/f25.jpg', 'work/guide/VS1/correction/frame-0025.jpg'),
+                   ('k/sheet.jpg', 'work/guide/VS1/correction/sheet.jpg'), ('k/R1.png', 'work/guide/VS1/correction/picture-R1.png')]
+    kept = json.loads((ws / 'work' / 'guide' / 'corrections.json').read_text(encoding='utf-8'))
+    assert kept['rule'] == 'The route of a correction.' and kept['corrections'][0]['frames'][1]['file'].endswith('frame-0025.jpg') and kept['corrections'][0]['pictures'][0]['file'].endswith('picture-R1.png')
+
+
+def test_a_correction_is_sent_from_its_file_withdrawn_with_the_operators_words_or_reopened(harness, sent, capsys):   # design/223
+    ws, _ = harness
+    assert run(args(what='correct'), capsys)[0] == 2                                                   # it needs its shot
+    code, out, err = run(args(what='correct', shot='VS1', withdraw=False, reopen=None, reason=None), capsys)
+    assert code == 2 and 'vw guide correct --shot S --file' in out['message'] and sent == []
+    (ws / 'work' / 'guide' / 'VS1').mkdir(parents=True)
+    body = {'route': 'edit', 'reason': 'Only the poles are wrong.', 'changes': ['Remove the poles on the left.'], 'keep': 'the people, the place, the camera, the light, the timing'}
+    (ws / 'work' / 'guide' / 'VS1' / 'correction.json').write_text(json.dumps(body), encoding='utf-8')
+    run(args(what='correct', shot='VS1', file='work/guide/VS1/correction.json', withdraw=False, reopen=None, reason=None), capsys)
+    run(args(what='correct', shot='VS1', withdraw=True, reopen=None, reason='Leave it as it is.'), capsys)
+    run(args(what='correct', shot='VS1', withdraw=False, reopen='The roof is wrong after all.', quote='The roof is wrong after all.', reason=None), capsys)
+    assert sent == [('/api/runs/run-1/visuals/guide/correct', {'shot_id': 'VS1', 'correction': body}),
+                    ('/api/runs/run-1/visuals/guide/correct', {'shot_id': 'VS1', 'correction': {'route': 'none', 'withdrawn': True, 'reason': 'Leave it as it is.'}}),
+                    ('/api/runs/run-1/visuals/guide/correct', {'shot_id': 'VS1', 'reopen': 'The roof is wrong after all.', 'quote': 'The roof is wrong after all.'})]

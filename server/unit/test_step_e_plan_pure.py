@@ -98,7 +98,7 @@ def test_the_instructions_say_fifteen_seconds_the_guide_and_no_longer_teach_the_
     st = next(s for s in json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
     text = ' '.join([st['prompt'], *st['steps'], *(p['text'] for p in st['parts'])])
     assert 'A take is 3 to 15 seconds' in text and 'AI video 1 to 15 s on screen' in text and 'every take is an edit of a guide, 3 to 15 s' in text and '(the 15 s limit and' in text
-    assert '`vw:guide` skill' in text and '`vw guide shoot --shot S --quote' in text and 'vw guide cause' in text and 'one still per AI video shot' in text
+    assert '`vw:guide` skill' in text and '`vw guide shoot --shot S --quote' in text and 'vw guide correct' in text and 'vw guide cause' not in text and 'one still per AI video shot' in text   # design/223: the cause is retired; a correction's route
     for gone in ('3 to 10 s', '2 to 10 s', 'makes 3 to 10 seconds', 'vw visuals prepare-take --shot S --start', 'vw visuals take --shots all', 'never a start image before the packet', 'clip-from-frame'):
         assert gone not in text, gone
-    assert 'not yet available' not in text and 'Any kind of shot may be an AI video' in text and '`recipe: other`' in text and 'two rejected takes from one camera' in text   # design/207: any kind of shot
+    assert 'not yet available' not in text and 'Any kind of shot may be an AI video' in text and '`recipe: other`' in text and 'there is no limit on the rounds of correction' in text and 'two rejected takes from one camera' not in text   # design/207: any kind of shot; design/223: no limit of takes

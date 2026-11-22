@@ -117,40 +117,6 @@ def take_film(held_):
     return s, p, [job('j1')]
 
 
-def test_a_takes_line_that_does_not_apply_is_no_fault_no_pass_and_never_a_fail_on_the_scorecard(held):
-    s, p, rows = take_film(held)
-    want = T.look_lines()
-    na = lambda why: [{'id': l['id'], 'pass': 'na' if l['check'] == 'people' else True, 'seen': why if l['check'] == 'people' else ''} for l in want]
-    said = T.record(s, p, rows, {'ref': 'j1', 'sha10': SHA[:10], 'lines': na('')}, 'helper')
-    assert said == P.PIC_LOOK_NA.format(name='Housing at work', check='people', id=want[0]['id'], max=300) and not s['take_checks']['j1'].get('look')
-    out = P.record_looks(None, USER, RUN, [], [{'ref': 'j1', 'sha10': SHA[:10], 'lines': na('No person is in this shot.')}], 'helper', rows)   # the route both front ends use
-    assert out['recorded'] == ['j1'] and out['log'] == '1 line did not apply: Housing at work: people (No person is in this shot.)'   # kept in the run's log
-    r = s['take_checks']['j1']
-    assert r['look']['lines'][0]['pass'] == 'na' and [x['state'] for x in r['scorecard'] if x['line'] == 'people'] == ['Does not apply']
-    assert not [x for x in r['scorecard'] if x['state'] in ('Fail', 'Not sure')] and r['not_read'] is False
-    v = T.check_view(s, rows[0], NOW)
-    assert v['state'] == 'pass' and v['head'] == 'Check passed' and v['faults'] == [] and len(v['passed']) == 8 and not [x for x in v['passed'] if x.startswith('People')]
-    assert v['na'] == {'head': '1 line did not apply', 'lines': ['People: No person is in this shot.']}
-    assert T.due(s, p, rows) == []                                                                     # recorded once
-
-
-def test_a_take_whose_every_line_does_not_apply_is_not_checked_and_a_take_looked_at_before_reads_as_before(held):
-    s, p, rows = take_film(held)
-    assert T.record(s, p, rows, {'ref': 'j1', 'sha10': SHA[:10], 'lines': [{'id': l['id'], 'pass': 'na', 'seen': 'Nothing of it is in the frames.'} for l in T.look_lines()]}, 'helper') is None
-    v = T.check_view(s, rows[0], NOW)
-    assert v['state'] == 'not_checked' and v['head'] == T.W['all_na'] and 'Judge it by eye' in v['head'] and v['na']['head'] == '5 lines did not apply'
-    from test_design222_takes_pure import look
-    s['take_checks'].update(j1=rec(look=look(fail=('objects',))))                                      # the format of before: true and false only
-    v = T.check_view(s, rows[0], NOW)
-    assert v['state'] == 'fail' and len(v['faults']) == 1 and len(v['passed']) == 8 and 'na' not in v
-
-
-def test_the_scorecard_of_before_is_unchanged():
-    lines = [{'check': n, 'pass': True, 'seen': ''} for n in GW.SCORECARD[3:]]
-    rows, _ = GW.scorecard([], {'lines': lines})
-    assert [r['state'] for r in rows[2:]] == ['Pass'] * 5
-
-
 # ---------- a picture of a reference set ----------
 
 def sets():
@@ -270,12 +236,12 @@ def test_a_drawing_whose_every_rule_does_not_apply_is_not_fact_checked():
 # ---------- the guard, where the checker reads it (A4): the server cannot see the picture ----------
 
 def test_the_served_look_instructions_say_the_third_answer_and_its_guard_with_two_neutral_examples():
-    for how in (' '.join(P.LOOK_HOW['judge']), ' '.join(P.TAKE_LOOK_HOW['judge']), ' '.join(RS.LOOK_HOW['judge'])):
+    for how in (' '.join(P.LOOK_HOW['judge']), ' '.join(RS.LOOK_HOW['judge'])):
         assert VS.NA_HOW in how
     assert '"pass": "na"' in VS.NA_HOW and 'only when this view cannot show' in VS.NA_HOW and 'or the line is about another thing' in VS.NA_HOW and 'Never for something that is in view' in VS.NA_HOW
     assert VS.NA_HOW.count(';') >= 1 and 'for example' in VS.NA_HOW                                 # two examples
     for word in ('brick', 'ceiling', 'kiln', 'mason', 'tumbler', 'documentary'):                    # generic: every category of video
         assert word not in VS.NA_HOW.lower()
-    assert 'na' in str(P.LOOK_HOW['file']) and 'na' in str(RS.LOOK_HOW['file']) and '"na"' in P.TAKE_LOOK_HOW['file']
+    assert 'na' in str(P.LOOK_HOW['file']) and 'na' in str(RS.LOOK_HOW['file'])   # design/223: a take has no look (TAKE_LOOK_HOW is retired)
     assert 'true, false or "na"' in P.PIC_LOOK_OPEN and 'true, false or "na"' in RS.LOOK_LINE_OPEN
     assert CF.WORDS   # the chat's words module loads with these

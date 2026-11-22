@@ -62,20 +62,6 @@ def test_a_drawn_graphics_fact_check_says_passed_its_notes_or_its_open_rules_cut
     assert P.server_view(None)['short'] == 'Not checked yet.'
 
 
-def test_an_ai_video_take_says_the_same_short_line(held):
-    s, p = take_session(), take_plan(take_shot('S1'))
-    s['guides']['S1'] = guide()
-    held(s, p)
-    view = lambda r: T.check_view({**s, 'take_checks': {'j1': r}}, job('j1'), NOW)
-    assert view(rec(look=look()))['short'] == 'Passed'
-    one = view(rec(look=look(fail=('the action',))))
-    assert one['short'] == '1 warning: The action' and one['head'] == 'Check:'
-    two = view(rec(look=look(fail=('the action',)), jump=1.1))
-    assert two['short'] == '2 warnings: One continuous shot' and two['faults'][0]['at_s'] == 1.1           # the server's measured line first
-    wait = view(rec(asked_at='2026-11-19T11:00:00+00:00'))
-    assert wait['state'] == 'not_checked' and wait['short'] == wait['head'] == "Not checked: Claude's check did not come within 30 minutes. Judge it by eye."
-
-
 def test_the_chat_says_the_short_line_a_warning_in_full_and_only_the_count_of_the_lines_that_did_not_apply():
     s, p = session(), plan(shot('S1'))
     line = lambda r: {'where': 'In the film at 2:10.4', 'check': P.check_view(s, r, p, NOW)}
@@ -85,12 +71,3 @@ def test_the_chat_says_the_short_line_a_warning_in_full_and_only_the_count_of_th
     assert bad == '- In the film at 2:10.4\n- 2 warnings: a real face\n- a real face: The face matches a bystander.\n- nothing extra: A second ladder.'
     old = P.chat_text({'check': {'state': 'fail', 'head': "Claude's check found 1 problem: the place: a wall.", 'faults': ['the place: a wall.'], 'show': 'first'}})
     assert old == "- Claude's check found 1 problem: the place: a wall."                                   # a line with no short line (kept by an older server): its head, which names the first problem
-
-
-def test_the_chat_says_a_takes_short_line_and_its_warnings_with_their_second(held):
-    s, p = take_session(), take_plan(take_shot('S1'))
-    s['guides']['S1'] = guide()
-    s['take_checks']['j1'] = rec(look=look(fail=('the action',)))
-    held(s, p)
-    text = T.chat_text(T.line(None, s, p, p['gaps'][0], p['gaps'][0]['scenes'][0]['shots'][0], 1, 1, [job('j1')], NOW))
-    assert '- 1 warning: The action\n- The action: The broom is gone at 3.5 s. (at 3.5 s)' in text and 'Check:' not in text

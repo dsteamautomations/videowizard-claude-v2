@@ -1036,13 +1036,13 @@ def _takes_page(ctx, base, lines, seven):
         start = T.starts(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run'])) if ctx.get('plan') else ''   # release 1, D1: what can start now, together in one message
         return {**base, 'step': T.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': T.W['page_later'],
                 'then': ' '.join(x for x in (count, start, T.W['page_later']) if x), 'how': TAKES_CLOSED}
-    rows = T.coming(seven)
+    rows = T.coming(seven, V.take_jobs(ctx['conn'], ctx['run']) if ctx.get('conn') is not None else ())   # design/223: each with what the provider answered
     refused = ctx['session'].get('page_refused') or {}
     lines = [{'line': f'l{n:02d}', **l, **({'refused': refused[l['key']]} if l['key'] in refused else {})} for n, l in enumerate(lines, 1)]
     for l in reversed(lines):
         if len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) <= ROUND_BYTES:
             break
-        l['takes'] = [{**t, 'details': [], 'check': {**t['check'], 'passed': []}} for t in l['takes']]
+        l['takes'] = [{**t, 'details': []} for t in l['takes']]
     n = len([l for l in lines if l['state'] == 'open'])
     return _counted(ctx['session'], {**base, 'step': T.W['step'], 'open': bool(n), 'lines': lines, 'say': T.say(lines, rows), 'summary': T.W['summary'].format(n=n),
                                      'note': T.W['note'] if n else T.W['nothing'], 'layout': {'kind': 'takes', 'help': T.W['help'], 'coming': rows, 'words': {**page_words(), 'takes': T.PAGE}}},
@@ -1364,15 +1364,12 @@ def page_record(conn, store, user, run, outputs, answers):
     if was == 'takes' or now['step'] == T.W['step']:   # design/222: step 7's own "what next": Claude's check, a take ordered on the page (its one line, said and not asked), what is left
         here = CF._ctx(conn, store, user, run, outputs)
         rows = V.take_jobs(conn, run)
-        if here['plan'] and T.asked(here['session'], here['plan'], rows):
-            V.save_session(store, run, here['session'])
-        ordered = T.ordered(here['session'], here['plan'], V.prices()['video_inr_per_s']) if here['plan'] else ''
+        ordered = T.C.ordered(here['session'], here['plan']) if here['plan'] else ''   # design/223: the full-size videos and the corrections the answers ordered
         if ordered:   # the critic's S7: each order is said once (`ordered` marks it), beside any other line to tell
             V.save_session(store, run, here['session'])
             tell = ' '.join(x for x in (tell, ordered) if x)
-        then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', T.W['ordered_how'] if ordered else '',
-                                    T.waits_words(here['session'], here['plan'], rows) if here['plan'] else '', T.again_due(here['session'], here['plan'], rows) if here['plan'] else '',
-                                    T.rejected_due(here['session'], here['plan'], rows) if here['plan'] else '',
+        then = ' '.join(x for x in ('Nothing was answered on the page.' if not answers else '', ROUND_REFUSED if refused else '', T.C.W['ordered_how'] if ordered else '',
+                                    T.C.due(here['session'], here['plan'], rows) if here['plan'] else '',
                                     PICTURES_LEFT.format(n=left) if now['step'] == T.W['step'] and left else now['then'] if now.get('closed') else TAKES_DONE) if x)
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
