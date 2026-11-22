@@ -152,3 +152,16 @@ def test_the_editors_package_lists_the_library_original_with_its_film_and_in_the
     assert original == [{'role': 'original', 'name': 'Media/Camera/yard.mp4', 'key': 'r0/media/yard.mp4', 'sha256': 'sha-L9', 'bytes': 7, 'source_film': 'VW-12'}]
     relink = next(v for k, v in puts.items() if k.endswith('Relink-list.csv')).decode()
     assert 'yard.mp4' in relink and relink.count('\n') == 2   # the heading and the one camera file the film uses
+
+
+def test_a_first_cut_event_of_a_library_clip_carries_its_key_into_every_render():
+    """Defect 60 (VW-24, 22 Nov 2026): the first cut placed two library clips; the proof film's render plan named them without their key, so the render
+    looked for them in this film's own media folder and stopped with "Storage returned 400." The same items feed the review and the master film."""
+    from app.stage2 import stage as S2
+    own = {'id': 'c1', 'name': 'C0012.MP4', 'sha256': 'sha-c1', 'color_transfer': 'bt709'}
+    session = {'package': {'clips': {'L9': LIB, 'c1': own}}}
+    rows = {'L9:SUB_01': {'clip_id': 'L9', 'source_fps': '50/1'}, 'c1:SUB_01': {'clip_id': 'c1', 'source_fps': '25/1'}}
+    ev = {'source_in_frame': 0, 'source_out_frame': 100, 'timeline_frames': 50}
+    lib_item, own_item = S2._event_items(session, {}, [{**ev, 'sub_clip_id': 'L9:SUB_01'}, {**ev, 'sub_clip_id': 'c1:SUB_01'}], rows)
+    assert lib_item['clip']['key'] == 'r0/media/yard.mp4' and lib_item['clip']['name'] == 'yard.mp4' and 'key' not in own_item['clip']
+    assert AS.S2._event_items is S2._event_items   # the assembly builds its camera events with the same function

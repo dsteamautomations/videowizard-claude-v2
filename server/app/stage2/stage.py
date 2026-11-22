@@ -539,7 +539,8 @@ def _event_items(session, pk, events, rows):
         clip = session['package']['clips'][row['clip_id']]
         crop = row['crop_rect'] if ev.get('crop') in ('solver', 'hands_only') else None
         items.append({'kind': 'event', 'sub_clip_id': ev['sub_clip_id'], 'clip': {'id': clip['id'], 'name': clip['name'], 'sha256': clip['sha256'], 'fps': row['source_fps'],
-                                                                                   'rotation_deg': row.get('horizon_rotation_deg') or 0.0, 'hdr': str(clip.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084')},
+                                                                                   'rotation_deg': row.get('horizon_rotation_deg') or 0.0, 'hdr': str(clip.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084'),
+                                                                                   **({'key': clip['key']} if clip.get('key') else {})},   # defect 60: a library clip's file is in its source film; without the key the render looked in this film's folder
                       'source_in_frame': ev['source_in_frame'], 'source_out_frame': ev['source_out_frame'], 'timeline_frames': ev['timeline_frames'], 'crop_rect': crop,
                       'hold_last_frame': bool(ev.get('hold_last_frame')), 'a2': ev.get('a2_intervals') or []})
     return items
