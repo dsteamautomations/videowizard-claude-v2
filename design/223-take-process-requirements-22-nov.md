@@ -197,7 +197,7 @@ One addition to the note: a take made for an earlier plan cannot be accepted, bu
 
 ## 10. Not covered
 
-- **Calls to Google:** none while building; five after it, on SK's word (section 11). Still not proven: that it takes `360p` as the size of a first take; a take the model itself made at 360p as the input of a 720p version; the exact shape of a failed call's message (read from its `error` field, as Gemini gives it elsewhere).
+- **Calls to Google:** none while building; seven after it, on SK's word (section 11): a first take at 360p, the 720p copy and the edit and reference requests all work. Still not proven: whether a copy made from a 360p take is good enough for the film (one shot, SK's judgement); a remake by reference from a 360p take with pictures; the exact shape of a failed call's message (read from its `error` field, as Gemini gives it elsewhere).
 - **The database-backed tests** (`server/tests`, Docker) were not run. The worker's step after a take (frames stored, the remake of both queued under the run's lock) is tested through its parts, not against a database.
 - **A remake's pictures through the film's own rules for a person's picture:** the flow is tested with the picture step stood in; the shrink to 1,536 px is tested alone.
 - **VW-24 as it stands on the live server:** not touched and not read. A shot of it with "Make another" pending or a rejected take will show its newest video to the operator again; this was not tried on its real data.
@@ -227,10 +227,19 @@ What follows from it:
 
 Not proven by it: a take made at 360p by the model; a face large in the frame; more than one try of each.
 
+### A first take asked at 360p, and its copy (the same day, two more calls)
+
+Evidence and results: `vw2-archive/2026-11-22/first-take-360/results.md`. The material was the layout test of 20 Nov (a nurse walks to a door, 6 s), all on the builder PC; both requests were built by the application's code, the copy with the application's own words.
+
+- **Google makes a first take at 360p** (640 x 360, 6 s, real footage of the layout).
+- **A 360p second is exactly a third of a 720p second** in tokens (1,931 against 5,792): the 360p price of ₹2.97 stands.
+- **The copy is the same video** (0.99 frame by frame) and sharper than its take (fine detail 10 to 26), **but less detailed than a take made at 720p** from the same request on 20 Nov (50; another take, so a loose comparison; the scene is mostly plain walls). On the model's own 360p picture the copy gained less than on the 720p takes made smaller. One shot, one try: SK judges on the videos whether it is enough.
+- Seen in passing: the layout video is sent in at 720p and counted at three times the tokens of the 360p take it makes. The application does not count what is sent in; sending it in smaller is not tested.
+
 ## 8. Not in this change
 
 - No deploy, no restart, nothing on the VM, nothing of VW-24's live run.
-- The 360p size of a first take is **not proven**; the first real run proves it. (The 720p copy was tested after the build: section 11.)
+- (The 360p size of a first take and the 720p copy were tested after the build: section 11.)
 - Shorter take words for the first take (O16).
 - 1080p.
 - SK's other way for the 720p copy (the first seconds as a reference): only the place to switch it is built.
