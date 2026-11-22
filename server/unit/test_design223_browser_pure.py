@@ -37,8 +37,7 @@ def new(extra=None):
         at = two['film_at']
         two['buttons'] = [button('Accept', 'select', 'select', 2, T.W['say_select'].format(n=2, at=at), T.W['end_select'].format(n=2, at=at)),
                           button('Say what is wrong', 'again', 'again', 2, T.W['say_again'].format(n=2, words='{words}'), T.W['end_again'].format(n=2, words='{words}'), words=True, paid=True),
-                          button('Use take 1 after all', 'old:1', 'select', 2, T.W['say_copy'].format(n=1), T.W['end_copy'].format(n=1), paid=True,
-                                 sure={'ask': T.W['old_ask'].format(n=1), 'go': 'Use take 1 after all', 'back': T.W['back']})]
+                          button('Use take 1 after all', 'old:1', 'select', 2, T.W['say_copy'].format(n=1), T.W['end_copy'].format(n=1), paid=True)]
         one['buttons'] = [button('Accept', 'select', 'select', 1, T.W['say_copy'].format(n=1), T.W['end_copy'].format(n=1), paid=True),
                           button('Say what is wrong', 'again', 'again', 1, T.W['say_again'].format(n=1, words='{words}'), T.W['end_again'].format(n=1, words='{words}'), words=True, paid=True)]
         if extra:
@@ -95,6 +94,10 @@ def test_a_version_is_shown_beside_the_video_it_was_made_from_and_both_play_toge
     pg.wait_for_function("[...document.querySelectorAll('#pvideo, #pvideo2')].every(v => !v.paused && v.currentTime < 0.9)")
     inside(pg, '#pbar'), inside(pg, '#kboth')
     assert still_main(pg)
+    pg.locator('#pbar [data-choice="old:1"]').click()   # SK, 22 Nov 2026: "Use take 1 after all" is one click: no second question under the buttons
+    assert saved(pg, 'l01', 'old:1')['choice'] == 'old:1' and pg.locator('#spanel').count() == 0 and T.W['say_copy'].format(n=1) in pg.locator('#sanswer').text_content()
+    pg.locator('#sundo').click()   # and it can be undone
+    pg.wait_for_function("!document.querySelector('#sanswer')")
     pg.locator('#ptabs [data-take="1"]').click()   # the earlier take alone: nothing to compare, and what the operator said of it
     pg.wait_for_function("!document.querySelector('#kpair')")
     assert T.W['said'].format(words='The helper looks into the camera.') in pg.locator('#pwas').text_content()

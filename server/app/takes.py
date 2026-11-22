@@ -30,7 +30,6 @@ W = {
     'end_resend': 'The same request sent once more.',
     'hint_again': 'What is wrong with it? Say it in plain words.', 'go_again': 'Send these words', 'need_words': 'Write what is wrong first. The correction is made from these words.',
     'paid': 'A new video is paid. Its price is said in the chat when you say done; nothing is ordered before that.',
-    'old_ask': 'Use take {n} in the film after all?', 'back': 'Go back',
     'log_short': ', shorter than its place in the film',
     'said': 'You said: {words}',
     'short': 'The take is {s} s; its place in the film is {slot} s.',
@@ -442,11 +441,11 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None):
     was = num.get(str((made or {}).get('job_id') or (cur_job.get('request') or {}).get('from_job') or ''))
     failed = every[-1]['status'] in GONE and every[-1] is not cur_job
 
-    def accept(t, j, choice, label, sure=None):
+    def accept(t, j, choice, label):
         final = C.final(j)
         return {'label': label, 'choice': choice, 'act': 'select', 'take': t['n'] if choice == 'select' else cur['n'], 'needs_words': False, 'hint': '', 'go': '', 'prefill': '', 'need': '',
                 'note': '' if final else W['paid'], 'say': (W['say_select'].format(n=t['n'], at=at) if final else W['say_copy'].format(n=t['n'])),
-                'end': (W['end_select'].format(n=t['n'], at=at) if final else W['end_copy'].format(n=t['n'])), **({} if final else {'paid': True}), **({'sure': sure} if sure else {})}
+                'end': (W['end_select'].format(n=t['n'], at=at) if final else W['end_copy'].format(n=t['n'])), **({} if final else {'paid': True})}
     buttons, old_plan = [], _stale(plan, cur_job)   # a take made for an earlier plan cannot be accepted: the operator says what should change (a version stands on today's plan)
     if not old_plan:
         buttons.append(accept(cur, cur_job, 'select', W['select']))
@@ -456,10 +455,10 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None):
         if not old_plan and failed and C.can_resend(g, every):   # E9: the same request once more, on the operator's word, once
             buttons.append({'label': W['resend'], 'choice': 'resend', 'act': 'again', 'take': cur['n'], 'needs_words': False, 'hint': '', 'go': '', 'prefill': '', 'need': '', 'note': W['paid'],
                             'paid': True, 'say': W['say_resend'], 'end': W['end_resend']})
-        for t, j in list(zip(takes, js))[:-1]:   # an earlier video may be used after all: asked once (D7)
+        for t, j in list(zip(takes, js))[:-1]:   # an earlier video may be used after all. SK, 22 Nov 2026: one click: the second question under the button asked the
+            # same thing again, and the answer can be undone on the page (until then: asked once, D7; design/35 row 334)
             if not _stale(plan, j):
-                label = W['select_old'].format(n=t['n'])
-                buttons.append(accept(t, j, f"old:{t['n']}", label, {'ask': W['old_ask'].format(n=t['n']), 'go': label, 'back': W['back']}))
+                buttons.append(accept(t, j, f"old:{t['n']}", W['select_old'].format(n=t['n'])))
     before, after = _beside(session, plan, gap, sh, take_rows)
     still = next((s for s in g.get('stills') or [] if s.get('status') == 'approved' and s.get('key')), None)
     pics = before + [{'_key': (_rec(session, j).get('frames') or [{}])[0].get('key'), '_mark': str((j.get('result') or {}).get('sha256') or ''), 'label': W['frame'].format(n=k), 'role': 'frame', 'take': k}

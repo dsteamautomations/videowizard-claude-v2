@@ -343,6 +343,7 @@ def test_a_version_is_shown_beside_the_video_it_was_made_from(held):
     ln = T.line(box['store'], s, p, p['gaps'][0], p['gaps'][0]['scenes'][0]['shots'][0], 1, 1, box['rows'], NOW)
     assert ln['compare'] == {'from': 1, 'new': 2, 'play': 'Play both together'} and ln['takes'][1]['how'] == 'An edit of take 1.' and ln['takes'][1]['size'] == '720p'
     assert [b['choice'] for b in ln['buttons']] == ['select', 'again', 'old:1'] and 'full-size' not in ln['buttons'][0]['say']   # a 720p video goes in the film
+    assert not any(b.get('sure') for b in ln['buttons']) and ln['buttons'][2]['label'] == 'Use take 1 after all'   # SK, 22 Nov 2026: one click, no second question (the answer can be undone)
 
 
 def test_the_shot_before_is_shown_by_its_last_picture(held):
