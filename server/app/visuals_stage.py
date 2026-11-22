@@ -1512,7 +1512,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                            **{k: sh[k] for k in ('size', 'camera_reason') if sh.get(k)}, **lit.get(sh['id'], {}),   # design/103
                                            'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
-                                           'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
+                                           'asset': ({'kind': asset['kind'], 'url': url(None if asset['kind'] == 'clip' else asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {}),   # design/89 B3
                                                       **({'by': asset.get('by_name') or '', 'quote': asset.get('quote') or '', 'duration_s': asset.get('duration_s'), 'made_outside': True, 'made': asset.get('made') or ''} if asset['kind'] in ('movie', 'still') else {})} if asset else None),   # R21, E17: a supplied file
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'], 'guide': _guide_view(session, sh['id'], url), **_state_order(session, sh),   # design/94 A2
@@ -7751,6 +7751,16 @@ def media_clips(outputs):
     return {c['id']: c for c in ((media or {}).get('summary') or {}).get('clips') or []}
 
 
+def library_clips(store, run):
+    """Defect 59: the clips of the client's library this film was offered at the first cut (design/147 L4), by id. Each carries `key`, where its file is
+    in its source film, and `library_from`. None when the film has no first-cut record."""
+    from .stage2 import stage as S2
+    if not store.exists(S2.key(run, 'session.json')):   # no first cut on this film; a record that is there but cannot be read is an error, never "no such clip"
+        return {}
+    clips = (S2.session_of(store, run).get('package') or {}).get('clips') or {}
+    return {cid: c for cid, c in clips.items() if c.get('library_from')}
+
+
 def _sec(frames, fps):
     return float(Fraction(int(frames)) / Fraction(str(fps)))
 
@@ -7853,7 +7863,7 @@ def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=No
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     need(shot['visual_type'] in ('image', 'video', 'footage'), f"shot {shot_id} is a {shot['visual_type']}: a clip stretch fills a footage, still or video shot, never a graphic.")   # design/124-b item 1
-    clip = media_clips(outputs).get(clip_id)
+    clip = media_clips(outputs).get(clip_id) or library_clips(store, run).get(clip_id)   # defect 59: this film's own clip first, else a clip of the client's library
     need(clip, f'Unknown clip {clip_id}.')
     need((quote or '').strip(), 'The operator reply is required.')
     seconds = _sec(shot['end_frame'] - shot['start_frame'], session['source'].get('fps') or 25)
@@ -7871,6 +7881,7 @@ def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=No
                                   'rotation_deg': clip.get('rotation_deg') or 0, 'hdr': str(clip.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084'),
                                   'in_s': in_s, 'out_s': out_s, 'quote': quote, 'by': user['id'], 'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']},
                                   **({'crop': list(crop)} if crop is not None else {}),
+                                  **({'key': clip['key'], 'library_from': clip['library_from']} if clip.get('library_from') else {}),   # defect 59: a library clip's file is in its source film
                                   **({'reuse': kept} if kept else {}), **({'repeat_warnings': warns} if warns else {})}
     session['selections'].pop(shot_id, None)
     (session.get('reuse_pending') or {}).pop(shot_id, None)
@@ -8143,9 +8154,11 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
                           'media': {'kind': 'sequence', 'states': media_states, 'dissolve_frames': asset['dissolve_frames'], 'motion': s.get('motion') or 'push_in', 'graphic': True}})   # design/89 B2
         elif asset['kind'] == 'clip':   # design/89 B3: a moving stretch of an original clip
             name = f"{s['id']}-clip-{asset['name']}"
-            files.append({'name': name, 'key': f"{run['id']}/media/{asset['name']}", 'sha256': asset['sha256'], 'bytes': asset.get('bytes'), 'location': 'storage', 'receipt': True})
+            lib = {k: asset[k] for k in ('key', 'library_from') if asset.get(k)}   # defect 59: a library clip is read from its source film, by the render and by the editor's package
+            files.append({'name': name, 'key': asset.get('key') or f"{run['id']}/media/{asset['name']}", 'sha256': asset['sha256'], 'bytes': asset.get('bytes'),
+                          'location': 'library' if lib else 'storage', 'receipt': True})   # a library clip's receipt is its source film's: the record does not ask this film for one (core.output)
             shots.append({'shot_id': s['id'], 'source': 'clip', 'kind': 'clip', 'placement': asset['placement'],
-                          'media': {'kind': 'clip', 'clip': {k: asset.get(k2) for k, k2 in (('id', 'clip_id'), ('name', 'name'), ('sha256', 'sha256'), ('fps', 'fps'), ('rotation_deg', 'rotation_deg'), ('hdr', 'hdr'))},
+                          'media': {'kind': 'clip', 'clip': {**{k: asset.get(k2) for k, k2 in (('id', 'clip_id'), ('name', 'name'), ('sha256', 'sha256'), ('fps', 'fps'), ('rotation_deg', 'rotation_deg'), ('hdr', 'hdr'))}, **lib},
                                     'in_s': asset['in_s'], 'out_s': asset['out_s'], 'crop_rect': asset.get('crop') or (asset.get('reuse') or {}).get('crop')}})
         else:
             name = f"{s['id']}-asset{'.mp4' if asset['kind'] == 'movie' else '.png'}"

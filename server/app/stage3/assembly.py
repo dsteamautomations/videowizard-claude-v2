@@ -413,7 +413,8 @@ def clip_item(ev, m, tl_fps, normalised_key):
     src_in = int(round(Fraction(str(m['in_s'])) * sf))
     n_src = int(Fraction(ev['timeline_frames']) * sf / Fraction(str(tl_fps)))
     return {'kind': 'event', 'sub_clip_id': ev['shot_id'], 'name': ev['shot_id'],   # 'name', not 'label': a label is the review film's burned-in caption
-            'clip': {'id': c['id'], 'name': c['name'], 'sha256': c['sha256'], 'fps': c['fps'], 'rotation_deg': c.get('rotation_deg') or 0.0, 'hdr': bool(c.get('hdr'))},
+            'clip': {'id': c['id'], 'name': c['name'], 'sha256': c['sha256'], 'fps': c['fps'], 'rotation_deg': c.get('rotation_deg') or 0.0, 'hdr': bool(c.get('hdr')),
+                     **({'key': c['key']} if c.get('key') else {})},   # defect 59: a library clip's file is in its source film; the render downloads by this key
             'source_in_frame': src_in, 'source_out_frame': src_in + n_src, 'timeline_frames': ev['timeline_frames'], 'crop_rect': m.get('crop_rect'),
             'hold_last_frame': False, 'a2': [], 'normalised_key': normalised_key, 'dissolve_into_next': 0}
 

@@ -26,9 +26,10 @@ def srt_time(seconds):
 
 
 def all_clips(media_o, pk):
-    """design/147 L3: this film's own clips, and the library clips the first cut placed (they carry key and library_from in the package)."""
+    """design/147 L3: this film's own clips, and the library clips offered to it (they carry key and library_from). `pk` is the first-cut record's
+    `package` (its `clips`), not the package file, which holds no clips (defect 59: the library clips were never found)."""
     own = {c['id']: c for c in media_o['summary']['clips']}
-    return {**own, **{cid: c for cid, c in ((pk or {}).get('clips') or {}).items() if c.get('library_from')}}
+    return {**own, **{cid: c for cid, c in ((pk or {}).get('clips') or {}).items() if c.get('library_from') and cid not in own}}   # a clip this film holds itself keeps its own row
 
 
 def srt_of(beats, sentences=None, fps=25):
@@ -229,7 +230,7 @@ def bundle(conn, store, user, run, outputs):
         if ev['kind'] == 'event':
             row = next(r for r in pk['sub_clips'] if r['sub_clip_id'] == ev['sub_clip_id'])
             used_clips[row['clip_id']] = row['clip_name']
-    clips = all_clips(media_o, pk)
+    clips = all_clips(media_o, s2.get('package'))
     for cid, name in used_clips.items():
         c = clips[cid]
         files.append({'role': 'original', 'name': layout('original', name), 'key': S2.clip_key(run, c), 'sha256': c['sha256'], 'bytes': c.get('bytes'),
@@ -273,7 +274,7 @@ def bundle(conn, store, user, run, outputs):
     cuts_per_clip = {cid: used.count(cid) for cid in set(used)}
     timeline_files = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, asm_o['summary'].get('finishing') or [], assembly.get('sfx_cues') or [], assembly['duration_frames']).encode('utf-8'), 'application/xml'),
                       f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
-                      'Relink-list.csv': (TL.relink_csv(media_o['summary']['clips'], set(used), cuts_per_clip).encode('utf-8'), 'text/csv')}   # design/107 slice 1
+                      'Relink-list.csv': (TL.relink_csv(clips.values(), set(used), cuts_per_clip).encode('utf-8'), 'text/csv')}   # design/107 slice 1; defect 59: a library clip is a camera file to relink too
     generated = {**timeline_files, 'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
                  'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown'),
                  **({'AI-shots.md': (ai_shots_md(shots).encode('utf-8'), 'text/markdown')} if shots else {})}   # design/105 E-c
@@ -306,7 +307,7 @@ def bundle_early(conn, store, user, run, outputs, session):
     s2 = S2.session_of(store, run)
     pk = S2._package(store, s2)
     fps = pk['timeline']['fps']
-    clips = all_clips(media_o, pk)
+    clips = all_clips(media_o, s2.get('package'))
     events, ai_files = E.events_of(plan, pk, outputs, clips)
     files = []
     for f in voice_o['files']:
@@ -330,7 +331,7 @@ def bundle_early(conn, store, user, run, outputs, session):
     generated = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, [], [], plan['duration_frames'], reference=False, captions=cues).encode('utf-8'), 'application/xml'),
                  f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
                  f"{run['code']}.srt": (captions.encode('utf-8'), 'text/plain'), 'Cut-list.csv': (E.cut_list_csv(events, fps).encode('utf-8'), 'text/csv'),
-                 'Relink-list.csv': (TL.relink_csv(media_o['summary']['clips'], set(used), cuts_per_clip).encode('utf-8'), 'text/csv'),
+                 'Relink-list.csv': (TL.relink_csv(clips.values(), set(used), cuts_per_clip).encode('utf-8'), 'text/csv'),
                  'OPEN-EDIT.md': (E.open_edit_text(run['code']).encode('utf-8'), 'text/markdown')}
     for name, (data, mime) in generated.items():
         k = key(run, 'delivery/' + name)
@@ -565,7 +566,7 @@ def final(conn, store, user, run, outputs, quote):
              {'name': 'manifest.json', **{k: b['manifest'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True}]
     for f in manifest['files']:   # the whole package is the delivery record, so retention keeps it (originals the timeline references included)
         if f['key'] not in {x['key'] for x in files}:
-            files.append({'name': f['name'], **{k: f[k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True})
+            files.append({'name': f['name'], **{k: f[k] for k in ('key', 'sha256', 'bytes')}, 'location': 'library' if f.get('source_film') else 'storage', 'receipt': True})   # defect 59: a library original's receipt is its source film's
     for name in ('drt', 'report'):
         ref = rep.get(name)
         if ref:

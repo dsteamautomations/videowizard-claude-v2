@@ -56,6 +56,9 @@ def download(run_id: UUID, key: str, user=User):
     with connect() as conn:
         run = core.load_run(conn, user, run_id)
         row = conn.execute('select * from vw2_files where run_id=%s and key=%s', (run['id'], key)).fetchone()
+        if not row:   # defect 59: a library clip, a media file of another film of the same client (design/147 L3; the page's rule, web.client_key)
+            from .web import client_key
+            row = client_key(conn, run, key) and storage().exists(key)
     store = storage()
     if not row:  # working files (planning package, ledger…) live under the run prefix without a receipt row
         from . import visuals_stage   # fix set B1 (defect 55): a brief's picture kept under another name is served from where its file is
