@@ -228,9 +228,15 @@ def test_the_edit_words_have_the_fixed_opening_each_change_as_a_line_and_what_st
     assert two == 'Edit the video. Make only these changes:\n1. Remove the poles.\n2. The wall is a brick parapet.\n\nKeep everything else exactly the same: the ponds, the camera.'
 
 
-def test_the_copy_asks_for_the_same_video_again_with_nothing_changed():
-    t = C.copy_text()
-    assert t.startswith('Edit the video.') and 'same video again' in t and all(w in t for w in ('people', 'action', 'place', 'camera', 'light', 'timing')) and C.COPY_WAY == 'edit'
+def test_the_copy_asks_for_the_same_video_at_full_detail_and_nothing_else_changed():
+    """SK's test of 22 Nov 2026 (5 paid calls; vw2-archive/2026-11-22/upscale-test): "make no change" gave the 360p picture made bigger; these words
+    gave a picture as detailed as a true 720p take on three videos, frame for frame on the input. The words are kept as tested."""
+    assert C.copy_text() == ('Edit the video. Make only this change: the picture becomes true 720p footage with sharp, fine detail: skin, cloth, surfaces, textures and edges '
+                             'as a camera records them at 720p. The video given is a small 360p picture; do not simply enlarge it.\n\n'
+                             'Keep everything else exactly the same, frame for frame: the people and what they do, every object, the place, the camera, the light and the timing.')
+    assert C.COPY_WAY == 'edit' and 'make no change' not in C.copy_text().lower() and 'same video again' not in C.copy_text()
+    later = C.copy_text('720p', '1080p')   # the two sizes come from the settings: when a version becomes 1080p the words follow
+    assert 'true 1080p footage' in later and 'at 1080p.' in later and 'a small 720p picture' in later and '360p' not in later
 
 
 def test_the_remake_words_name_each_picture_then_the_prompt_then_one_continuous_shot():

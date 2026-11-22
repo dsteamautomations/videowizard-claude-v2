@@ -197,7 +197,7 @@ One addition to the note: a take made for an earlier plan cannot be accepted, bu
 
 ## 10. Not covered
 
-- **No call to Google was made.** Not proven: that it takes `360p`; a 360p take as the input of a 720p edit or remake; how true the "same video again" copy is; the exact shape of a failed call's message (read from its `error` field, as Gemini gives it elsewhere).
+- **Calls to Google:** none while building; five after it, on SK's word (section 11). Still not proven: that it takes `360p` as the size of a first take; a take the model itself made at 360p as the input of a 720p version; the exact shape of a failed call's message (read from its `error` field, as Gemini gives it elsewhere).
 - **The database-backed tests** (`server/tests`, Docker) were not run. The worker's step after a take (frames stored, the remake of both queued under the run's lock) is tested through its parts, not against a database.
 - **A remake's pictures through the film's own rules for a person's picture:** the flow is tested with the picture step stood in; the shrink to 1,536 px is tested alone.
 - **VW-24 as it stands on the live server:** not touched and not read. A shot of it with "Make another" pending or a rejected take will show its newest video to the operator again; this was not tried on its real data.
@@ -206,10 +206,31 @@ One addition to the note: a take made for an earlier plan cannot be accepted, bu
 - **The 360p price** is a third by rule (₹2.97), not measured.
 - Three plugin tests fail on this Windows PC before and after this change (line endings, a Mac path): `test_intake` (2) and `test_start_defect_paths` (1).
 
+## 11. SK's test of the 720p copy (22 Nov 2026, after the build)
+
+Five paid calls, on SK's word, by Claude's scripts outside the application, on the local test key; the requests were built by the application's new code. The server and VW-24 were not touched. Evidence and the full results: `vw2-archive/2026-11-22/upscale-test/results.md` and `batch2/results.md`.
+
+The input each time: a true 720p take of the trial made smaller to 360p (no take made at 360p by the model exists yet).
+
+| Call | Words | Result |
+|---|---|---|
+| Edit, hand-over take | "Do not change anything: this is only an increase of the picture size" | The same video frame for frame (0.98), but only as detailed as the 360p picture made bigger (32; the true 720p take 94). |
+| Reference mode, first 3 s | the same idea | More detail (58), but the movement is acted again: not the same video (0.84). |
+| Edit, hand-over, brick close-up, mason with wire | "the picture becomes true 720p footage with sharp, fine detail ... do not simply enlarge it", then "keep everything else exactly the same, frame for frame" | The same video frame for frame (0.94 to 0.96) with the detail of a true 720p take (91, 77, 158 against 89, 44, 173). |
+
+What follows from it:
+
+- **The 720p copy stays an edit (R12), with the second wording.** The words the build first had ("make no change: give the same video again") were of the first kind and would have given a soft picture; they were replaced before any deploy (`corrections.copy_text`, design/35 row 324). The two sizes in the words come from the settings.
+- The detail is drawn by the model, not taken from an original: the operator still sees the copy beside the take before it goes in the film (A4).
+- A 360p video is accepted as the input of a 720p edit and of a reference call, and is counted at a third of the 720p tokens (1,931 a second against 5,792): this supports the 360p price.
+- The application's edit and remake requests work against Google as built.
+
+Not proven by it: a take made at 360p by the model; a face large in the frame; more than one try of each.
+
 ## 8. Not in this change
 
 - No deploy, no restart, nothing on the VM, nothing of VW-24's live run.
-- No paid call. The 360p size, a 360p take as the input of a 720p edit or remake, and the "same video again" edit are **not proven**; the first real run proves them.
+- The 360p size of a first take is **not proven**; the first real run proves it. (The 720p copy was tested after the build: section 11.)
 - Shorter take words for the first take (O16).
 - 1080p.
 - SK's other way for the 720p copy (the first seconds as a reference): only the place to switch it is built.

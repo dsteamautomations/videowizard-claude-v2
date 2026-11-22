@@ -54,8 +54,11 @@ FILE = ('{"route": "edit|remake|both|first_take|none", "reason": "one sentence: 
 
 W = {
     'edit_one': 'Edit the video. Make only this change: {change}', 'edit_many': 'Edit the video. Make only these changes:', 'keep': 'Keep everything else exactly the same: {keep}.',
-    'copy': ('Edit the video. Make no change: give the same video again, exactly as it is. Keep everything exactly the same: the people and what they do, the action, '
-             'the place, the camera, the light and the timing.'),
+    # SK's test of 22 Nov 2026 (5 paid calls; vw2-archive/2026-11-22/upscale-test): "make no change: give the same video again" returned the 360p picture made bigger (a 720p
+    # file with 360p detail). These words returned a picture as detailed as a true 720p take on three videos, frame for frame on the input. Kept as tested.
+    'copy': ('Edit the video. Make only this change: the picture becomes true {to} footage with sharp, fine detail: skin, cloth, surfaces, textures and edges '
+             'as a camera records them at {to}. The video given is a small {was} picture; do not simply enlarge it.\n\n'
+             'Keep everything else exactly the same, frame for frame: the people and what they do, every object, the place, the camera, the light and the timing.'),
     'remake_open': 'Make a new {s}-second video that begins as the reference video does.', 'remake_close': 'One continuous shot. No cut. No dialogue. No music.',
     'no_correction': 'No correction of {shot} waits for its route: the operator has said nothing is wrong with its video, or its route was already sent (`vw guide corrections`).',
     'being_made': 'A video of this shot is being made: say it again when it is back.',
@@ -103,8 +106,9 @@ def edit_text(changes, keep):
     return head + '\n\n' + W['keep'].format(keep=' '.join(str(keep).split()).rstrip('.'))
 
 
-def copy_text():
-    return W['copy']
+def copy_text(was=None, to=None):
+    """The words of the full-size copy of an accepted take: `was` is the take's size, `to` the size of a version (both from the settings)."""
+    return W['copy'].format(was=was or video_generators.GUIDE['resolution'], to=to or VERSION_SIZE)
 
 
 def remake_text(seconds, picture_jobs, prompt):
@@ -295,12 +299,13 @@ def copied(g, job):
 
 
 def copy(conn, store, user, run, session, shot_id, job, quote=''):
-    """The full-size video of an accepted 360p take: the whole take sent as an edit that asks for the same video again. The caller saves the session."""
+    """The full-size video of an accepted 360p take: the whole take sent as an edit that asks for the same video at the version's size, with its detail
+    (`copy_text`). The caller saves the session."""
     g = session['guides'][shot_id]
     need(not copied(g, job), W['already'])
     c = _new(job, user, route='copy', source=_source(job))
     g.setdefault('corrections', []).append(c)
-    _go(conn, store, run, session, shot_id, c, {'kind': COPY_WAY, 'text': copy_text(), 'pictures': []})
+    _go(conn, store, run, session, shot_id, c, {'kind': COPY_WAY, 'text': copy_text(size_of(job)), 'pictures': []})
     _log(conn, run, shot_id, W['log_copy'], user, quote, 'operator')
     return c
 
