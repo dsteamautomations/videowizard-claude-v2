@@ -52,7 +52,7 @@
 <div class="cols" id="cols" hidden>
   <div>
     <div class="scr" id="script"></div>
-    <div class="note">Click a word. Underlined: an approved word. For a name of several words, select them with the mouse.</div>
+    <div class="note">Click a word. Underlined: an approved word. For a name of several words, click the first word, then Shift + click the last. One name, one spelling, one try, one approval.</div>
   </div>
   <div>
     <div class="cd" id="card"></div>
@@ -73,7 +73,7 @@ const app=document.getElementById('app'), code=app.dataset.code, job=app.dataset
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const OPEN=['queued','running','storage_pending'];
-let data=null, word=null, place=0, toks=[], stopAt=null, timer=null, hit=null, sending=false, checked=false, hints={};
+let data=null, word=null, place=0, toks=[], raw=[], anchor=null, stopAt=null, timer=null, hit=null, sending=false, checked=false, hints={};
 
 function wkey(t){return String(t||'').replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'');}
 function fold(t){return t.slice(0,1).toLowerCase()+t.slice(1);}   // "Shuttering" at the start of a sentence is "shuttering": corrected with it
@@ -91,8 +91,16 @@ function renderScript(){const fin=wordsOf().filter(x=>x.final_say_as).flatMap(x=
   const inAny=(list,i)=>list.some(([a,b])=>i>=a&&i<=b);let i=0;
   $('script').innerHTML=data.script_text.split(/\n\s*\n/).filter(p=>p.trim()).map(p=>'<p>'+p.trim().split(/\s+/).map(t=>{const n=i++;
     return `<span class="w ${inAny(on,n)?'on':''} ${inAny(fin,n)?'fx':''}" data-i="${n}">${esc(t)}</span>`;}).join(' ')+'</p>').join('');
-  $('script').querySelectorAll('.w').forEach(s=>s.addEventListener('click',()=>{const sel=String(window.getSelection()).trim().replace(/\s+/g,' ');
-    const many=sel.includes(' ')&&sel.length<=80?sel.split(' ').map(wkey).filter(Boolean).join(' '):'';pick(many&&places(many).length?many:wkey(s.textContent),Number(s.dataset.i));}));}
+  $('script').querySelectorAll('.w').forEach(s=>s.addEventListener('click',e=>{const n=Number(s.dataset.i);
+    if(e.shiftKey&&anchor!=null&&anchor!==n){window.getSelection().removeAllRanges();phrase(Math.min(anchor,n),Math.max(anchor,n));return;}
+    anchor=n;pick(wkey(s.textContent),n);}));}
+
+// SK, 23 Nov 2026: a name of several words is the first word clicked and the last Shift + clicked; refused here where the server would not find it in the script
+function phrase(a,b){const mid=raw.slice(a,b+1),w=toks.slice(a,b+1).join(' ');
+  if(mid.slice(0,-1).some(t=>/[.!?…]["'”’)\]]*$/.test(t))){msg('Pick words inside one sentence.',true);return;}
+  if(mid.some((t,k)=>!toks[a+k]||(k>0&&!t.startsWith(toks[a+k]))||(k<mid.length-1&&!t.endsWith(toks[a+k])))){msg('Pick words with nothing between them but spaces.',true);return;}
+  if(w.length>80){msg('A name can be up to 80 characters. Pick fewer words.',true);return;}
+  pick(w,a);}
 
 function pick(w,at){if(!w)return;const known=wordsOf().find(x=>fold(x.word)===fold(w));word=known?known.word:w;const ps=places(word);place=Math.max(0,ps.findIndex(([a,b])=>at>=a&&at<=b));hit=null;msg('');render();}
 function show(i){const el=$('script').querySelector('[data-i="'+i+'"]');if(el)el.scrollIntoView({block:'center',behavior:'smooth'});}
@@ -107,7 +115,7 @@ $('au').addEventListener('error',()=>msg('The recording could not be played. Try
 function playTry(key){const tp=$('tp');$('au').pause();tp.src='/runs/'+code+'/audio/'+key;tp.play().catch(()=>msg('The recording could not be played. Try again.',true));}
 
 function renderCard(){const c=$('card'),closed=data.closed,typing=document.activeElement&&document.activeElement.id==='say';
-  if(!word){c.innerHTML='<div class="ds">Click a word in the script, or select several words for a name.</div>';return;}
+  if(!word){c.innerHTML='<div class="ds">Click a word in the script. For a name of several words, click the first word, then Shift + click the last.</div>';return;}
   const ps=places(word),e=entry(),fin=e&&e.final_say_as,mine=data.tries.filter(t=>t.word===word),typed=($('say')&&$('say').dataset.w===word)?$('say').value:((e&&(e.say_as||e.final_say_as))||'');
   const made=data.narration.made_at?new Date(data.narration.made_at).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
   const now=data.times.length&&ps.length
@@ -118,10 +126,9 @@ function renderCard(){const c=$('card'),closed=data.closed,typing=document.activ
   const first=wkey(word.split(' ')[0]),alt=ps.filter(([a])=>toks[a]!==first),also=alt.length?' (with “'+esc(toks[alt[0][0]])+'”, '+alt.length+' place'+(alt.length===1?'':'s')+', corrected with it)':'';
   c.innerHTML=`<div class="wd">${esc(word)}</div><div class="ds">${ps.length} place${ps.length===1?'':'s'} in the script${also}${fin?' · approved, said as “'+esc(fin)+'”':''}</div>
     <div class="stp">${data.pre?'How this voice says it':'How it sounds in this narration'}</div>${now}
-    <div class="stp">1 · Type how it should sound</div><input id="say" data-w="${esc(word)}" value="${esc(typed)}" placeholder="the way you would say it, for example SHUT-er-ing" maxlength="120" ${closed?'disabled':''}>
-    <div class="note">Write it as it sounds: syllables with hyphens, the stressed one in capitals. Google shows vi · vay · <b>kaa</b> · nuhnd: type vi-vay-KAA-nuhnd.</div>
-    <div class="row" style="margin-top:4px"><a class="lk" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent('how to pronounce '+word+' in english')}">Look it up on Google ↗</a>
-      <button type="button" class="lk" id="sugg" ${closed?'disabled':''}>Suggest spellings (free)</button></div><div id="sugs"></div>
+    <div class="stp">1 · Write it in an Indian script</div><input id="say" data-w="${esc(word)}" value="${esc(typed)}" placeholder="in Hindi or Tamil letters, for example विवेकानंद" maxlength="120" ${closed?'disabled':''}>
+    <div class="note">Write the word in Hindi or Tamil letters, as it is spoken. The voice then says it the Indian way. The script and the captions keep the English spelling.</div>
+    <div class="row" style="margin-top:4px"><button type="button" class="lk" id="sugg" ${closed?'disabled':''}>Suggest in Hindi and Tamil script (free)</button></div><div id="sugs"></div>
     <div class="stp">2 · Make the sound</div><button type="button" class="paid" id="make" ${closed?'disabled':''}></button>
     <div class="note"><button type="button" class="lk" id="insent" ${closed?'disabled':''}>Hear it inside its sentence instead (paid, one whole sentence)</button></div>
     <div class="stp">3 · Listen · playing is free</div><div id="tries">${mine.length?mine.map((t,k)=>tryRow(t,k+1,fin,closed)).reverse().join(''):'<div class="ds">No try yet for this word.</div>'}</div>
@@ -132,11 +139,11 @@ function renderCard(){const c=$('card'),closed=data.closed,typing=document.activ
   $('make').addEventListener('click',()=>ask(true));$('insent').addEventListener('click',()=>ask(false));
   if($('asw'))$('asw').addEventListener('click',()=>ask(true,true));
   const sugs=()=>{const h=hints[word];$('sugs').innerHTML=!h?'':(h.error?`<div class="note">${esc(h.error)}</div>`
-    :'<div class="row" style="margin-top:4px">'+h.list.map(s=>`<button type="button" class="free" data-sug="${esc(s)}">${esc(s)}</button>`).join('')+'</div><div class="note">These are guesses: listen before you approve.</div>');
+    :'<div class="row" style="margin-top:4px">'+h.list.map(s=>`<span class="ds">${esc(s.label)}:</span><button type="button" class="free" data-sug="${esc(s.text)}">${esc(s.text)}</button>`).join('')+'</div><div class="note">These are guesses: listen before you approve.</div>');
     $('sugs').querySelectorAll('[data-sug]').forEach(b=>b.addEventListener('click',()=>{say.value=b.dataset.sug;label();msg('');say.focus();}));};sugs();
   $('sugg').addEventListener('click',async e=>{const b=e.currentTarget,w=word;b.disabled=true;b.textContent='Thinking…';
     try{const r=await act({action:'word-suggest',word:w});hints[w]={list:r.spellings};}catch(err){hints[w]={error:err.message};}
-    if(w===word){b.disabled=false;b.textContent='Suggest spellings (free)';sugs();}});
+    if(w===word){b.disabled=false;b.textContent='Suggest in Hindi and Tamil script (free)';sugs();}});
   if($('now')){$('now').addEventListener('click',hearNow);if(ps.length>1){const step=d=>{place=(place+d+ps.length)%ps.length;show(ps[place][0]);renderCard();};$('prev').addEventListener('click',()=>step(-1));$('next').addEventListener('click',()=>step(1));}}
   c.querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click',()=>playTry(b.dataset.play)));
   c.querySelectorAll('[data-again]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.written==='1'){ask(true,true);return;}say.value=b.dataset.again;label();ask(b.dataset.alone==='1');}));
@@ -192,7 +199,7 @@ async function load(){const r=await fetch(base+'/words/'+encodeURIComponent(job)
   if(!r.ok){let j=null;try{j=await r.json();}catch(e){}$('cols').hidden=true;$('which').textContent='';
     $('top').className='msg err';$('top').textContent=((j&&(j.message||j.detail))||'This page could not be opened.')+' Use “Back to the narrations”.';return;}
   data=await r.json();const n=data.narration;
-  toks=data.script_text.split(/\s+/).filter(Boolean).map(wkey);
+  raw=data.script_text.split(/\s+/).filter(Boolean);toks=raw.map(wkey);
   $('which').textContent=data.pre?(n.name||'the voice')+' · before its first narration':(n.name||'the voice')+' #'+(n.number||'')+' · narrated '+new Date(n.made_at).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   $('back').textContent=data.pre?'← Back to the voices page':'← Back to the narrations';
   $('top').className='msg';$('top').textContent=data.closed?'The final narration is chosen: this page is for reading and listening only.':'';

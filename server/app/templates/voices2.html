@@ -99,7 +99,7 @@
 .v2.footmin .spacer{height:56px}
 .v2 button.paid{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);padding:8px 14px;font-size:13.5px;font-weight:600;border-radius:10px;cursor:pointer;white-space:nowrap}
 .v2 button.paid:disabled{opacity:.45;cursor:default}
-.v2 button.paid.armed{background:var(--err);border-color:var(--err);color:#fff}
+.v2 button.armed,.v2 .foot .go.armed{background:var(--err);border-color:var(--err);color:#fff}
 .v2 button.cancel{margin-left:6px;padding:8px 12px;font-size:13px;border-radius:10px}
 .v2 .paidnote{display:block;font-size:12px;color:var(--muted);margin-top:4px}
 /* design/208: "A word sounds wrong" is a page of its own (voice_words.html); the side panel of design/194 is retired */
@@ -158,11 +158,16 @@ let footMin=false; try{footMin=localStorage.getItem('vw-voices-foot')==='min';}c
 function tabText(){const pl=$('pl'),st=data&&data.state;return ((playing&&pl&&!pl.paused)?'Playing: '+$('pl-name').textContent:(step==='narrations'&&st&&!st.final)?'Pick the final narration':'Player and actions')+' ▲';}
 function setFoot(min){footMin=!!min;try{localStorage.setItem('vw-voices-foot',footMin?'min':'open');}catch(e){}$('foot').classList.toggle('min',footMin);$('app').classList.toggle('footmin',footMin);const t=$('foot-tab');t.hidden=!footMin;t.textContent=tabText();}
 function making(){const st=data&&data.state;return !!(st&&(st.narrations||[]).some(n=>['queued','running','storage_pending'].includes((data.jobs.find(j=>j.id===n.job_id)||{}).status)));}
-// a full narration is paid: the first click only arms the button (Confirm, with a Cancel beside it), the second sends; it disarms by itself after 8 s
-function paid(btn,run){const label=btn.textContent;let armed=false,t=0;
-const reset=()=>{armed=false;clearTimeout(t);btn.disabled=false;btn.textContent=label;btn.classList.remove('armed');const c=btn.nextElementSibling;if(c&&c.classList.contains('cancel'))c.remove();};
-btn.addEventListener('click',()=>{if(!armed){armed=true;btn.classList.add('armed');btn.textContent='Confirm: '+label.charAt(0).toLowerCase()+label.slice(1);btn.disabled=true;setTimeout(()=>{if(armed)btn.disabled=false;},700);
-const c=document.createElement('button');c.type='button';c.className='cancel';c.textContent='Cancel';c.addEventListener('click',reset);btn.after(c);t=setTimeout(reset,8000);return;}
+// a full narration is paid: the first click only arms the button (red, "Confirm: send"), the second sends; it disarms by itself after 8 s.
+// SK, 23 Nov 2026: nothing moves when it arms (the button keeps its width; in the bottom bar Cancel is a link in the message line), and the bar says what it waits for
+function paid(btn,run){const label=btn.textContent;let armed=false,t=0,c=null;
+const reset=()=>{armed=false;clearTimeout(t);btn.disabled=false;btn.textContent=label;btn.classList.remove('armed');btn.style.minWidth='';if(c){c.remove();c=null;}};
+const off=()=>{reset();msg('Not sent.');};
+btn.addEventListener('click',()=>{if(!armed){armed=true;btn.style.minWidth=btn.offsetWidth+'px';btn.classList.add('armed');btn.textContent='Confirm: send';btn.disabled=true;setTimeout(()=>{if(armed)btn.disabled=false;},700);
+msg('Click Confirm within 8 seconds to send. Nothing is sent yet.');
+c=document.createElement('button');c.type='button';c.textContent='Cancel';c.addEventListener('click',off);
+if(btn.closest('.foot')){c.className='lk';c.style.marginLeft='10px';$('fmsg').append(c);}else{c.className='cancel';btn.after(c);}
+t=setTimeout(off,8000);return;}
 reset();run();});}
 function msg(t,err,busy){if(err)setFoot(false);const m=$('msg');m.textContent='';const f=$('fmsg');f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');f.className='status '+(err?'err':(busy?'':'ok'));}
 function busy(btn,label){if(!btn)return;btn.disabled=true;btn.dataset.label=btn.textContent;btn.innerHTML='<span class="spin"></span>'+label;}

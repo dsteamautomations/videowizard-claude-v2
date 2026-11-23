@@ -24,7 +24,7 @@ def test_the_tab_says_what_matters():
 
 
 def test_a_full_narration_is_sent_on_the_second_click():
-    assert 'function paid(btn,run)' in PAGE and "'Confirm: '" in PAGE and "c.textContent='Cancel'" in PAGE
+    assert 'function paid(btn,run)' in PAGE and "'Confirm: send'" in PAGE and "c.textContent='Cancel'" in PAGE
     assert PAGE.count('paid(') == 4   # the helper, and its three uses: narrate again, narrate again with the final words, narrate the ticked voices
     for old in ("forEach(b=>b.addEventListener('click',async()=>{const box=b.closest('details')", "rb.addEventListener('click',async()=>{busy(rb", "if(b)b.addEventListener('click',async()=>{busy(b,'Submitting…');msg('Submitting '+chosen.length+' full narrations"):
         assert old not in PAGE, old   # no full narration is wired to a single click any more
@@ -34,7 +34,7 @@ def test_narrate_again_reads_as_a_paid_button_without_the_character_count():
     assert '<button class="tw-go paid" type="button" data-v="${esc(n.voice_id)}" disabled>Narrate again (paid)</button>' in PAGE
     assert 'This makes another full narration and is charged again.' in PAGE
     assert 'narrate again — paid, ~' not in PAGE and "again with the final words · paid, ~" not in PAGE
-    assert '.v2 button.paid{' in PAGE and '.v2 button.paid.armed{' in PAGE
+    assert '.v2 button.paid{' in PAGE and '.v2 button.armed,.v2 .foot .go.armed{' in PAGE   # 23 Nov 2026: every armed button turns red, also the bar's Narrate
 
 
 def test_the_button_is_off_without_a_tag_and_while_a_narration_is_being_made():

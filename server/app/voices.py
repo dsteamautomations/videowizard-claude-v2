@@ -587,7 +587,7 @@ def check_word(text, word, say_as=None):
         return word, None
     say_as = ' '.join(str(say_as or '').split())
     if not say_as or len(say_as) > 120:
-        raise Problem(422, 'WORD', 'Type how it should sound first, the way you would say it (for example "Man-ga-loor"). Nothing was sent.')
+        raise Problem(422, 'WORD', 'Type how it should sound first: the word in Hindi or Tamil letters, as it is spoken (for example "मंगलूरु"). Nothing was sent.')
     if say_as.lower() == word.lower():
         raise Problem(422, 'WORD', f'"{say_as}" is the word as written, which is what the voice reads now. Type how it should sound. Nothing was sent.')
     return word, say_as
@@ -717,7 +717,7 @@ def sentence_of(text, word):
 
 
 def suggest_spellings(store, outputs, word):
-    """design/208 J4: up to three spellings to start from, asked for by the operator on the word page. Guesses; nothing is sent to the voice."""
+    """design/208 J4: spellings to start from, asked for by the operator on the word page: the word in Hindi and Tamil script, labelled (SK, 23 Nov 2026). Guesses; nothing is sent to the voice."""
     from . import spelling_hints
     text = script_text(store, outputs)[0]['spoken_text']
     word, _ = check_word(text, word)
