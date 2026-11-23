@@ -83,7 +83,7 @@ def test_the_boards_are_asked_of_gpt_image_whatever_the_picture_ai_of_the_run(fi
     for run_id, unit, request, request_id, provider in conn.rows:
         req = request.obj
         assert provider == 'openai' and req['provider'] == 'openai' and req['model'] == VS.IMAGE_MODELS['generate'] and req['op'] == 'generate' and req['parents'] == []
-        assert req['reference']['kind'] == 'board' and unit == req['reference']['id'] and request_id == 'board:' + unit
+        assert req['reference']['kind'] == 'board' and unit == req['reference']['id'] and len(request_id) == 36
     made = film['session']['boards']
     assert len(made) == 2 and {b['status'] for b in made.values()} == {'generating'} and film['session']['references'] == {}   # no reference list is touched
     assert [b['label'] for b in out['boards']] == ['First', 'Second'] and out['to_make'] == 0

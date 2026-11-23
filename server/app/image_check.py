@@ -368,6 +368,9 @@ def light_line(store, session, ref, png):
     None for a graphic, a sheet, or a film without footage frames. Code, not a model: free; a must line since design/111 F18."""
     if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') not in ('keyframe', 'isolated'):
         return None
+    looks = (session.get('treatment') or {}).get('direction_look')
+    if looks:   # SK, 23 Nov 2026: a film with no camera footage is measured against its look picture, never against a library clip
+        return _light_look(store, session, looks, png)
     frames = [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')]
     beside = {c for c in ((session.get('gap_neighbours') or {}).get(ref.get('gap_id')) or {}).values() if c}
     frames = [r for r in frames if (r.get('source') or {}).get('media_id') in beside] or frames
@@ -381,10 +384,33 @@ def light_line(store, session, ref, png):
         return None
     footage = {k: sum(s[k] for s in stats) / len(stats) for k in LIGHT_JUMP}
     mine = _light(png)
-    words = {'brightness': ('brighter', 'darker'), 'saturation': ('more saturated', 'less saturated'), 'warmth': ('warmer', 'cooler')}
-    jumps = [f"{words[k][0] if mine[k] > footage[k] else words[k][1]} by {abs(mine[k] - footage[k]):.2f}" for k in LIGHT_JUMP if abs(mine[k] - footage[k]) >= LIGHT_JUMP[k]]
+    jumps = _jumps(mine, footage)
     seen = (', '.join(jumps) + ' than' if jumps else 'close to') + f" the footage beside it ({len(stats)} frame{'s' if len(stats) > 1 else ''})"
     return {'check': 'light and colour', 'pass_when': 'the light, colour and saturation match the footage beside it', 'weight': 'must', 'pass': not jumps, 'seen': seen}   # design/111 F18: a must (SK, 27 Oct), the jumps untuned
+
+
+def _jumps(mine, other):
+    words = {'brightness': ('brighter', 'darker'), 'saturation': ('more saturated', 'less saturated'), 'warmth': ('warmer', 'cooler')}
+    return [f"{words[k][0] if mine[k] > other[k] else words[k][1]} by {abs(mine[k] - other[k]):.2f}" for k in LIGHT_JUMP if abs(mine[k] - other[k]) >= LIGHT_JUMP[k]]
+
+
+def _light_look(store, session, looks, png):
+    """The light of a picture against the look board of the Direction taken; on a film of more than one period, against the closer board.
+    None when no board was made (the look is then in the words only). A should line: a board is a laid-out picture, not a frame of the film."""
+    from . import visuals_stage as V
+    mine, best = _light(png), None
+    for e in looks:
+        board = V.look_board(session, e)
+        try:
+            jumps = _jumps(mine, _light(store.get(board['key']))) if board else None
+        except Exception:
+            jumps = None
+        if jumps is not None and (best is None or len(jumps) < len(best)):
+            best = jumps
+    if best is None:
+        return None
+    return {'check': 'light and colour', 'pass_when': "the light, colour and saturation match the film's look picture", 'weight': 'should', 'pass': not best,
+            'seen': (', '.join(best) + ' than' if best else 'close to') + " the film's look picture"}
 
 
 DETAIL_MIN, DETAIL_FRAMES = 0.6, 3   # design/104 C3; ponytail: the handover's 40 % smoother, untuned; tune it from the ratios the line reports
@@ -398,6 +424,8 @@ def detail_line(store, session, ref, png):
     """design/104 C3: the picture's fine detail (edge energy) against the footage frames beside its gap, as N9 does for the light; code, not a model,
     and a should line. None for a graphic, a sheet, or fewer than three footage frames."""
     if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') not in ('keyframe', 'isolated'):
+        return None
+    if (session.get('treatment') or {}).get('direction_look'):   # no camera footage of its own: nothing to compare the fine detail with
         return None
     frames = [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')]
     beside = {c for c in ((session.get('gap_neighbours') or {}).get(ref.get('gap_id')) or {}).values() if c}

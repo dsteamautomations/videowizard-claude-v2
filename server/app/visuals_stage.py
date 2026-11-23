@@ -1314,6 +1314,21 @@ def board_prompt(text, entry, lettering):
             + ('any other writing.' if lettering else 'any writing.'))
 
 
+LOOK_PARENT = "\nImage {n} is the film's look board: take its light, colour and texture only; show nothing of what is on it, no swatches and no lettering."
+
+
+def look_parent(session, provider, body, element, n):
+    """SK, 23 Nov 2026 (release 2c): a run whose picture AI is Nano Banana is handed the look board as one more reference of a picture in the
+    film (not a set, a sheet, a graphic or a fix), after its `n` own pictures: (the request's entry, the line that names it), or (None, '').
+    A film of more than one period: the board of the period whose look the prompt carries; neither named, no board."""
+    if provider != 'gemini' or body.get('set') or body.get('fix_of') or body.get('region') or body['kind'] not in ('keyframe', 'isolated') or element.get('kind') in ('graphic', 'style') or n >= GEMINI_MAX_INPUTS:
+        return None, ''
+    looks = (session.get('treatment') or {}).get('direction_look') or []
+    entry = looks[0] if len(looks) == 1 else next((x for x in looks if x['look'].rstrip('.') in body['prompt']), None)
+    board = look_board(session, entry) if entry else None
+    return ({k: board[k] for k in ('id', 'key', 'sha256')}, LOOK_PARENT.format(n=n + 1)) if board else (None, '')
+
+
 def look_boards(conn, store, user, run, outputs, make=None):
     """The look boards of a film with no camera footage. With no `make`: what there is and what making the missing ones costs, nothing made (the
     cost is said first). `make='all'`: the missing boards are asked for. `make=<board id>`: that board again (once when it was made; a failed one
@@ -1341,7 +1356,7 @@ def look_boards(conn, store, user, run, outputs, make=None):
             request = {'kind': 'image', 'op': 'generate', 'provider': 'openai', 'model': IMAGE_MODELS['generate'], 'prompt': board_prompt(r['text'], r, lettering), 'size': size, 'quality': 'high', 'parents': [],
                        'reference': {'id': bid, 'element_id': 'look', 'element_kind': 'look', 'name': 'look board' + (' ' + r['label'] if r['label'] else ''), 'kind': 'board', 'subject': r['look']}}
             row = conn.execute("insert into vw2_jobs(run_id, stage, unit, request, request_id, provider) values (%s,'visuals',%s,%s,%s,%s) returning id",
-                               (run['id'], bid, Jsonb(request), 'board:' + bid, 'openai')).fetchone()
+                               (run['id'], bid, Jsonb(request), str(uuid.uuid5(uuid.NAMESPACE_OID, 'board:' + bid)), 'openai')).fetchone()   # defect 27: a job's request_id is a uuid
             session.setdefault('boards', {})[bid] = {'id': bid, 'of': r['of'], 'n': n, 'remakes': remakes, 'period': r['period'], 'status': 'generating', 'job_id': str(row['id']),
                                                     'generation': {k: request[k] for k in ('op', 'provider', 'model', 'prompt', 'size', 'quality')}}
         rows, todo, changed = board_view(session), [], True
@@ -5150,9 +5165,10 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     else:
         size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
         model = body.get('model') or IMAGE_MODELS[op]
-    request = {'kind': 'image', 'op': op, 'provider': provider, 'model': model, 'prompt': body['prompt'], 'size': size,
+    board, board_line = look_parent(session, provider, body, element, len(parents))   # SK, 23 Nov 2026: no camera footage, Nano Banana: the look picture goes with the words
+    request = {'kind': 'image', 'op': op, 'provider': provider, 'model': model, 'prompt': body['prompt'] + board_line, 'size': size,
                **({'background': 'transparent'} if body['kind'] == 'component' and provider == 'openai' else {}), **({'chroma_key': True} if body['kind'] == 'component' and provider == 'gemini' else {}),
-               'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents],
+               'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents] + ([board] if board else []),
                **({'set': True, 'views': list(body.get('views') or [])} if body.get('set') else {}), **({'search': True} if body.get('search') else {}),   # design/151; section 13: the views, one per turn
                **({'view_names': list(body['view_names'])} if body.get('set') and body.get('view_names') else {}),   # design/211: the short name of each view, written on its picture
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
