@@ -227,6 +227,7 @@ class Note(Write):
 
 class VisualPlan(Write):
     plan: dict[str, Any]
+    pictures: list[str] | None = Field(default=None, max_length=500)   # SK, 23 Nov 2026 (no footage, release 3): the pictures in the run folder's in/, as the tool lists them
     answers: str = Field(default='', max_length=200)   # release 3, C2: the item of a question the operator answered; the proposal that follows it (`vw visuals propose --answers`)
 
 
@@ -1386,12 +1387,12 @@ def visuals_prepare(run_id: UUID, body: Write, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/check', dependencies=[Depends(plan_size_guard)])
 def visuals_check(run_id: UUID, body: VisualPlan, user=User, conn=DB):
     run, outputs = _visuals_run(conn, user, run_id)
-    return Response(visuals_stage.check(storage(), run, outputs, body.plan))
+    return Response(visuals_stage.check(storage(), run, outputs, body.plan, pictures=body.pictures))
 
 
 @app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(plan_size_guard)])
 def visuals_propose(run_id: UUID, body: VisualPlan, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan, body.answers))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan, body.answers, pictures=body.pictures))
 
 
 @app.post('/api/runs/{run_id}/visuals/select')

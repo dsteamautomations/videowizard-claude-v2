@@ -395,7 +395,8 @@ def inputs_of(session, element):
         return ([{'ref': photo, 'role': 'photo', 'view': ''}] if photo else []), set()
     frames = approved[:3]
     from . import drawings
-    return ([{'ref': f['ref'], 'role': 'footage', 'view': f.get('view') or ''} for f in frames]
+    own = [] if frames else [{'ref': r, 'role': 'footage', 'view': 'as given'} for r in V._own_pictures(session, eid)[:3]]   # SK, 23 Nov 2026 (release 3, N2): with no footage picture, the operator's own
+    return ([{'ref': f['ref'], 'role': 'footage', 'view': f.get('view') or ''} for f in frames] + own
             + [{'ref': s['id'], 'role': 'drawing', 'view': s['view']} for s in drawings.approved_sheets(session, eid)]), {f['ref'] for f in frames if f.get('weak')}
 
 
@@ -1364,6 +1365,11 @@ def round_rewrite(conn, store, user, run, outputs, rows):
     return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'then': ' '.join(x for x in (REWRITE_MAKING.format(n=len(queued)) if queued else '', things_due_words(session)) if x) or REWRITE_MAKING.format(n=0)}
 
 
+def clean_from(session, eid, frames):
+    """Release 3 (F16): a clean set is made from the thing's footage picture or, with none, from the operator's own approved picture of it."""
+    return bool(frames or V._own_pictures(session, eid))
+
+
 def round_reopen(conn, store, user, run, outputs, eid, verdict, words, quote):
     """The operator's answer to a thing that came back after a second send of the round file (`reopened`), with the meaning of step 1:
     'approve' takes its footage picture as the reference where it has one (free), else orders its set (paid, their word); 'clean' orders a
@@ -1376,7 +1382,7 @@ def round_reopen(conn, store, user, run, outputs, eid, verdict, words, quote):
     V.need(verdict in STEP1_VERDICTS, f'{eid}: the answer is approve, clean or ignore.')
     plan = V.guarded(lambda: V.current_plan(store, session))
     frames = step1_frames(session, eid, row)
-    V.need(verdict != 'clean' or frames, CLEAN_NO_FRAME.format(eid=eid))
+    V.need(verdict != 'clean' or clean_from(session, eid, frames), CLEAN_NO_FRAME.format(eid=eid))
     stamp = {'by': user['id'], 'at': _now(), 'quote': V.said(quote, 'Answered on the references', user)}
     row.pop('reopened')
     row.pop('aside', None)

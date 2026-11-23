@@ -214,7 +214,7 @@ def _gap_rows(session, gap, selection=None):
     cell = lambda v: ' '.join(str(v or '').split()).replace('|', '/')   # one line, no column break
     for sc in V.chosen_scenes(gap, selection or session['choice_selections'].get(gap['gap_id'])):
         for s in sc['shots']:
-            kind = ROUTE_WORDS.get(V.route_of(s), V.route_of(s))
+            kind = ROUTE_WORDS.get(V.route_of(s), V.route_of(s)) + (f" (your picture {cell(s['supplied'])})" if s.get('supplied') else '')   # release 3 (F15): the place of the operator's own picture
             rows.append([str(len(rows) + 1), cell(s.get('title') or s['id']), kind, f'{_seconds(s, fps):.1f} s', cell(s.get('purpose')), cell(s.get('narration'))[:220]])
             total += _seconds(s, fps)
     return rows, f'{len(rows)} shots, {total:.1f} s in all.'
@@ -230,6 +230,7 @@ def _world_rows(plan, n=400):
     rows = ([['The look', f.get('appearance')]]
             + [[label, r.get('statement')] for label, k in (('The world', 'world'), ('Not shown', 'exclusions'), ('Specification', 'specifications')) for r in f.get(k) or []]
             + [['The graphic style', '; '.join(f"{k.replace('_', ' ')}: {v}" for k, v in ((k, style.get(k)) for k in ('palette', 'line_weight', 'labels', 'background', 'frame_fill')) if v)]])
+    rows += [['Your picture, not used', f"{x.get('file')}: {x.get('reason')}"] for x in (plan or {}).get('images_not_used') or []]   # release 3 (F15)
     rows = [r for r in rows if r[1]]
     if not rows:
         return []
@@ -2277,7 +2278,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)
-        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan))) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
+        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.supplied_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
         from . import core

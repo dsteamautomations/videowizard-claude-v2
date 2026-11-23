@@ -308,6 +308,7 @@ class Shot(Model):
     scene_svg: SvgScene | None = None   # design/117 P2 (design/113 E1 was the primitive scene)
     scene_motion: MotionScene | None = None   # design/130: the HyperFrames project of a drawn shot on a motion film
     camera_flow: Literal['', 'fixed', 'step_closer', 'pull_back', 'pan_along', 'follow', 'slow_push_in'] = ''   # design/221 section 10: a drawn shot's one camera flow (film.CAMERA); empty is fixed
+    supplied: str = Field(default='', max_length=200)   # SK, 23 Nov 2026 (no footage, release 3): the operator's own picture this still shot shows, by its path in the run folder (in/<name>)
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
@@ -397,7 +398,13 @@ class Gap(Model):
     candidates: list[SourceCandidate] = Field(default_factory=list, max_length=30)
 
 
+class ImageOut(Model):   # SK, 23 Nov 2026 (release 3): a picture the operator gave that the plan does not show, and why
+    file: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class Plan(Model):
+    images_not_used: list[ImageOut] = Field(default_factory=list, max_length=200)
     sequence_overview: str = Field(default='', max_length=12000)
     sequence_rules: list[Rule] = Field(default_factory=list, max_length=100)
     foundation: Foundation
@@ -1229,6 +1236,12 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
         for scene in all_scenes(gap):
             if not scene.get('period'):
                 scene.pop('period', None)
+            for shot in scene['shots']:   # the same for a shot with no picture of the operator
+                if not shot.get('supplied'):
+                    shot.pop('supplied', None)
+    if not result.get('images_not_used'):
+        result.pop('images_not_used', None)
+    warnings.extend(supplied_warnings(result))
     answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
         if key not in document: result.pop(key)
@@ -1452,6 +1465,7 @@ WARNING_PLAIN = {
     'graphic_short': 'This graphic is on screen too briefly to be read.',
     'still_long': 'This still picture stays on screen longer than a still should.',
     'stills_many': 'Still pictures take up a large part of the film.',   # design/202
+    'supplied_repeat': 'The same picture of yours is shown twice, next to each other or framed the same way.',   # SK, 23 Nov 2026 (release 3, F18)
     'over_limit': "The estimate for this film is above its cost limit.",   # SK, 23 Nov 2026 (no footage, V1)
     'still_more_than_agreed': 'This gap has more still picture than you accepted in the treatment.',   # design/207 (SK, 16 Nov 2026): this and the next two are raised by other parts of the server
     'text_card': "This is a card of words; this kind of film carries no words on the picture beyond a diagram's labels.",
@@ -1476,6 +1490,25 @@ WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missi
                      'people_alike', 'palette_missing',   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
                      'camera_words', 'continues_apart', 'end_change_large',   # fix set M1, M2, M4 (19 Nov 2026): settled with the plan, not at the build
                      'labels_missing')   # release 3, C4 (SK, 20 Nov 2026): a drawn shot that carries text and lists no labels, named at the plan
+
+
+def supplied_warnings(plan):
+    """SK, 23 Nov 2026 (release 3, F15, F18): the operator's own picture fills a still shot only (refused elsewhere); the same picture may be
+    shown in two shots, with a warning when the second comes straight after the first or has the same framing."""
+    flat = lambda v: ' '.join(str(v or '').lower().split())
+    shots = sorted((sh for gap in plan['gaps'] for scene in all_scenes(gap) for sh in scene['shots']), key=lambda s: s['start_frame'])
+    out, seen = [], {}
+    for n, sh in enumerate(shots):
+        name = flat(sh.get('supplied'))
+        if not name:
+            continue
+        need(sh['visual_type'] == 'image', f"shot {sh['id']}: `supplied` names the operator's own picture, and that fills a still shot only (visual_type image).")
+        first = next((f for m, f in seen.get(name, []) if m == n - 1 or flat(f.get('framing')) == flat(sh.get('framing'))), None)
+        if first:
+            out.append({'shot_id': sh['id'], 'kind': 'supplied_repeat', 'message': f"shot {sh['id']} shows the operator's picture {sh['supplied']} again, after {first['id']}, straight after it or with the "
+                                                                                 'same framing: give the second showing another framing or another place, or keep it with the operator\'s word'})
+        seen.setdefault(name, []).append((n, sh))
+    return out
 
 
 def answer_warnings(plan, warnings):

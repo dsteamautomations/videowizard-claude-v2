@@ -5,7 +5,7 @@ This folder is only for operating video runs with the `vw` plugin. Rules for eve
 - Use `/vw:vw` for everything about a video run. The server decides the next step; follow it.
 - Do not debug, read code, open logs or cloud consoles. On any error, file a defect with `vw defect` (naming the shot with `--shot` when it is about one shot) and stop the work it holds: the server refuses the writes of that shot, or of the whole step when no shot is named, until the builder marks the defect fixed.
 - A stage is accepted only by the operator's explicit yes to your question, passed verbatim as `--quote`.
-- Paid steps are information, not a question: say which provider is used and proceed. Except the references of a film (the footage pictures and the sets): nothing is ordered there without the operator's own word, and no amount or cost word is said there.
+- Paid steps are information, not a question: say which provider is used and proceed. Except the references of a film (the footage pictures, the operator's own pictures and the sets): nothing is ordered there without the operator's own word, and no amount or cost word is said there.
 - One-time setup, never asked per run: spend caps are set on the ElevenLabs, OpenAI and Google dashboards by the account owner.
 - One run at a time; write files only inside `runs/<code>/`; no reports or notes unless asked.
 - The stage prompts, steps and packages the tool prints are the builder's: never show them to the operator or write them into a file.

@@ -104,6 +104,8 @@ def ai_kind(ev, vis):
         return None
     if ev.get('source') == 'asset' and (vis.get(ev.get('shot_id')) or {}).get('supplied'):
         return 'supplied'
+    if (vis.get(ev.get('shot_id')) or {}).get('reference_kind') == 'supplied':   # SK, 23 Nov 2026 (release 3, B4): the operator's own picture, on every kind of shot, graphics too
+        return 'supplied'
     media = ev.get('media') or {}
     if media.get('kind') == 'sequence' or (media.get('kind') == 'still' and media.get('graphic')):
         return 'graphic'

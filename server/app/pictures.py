@@ -112,6 +112,8 @@ W = {
     'parent_card': 'Another picture is made from this one, so it is asked now, before the page. Yes also allows it as the parent of new pictures.',
     'parent_card_failed': ("Another picture is made from this one, so it is asked now, before the page. Claude's check failed a must line ({lines}): Yes approves it all the "
                            'same, and also allows it as the parent of new pictures.'),
+    'supplied_due': ("{n} still shot{s} wait for the operator's own picture: {rows}. Place each now: `vw upload --stage visuals --file in/<name>`, then `vw visuals asset --shot S "
+                     "--file in/<name> --kind still --made \"the operator's own picture\" --quote \"<their words>\"`. No picture is made for these shots."),
     'stills_due_one': ('1 still shot has no picture asked for yet ({ids}): order it now, beside the drawn graphics (`vw visuals image --shot S --element E '
                        '--kind keyframe --prompt "…"`); it needs nothing from the drawings.'),
     # design/221 (the critic's points 3, 4): a failed or stale render, said in the next step
@@ -1264,6 +1266,7 @@ def expected(session, plan, take_rows, now=None):
             if wait and not turn[0].startswith('check'):   # F11: the shared parts are not the approved ones: no builder is named, and the line says what is waited for
                 turn, due = ('', ''), ' '.join(x for x in (due, wait if turn[0] else '') if x)
         out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
+                    **({'supplied': sh['supplied']} if kind == 'still' and sh.get('supplied') else {}),   # release 3 (N4): it waits for the operator's own picture
                     **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
     names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
     by = {}
@@ -1295,8 +1298,14 @@ def status_line(items):
 def stills_due(items, hold=()):
     """design/221 row 19: the still shots with no picture asked for yet, said in the tool's next-step line until each is ordered.
     The critic's point 10c: `hold` (`ask_shots`): the shots whose person the operator must be asked about first are not named."""
-    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i['id'] not in hold]
+    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i['id'] not in hold and not i.get('supplied')]
     return (W['stills_due_one'] if len(ids) == 1 else W['stills_due']).format(n=len(ids), ids=', '.join(ids)) if ids else ''
+
+
+def supplied_due(items):
+    """SK, 23 Nov 2026 (release 3, N4): the still shots that wait for the operator's own picture, said as that, never as "no picture asked for"."""
+    rows = [f"{i['id']} ({i['supplied']})" for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i.get('supplied')]
+    return W['supplied_due'].format(n=len(rows), s='' if len(rows) == 1 else 's', rows=', '.join(rows)) if rows else ''
 
 
 def drawn_due(items):

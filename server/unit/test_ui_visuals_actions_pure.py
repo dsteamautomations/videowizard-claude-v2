@@ -662,8 +662,7 @@ def test_an_uploaded_photo_is_not_used_for_a_person_until_the_permission_is_reco
 def test_an_upload_that_is_not_a_picture_or_too_large_is_refused_and_nothing_is_saved():
     store, conn, s = with_sets(doc_with(KILN, MASON))
     n = len(saved(store)['references'])
-    for content, words in ((b'these are words, not a picture', 'not a picture'), (b'\0' * (15 * 1024 * 1024 + 1), 'larger than 15 MB'),
-                           (png_bytes(6001, 4001, (1, 1, 1)), '24 megapixels')):
+    for content, words in ((b'these are words, not a picture', 'not a picture'), (b'\0' * (15 * 1024 * 1024 + 1), 'larger than 15 MB')):   # a large photo is made smaller, not refused (SK, 23 Nov 2026)
         with pytest.raises(Problem) as e:
             g(lambda: VS.supply_own(conn, store, USER, NEW, [], 'E2', content=content, name='x'))
         assert words in e.value.message and '`' not in e.value.message

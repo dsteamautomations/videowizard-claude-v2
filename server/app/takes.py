@@ -239,7 +239,7 @@ def _state(session, plan, sh, take_rows, now):
     in the chat (no route fits, a question is open), or its video waits for the cost limit.
     design/223: a shot whose correction is awaited or being made keeps the page closed: the page opens again when every video of the run is back."""
     sid = sh['id']
-    if sid in (session.get('selections') or {}):
+    if sid in (session.get('selections') or {}) or sid in (session.get('assets') or {}):   # SK, 23 Nov 2026 (release 3, N1): a shot filled with the operator's own file is done, as step 6 counts it
         return 'answered', None, False
     js, g = jobs_of(take_rows, sid), (session.get('guides') or {}).get(sid) or {}
     if js:

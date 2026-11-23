@@ -26,7 +26,7 @@ Never lower the level to save time. If you cannot reach the level, say so and st
 
 ## Before you write
 
-1. **The facts.** Every size, count and state the picture must show, each with its source (the plan, a measure on a footage frame, a standard) or marked `"assumed": true`. An assumed size is shown to the operator as assumed.
+1. **The facts.** Every size, count and state the picture must show, each with its source (the plan, a measure on a footage frame or on the operator's own picture, a standard) or marked `"assumed": true`. An assumed size is shown to the operator as assumed.
 2. **Footage beats the plan's numbers.** When the film's footage shows the thing, take its proportions from the frame. If the plan's sizes cannot build what the frame shows, draw from the frame and tell the operator in one line.
 3. **Only what a camera can see.** Model the faces and patterns that can be photographed; say in a fact what you left out (the inside of a wall, the mesh of a guard).
 

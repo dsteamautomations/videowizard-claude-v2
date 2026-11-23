@@ -539,7 +539,32 @@ def vertical_video(run, plan):
     return [VERTICAL_VIDEO.format(shots=', '.join(ids), these='this shot' if len(ids) == 1 else 'each of these shots')] if ids else []
 
 
-def check(store, run, outputs, document):
+def supplied_plan(run, plan, pictures):
+    """SK, 23 Nov 2026 (no footage, release 3, F15): on a film with no camera footage every picture the operator gave (`pictures`, the tool's list
+    of the run folder's in/) has its place in the plan (`supplied` on a still shot) or its reason in `images_not_used`, and a shot names only a
+    picture that is there. The refusals, one sentence each; [] for a film with footage, and where no list was sent."""
+    if pictures is None or core.footage_of(run) != 'none':
+        return []
+    have = {str(p).lower() for p in pictures}
+    placed = {str(sh['supplied']).lower(): sh for gap in plan['gaps'] for scene in all_scenes(gap) for sh in scene['shots'] if sh.get('supplied')}
+    listed = {str(x['file']).lower() for x in plan.get('images_not_used') or []}
+    out = [f"shot {sh['id']}: `supplied` names {sh['supplied']}, which is not among the operator's pictures in in/ ({', '.join(pictures) or 'none'})." for name, sh in placed.items() if name not in have]
+    left = [p for p in pictures if str(p).lower() not in placed and str(p).lower() not in listed]
+    if left:
+        out.append(f"The operator gave pictures this plan neither places nor lists: {', '.join(left)}. Give each its place (`supplied` on a still shot) or list it in `images_not_used` with the "
+                   'reason: the operator sees both when they approve the plan.')
+    return out
+
+
+def repeat_allowed(row):
+    """Release 3 (F18): the operator's own picture may be shown in more than one shot; the plan warns where the two showings are close or alike."""
+    return row.get('kind') == 'supplied'
+
+
+MAX_PIXELS = 24_000_000
+
+
+def check(store, run, outputs, document, pictures=None):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
@@ -548,7 +573,7 @@ def check(store, run, outputs, document):
                                        drawn_route(run) == 'motion', not film.older(run))   # design/89 B4; design/124-b item 13; design/130 §12; design/139 R3
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc), 'errors': list(getattr(exc, 'errors', None) or [str(exc)])}   # design/148 A1: every item's first failure, as a list too
-    upright = vertical_video(run, plan) + no_clip_plan(session, plan)   # release 1, C5: an AI video shot on a vertical film is refused here, at the plan, in one plain sentence; 23 Nov 2026: a footage shot on a film with no clip
+    upright = vertical_video(run, plan) + no_clip_plan(session, plan) + supplied_plan(run, plan, pictures)   # release 1, C5: an AI video shot on a vertical film is refused here, at the plan, in one plain sentence; 23 Nov 2026: a footage shot on a film with no clip
     if upright:
         return {'status': 'rejected', 'error': '\n'.join(upright), 'errors': upright}
     departed = _ways_departed(session, plan) if session.get('treatment') else []   # design/207: what only the proposal refused before, so a clean check means the proposal is taken
@@ -572,12 +597,13 @@ def check(store, run, outputs, document):
             'budget': {'planned_inr': planned, 'cap_inr': cap_of(session), 'sets': sets['sets'], 'sets_inr': sets['inr']}, 'look_alike': alike}   # design/45 10.2
 
 
-def propose(conn, store, user, run, outputs, document, answers=''):
+def propose(conn, store, user, run, outputs, document, answers='', pictures=None):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
     plan, warnings = guarded(lambda: validate_plan(_with_direction(session, document), session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
                                                    drawn_route(run) == 'motion', not film.older(run)))   # design/130 §12; design/139 R3; design/207: the Direction is placed by the server (the older refusal "starts from the treatment's Direction, word for word" is retired)
     need(not vertical_video(run, plan), '\n'.join(vertical_video(run, plan)))   # release 1, C5: as the check refuses it
+    need(not supplied_plan(run, plan, pictures), '\n'.join(supplied_plan(run, plan, pictures)))   # release 3 (F15)
     need(not no_clip_plan(session, plan), '\n'.join(no_clip_plan(session, plan)))   # SK, 23 Nov 2026 (V3, V9): as the check refuses it
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     departed = _ways_departed(session, plan)   # a route that departs from the recorded treatment needs a new treatment, with the reason
@@ -3442,8 +3468,11 @@ def image_bytes(raw):
     from PIL import Image
     need(0 < len(raw) <= 16 * 1024 * 1024, 'Reference image must be at most 16 MiB.')
     with Image.open(BytesIO(raw)) as image:
-        need(image.format in ('PNG', 'JPEG', 'WEBP') and image.width * image.height <= 24_000_000, 'Use a PNG, JPEG or WebP image up to 24 megapixels.')
+        need(image.format in ('PNG', 'JPEG', 'WEBP'), 'Use a PNG, JPEG or WebP image: an SVG, PDF or design file is not read; export it as a PNG.')
         image.load()
+        if image.width * image.height > MAX_PIXELS:   # release 3 (V7): a large camera photo is made smaller on the way in, not refused
+            k = (MAX_PIXELS / (image.width * image.height)) ** 0.5
+            image = image.resize((max(1, int(image.width * k)), max(1, int(image.height * k))))
         out = BytesIO()
         image.convert('RGBA' if image.mode == 'RGBA' else 'RGB').save(out, format='PNG')
         size = image.size
@@ -5121,11 +5150,14 @@ def measure(store, user, run, outputs, ref_ids, question):
     frames = [session['references'].get(r) for r in ref_ids or []]
     need(frames and all(frames), 'Measure reads approved footage frames only: name frames taken from the clips (`vw visuals status` lists them).')
     for rid, f in zip(ref_ids, frames):   # defect 40: say which frame and why, and the approved ones to use
+        if f.get('kind') == 'supplied' and f['status'] == 'approved':   # release 3 (F17): the operator's own picture is read as a footage frame is
+            continue
         if f.get('kind') != 'frame' or f['status'] != 'approved':
             ok = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('element_id') == f.get('element_id')]
             why_ = 'was rejected in the picture round' if f.get('status') == 'rejected' else f"is a {f.get('kind')} picture, not an approved footage frame" if f.get('kind') != 'frame' else f"is {f.get('status')}"
             need(False, f"{rid} {why_}: measure reads approved footage frames only" + (f"; {f.get('element_id')}'s: {', '.join(ok)}." if ok else f"; {f.get('element_id')} has none: approve one first."))
-    where = [f"clip {(f.get('source') or {}).get('media_id')} at {(f.get('source') or {}).get('requested_s')} s" for f in frames]
+    where = [f"the operator's own picture {f.get('name') or f['id']}" if f.get('kind') == 'supplied' else
+             f"clip {(f.get('source') or {}).get('media_id')} at {(f.get('source') or {}).get('requested_s')} s" for f in frames]
     parts = []
     for n, (f, w) in enumerate(zip(frames, where), 1):
         parts += [{'text': f'Frame {n}, {w}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(f['key'])).decode()}}]
@@ -7928,7 +7960,7 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     elif not made and row.get('kind') in ('keyframe', 'state'):
         warns.append(f'{reference_id} has no shot recorded: make pictures with --shot so each is placed only in the shot it was made for')
     used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
-    _rule(session, not used, f'this picture is already in {used[0] if used else ""}. Two shots never show the same picture: compose another (a reimagined shot, return_of, for a return), '
+    _rule(session, not used or repeat_allowed(row), f'this picture is already in {used[0] if used else ""}. Two shots never show the same picture: compose another (a reimagined shot, return_of, for a return), '
                              f'or take it out there first: `vw visuals unplace --shot {used[0] if used else ""}`, or Remove on the page.', warns)   # design/94 R1.8
     if made and made != shot_id:
         row.update(shot_id=shot_id, moved={'from': made, 'to': shot_id, 'quote': move, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
@@ -8256,7 +8288,7 @@ def status(conn, store, run, outputs, repair=True):
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
-    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()),
+    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()), pictures.supplied_due(six),
                                  takes.starts(session, plan, take_rows) if seven else '') if x)   # release 1, D1: what of step 7 can start now, together
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
