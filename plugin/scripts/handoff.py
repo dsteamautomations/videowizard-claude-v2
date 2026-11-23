@@ -149,7 +149,10 @@ def cross_check(edit_dir, manifest, skip_roles=()):
     rows = manifest.get('files') or []
     tl = edit_dir / (manifest.get('timeline_file') or f"Timeline/{manifest.get('run')}.fcpxml")
     portable = tl.with_name(tl.name.replace('.fcpxml', '.portable.fcpxml'))
-    src = portable if portable.exists() else tl   # review 27 Oct: once `download` wrote this computer's paths, the portable copy is what the manifest describes
+    # review 27 Oct: once `download` wrote this computer's paths, the portable copy is what the manifest describes.
+    # Defect 62: a timeline that still holds the server's relative paths was just downloaded and is the one to check, whatever older portable copy lies beside it.
+    own_paths = tl.exists() and REL.encode('utf-8') not in tl.read_bytes()
+    src = portable if own_paths and portable.exists() else tl
     skipped = {f['name'] for f in rows if f.get('role') in skip_roles}   # design/115 H2: the camera copies left out on purpose; the cuts link to the originals
     for f in rows:
         if f['name'] in skipped:
@@ -168,8 +171,13 @@ def cross_check(edit_dir, manifest, skip_roles=()):
         problems.append(f'{tl.name}: the timeline file is missing')
         out['ok'] = False
         return out
-    cuts, frames = read_timeline(src.read_bytes().decode('utf-8'), (manifest.get('timeline') or {}).get('fps') or 25)
-    video = [c for c in cuts if c['lane'] == 1]
+    try:
+        cuts, frames = read_timeline(src.read_bytes().decode('utf-8'), (manifest.get('timeline') or {}).get('fps') or 25)
+    except (UnicodeDecodeError, ET.ParseError):
+        problems.append(f'{tl.name}: the timeline file cannot be read')
+        out['ok'] = False
+        return out
+    video =[c for c in cuts if c['lane'] == 1]
     out['cuts'], out['timeline_frames'] = len(video), frames
     for i, c in enumerate(video, 1):
         if c['file'] in skipped:

@@ -140,3 +140,22 @@ def test_the_bundle_passes_each_files_fingerprint(setup, monkeypatch):
     monkeypatch.setattr(vw, '_download', lambda m, key, rel, expect=None: seen.append((rel, expect and expect['sha256'])) or str(ws / rel))
     vw.download_bundle(m, {'files': [{'role': 'original', 'name': 'Media/Originals/C1.MP4', 'key': 'k1', 'bytes': 5, 'sha256': 'a' * 64}]})
     assert seen == [('bundle/Media/Originals/C1.MP4', 'a' * 64)]
+
+
+def test_the_bundle_says_which_files_were_fetched_and_which_were_already_here(setup, capsys):
+    """Defect 62: a file skipped as already here must not print as downloaded."""
+    m, api, use, slept, ws = setup
+    data = body(1000)
+    (ws / 'edit/Media').mkdir(parents=True)
+    (ws / 'edit/Media/A.mp4').write_bytes(data)   # already here, right fingerprint
+    use(data)
+    sha = hashlib.sha256(data).hexdigest()
+    vw.download_bundle(m, {'files': [{'role': 'ai', 'name': 'Media/A.mp4', 'key': 'k1', 'bytes': 1000, 'sha256': sha},
+                                     {'role': 'ai', 'name': 'Media/B.mp4', 'key': 'k2', 'bytes': 1000, 'sha256': sha}]}, into=ws / 'edit', roles=None)
+    err = capsys.readouterr().err
+    lines = [x for x in err.splitlines() if 'A.mp4' in x or 'B.mp4' in x]
+    assert any(x.startswith('already here') and 'A.mp4' in x for x in lines) and any(x.startswith('downloaded') and 'B.mp4' in x for x in lines)
+    assert not any(x.startswith('downloaded') and 'A.mp4' in x for x in lines)
+    assert 'fetched 1, already here 1' in err
+    vw.download_bundle(m, {'files': [{'role': 'ai', 'name': 'Media/A.mp4', 'key': 'k1', 'bytes': 1000, 'sha256': sha}]}, into=ws / 'edit', roles=None)
+    assert 'fetched 0, already here 1' in capsys.readouterr().err

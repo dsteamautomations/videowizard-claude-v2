@@ -183,3 +183,50 @@ def test_confirm_records_the_operators_side_by_side_check_on_the_ledger(cli, mon
     assert sent[2][1]['state'] == 'reported' and rep['route'] == 'free' and rep['timeline_verified'] is True and rep['cuts'] == 2 and rep['quote'].startswith('Yes')
     code, out, err = run(args(what='confirm'), capsys)
     assert code == 2 and 'words' in out['message']
+
+
+# ---------- defect 62: a second download after an earlier package ----------
+
+def full_after_early(tmp_path):
+    """The early package was downloaded (both timeline files written), then the full package's timeline landed over VW-9.fcpxml."""
+    d, early = edit(tmp_path, cuts=[('Media/Camera/C1.MP4', 250, 0, 100), ('Media/AI/VS1.mp4', 0, 100, 300), ('Media/AI/VS1.mp4', 300, 300, 400)], n_cuts=3)
+    H.write_timeline_for(d, early, base=str(d))   # the portable copy now holds the early timeline
+    text = fcp(CUTS)
+    (d / 'Timeline' / 'VW-9.fcpxml').write_bytes(text.encode('utf-8'))   # the full package's timeline, as a download lands
+    manifest = json.loads(json.dumps(early))
+    manifest['cuts'] = 2
+    manifest['files'][-1].update(sha256=hashlib.sha256(text.encode('utf-8')).hexdigest(), bytes=len(text.encode('utf-8')))
+    return d, manifest
+
+
+def test_a_full_package_after_an_early_one_is_checked_on_its_own_timeline(tmp_path):
+    d, manifest = full_after_early(tmp_path)
+    rep = H.cross_check(d, manifest)
+    assert rep['ok'] and rep['problems'] == [] and rep['cuts'] == 2
+    H.write_timeline_for(d, manifest, base=str(d))   # the portable copy is the new timeline from here on
+    assert (d / 'Timeline' / 'VW-9.portable.fcpxml').read_bytes() == fcp(CUTS).encode('utf-8')
+    assert H.cross_check(d, manifest)['ok']
+
+
+def test_a_missing_timeline_is_missing_even_when_an_old_portable_copy_is_there(tmp_path):
+    d, manifest = edit(tmp_path)
+    H.write_timeline_for(d, manifest, base=str(d))
+    (d / 'Timeline' / 'VW-9.fcpxml').unlink()
+    rep = H.cross_check(d, manifest)
+    assert not rep['ok'] and any('VW-9.fcpxml' in p and 'missing' in p for p in rep['problems'])
+
+
+def test_once_this_computers_paths_are_written_the_check_reads_the_portable_copy(tmp_path):
+    d, manifest = edit(tmp_path)
+    H.write_timeline_for(d, manifest, base=str(d))
+    rep = H.cross_check(d, manifest)
+    assert rep['ok'] and rep['present'] == '5 of 5 files'
+
+
+def test_a_timeline_that_cannot_be_read_is_named_not_a_crash(tmp_path):
+    d, manifest = edit(tmp_path)
+    (d / 'Timeline' / 'VW-9.fcpxml').write_bytes(bytes([255, 254]) + b' not a timeline')
+    rep = H.cross_check(d, manifest)
+    assert not rep['ok'] and any('cannot be read' in p for p in rep['problems'])
+    (d / 'Timeline' / 'VW-9.fcpxml').write_bytes(b'<fcpxml><resources>')
+    assert any('cannot be read' in p for p in H.cross_check(d, manifest)['problems'])

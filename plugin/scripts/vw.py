@@ -2064,6 +2064,9 @@ def _dropped(key, exc):
                                               'This is not a defect: check the network, then run the same command again.'}, 2)
 
 
+ALREADY_HERE = set()   # paths `_download` skipped as already on this computer with the manifest's fingerprint
+
+
 def _download(m, key, rel, expect=None):
     """design/108: streamed to disk (D1); skipped when already here with the manifest's fingerprint (D2); big files in parallel parts (D3); verified (D4).
     `expect`: the manifest's row, with sha256 and bytes, when there is one."""
@@ -2071,6 +2074,7 @@ def _download(m, key, rel, expect=None):
     dest = ws / rel
     want_sha, want_bytes = (expect or {}).get('sha256'), (expect or {}).get('bytes')
     if want_sha and dest.exists() and (not want_bytes or dest.stat().st_size == want_bytes) and _sha256_of(dest) == want_sha:
+        ALREADY_HERE.add(str(dest))   # defect 62: the progress line says so
         return str(dest)   # D2
     for wait in (*DOWNLOAD_WAITS, None):   # design/129 D39: the file's link is asked again when the connection drops, like the storage part
         try:
@@ -3748,7 +3752,7 @@ def download_bundle(m, manifest, into=None, roles=('original', 'normalised', 'na
     from concurrent.futures import ThreadPoolExecutor
     wanted = [f for f in manifest['files'] if roles is None or f['role'] in roles]
     folder = Path(into).relative_to(workspace(m['code'])).as_posix() if into else 'bundle'
-    done, paths = [], {}
+    done, here, paths = [], [], {}
 
     def one(f):
         try:
@@ -3756,12 +3760,17 @@ def download_bundle(m, manifest, into=None, roles=('original', 'normalised', 'na
         except SystemExit:
             raise RuntimeError(f['name'])
         done.append(f['name'])
-        print(f"downloaded {len(done)}/{len(wanted)} {Path(f['name']).name} ({(f.get('bytes') or 0) / 1e6:.0f} MB)", file=sys.stderr, flush=True)
+        if p in ALREADY_HERE:   # defect 62: a skipped file is not said to be downloaded
+            here.append(f['name'])
+            print(f"already here {len(done)}/{len(wanted)} {Path(f['name']).name}", file=sys.stderr, flush=True)
+        else:
+            print(f"downloaded {len(done)}/{len(wanted)} {Path(f['name']).name} ({(f.get('bytes') or 0) / 1e6:.0f} MB)", file=sys.stderr, flush=True)
         return f['name'], p
     try:
         with ThreadPoolExecutor(max_workers=3) as pool:
             for name, p in pool.map(one, wanted):
                 paths[name] = p
+        print(f'fetched {len(done) - len(here)}, already here {len(here)}', file=sys.stderr, flush=True)
     except RuntimeError as exc:
         emit({'action': 'refused', 'message': f'Download of {exc} failed before dispatch; nothing was reserved for Resolve beyond the ledger. Check the line and run `vw delivery resolve --run` again.'}, 2)
     return paths
