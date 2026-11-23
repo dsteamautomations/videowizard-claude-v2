@@ -1214,7 +1214,42 @@ def direction_from(parts, who='The Direction'):
     return '\n'.join(f'{h}: {given[k]}' for k, h, _ in DIRECTION_PARTS if k in given), given, missing
 
 
-def direction_fields(document):
+LOOK_CHARS, LOOK_MAX = 400, 4
+NO_LOOK = ('{who}: give its look in `{field}`: a list with one entry for each period the script speaks of, each {{period, look}}; the look is a few lines on colours, contrast, '
+           'light and texture. One period: one entry, its period left empty.')
+TWO_DIRECTIONS = ('This film has no camera footage, so the operator is always shown two Directions, each with its look: put the second in `direction_alternative` '
+                  '(its six parts, `answers_brief`, `risk` and `look`) and send the Direction again.')
+
+
+def look_of(value, who, field):
+    """SK, 23 Nov 2026 (no footage, release 2): the look of a Direction, [{period, look}], one entry for each period of the film."""
+    need(isinstance(value, list) and 1 <= len(value) <= LOOK_MAX and all(isinstance(x, dict) for x in value), NO_LOOK.format(who=who, field=field))
+    out = [{'period': _one_line(x.get('period')), 'look': _one_line(x.get('look'))} for x in value]
+    need(all(x['look'] for x in out), f'{who}: every entry of `{field}` has its look in words.')
+    need(all(len(x['look']) <= LOOK_CHARS for x in out), f'{who}: a look is at most {LOOK_CHARS} characters.')
+    need(len(out) == 1 or all(x['period'] for x in out), f'{who}: with more than one look, each names its period.')
+    need(len({x['period'].lower() for x in out}) == len(out), f'{who}: a period is named twice in `{field}`.')
+    return out
+
+
+def second_due(session, direction):
+    """A film with no camera footage is shown two Directions until one is taken: True when this Direction comes without a second and is not the
+    one already taken (the accepted line of the draft, else the recorded treatment)."""
+    if direction.get('direction_alternative'):
+        return False
+    draft = session.get('treatment_draft')
+    taken = (draft if ((draft.get('lines') or {}).get('direction') or {}).get('state') == 'accepted' else None) if draft else session.get('treatment')
+    return not (taken and taken.get('direction') and _line_digests(taken)['direction'] == _line_digests(direction)['direction'])
+
+
+def look_for(session, scene=None):
+    """The film's look in words, for a film whose Direction carries one (no camera footage): the look of the scene's period, else the first. '' otherwise."""
+    looks = ((session or {}).get('treatment') or {}).get('direction_look') or []
+    period = _one_line((scene or {}).get('period')).lower()
+    return next((x for x in looks if x['period'].lower() == period), looks[0])['look'].rstrip('.') if looks else ''
+
+
+def direction_fields(document, none=False):
     """design/203: the Direction of a sent draft as the record keeps it: `direction` (text), `direction_parts`, the two lines on how it answers
     the brief and what it risks (`direction_notes`), a second Direction beside it (`direction_alternative`), and `direction_missing`, what was
     not given. A draft that sends only the older paragraph is taken, flagged as not in its six parts."""
@@ -1227,6 +1262,8 @@ def direction_fields(document):
     need(text, NO_DIRECTION)   # design/124 Change 3
     need(len(text) <= 2000, 'The Direction is a few lines (at most 2000 characters).')
     out['direction'] = text
+    if none:   # SK, 23 Nov 2026: `none`, a film with no camera footage: the Direction holds the film's look; a film with footage keeps none
+        out['direction_look'] = look_of(document.get('direction_look'), 'The Direction', 'direction_look')
     notes = {k: _one_line(document.get('direction_' + k)) for k, _ in SECOND_LINES}
     alt = document.get('direction_alternative')
     if isinstance(alt, dict) and 'direction_parts' in out:
@@ -1234,6 +1271,10 @@ def direction_fields(document):
         need(agiven, 'The second direction has none of its six parts.')
         need(_one_line(atext) != _one_line(text), 'The second direction is the same as the first: write one that differs in viewpoint or approach.')
         second = {'parts': agiven, 'text': atext, **{k: _one_line(alt.get(k)) for k, _ in SECOND_LINES if _one_line(alt.get(k))}}
+        if none:
+            second['look'] = look_of(alt.get('look'), 'The second direction', 'look')
+            need(sorted(x['period'].lower() for x in second['look']) == sorted(x['period'].lower() for x in out['direction_look']),
+                 'The second direction: its looks are for the same periods as the first.')
         out['direction_alternative'] = second
         missing = (missing + [f'The first direction: {what}' for k, what in SECOND_LINES if not notes[k]] + [f'The second direction: {h}' for h in amissing]
                    + [f'The second direction: {what}' for k, what in SECOND_LINES if k not in second])
@@ -1270,9 +1311,10 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     if document is None:
         document = session.get('treatment_draft')
         need(document, 'No treatment draft on this run: send one first (`vw visuals treatment --file out/visual-treatment.json`).')
-        direction = {k: document[k] for k in ('direction', 'direction_parts', 'direction_notes', 'direction_alternative', 'direction_missing') if k in document}   # the stored draft, as it is
+        direction = {k: document[k] for k in ('direction', 'direction_parts', 'direction_notes', 'direction_alternative', 'direction_missing', 'direction_look') if k in document}   # the stored draft, as it is
     else:
-        direction = direction_fields(document if isinstance(document, dict) else {})   # design/203: six parts, or the older paragraph
+        direction = direction_fields(document if isinstance(document, dict) else {}, none=core.footage_of(run) == 'none')   # design/203: six parts, or the older paragraph
+        need(core.footage_of(run) != 'none' or not second_due(session, direction), TWO_DIRECTIONS)
     entries = (document or {}).get('gaps')
     need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
     gaps = session['source']['gaps']
@@ -1360,7 +1402,8 @@ DIRECTION_ACCEPTED = ('The Direction is accepted. Now write every gap line from 
 def _direction_alone(store, user, run, session, document):
     """design/205 (SK, 15 Nov 2026): the Direction is written, shown and answered before any gap line is written. A draft that holds only the
     Direction is kept as the draft with one line; accepting that line never records the treatment."""
-    direction = direction_fields(document)
+    direction = direction_fields(document, none=core.footage_of(run) == 'none')
+    need(core.footage_of(run) != 'none' or not second_due(session, direction), TWO_DIRECTIONS)   # SK, 23 Nov 2026
     record = {'gaps': [], 'direction_only': True, 'totals': {}, 'estimate_inr': 0, 'warnings': [], 'reasons_missing': [], 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
               'digest': digest([]), **direction}
     old = session.get('treatment_draft') or {}
@@ -1380,7 +1423,9 @@ def _direction_alone(store, user, run, session, document):
 def _line_digests(record):
     """The Direction and each gap entry, each a line the operator accepts or sends back on its own."""
     second = _one_line((record.get('direction_alternative') or {}).get('text'))   # design/203: a second Direction beside the first is part of the line the operator answers
-    out = ({'direction': digest([_one_line(record['direction']), second]) if second else digest(' '.join(record['direction'].split()))}) if record.get('direction') else {}
+    look = [[x['period'], x['look']] for x in (record.get('direction_look') or []) + ((record.get('direction_alternative') or {}).get('look') or [])]   # a film with no camera footage: the look is part of the line
+    out = ({'direction': digest([_one_line(record['direction']), second, look]) if look else
+            digest([_one_line(record['direction']), second]) if second else digest(' '.join(record['direction'].split()))}) if record.get('direction') else {}
     out.update({e['gap_id']: digest(e) for e in record.get('gaps') or []})
     return out
 
@@ -1450,6 +1495,8 @@ def _treatment_lines(store, user, run, session, accept, send_back, notes, quote,
         second = draft.pop('direction_alternative')
         if use_second:
             draft['direction'], draft['direction_parts'] = second['text'], second['parts']
+            if second.get('look'):
+                draft['direction_look'] = second['look']
             draft.pop('direction_notes', None)
             if any(second.get(k) for k, _ in SECOND_LINES):
                 draft['direction_notes'] = {k: second[k] for k, _ in SECOND_LINES if second.get(k)}
@@ -1886,6 +1933,9 @@ def signs_lines(session, plan, scene, shot, element_id):
 def real_light_line(store, session, scene=None):
     """Composed once per run from the footage character and the measured light of the approved footage frames, then kept on the session.
     design/134 3: a scene with its own light keeps the footage's look and the no-glow clause, never the film's measured brightness and colour."""
+    look = look_for(session, scene)   # SK, 23 Nov 2026: a film with no camera footage reads the look of the Direction the operator took
+    if look or no_real_clip(session):
+        return (f"The film's look: {look}. " if look else '') + 'No studio light, no glow, no added saturation.'
     parts = session.get('real_light_parts')
     if parts is None:
         parts = session['real_light_parts'] = _real_light_parts(store, session)
@@ -2324,10 +2374,10 @@ def distinct_people(plan):
         need(False, PEOPLE_ALIKE.format(a=names[a], b=names[b]))
 
 
-def _place_look(plan):
+def _place_look(plan, session=None):
     scenes = [sc for gap in plan.get('gaps') or [] for sc in (gap.get('scenes') or [])]
     place = next((str(sc.get('location_time') or '').strip() for sc in scenes if str(sc.get('location_time') or '').strip()), 'the place the plan describes')
-    return place, str((plan.get('foundation') or {}).get('appearance') or '').strip() or 'as the footage'
+    return place, str((plan.get('foundation') or {}).get('appearance') or '').strip() or look_for(session) or 'as the footage'
 
 
 def thing_prompt(plan, run, session, element, subject, frame=False, drawn=None):
@@ -2338,7 +2388,7 @@ def thing_prompt(plan, run, session, element, subject, frame=False, drawn=None):
     m = HOW_WORDS.search(subject)
     if m:
         need(False, f'The subject block describes how the work is done ({m.group(0)!r} …): the kept method takes that from real photographs; say only what the picture must represent.')
-    place, look = _place_look(plan)
+    place, look = _place_look(plan, session)
     parts = [KEPT_PREAMBLE, KEPT_SET_LINE, 'What the picture must represent: ' + subject.rstrip('.') + '.']
     if frame:
         parts.append(KEPT_FRAME_LINE.format(name=element.get('name') or element['id']))
@@ -2359,14 +2409,14 @@ LIKENESS_PHOTO_LINE = ('Image 1 is a photograph of this person, used with their 
                        'the garments, the poses and the plain ground are as written here.')   # design/207 (D1)
 
 
-def person_prompt(plan, run, element, why='', photo=False):
+def person_prompt(plan, run, element, why='', photo=False, session=None):
     """design/151 part 2: a person's character sheet from the plan's words: who they are, their fixed look, their garments, the place, the writer's why line,
     one line against every other person so they stay apart, then the three poses as separate pictures. design/207 (D1): photo: the person's own photo is
     Image 1 (own likeness, with the recorded permission); without it the person is a stand-in, made from the words alone."""
     others = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] != element['id']]
     outfits = list(dict.fromkeys(str((sc.get('outfit') or {}).get(element['id']) or '').strip() for gap in plan.get('gaps') or [] for sc in (gap.get('scenes') or [])))
     outfits = [o for o in outfits if o]
-    place, look = _place_look(plan)
+    place, look = _place_look(plan, session)
     lines = [f"Character sheet of {element.get('name') or element['id']} ({element['id']}), a person in this film.",
              f"Who they are: {str(element.get('requirements') or '').strip().rstrip('.')}.",
              f"Fixed look: {str(element.get('description') or '').strip().rstrip('.')}.",
@@ -4352,7 +4402,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
         if element['kind'] == 'person':
             distinct_people(plan)
             photo = likeness_photo(session, element['id'])   # design/207 (D1): own likeness: the person's photo is Image 1; a stand-in is made from the words alone
-            body = {**body, 'prompt': person_prompt(plan, run, element, body['prompt'], photo=bool(photo)), 'parents': [photo] if photo else [], 'set': True, 'views': set_views(element)}
+            body = {**body, 'prompt': person_prompt(plan, run, element, body['prompt'], photo=bool(photo), session=session), 'parents': [photo] if photo else [], 'set': True, 'views': set_views(element)}
         else:
             own = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
             parents_ = list(body.get('parents') or []) or own[:1]   # Q1: a thing the footage shows is made from its approved frame

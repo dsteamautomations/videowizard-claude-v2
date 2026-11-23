@@ -82,6 +82,11 @@ SECOND_DIRECTION_TELL = ('Write a second Direction that differs in viewpoint or 
                          'send the draft again. The operator then sees both and takes one.')
 
 
+def _look_rows(looks, name=''):
+    """SK, 23 Nov 2026: the look of a Direction (a film with no camera footage), one row for each period."""
+    return [(' · '.join(x for x in (name, 'The look', l.get('period')) if x), l.get('look') or 'not given') for l in looks or []]
+
+
 def _direction_rows(draft, outputs):
     """design/203: the Direction as the operator reads it: from the brief its purpose, audience and tone (so a departure shows at once), then the
     six headed parts, a part not given reading 'not given'. With a second Direction beside it, both are shown, each with how it answers the brief
@@ -99,11 +104,12 @@ def _direction_rows(draft, outputs):
         rows = []
     second = draft.get('direction_alternative')
     if not second:
-        return rows + [(h, parts.get(k) or 'not given') for k, h, _ in V.DIRECTION_PARTS]
+        return rows + [(h, parts.get(k) or 'not given') for k, h, _ in V.DIRECTION_PARTS] + _look_rows(draft.get('direction_look'))
     notes = draft.get('direction_notes') or {}
     for name, p, lines in (('First', parts, notes), ('Second', second.get('parts') or {}, second)):
         rows += [(f'{name} · {h}', p.get(k) or 'not given') for k, h, _ in V.DIRECTION_PARTS]
         rows += [(f'{name} · {what}', lines.get(k) or 'not given') for k, what in V.SECOND_LINES]
+        rows += _look_rows(draft.get('direction_look') if name == 'First' else second.get('look'), name)
     return rows
 
 

@@ -430,12 +430,12 @@ def look_how(category):
     return LOOK_HOW if category in ('', DOCUMENTARY) else {**LOOK_HOW, 'may_show': LOOK_HOW['may_show'].replace(*MAY_SHOW_LOOK)}
 
 
-def _look(plan, photo=True):
+def _look(plan, photo=True, session=None):
     """The film's look as a photograph can take it: the sentences on drawn or lettered pictures are left out (design/211 review, S8).
     design/215: `photo` false (a category whose references follow the film's look): the look whole."""
     # ponytail: a word list decides what is about a drawn picture; a look written as one long sentence is kept or dropped whole
     text = ' '.join(str((plan.get('foundation') or {}).get('appearance') or '').split())
-    return ' '.join(s for s in re.split(r'(?<=[.;])\s+', text) if s and not (photo and NOT_PHOTO.search(s))).rstrip('.;') or 'as the footage'
+    return ' '.join(s for s in re.split(r'(?<=[.;])\s+', text) if s and not (photo and NOT_PHOTO.search(s))).rstrip('.;') or V.look_for(session) or 'as the footage'
 
 
 def _plain_words(element, text):
@@ -660,7 +660,7 @@ def set_request(plan, run, session, element, row):
     except Problem:
         category = ''
     doc = category in ('', DOCUMENTARY)   # design/215: a documentary's own rules; a film with no category recorded reads them, as before
-    look = _look(plan, photo=doc)
+    look = _look(plan, photo=doc, session=session)
     if not doc and kind == 'object':
         views = [{**v, 'ask': USE_ANY.format(name=name)} if v['name'] == THING[1]['name'] else v for v in views]
     sizes = [] if element.get('material_spec') else _sizes(element)   # the material spec carries its own

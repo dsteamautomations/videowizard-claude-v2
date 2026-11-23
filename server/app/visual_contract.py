@@ -358,6 +358,7 @@ class Scene(Model):
     air: str = Field(default='', max_length=500)   # design/103 A2: what hangs in the air, lit by that light, or 'clean'
     outfit: dict[str, str] = Field(default_factory=dict)   # design/111 F16: person element id -> the garment colours of this scene
     time_jump: str = Field(default='', max_length=500)   # design/111 F16; design/207 (SK, 16 Nov 2026): what changed in time when the colours change from the scene before (later the same day, another day, another season, years later), from the script or the scene's own time
+    period: str = Field(default='', max_length=60)   # SK, 23 Nov 2026 (no footage, release 2): the period of the scene, as the Direction's looks name it; '' on a film of one period
     continues_footage: bool = False   # design/124-b item 11: the scene continues the place of the footage beside the gap, which is its wider view
 
 
@@ -1224,6 +1225,10 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
     warnings.extend(course_warnings(plan, fps, drawn_in_run))   # design/103; design/126 TR1b
     warnings.extend(script_people_warnings(plan))   # design/151 Q4
     result = plan.model_dump()
+    for gap in result['gaps']:   # a scene with no period is stored as it was before the field, so no stored plan's digest moves
+        for scene in all_scenes(gap):
+            if not scene.get('period'):
+                scene.pop('period', None)
     answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
         if key not in document: result.pop(key)
