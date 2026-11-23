@@ -353,6 +353,10 @@ class TreatmentBody(Write):   # design/65 B6: a document without words is the dr
     notes: str = ''
 
 
+class BoardsBody(Write):   # SK, 23 Nov 2026 (no footage, release 2b)
+    make: str = Field(default='', max_length=40)   # '': what there is and its cost; 'all': the missing boards; a board's id: that board again
+
+
 class SequenceBody(Write):    # design/65 B2'
     shot_id: str
     reference_ids: list[str] = Field(default_factory=list, max_length=12)   # design/94 A2: the server's order when left out
@@ -1885,6 +1889,12 @@ def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/treatment')
 def visuals_treatment(run_id: UUID, body: TreatmentBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.treatment(storage(), user, run, outputs, body.document, body.quote, accept=body.accept, send_back=body.send_back, notes=body.notes))
+
+
+@app.post('/api/runs/{run_id}/visuals/boards')
+def visuals_boards(run_id: UUID, body: BoardsBody, user=User, conn=DB):
+    """SK, 23 Nov 2026: the look boards of a film with no camera footage; the page and the chat show what this keeps."""
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.look_boards(conn, storage(), user, run, outputs, make=body.make))
 
 
 @app.post('/api/runs/{run_id}/visuals/sequence')

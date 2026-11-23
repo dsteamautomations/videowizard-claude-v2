@@ -1189,6 +1189,7 @@ def _page(conn, store, user, run, outputs):
             i = by_key[key]
             lines.append({**head, 'state': 'open', 'item': i['id'], 'title': _title(i), 'rows': i['_card'].get('r') or [], 'text': i['_card'].get('t') or '',
                           'asked': bool(st.get('asked')), 'changed': bool(st.get('changed')), 'changes': CF._changes(st.get('changes')),
+                          **({'pics': [pic(k, label, mark) for k, label, mark in i['_boards']]} if i.get('_boards') else {}),   # SK, 23 Nov 2026: the look boards of a film with no camera footage
                           'buttons': [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words'))} for b in i['buttons']]})
     for line in lines:   # a refusal of the last "done" stays on its line until the line is answered again
         if line['key'] in (session.get('page_refused') or {}):

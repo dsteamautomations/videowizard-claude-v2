@@ -1249,6 +1249,119 @@ def look_for(session, scene=None):
     return next((x for x in looks if x['period'].lower() == period), looks[0])['look'].rstrip('.') if looks else ''
 
 
+BOARD_REMAKES = 1   # the assistant has a board that does not match its words made again once
+NO_BOARDS = 'Look boards are made for a film with no camera footage; this film takes its look from its footage.'
+BOARD_FIRST = 'Send the Direction with its looks first (`vw visuals treatment`): the boards are made from them.'
+
+
+def board_sides(session):
+    """SK, 23 Nov 2026 (no footage, release 2b): the Directions whose looks are shown as boards, [(name, text, looks)]: both while the operator
+    chooses, then the one taken. [] for a film whose Direction holds no look (a film with footage)."""
+    rec = session.get('treatment_draft') or session.get('treatment') or {}
+    alt = rec.get('direction_alternative') or {}
+    return [(n, t, l) for n, t, l in (('First' if alt else '', rec.get('direction'), rec.get('direction_look')), ('Second', alt.get('text'), alt.get('look'))) if t and l]
+
+
+def _board_of(text, entry):
+    return digest([_one_line(text), entry['period'], entry['look']])   # a board belongs to these words: other words, another board
+
+
+def board_view(session):
+    """Each look of those Directions with its latest board (None when none was asked for), in the order shown."""
+    out = []
+    for name, text, looks in board_sides(session):
+        for e in looks:
+            made = [b for b in (session.get('boards') or {}).values() if b['of'] == _board_of(text, e)]
+            out.append({'name': name, 'label': ' · '.join(x for x in (name, e['period']) if x), 'text': text, 'of': _board_of(text, e), **e, 'board': max(made, key=lambda b: b['n']) if made else None})
+    return out
+
+
+def look_board(session, scene=None):
+    """The picture of the film's look: the made board of the Direction the operator took, of the scene's period, else of the first. None when
+    that Direction has none (taken from its words, or a film with footage)."""
+    rec = session.get('treatment') or {}
+    looks = rec.get('direction_look') or []
+    if not looks:
+        return None
+    period = _one_line((scene or {}).get('period')).lower()
+    of = _board_of(rec.get('direction'), next((x for x in looks if x['period'].lower() == period), looks[0]))
+    made = [b for b in (session.get('boards') or {}).values() if b['of'] == of and b.get('status') == 'candidate']
+    return max(made, key=lambda b: b['n']) if made else None
+
+
+def made_pictures(session):
+    """Every record a finished image job is written on: the references, then the look boards."""
+    return list(session['references'].values()) + list((session.get('boards') or {}).values())
+
+
+def board_lettering(store, outputs):
+    """A board shows a sample of lettering only when the script is written in letters the picture AI draws well (Latin)."""
+    from . import voices
+    try:
+        return film.scripts_of(voices.script_text(store, outputs)) <= {'latin'}
+    except Problem:
+        return False
+
+
+def board_prompt(text, entry, lettering):
+    return ('One picture laid out as a look board for a film, filling the frame.\n'
+            f'The film: {_one_line(text)}\n'
+            f"Its look: {entry['look'].rstrip('.')}." + (f" The period: {entry['period']}." if entry['period'] else '') + '\n'
+            "On the board: two or three frames of this film's own world as the film would show them in this look (a place, people in it, one close detail), "
+            "and under them a row of five plain colour swatches of the look's colours"
+            + ("; in one corner a short sample of the film's lettering or graphic style, two or three words.\n" if lettering else '.\n')
+            + 'Never: a real, named person or their likeness (show the kind of person the film speaks of); the logo or brand mark of any company; '
+            + ('any other writing.' if lettering else 'any writing.'))
+
+
+def look_boards(conn, store, user, run, outputs, make=None):
+    """The look boards of a film with no camera footage. With no `make`: what there is and what making the missing ones costs, nothing made (the
+    cost is said first). `make='all'`: the missing boards are asked for. `make=<board id>`: that board again (once when it was made; a failed one
+    freely). Always GPT Image, whatever the run's picture AI; the cost counts in the film's limit and is checked before anything is asked for."""
+    need(core.footage_of(run) == 'none', NO_BOARDS)
+    session = session_of(store, run, outputs)
+    changed = bool(reconcile(conn, run, session))
+    rows = board_view(session)
+    need(rows, BOARD_FIRST)
+    if make in (None, '', 'all'):
+        todo = [(r, 0, 0) for r in rows if r['board'] is None]
+    else:
+        r = next((r for r in rows if r['board'] and r['board']['id'] == make), None)
+        need(r, f'No look board {make!r} among the Directions shown now; `vw visuals boards` lists them.')
+        b = r['board']
+        need(b['status'] != 'generating', 'This board is still being made.')
+        need(b['status'] == 'failed' or b['remakes'] < BOARD_REMAKES, 'This board was made again once already: show it to the operator as it is and say what does not match its words.')
+        todo = [(r, b['n'] + 1, b['remakes'] + int(b['status'] != 'failed'))]
+    cost = len(todo) * image_price_inr(run, provider='openai')
+    if make and todo:
+        check_cap(conn, run, session, cost, f"{len(todo)} look board{'' if len(todo) == 1 else 's'}")   # before anything is asked for: nothing half-made
+        size, lettering = library.default_size(aspect_of(run, outputs, 'board')), board_lettering(store, outputs)
+        for r, n, remakes in todo:
+            bid = digest({'run': str(run['id']), 'board': r['of'], 'n': n})[:32]
+            request = {'kind': 'image', 'op': 'generate', 'provider': 'openai', 'model': IMAGE_MODELS['generate'], 'prompt': board_prompt(r['text'], r, lettering), 'size': size, 'quality': 'high', 'parents': [],
+                       'reference': {'id': bid, 'element_id': 'look', 'element_kind': 'look', 'name': 'look board' + (' ' + r['label'] if r['label'] else ''), 'kind': 'board', 'subject': r['look']}}
+            row = conn.execute("insert into vw2_jobs(run_id, stage, unit, request, request_id, provider) values (%s,'visuals',%s,%s,%s,%s) returning id",
+                               (run['id'], bid, Jsonb(request), 'board:' + bid, 'openai')).fetchone()
+            session.setdefault('boards', {})[bid] = {'id': bid, 'of': r['of'], 'n': n, 'remakes': remakes, 'period': r['period'], 'status': 'generating', 'job_id': str(row['id']),
+                                                    'generation': {k: request[k] for k in ('op', 'provider', 'model', 'prompt', 'size', 'quality')}}
+        rows, todo, changed = board_view(session), [], True
+    if changed:
+        save_session(store, run, session)
+    out = [{'label': r['label'], 'period': r['period'], 'look': r['look'], **({k: r['board'][k] for k in ('id', 'status', 'error', 'key', 'sha256') if r['board'].get(k)} if r['board'] else {'status': 'not made'})} for r in rows]
+    made = [b for b in out if b['status'] == 'candidate']
+    if todo:
+        nxt = (f"{len(todo)} look board{'' if len(todo) == 1 else 's'} to make with GPT Image, about ₹{cost:,.0f} in all, counted in this film's cost limit: say this cost to the operator, "
+               'then `vw visuals boards --make all`.')
+    elif any(b['status'] == 'generating' for b in out):
+        nxt = 'The boards are being made, about a minute each: run `vw visuals boards` again to see them.'
+    else:
+        nxt = ('Look at each board against its own words before the operator does (the tool saved them in work/chat/). One that does not match is made again once: `vw visuals boards --make <its id>`. '
+               'Then `vw visuals page`: the operator sees each Direction with its board and takes one.'
+               + (' A board that was not made is said with its reason: the operator may pick from the words, and it can be asked for again later.' if len(made) < len(out) else ''))
+    return {'boards': out, 'to_make': len(todo), 'cost_inr': cost, 'next': nxt,
+            'show': [{'key': b['key'], 'name': 'look-board-' + (re.sub(r'[^A-Za-z0-9]+', '-', b['label']).strip('-').lower() or 'film') + '.png'} for b in made]}
+
+
 def direction_fields(document, none=False):
     """design/203: the Direction of a sent draft as the record keeps it: `direction` (text), `direction_parts`, the two lines on how it answers
     the brief and what it risks (`direction_notes`), a second Direction beside it (`direction_alternative`), and `direction_missing`, what was
@@ -8089,7 +8202,7 @@ def reconcile(conn, run, session):
     """Ticket 9: repair references left 'generating' after their image job finished (a lost write). Returns how many changed."""
     from .visual_workers import apply_image_result
     fixed = 0
-    for ref in session['references'].values():
+    for ref in made_pictures(session):   # SK, 23 Nov 2026: the look boards too
         if ref.get('status') != 'generating' or not ref.get('job_id'):
             continue
         job = conn.execute('select status, result, error, cost from vw2_jobs where id=%s', (ref['job_id'],)).fetchone()

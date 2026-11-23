@@ -2195,13 +2195,14 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page', 'cap', 'likeness', 'digest', 'trial', 'look', 'pictures']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page', 'cap', 'likeness', 'digest', 'trial', 'look', 'pictures', 'boards']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
 _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
+    'boards': {'make'},   # SK, 23 Nov 2026: the look boards of a film with no camera footage
     'digest': set(), 'trial': {'file', 'element', 'clip', 'at'}, 'look': {'file'},   # design/211 part A: the digest of the footage, trial frames, the looks
     'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file', 'answers'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record', 'uploaded', 'pictures_again'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
@@ -2517,6 +2518,10 @@ def cmd_visuals(a):
         if out.get('draft'):
             emit(out, 0, f"Treatment draft sent ({figures}). Now `vw visuals page`: the operator answers on the page (design/204); the card, `vw visuals next`, only where the page cannot be shown.")
         emit(out, 0, f"Treatment recorded: {figures}. Now author out/visual-plan.json to it.")
+    if a.what == 'boards':   # SK, 23 Nov 2026: the look boards; with no --make the cost only, said before anything is made
+        out = write(base + '/boards', {'make': getattr(a, 'make', None) or ''})
+        out['show_files'] = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in out.get('show') or []]
+        emit(out, 0, out.get('next') or '')
     if a.what == 'sequence':   # design/65 B2': the states of a graphic, approved in one call
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
         out = write(base + '/sequence', {'shot_id': a.shot, 'reference_ids': refs, 'quote': a.quote or ''})

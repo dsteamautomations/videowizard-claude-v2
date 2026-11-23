@@ -418,6 +418,13 @@ def apply_image_result(conn, run_id, ref, status, result, error, cost):
     return False
 
 
+def ref_of(session, rid):
+    """SK, 23 Nov 2026 (no footage, release 2b): the record a finished image job is written on, and whether it is a look board (kept beside the references)."""
+    ref = session['references'].get(rid)
+    board = None if ref else (session.get('boards') or {}).get(rid)
+    return ref or board, bool(board)
+
+
 def finalize_image(conn, job, status, result, error, cost, retry_in):
     jobs.finish(conn, job['id'], status, result=result, error=error, cost=cost, retry_in=retry_in)
     # Ticket 9 (16 Oct 2026): this read-modify-write raced the server and the other workers, and two finished images were lost.
@@ -429,7 +436,7 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
         session = json.loads(store.get(k).decode('utf-8'))
     except Problem:
         return
-    ref = session['references'].get(job['request']['reference']['id'])
+    ref, board = ref_of(session, job['request']['reference']['id'])
     due = False
     if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
         made = [ref]
@@ -443,7 +450,9 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
             each = (result or {}).get('notes_each')   # design/213: each picture keeps the notes of its own turn; the set's notes are these joined (ref_sets.set_facts)
             for n, pic in enumerate(made):
                 pic.update({'view': names[n] if n < len(names) else '', **({'ask': asks[n]} if n < len(asks) else {}), **({'notes': each[n] if n < len(each) else ''} if each else {})})
-        if status == 'retained' and ref.get('set') and (session.get('round') or {}).get('v') == 2:
+        if board:   # a look board has no check list: the assistant looks at it against its own words
+            pass
+        elif status == 'retained' and ref.get('set') and (session.get('round') or {}).get('v') == 2:
             # design/214: a set of a v2 round is not checked by a model: Claude's look answers its check list (ref_sets.check_lines). The code checks stay.
             from . import image_check
             for pic in made:

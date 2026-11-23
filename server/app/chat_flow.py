@@ -87,6 +87,21 @@ def _look_rows(looks, name=''):
     return [(' · '.join(x for x in (name, 'The look', l.get('period')) if x), l.get('look') or 'not given') for l in looks or []]
 
 
+def board_lines(run, session):
+    """SK, 23 Nov 2026 (no footage, release 2b): the look boards of the Directions shown: a row for each, the made pictures for the chat, and
+    (key, label, mark) of each for the page. Three empty lists on a film with footage."""
+    rows, show, pics = [], [], []
+    for r in V.board_view(session):
+        b, name = r['board'], ' · '.join(x for x in (r['name'], 'The look board', r['period']) if x)
+        if b and b['status'] == 'candidate':
+            rows.append((name, 'The picture shown with this line.'))
+            show.append(_pic(run, b['id'], 'look-board-' + b['id'][:8]))
+            pics.append((_ref_key(run, b['id']), r['label'] or 'The look', b.get('sha256')))
+        else:
+            rows.append((name, 'Being made.' if b and b['status'] == 'generating' else f"Not made: {b.get('error') or 'no reason given.'} Choose from the words." if b else 'Not made yet.'))
+    return rows, show, pics
+
+
 def _direction_rows(draft, outputs):
     """design/203: the Direction as the operator reads it: from the brief its purpose, audience and tone (so a departure shows at once), then the
     six headed parts, a part not given reading 'not given'. With a second Direction beside it, both are shown, each with how it answers the brief
@@ -150,8 +165,11 @@ def _treatment_items(ctx):
         st = lines[key]
         if st['state'] != 'to_accept':
             continue
+        show, pics = [], []
         if key == 'direction':
             head, rows = 'The direction of the film', _direction_rows(draft, ctx.get('outputs'))   # design/203: six headed rows, the brief above them
+            more, show, pics = board_lines(ctx['run'], ctx['session'])   # a film with no camera footage: each Direction's look as a picture
+            rows = rows + more if rows else rows
             body = DIRECTION_HELP + '\n\n' + ('\n'.join(f'- **{k}:** {v}' for k, v in rows) if rows else str(draft.get('direction') or ''))   # design/202: named, explained, in full
         else:
             e = entries.get(key) or {}
@@ -176,8 +194,8 @@ def _treatment_items(ctx):
         items.append(_item(f"treatment:{key}:{st['digest'][:10]}", 'treatment line', f'Treatment, line {n} of {len(order)}',
                            f"{head}{' (changed as you asked)' if st.get('asked') else ' (changed since you last saw it)' if st.get('changed') else ''}. "
                            + ('Do you accept the direction of the film?' if key == 'direction' else 'Do you accept this line?'), run,   # design/202: the Direction is asked by its name
-                           buttons, text=_changed_text(st.get('changes'), bool(st.get('asked'))) + body))
-        items[-1].update(_key=key, _summary=summary, _card={'n': head, 'c': 1 if st.get('changed') else 0, **({'a': 1} if st.get('asked') else {}), **({'ch': _changes(st['changes'])} if st.get('changes') else {}),
+                           buttons, text=_changed_text(st.get('changes'), bool(st.get('asked'))) + body, show=show))
+        items[-1].update(_key=key, _summary=summary, _boards=pics, _card={'n': head, 'c': 1 if st.get('changed') else 0, **({'a': 1} if st.get('asked') else {}), **({'ch': _changes(st['changes'])} if st.get('changes') else {}),
                                           **({'t': body} if not rows else {'r': [[k, str(v)] for k, v in rows if v not in (None, '', [])]})})
     return items, summary, [k for k in order if lines[k]['state'] == 'sent_back']
 
