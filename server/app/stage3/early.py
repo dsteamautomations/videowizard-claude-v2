@@ -93,14 +93,15 @@ def cut_list_csv(events, fps):
     fps_ = Fraction(str(fps))
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator='\n')
-    w.writerow(['cut', 'kind', 'file', 'source in (s)', 'source in (tc)', 'source out (s)', 'source out (tc)', 'film in (s)', 'film in (tc)', 'film out (s)', 'film out (tc)', 'zoom', 'note'])
+    w.writerow(['cut', 'kind', 'file', 'source in (s)', 'source in (tc)', 'source out (s)', 'source out (tc)', 'film in (s)', 'film in (tc)', 'film out (s)', 'film out (tc)', 'zoom', 'note',
+                'position x (px)', 'position y (px)', 'rotation (deg)'])   # SK, 23 Nov 2026 (Phase 4b): the editor's fallback when an import drops the transform
     for i, e in enumerate(events, 1):
         sf = Fraction(str(e.get('source_fps') or fps_))
         s_in, s_out = Fraction(e['source_in_frame']) / sf, Fraction(e['source_out_frame']) / sf
         r_in, r_out = Fraction(e['record_in_frame']) / fps_, Fraction(e['record_out_frame']) / fps_
         w.writerow([i, e.get('kind', 'camera'), e['file'], f'{float(s_in):.3f}', tc(e['source_in_frame'], sf), f'{float(s_out):.3f}', tc(e['source_out_frame'], sf),
                     f'{float(r_in):.3f}', tc(e['record_in_frame'], fps_), f'{float(r_out):.3f}', tc(e['record_out_frame'], fps_), f"{float(e.get('zoom') or 1.0):g}",
-                    (e.get('marker') or {}).get('note') or ''])
+                    (e.get('marker') or {}).get('note') or '', f"{float(e.get('pan') or 0):g}", f"{float(e.get('tilt') or 0):g}", f"{float(e.get('rotation') or 0):g}"])
     return buf.getvalue()
 
 
@@ -162,7 +163,9 @@ def open_edit_text(code):
             "1. `vw delivery open --originals \"<the folder with the camera originals>\"` imports the timeline into a project named after the run and links the camera cuts to the originals in one step; "
             "or, by hand: File > Import > Timeline, pick `Timeline/" + code + ".fcpxml`; then in the Media Pool select the camera clips, right-click, Relink, and pick the originals' folder.\n"
             "2. Captions: File > Import > Subtitle, pick `Timeline/" + code + ".srt`; it lands on a subtitle track, one cue per sentence.\n"
-            "3. `Cut-list.csv` is the same timeline as a table: one row per cut, source and film in and out in seconds and timecode, and a note per AI picture with its planned move (push in or pan), which the server would have applied; apply it or not as you judge.\n"
+            "3. `Cut-list.csv` is the same timeline as a table: one row per cut, source and film in and out in seconds and timecode, and a note per AI picture with its planned move (push in or pan), which the server would have applied; apply it or not as you judge. "
+            "Each camera cut's marker, and its note in the cut list, says its scene and shot, the words spoken under it, whether it is B-roll, the crop and what the crop is for, any warning (a soft picture, a glance at the camera) "
+            "and what the operator decided at review (a trim, another clip). The cut list also carries the position and the rotation, in case the import drops them. A cut marked \"hold the last frame\" is frozen on its last frame to fill its length.\n"
             "4. AI takes are 720p: Super Scale 2x before the final render. A still shorter than its slot is held on its last frame.\n"
             "5. An AI take is placed from the point chosen when it was selected, and without its own sound: the generator's sound is not part of the film. "
             "A take of a walk that looks slow may be sped up to 1.15 times, never above 1.2. Grain on an AI take: light, or none. A small error in lettering is patched frame by frame, and the shot ends before anyone crosses the patch.\n\n"

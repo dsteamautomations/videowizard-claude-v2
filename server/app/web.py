@@ -548,8 +548,9 @@ async def review_act(request: Request, code: str, vw2_session: str | None = Cook
 
 
 def _review_act(code, vw2_session, body):
-    """One JSON post per button: {action: 'record', quote} at the options stage; {action: 'decide', slide, decision, note, edit} at the master stage.
-    Each calls the server function the vw tool calls (`vw options record`, `vw master decide`)."""
+    """One JSON post per button: {action: 'record', quote} at the options stage; {action: 'decide', slide, decision, note, edit, sub_clip_id} at the
+    master stage; SK, 23 Nov 2026: {action: 'others', slide} lists the other clips of a row and {action: 'room', slide} says what a trim can take
+    (both reads). Each calls the server function the vw tool calls (`vw options record`, `vw master decide`, `vw master others`)."""
     from fastapi.responses import JSONResponse
     from .stage2 import stage as stage2
     from .storage import storage
@@ -569,8 +570,16 @@ def _review_act(code, vw2_session, body):
         if action == 'decide':
             run = _run_at(conn, user, code, ('options', 'master'))   # design/98: the first answer approves the options
             store = storage()
-            out = stage2.decide(conn, store, user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None)
+            out = stage2.decide(conn, store, user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None,
+                                body.get('sub_clip_id') or None)
             return JSONResponse(core.jsonable({**out, 'view': _review_payload(conn, store, run)}))   # design/63 addendum: one round trip per click
+        if action == 'others':
+            run = _run_at(conn, user, code, ('options', 'master'))
+            store = storage()
+            return JSONResponse(core.jsonable(stage2.others(store, run, body.get('slide'))))
+        if action == 'room':
+            run = _run_at(conn, user, code, ('options', 'master'))
+            return JSONResponse(core.jsonable(stage2.trim_room(storage(), run, body.get('slide'))))
     raise Problem(404, 'NOT_FOUND', 'No such action.')
 
 

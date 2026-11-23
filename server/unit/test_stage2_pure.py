@@ -62,7 +62,7 @@ def test_the_refusal_hands_over_what_a_scene_split_is_made_from():   # defect 53
         ST.need_scenes(None)
     assert e.value.extra == {}
     import inspect
-    assert "need_scenes(session.get('scenes'), words, production.get('process_stages'))" in inspect.getsource(ST.prepare)
+    assert "need_scenes(session.get('scenes'), words, stages, unknown)" in inspect.getsource(ST.prepare)   # 23 Nov 2026 (VW-25): and the chapter names of reused studies this film does not have
     assert 'under `sentences` in the refusal of `vw options prepare`' in inspect.getsource(NR.validate_scenes)
 
 

@@ -15,7 +15,7 @@ def ev(file, kind, s_in, s_out, r_in, r_out, src_fps='25', zoom=1.0, pan=0.0, ti
             'a2': list(a2), 'stabilized': stab, **({'source_frames': frames} if frames else {})}
 
 
-EVENTS = [ev('Media/Camera/C0120.MP4', 'camera', 250, 350, 0, 100, '25', zoom=1.2, pan=0.05, tilt=-0.02, rot=1.5, group='G1', name='c1:S1', a2=[{'in_frame': 260, 'out_frame': 300}], frames=3000),
+EVENTS = [ev('Media/Camera/C0120.MP4', 'camera', 250, 350, 0, 100, '25', zoom=1.2, pan=54.0, tilt=-21.6, rot=1.5, group='G1', name='c1:S1', a2=[{'in_frame': 260, 'out_frame': 300}], frames=3000),
           ev('Media/Camera/Stabilised/c2-S1-100.mp4', 'camera', 0, 50, 100, 150, '25', name='c2:S1', stab=True),
           ev('Media/Camera/C0130.MOV', 'camera', 1500, 1600, 150, 200, '50', name='c3:S2', frames=6000),   # a 50 fps source: 100 source frames fill 50 timeline frames (2 s)
           ev('Media/AI/VS1.mp4', 'movie', 0, 125, 200, 325, '25', name='VS1'),
@@ -57,7 +57,7 @@ def test_the_transform_is_relative_to_the_frame_and_a_stabilised_copy_has_none()
     root = ET.fromstring(doc())
     video = [c for c in root.iter('asset-clip') if c.get('lane') == '1']
     t = video[0].find('adjust-transform')
-    assert t.get('scale') == '1.2 1.2' and t.get('position') == '0.05 -0.02' and t.get('rotation') == '1.5'
+    assert t.get('scale') == '1.2 1.2' and t.get('position') == '5 -2' and t.get('rotation') == '1.5'   # 23 Nov 2026: 54 and -21.6 pixels of a 1080-high film, in per cent of its height
     assert video[1].find('adjust-transform') is None and video[3].find('adjust-transform') is None
 
 

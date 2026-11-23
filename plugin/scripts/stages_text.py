@@ -311,12 +311,22 @@ def same_as_last(lb):
     return {'from_run': lb.get('run'), 'production': {k: prod[k] if k in prod else NOT_ASKED for k in SAME_KEYS}, 'first_answer': SAME_AS_LAST}
 
 
-def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None, client_card=None, category=None):
+def library_chapters_text(rows):
+    """SK, 23 Nov 2026 (VW-25): the chapter names the client's stored footage carries, each once, with the films that used it."""
+    films = {}
+    for r in rows or []:
+        for name in r.get('chapters') or []:
+            films.setdefault(name, []).append(str(r.get('run')))
+    return '\n'.join(f"- {name} ({', '.join(runs)})" for name, runs in films.items()) or 'none'
+
+
+def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None, client_card=None, category=None, library_chapters=None):
     intake = prior('intake')
     timing = intake['summary'].get('timing_lines') or []   # design/53 L2
     prompt = (procedure['prompt'].replace('{last_brief}', last_brief_text(last_brief)).replace('{client_rules}', client_rules_text(client_rules))
               .replace('{document_timing}', '\n'.join(f'- {t}' for t in timing) or 'none').replace('{client_card}', client_card_text(client_card))   # design/50
-              .replace('{category}', category or 'not recorded'))   # design/192 (brief 1)
+              .replace('{category}', category or 'not recorded')   # design/192 (brief 1)
+              .replace('{library_chapters}', library_chapters_text(library_chapters)))
     return {'prompt': prompt, 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
             'script': cleaned_script(ws, intake), 'last_brief': last_brief, 'client_rules': client_rules or [], 'document_timing': timing, 'client_card': client_card or {}, 'category': category}, 'same_as_last': same_as_last(last_brief), 'prepared_at': stamp(ws, 'brief'),
             'output_file': 'out/brief.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}

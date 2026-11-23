@@ -190,7 +190,7 @@ def build(adapter, bundle_dir, manifest, run_code, out_dir):
             props['RotationAngle'] = e['rotation']
         if props:
             adapter.set_property(ti, props)
-        adapter.marker(e['record_in_frame'], e['marker']['colour'], e['marker']['name'], e['marker']['note'] + (f"; colour group {e['color_group']}" if e.get('color_group') else ''))
+        adapter.marker(e['record_in_frame'], e['marker']['colour'], e['marker'].get('title') or e['marker']['name'], e['marker']['note'] + (f"; colour group {e['color_group']}" if e.get('color_group') else ''))
         expected.append({'record_in': e['record_in_frame'], 'record_out': e['record_out_frame'], 'source_in': e['source_in_frame'], 'source_out': e['source_out_frame']})
     narration = items[str(bundle_dir / 'Audio/narration.mp3')]
     expected_audio = []

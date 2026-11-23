@@ -81,10 +81,10 @@ def demo():
 
     # ---- which kind of log a film holds: every clip by sentence and the counts agree, else by paragraph, with the reason ----
     by = lambda n: {'fit_unit': 'sentence', 'sentences': n}
-    assert P.fit_unit([by(3), by(3)], 3) == ('sentence', '')
-    assert P.fit_unit([by(3), {}], 3)[0] == 'paragraph' and 'before' in P.fit_unit([by(3), {}], 3)[1]
-    assert P.fit_unit([by(4), by(4)], 3)[0] == 'paragraph' and '4' in P.fit_unit([by(4), by(4)], 3)[1]
-    assert P.fit_unit([{}, {}], 3) == ('paragraph', '')   # an older film: as today, nothing to say
+    assert P.fit_unit([by(3), by(3)]) == ('sentence', '')
+    assert P.fit_unit([by(3), {}])[0] == 'paragraph' and 'before' in P.fit_unit([by(3), {}])[1]
+    assert P.fit_unit([by(4), by(4)]) == ('sentence', '')   # 23 Nov 2026: another count no longer packages the film by paragraph (unit/test_sentence_pairing_pure.py)
+    assert P.fit_unit([{}, {}]) == ('paragraph', '')   # an older film: as today, nothing to say
 
     # ---- R4: a piece only related to a sentence is not a direct match for it ----
     row = {'fit_unit': 'sentence', 'sentence_fits': a['sentence_fits']}

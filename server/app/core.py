@@ -114,6 +114,19 @@ def last_voice(conn, client_id):
             'choice_note': s.get('choice_note') or ''}
 
 
+def library_chapters(conn, client_id, limit=8):
+    """SK, 23 Nov 2026 (VW-25): the chapter names the client's stored footage carries: the chapters of the briefs of the films whose clips are in
+    the client's library, newest first. The brief reuses a name when a chapter of the new film means the same, so a stored study fits the new
+    film by chapter. [] for a client with no library."""
+    if not client_id:
+        return []
+    rows = conn.execute("""select r.code, o.summary->'production'->'process_stages' as chapters from vw2_stage_outputs o join vw2_runs r on r.id = o.run_id
+                           where r.client_id=%s and o.stage='brief' and o.unit is null and not o.stale
+                             and exists (select 1 from vw2_library l where l.client_id = r.client_id and l.films @> to_jsonb(r.code))
+                           order by o.created_at desc limit %s""", (client_id, limit)).fetchall()
+    return [{'run': r['code'], 'chapters': list(r['chapters'])} for r in rows if r['chapters']]
+
+
 def last_category(conn, client_id):
     """design/192 (intake 2): the category this client's newest film recorded, to recommend at intake; None when no film of theirs recorded one."""
     row = conn.execute("select film->'category'->>'value' as category from vw2_runs where client_id=%s and film->'category'->>'value' is not null "

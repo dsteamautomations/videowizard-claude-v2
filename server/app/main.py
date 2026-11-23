@@ -542,9 +542,10 @@ class DecideBody(Write):
         if isinstance(v, dict) and 'option_number' in v:
             raise Problem(422, 'RETIRED', OPTION_NUMBER_RETIRED)
         return v
-    action: str   # design/127: KEEP, REJECT or TRIM; the retired KEEP_WITH_EDIT and DROP are refused by name in stage2.decide
+    action: str   # design/127: KEEP, REJECT or TRIM; 23 Nov 2026: SWAP; the retired KEEP_WITH_EDIT and DROP are refused by name in stage2.decide
     note: str = ''
-    edit: str | None = None
+    edit: str | None = None   # a TRIM: "start:<seconds>,end:<seconds>"
+    sub_clip_id: str | None = None   # a SWAP: the piece chosen under Other clips
 
 
 class RuleBody(Write):
@@ -783,6 +784,7 @@ def create_run(body: NewRun, user=User, conn=DB):
                      'client_rules': core.client_rules(conn, run['client_id']),               # rules learned for the client (design/37 2.3)
                      'last_voice': core.last_voice(conn, run['client_id']),                   # the client's narrator last time (design/39 4.2)
                      'last_category': core.last_category(conn, run['client_id']),             # the category their last film recorded (design/192)
+                     'library_chapters': core.library_chapters(conn, run['client_id']),       # the chapter names their stored footage carries (23 Nov 2026)
                      'client_card': auth.client_card(run['client_id'])}                       # what the directory knows (design/50)
     status, resp = core.with_receipt(conn, user, body_dict(body), create)
     return Response(resp, status_code=status)
@@ -2295,7 +2297,14 @@ def options_record(run_id: UUID, body: Quote, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/master/decide')
 def master_decide(run_id: UUID, body: DecideBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, ('options', 'master'), body, lambda run, outputs: stage2.decide(conn, storage(), user, run, body.slide, body.action, body.note, body.edit))
+    return _s2(conn, user, run_id, ('options', 'master'), body, lambda run, outputs: stage2.decide(conn, storage(), user, run, body.slide, body.action, body.note, body.edit, body.sub_clip_id))
+
+
+@app.get('/api/runs/{run_id}/master/others')
+def master_others(run_id: UUID, slide: str, user=User, conn=DB):
+    """SK, 23 Nov 2026: the other clips of one row, in the server's order; the review page shows the same list."""
+    run, _ = _stage_run(conn, user, run_id, ('options', 'master'))
+    return Response(stage2.others(storage(), run, slide))
 
 
 @app.get('/api/runs/{run_id}/master/slides')

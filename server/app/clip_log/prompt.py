@@ -16,11 +16,12 @@ def policy_paragraph(policy):
     mode = mode_of(policy)
     if mode == 3:
         return ('SPEAKER POLICY IN FORCE: Mode 3, Pure Visual Infill (allow_speaker_audio=false, show_speaker_video=false). All source speech will be muted in the film; '
-                'transcribe and translate it ONLY so the editor has context and domain facts. Anyone visibly talking to camera or looking at the lens must be trimmed or cropped out. '
-                'EXCEPTION: silent workers doing their job, or people with backs turned or too far to see lips (mouth_visible=false AND looking_at_lens=false) are allowed full frame.')
+                'transcribe and translate it ONLY so the editor has context and domain facts. A person who looks at the lens and speaks to the camera must be trimmed or cropped out. '
+                'Allowed full frame: silent workers doing their job, a worker who speaks to someone else without looking at the lens, a person who only glances at the lens, and people with backs '
+                'turned or too far to see lips. Log mouth_visible, looking_at_lens, the roles and the boxes as seen and heard; the tool decides.')
     if mode == 2:
         return ('SPEAKER POLICY IN FORCE: Mode 2, Voice only (allow_speaker_audio=true, show_speaker_video=false). Source speech may be kept as audio; the speaker must not be seen talking: '
-                'anyone visibly talking to camera or looking at the lens must be trimmed or cropped out, exactly as in Mode 3, while the speech is logged in full for use on the audio track.')
+                'a person who looks at the lens and speaks to the camera must be trimmed or cropped out, exactly as in Mode 3, while the speech is logged in full for use on the audio track.')
     if mode == 1:
         return ('SPEAKER POLICY IN FORCE: Mode 1, Speaker on screen (allow_speaker_audio=true, show_speaker_video=true). Talking heads are allowed on screen; still log boxes, '
                 'speech and settle buffers so the assembler can choose A-roll windows precisely.')

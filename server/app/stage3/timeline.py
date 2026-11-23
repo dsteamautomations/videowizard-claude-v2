@@ -80,11 +80,14 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames,
         by_cut[e['marker']['name']] = e
         z, pan, tilt, rot = float(e.get('zoom') or 1.0), float(e.get('pan') or 0.0), float(e.get('tilt') or 0.0), float(e.get('rotation') or 0.0)
         if z != 1.0 or pan or tilt or rot:
-            ET.SubElement(clip, 'adjust-transform', scale=f'{z:g} {z:g}', position=f'{pan:g} {tilt:g}', rotation=f'{rot:g}')
+            # SK, 23 Nov 2026 (Phase 4b): the events carry the position in pixels of the film's frame; this file's unit is per cent of the frame's
+            # height on both axes. Pixels were written as they were, so a cropped shot would have landed far off its place.
+            unit = 100 / float(tl['height'])
+            ET.SubElement(clip, 'adjust-transform', scale=f'{z:g} {z:g}', position=f'{pan * unit:.6g} {tilt * unit:.6g}', rotation=f'{rot:g}')
         note = e['marker'].get('note') or ''
         if e.get('color_group'):
             note += f"; colour group {e['color_group']}"
-        ET.SubElement(clip, 'marker', start=_t(Fraction(e['source_in_frame']) / src_fps), duration=_t(1 / fps), value=e['marker']['name'], note=note)
+        ET.SubElement(clip, 'marker', start=_t(Fraction(e['source_in_frame']) / src_fps), duration=_t(1 / fps), value=e['marker'].get('title') or e['marker']['name'], note=note)
         for iv in e.get('a2') or []:   # the nat sound of this cut, in its place; on the original when the cut is a stabilised copy (review 27 Oct)
             a_fps = Fraction(str(e.get('a2_source_fps') or src_fps))
             a_in = e.get('a2_source_in_frame', e['source_in_frame'])

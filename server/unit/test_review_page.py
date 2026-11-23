@@ -129,7 +129,7 @@ def test_review_view_with_the_film_ready_carries_the_key_the_cues_and_the_answer
     assert view['cues'] == {'1': [0.0, 10.0], '1.1': [3.0, 7.0], '1.2A1': [7.0, 10.0]}
     assert view['accepted'] is True and view['render']['status'] == 'ready'
     by = {s['slide']: s for s in view['slides']}
-    assert by['1.1']['answer'] == {'action': 'KEEP', 'note': '', 'edit': None, 'by': 'u1', 'at': '2026-10-21T10:00:00Z'} and by['1.2']['answer']['action'] == 'REJECT'
+    assert by['1.1']['answer'] == {'action': 'KEEP', 'note': '', 'edit': None, 'edit_text': None, 'swap': None, 'by': 'u1', 'at': '2026-10-21T10:00:00Z'} and by['1.2']['answer']['action'] == 'REJECT'
     assert by['1.2A1']['needs_answer'] is True   # its shot is rejected: the alternatives open
     assert view['answered'] == 2 and view['of'] == 5 and view['waiting'] == ['1.2A1', '1.2A2', '2.1']
 

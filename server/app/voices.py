@@ -454,6 +454,12 @@ def record_direction(store, run, outputs, body, user):
     return {'chosen': chosen, 'digest': digest, 'number': doc['number'], 'items': len(items), 'register': register, 'passage': choice if passages else None, 'sentences': doc['sentences']}
 
 
+def tag_in_force(tag, behind):
+    """The refusal of a tag equal to the one in force; when the approved words are newer than the narration, it names the button that brings them."""
+    return (f"This sentence is already read as {tag}; pick a different tag. Nothing was narrated."
+            + (" To get the approved words, press 'Narrate again with the approved words'." if behind else ''))
+
+
 def set_tweaks(store, run, outputs, voice_id, tweaks):
     doc = direction_of(store, run)
     if not doc:
@@ -465,7 +471,8 @@ def set_tweaks(store, run, outputs, voice_id, tweaks):
         raise Problem(422, 'DIRECTION', 'The tweaks were refused: ' + '; '.join(problems[:6]) + '. Nothing was narrated.', problems=problems)
     same = VD.already_read_as(script['spoken_text'], doc.get('base') or [], doc.get('register') or '', tweaks) if doc.get('chosen') != 'none' else None
     if same:   # design/192 (voice 12): a tag equal to the one in force is never sent to the narrator; say so instead of returning the stored recording
-        raise Problem(422, 'TAG_IN_FORCE', f"This sentence is already read as {same['tag']}; pick a different tag. Nothing was narrated.")
+        latest = [n for n in page_state(store, run).get('narrations') or [] if n.get('voice_id') == voice_id][-1:]
+        raise Problem(422, 'TAG_IN_FORCE', tag_in_force(same['tag'], bool(latest) and narration_behind(latest[0], words_doc(store, run))))
     doc.setdefault('tweaks', {})[voice_id] = [{'passage_id': t['passage_id'], 'sentence': t['sentence'], 'tag': t['tag']} for t in tweaks]
     save_doc(store, run, 'direction.json', doc)
     return {'voice_id': voice_id, 'tweaks': len(tweaks)}

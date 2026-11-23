@@ -274,9 +274,16 @@ def pieces_by_scene(data):
         fits = [(f, r) for f, r in fits if f]
         fits.sort(key=lambda x: (FIT_ORDER.index(x[0]) if x[0] in FIT_ORDER else len(FIT_ORDER), rank(x[1], b['beat_id'])))
         placed.update(r['sub_clip_id'] for _, r in fits)
+        broll = []
+        order = (data.get('ranked') or {}).get(b['beat_id'])
+        if order is not None:   # 23 Nov 2026 (VW-25): the server ranks a scene's pieces (kind of fit, variety, grade, warnings); the tool's own order above is for a package prepared before that
+            at = {x['sub_clip_id']: n for n, x in enumerate(order)}
+            fits.sort(key=lambda x: at.get(x[1]['sub_clip_id'], len(at)))
+            by_id = {r['sub_clip_id']: r for r in rows}
+            broll = [{**light(by_id[x['sub_clip_id']], 'b-roll', short=True), 'chapter': by_id[x['sub_clip_id']].get('process_stage')} for x in order if x['kind'] == 'b-roll' and x['sub_clip_id'] in by_id]
         scenes.append({'beat_id': b['beat_id'], 'title': b.get('title'), 'process_stages': b.get('process_stages') or [], 'target_beat_frames': b.get('target_beat_frames'),
                        'sentences': [{k: s.get(k) for k in ('step_id', 'text', 'start_frame', 'end_frame')} for s in b.get('steps') or []],
-                       'pieces': once(of_scene(fits, b['beat_id']))})
+                       'pieces': once(of_scene(fits, b['beat_id']) + broll)})
     return scenes, once([light(r, None) for r in rows if r['sub_clip_id'] not in placed])
 
 
@@ -592,6 +599,7 @@ def make_workspace(run, keep_logs=False, assembly_machine=None, files=None):
     m = {'code': run['code'], 'run_id': run['id'], 'title': run.get('title'), 'client': run.get('client'), 'client_id': run.get('client_id'), 'created': datetime.now(timezone.utc).isoformat(),
          'version': run.get('procedure_version'), 'client_runs': run.get('client_runs') or [],
          'last_brief': run.get('last_brief'), 'client_rules': run.get('client_rules') or [],   # design/37 2.2, 2.3
+         'library_chapters': run.get('library_chapters') or [],   # the chapter names the client's stored footage carries (23 Nov 2026)
          'last_voice': run.get('last_voice'),   # design/39 4.2
          'client_card': run.get('client_card') or {},   # design/50
          'last_category': run.get('last_category'),   # design/192: what this client's last film recorded
@@ -1363,7 +1371,7 @@ def cmd_stage(a):
             emit(out, 0, f"{out['file']}: the script as it will be kept, {out['kept']} lines ({out['removed']} removed); ask the operator to read it before approving.")
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or [], 'last_category': m.get('last_category')} if a.stage == 'intake' else \
-                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}, 'category': film_category(full)} if a.stage == 'brief' else \
+                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}, 'category': film_category(full), 'library_chapters': m.get('library_chapters') or []} if a.stage == 'brief' else \
                 {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else \
                 {'known': lambda shas: (write(f"/api/runs/{m['run_id']}/library/known", {'shas': shas}) or {}).get('known') or {}} if a.stage == 'media' else {}   # design/147 L2
             prepared = prepare(ws, procedure, prior, **extra)
@@ -3527,14 +3535,16 @@ def cmd_options(a):
         out = write(base + '/prepare', {})
         files = download_options_package(m, out['package']['key'])   # design/61: one file per section
         emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0, f"Package for reading in work/options/ ({len(files)} files, listed in `files` with row counts): {out['beats']} beats, "
-             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the pieces files (by scene) and the words files come after. Show the coverage report first.")
+             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the pieces files (by scene) and the words files come after. Show the coverage report first."
+             + (f" FIT NOTE, tell the operator: {out['fit_note']}" if out.get('fit_note') else '') + (f" CHAPTER NAMES: {out['chapters_note']}" if out.get('chapters_note') else ''))
     if a.what == 'coverage':
         emit(call('GET', base + '/coverage'))
     if a.what == 'scenes':
         out = write(base + '/scenes', {'document': _json_file(m, a.file), 'quote': a.quote or ''}, wait=300)
         files = download_options_package(m, out['package']['key'])
         emit({**out, 'files': files}, 0, f"Scenes and pauses recorded: {len(out['scenes'])} scenes, film {out['film_seconds']} s ({out['inserted_seconds']} s of pauses added). "
-             f"Package refreshed in work/options/ ({len(files)} files); show the coverage report next.")
+             f"Package refreshed in work/options/ ({len(files)} files); show the coverage report next."
+             + (f" FIT NOTE, tell the operator: {out['fit_note']}" if out.get('fit_note') else '') + (f" CHAPTER NAMES: {out['chapters_note']}" if out.get('chapters_note') else ''))
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'document': _json_file(m, a.file)})
         emit(out, 2 if out.get('status') == 'rejected' else 0, f"{a.what}: {out.get('status') or 'version ' + str(out.get('version'))}"   # design/125 P11: act_on in full, for_information as one line
@@ -3617,17 +3627,20 @@ def cmd_master(a):
         out = call('GET', base + '/slides')
         out['review_page_url'] = review_page_url(m['code'])   # design/62: the default place to decide
         emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none')
-             + f". Review page: {out['review_page_url']}. In chat: `vw master decide --slide <label> --action KEEP|REJECT|TRIM [--note …] [--edit \"in:+12,out:-6\"]`, "
+             + ''.join(f". OUT OF BALANCE, tell the operator: {b['text']}" + (' It can go to: ' + ', '.join(f"#{t['slide']} (--edit \"{t['edit']}\")" for t in b['takers']) if b.get('takers') else '')
+                       for b in out.get('balance') or [])
+             + f". Review page: {out['review_page_url']}. In chat: `vw master decide --slide <label> --action KEEP|REJECT|TRIM|SWAP [--note …] [--edit \"start:0.5,end:0\"] [--sub <piece>]` "
+               "(a TRIM is in seconds: start later by, end earlier by; a SWAP takes a piece from `vw master others --slide <label>`), "
                'or a file that is a list with one object per answer, [{"slide": "2.1", "action": "KEEP", "note": "", "edit": ""}]: `vw master decide --file out/decisions.json`.')
     if a.what == 'decide':
         if a.file:   # design/44 8.1: every answer in one call, in order, stopping at the first refusal
             answers = _json_file(m, a.file)
             if not isinstance(answers, list):
-                emit({'action': 'refused', 'message': f'{a.file} must be a list with one object per answer: [{{"slide": "2.1", "action": "KEEP", "note": "", "edit": ""}}] (action KEEP, REJECT or TRIM; edit only for a TRIM, like "in:+12,out:-6").'}, 2)
+                emit({'action': 'refused', 'message': f'{a.file} must be a list with one object per answer: [{{"slide": "2.1", "action": "KEEP", "note": "", "edit": ""}}] (action KEEP, REJECT, TRIM or SWAP; edit only for a TRIM, in seconds, like "start:0.5,end:0"; sub only for a SWAP).'}, 2)
             recorded, last = [], {}
             for i, ans in enumerate(answers):
                 body = {'request_id': str(uuid.uuid4()), 'slide': slide_label(ans.get('slide', '')), 'action': ans.get('action'), 'note': ans.get('note') or '',
-                        **({'edit': ans['edit']} if ans.get('edit') else {})}
+                        **({'edit': ans['edit']} if ans.get('edit') else {}), **({'sub_clip_id': ans['sub']} if ans.get('sub') else {})}
                 payload, code = request('POST', base + '/decide', json=body)
                 if code:
                     if code == 401:
@@ -3641,8 +3654,16 @@ def cmd_master(a):
         n = a.slide or a.option
         if not n:
             emit({'action': 'refused', 'message': 'Give the shot label (--slide 2.1, --slide 2.1A1) or a file of answers (--file out/decisions.json).'}, 2)
-        body = {'slide': slide_label(n), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
+        body = {'slide': slide_label(n), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {}), **({'sub_clip_id': a.sub} if getattr(a, 'sub', None) else {})}
         emit(write(base + '/decide', body))
+    if a.what == 'others':   # SK, 23 Nov 2026: the other clips of one shot, or of an all-AI scene, in the server's order; the review page shows the same list
+        if not a.slide:
+            emit({'action': 'refused', 'message': 'Give the shot: `vw master others --slide 2.1`.'}, 2)
+        out = call('GET', base + '/others', params={'slide': slide_label(a.slide)})
+        can = [p for p in out.get('pieces') or [] if p.get('can')]
+        emit(out, 0, (out.get('empty') or f"{len(can)} of {len(out['pieces'])} pieces can go on {out['title']} ({out['seconds']} s), best first: "
+                      + '; '.join(f"{p['sub_clip_id']} ({p['kind']}, grade {p.get('grade')})" for p in can[:8]))
+             + f". To use one: `vw master decide --slide {out['slide']} --action SWAP --sub <piece>`.")
     if a.what == 'rule':   # design/43 7.5: a client rule is the operator's; their yes travels with it
         if not (a.quote or '').strip():
             emit({'action': 'refused', 'message': "A client rule needs the operator's confirmation: --quote \"<their yes>\""}, 2)
@@ -4180,8 +4201,8 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the film (status)')
     s.set_defaults(fn=cmd_options)
-    s = sub.add_parser('master'); s.add_argument('what', choices=['slides', 'decide', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
-    for flag in ('--slide', '--option', '--action', '--note', '--edit', '--add', '--quote', '--file'):
+    s = sub.add_parser('master'); s.add_argument('what', choices=['slides', 'decide', 'others', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
+    for flag in ('--slide', '--option', '--action', '--note', '--edit', '--sub', '--add', '--quote', '--file'):
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the master film (status)')
     s.set_defaults(fn=cmd_master)

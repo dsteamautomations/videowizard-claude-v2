@@ -57,6 +57,16 @@
 .rv .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:rvspin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes rvspin{to{transform:rotate(360deg)}}
 .rv .spacer{height:120px}
+/* SK, 23 Nov 2026 (VW-25): the other clips of a row, and a scene a trim left short or long */
+.rv .oth{grid-column:1/-1;margin-top:4px;border-top:1px solid var(--line);padding-top:6px;cursor:default}
+.rv .pc{display:grid;grid-template-columns:200px minmax(0,1fr);gap:4px 10px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line)}
+.rv .pc>:first-child{grid-row:1/3}.rv .pc>:last-child{grid-column:2}
+.rv .pc.sel{outline:2px solid var(--accent);border-radius:8px}
+.rv .pc video,.rv .pc .nopv{width:200px;height:112px;max-height:none;border-radius:8px;background:#000}
+.rv .pc .nopv{display:flex;align-items:center;justify-content:center;color:#bbb;font-size:12px;text-align:center}
+@media (max-width:560px){.rv .pc{grid-template-columns:1fr}.rv .pc>:first-child{grid-row:auto}.rv .pc>:last-child{grid-column:1}}
+.rv .bal{margin-top:6px;padding:8px 10px;border:2px solid var(--err);border-radius:10px;font-size:13.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--bg)}
+.rv .bal button{padding:4px 10px;font-size:12.5px;border-radius:999px}
 </style>
 <div class="rv" id="app" data-code="{{ run.code }}">
   <div class="top">
@@ -84,7 +94,15 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 let detOpen=false, data=null, timer=null, open=null, inflight=false, filmKey=null, current=null, waitingFor=null;
 const passed=new Set();   // shots the viewer chose to play past without answering, this viewing
 // design/127: a footage shot KEEP / REJECT / TRIM; the AI shot of an all-AI scene Keep AI (KEEP) / Find footage (REJECT); an alternative KEEP / REJECT once its shot is rejected
-const CHOICES={shot:[['KEEP','Keep'],['REJECT','Reject'],['TRIM','Trim']],alternative:[['KEEP','Keep'],['REJECT','Reject']],ai:[['KEEP','Keep AI'],['REJECT','Find footage']]};
+// SK, 23 Nov 2026 (VW-25): Other clips on a footage shot and Find footage on an all-AI scene open the same list (the server's order); "Use this" is the answer SWAP
+const CHOICES={shot:[['KEEP','Keep'],['REJECT','Reject'],['TRIM','Trim'],['OTHERS','Other clips']],alternative:[['KEEP','Keep'],['REJECT','Reject']],ai:[['KEEP','Keep AI'],['OTHERS','Find footage']]};
+const KINDS={exact:'shows what the words say',partly:'shows part of what the words say',related:'related to the words',chapter:'from the same chapter','b-roll':'B-roll'};
+function said(s,a){   // an answer in plain words
+  if(a.action==='SWAP'){return 'Other clip: '+((a.swap&&a.swap.clip)||'');}
+  if(a.action==='TRIM'){return 'Trim: '+(a.edit_text||a.edit||'');}
+  if(s.type==='ai'){return a.action==='KEEP'?'Keep AI':'Find footage: the assistant is asked';}
+  return a.action;
+}
 let pauseOn=true; try{pauseOn=localStorage.getItem('vw-review-pause')!=='off';}catch(e){}
 $('pauseon').checked=pauseOn;
 $('pauseon').addEventListener('change',()=>{pauseOn=$('pauseon').checked;try{localStorage.setItem('vw-review-pause',pauseOn?'on':'off');}catch(e){}if(!pauseOn)resume();});
@@ -129,8 +147,9 @@ function row(s,can){
   else if(off){ans='<span class="ds">'+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action)+' (not used)</div>':'');}
   else{
     const a=s.answer;
-    if(can){ans='<div class="btns">'+(CHOICES[s.type]||[]).map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(a&&a.action===v?'on':'')+'">'+l+'</button>').join('')+'</div>';}
-    if(a){ans+='<div class="ans"><b>'+esc(s.type==='ai'?(a.action==='KEEP'?'Keep AI':'Find footage'):a.action)+'</b>'+(a.note?' · '+esc(a.note):'')+(a.edit?' · '+esc(a.edit):'')+'</div>';}
+    const on=v=>a&&(a.action===v||(v==='OTHERS'&&(a.action==='SWAP'||(s.type==='ai'&&a.action==='REJECT'))));
+    if(can){ans='<div class="btns">'+(CHOICES[s.type]||[]).map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(on(v)?'on':'')+'">'+l+'</button>').join('')+'</div>';}
+    if(a){ans+='<div class="ans"><b>'+esc(said(s,a))+'</b>'+(a.note?' · '+esc(a.note):'')+'</div>';}
     if(!can){ans+='<span class="ds">'+(data.accepted?(data.master_built?'no answer':'waiting'):'after the film')+'</span>';}
   }
   return '<div data-slide="'+esc(s.slide)+'" class="row'+(s.type==='alternative'?' alt':'')+(off?' off':'')+(current===s.slide?' cur':'')+'">'+info+'<div>'+ans+'</div>'+(open&&open.slide===s.slide?form(open):'')+'</div>';
@@ -142,10 +161,11 @@ function draw(){
     film.hidden=true;no.hidden=false;no.textContent=$('line').textContent;$('slides').innerHTML='';$('action').innerHTML='';return;
   }
   // SK, 15 Nov 2026: one line the reviewer must read, large; the record of the version, the approval and the second look sits behind Details
-  let st;
+  let st; const bal=d.master_built?[]:(d.balance||[]);   // SK, 23 Nov 2026: the scenes a trim left short or long; "all answered" waits for them
   if(!d.accepted&&stage()==='options'){st=d.film?'Answer each shot. Your first answer approves these options.':'The review film is not ready yet.';}
   else if(!d.accepted){st='This version is not the recorded one. The assistant proposes or records in chat.';}
   else if(d.master_built){st='Answers closed. The master film is built.';}
+  else if(bal.length){st=(bal.length===1?bal[0].text:bal.length+' scenes do not add up after a trim.')+' Fix it under the scene before the master film.';}
   else if(d.of&&d.answered>=d.of){st='All '+d.of+' answered. The assistant builds the master film next.';}
   else{st=d.answered+' of '+d.of+' answered. '+(d.of-d.answered)+' left.';}
   let det='<div>Version '+esc(d.version)+(d.accepted&&d.approved_by&&d.approved_by.slide?' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')':'')   // design/98 D6
@@ -155,7 +175,7 @@ function draw(){
     ' · '+esc(Object.keys(sl.unchanged||{}).length)+' unchanged'+(sl.no_fix_file.length?' · no fix file for '+esc(sl.no_fix_file.join(', ')):'')+(sl.edited_after?' · <span class="err">the cut was changed after the second look</span>':'')+
     sl.fixes.map(f=>'<div>Changed by the second look, nothing to approve: '+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')
     :'Second look: not recorded for this version')+'</div>';
-  let line='<div class="st">'+esc(st)+'<a id="more" role="button" tabindex="0" aria-expanded="'+(detOpen?'true':'false')+'">'+(detOpen?'Hide details':'Details')+'</a></div>';
+  let line=(bal.length&&d.accepted?'<div class="st err">':'<div class="st">')+esc(st)+'<a id="more" role="button" tabindex="0" aria-expanded="'+(detOpen?'true':'false')+'">'+(detOpen?'Hide details':'Details')+'</a></div>';
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+='<div class="st err">A defect is open on this run. Nothing can be recorded until it is fixed.</div>';}
   line+='<div class="det"'+(detOpen?'':' hidden')+'>'+det+'</div>';
   $('line').innerHTML=line;fit();
@@ -180,46 +200,88 @@ function draw(){
       if(inScene){html+='</div>';}
       inScene=true;
       html+='<div class="scene" style="--sc:'+esc(s.colour)+';background:'+esc(s.colour)+'1f"><div class="head" data-slide="'+esc(s.slide)+'"><b>'+esc(s.lines[0])+' · '+esc(s.lines[1]||'')+'</b><span>'+esc(s.lines[2]||'')+' - '+esc(s.lines[3]||'')+'</span></div>';
+      const b=can?bal.find(x=>String(x.scene)===String(s.number)):null;   // one click hands the time to a shot of the same scene
+      if(b){html+='<div class="bal"><b class="err">'+esc(b.text)+'</b>'+(b.takers.length?'<span>'+(b.short?'Give ':'Take ')+esc(b.seconds)+' s '+(b.short?'to':'from')+':</span>'
+        +b.takers.map(t=>'<button data-bal="'+esc(t.slide)+'" data-edit="'+esc(t.edit)+'">'+esc(t.title.split(' · ').pop())+(t.edit==='in:0,out:0'?' (undo its trim)':'')+'</button>').join('')
+        :'<span>No shot of this scene can take it: change the trim.</span>')+'</div>';}
     }else{html+=row(s,can);}
   }
   if(inScene){html+='</div>';}
   $('slides').innerHTML=html;
   $('slides').querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();choose(b.dataset.slide,b.dataset.act);}));
-  $('slides').querySelectorAll('[data-slide]').forEach(el=>{if(el.tagName==='BUTTON')return;el.addEventListener('click',e=>{if(e.target.closest('button,input,label'))return;seek(el.dataset.slide);});});
-  if(open){const f=$('f-'+open.slide);if(f){f.querySelector('button.go').addEventListener('click',()=>submit(open.slide));f.querySelector('button.no').addEventListener('click',()=>{open=null;draw();});const first=f.querySelector('input');if(first)first.focus();}}
+  $('slides').querySelectorAll('[data-slide]').forEach(el=>{if(el.tagName==='BUTTON')return;el.addEventListener('click',e=>{if(e.target.closest('button,input,label,.oth,.form'))return;seek(el.dataset.slide);});});
+  $('slides').querySelectorAll('button[data-bal]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();send({action:'decide',slide:b.dataset.bal,decision:'TRIM',edit:b.dataset.edit});}));
+  if(open){const f=$('f-'+open.slide);if(f){
+    const on=(sel,fn)=>f.querySelectorAll(sel).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();fn(b);}));
+    on('button.go',()=>submit(open.slide));on('button.no',()=>{open=null;draw();});
+    on('button.use',b=>send({action:'decide',slide:open.slide,decision:'SWAP',sub_clip_id:b.dataset.sub}));
+    on('button.more',()=>{open.shown+=6;draw();});
+    on('button.ask',()=>send({action:'decide',slide:open.slide,decision:'REJECT'}));
+    f.querySelectorAll('video').forEach(v=>v.addEventListener('play',()=>$('film').pause()));   // a preview plays alone
+    const first=f.querySelector('input');if(first)first.focus();}}
   const help='Watch the film and answer each shot. Keep: use it. Reject: not this one; an AI stretch takes its place (a reason is optional). Trim: use it with its start or end moved. '
-    +'B-roll is marked in dark red: it is fine to reject. An alternative (dashed) is another clip for the same words: it opens when you reject its shot. Keep AI / Find footage: for a scene made only with AI.';
+    +'Other clips: put a different clip on this shot. B-roll is marked in dark red: it is fine to reject. An alternative (dashed) is another clip for the same words: it opens when you reject its shot. Keep AI / Find footage: for a scene made only with AI.';
   if(!d.accepted&&stage()==='options'){$('action').innerHTML='<span>'+esc(help)+' Your first answer approves these options.</span>';}   // design/98 D1
+  else if(d.accepted&&bal.length){$('action').innerHTML='<span class="err">'+esc(bal.map(b=>b.text).join(' '))+' The master film cannot be built until each scene adds up: use the buttons under the scene.</span>';}
   else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){$('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';}
   else if(d.accepted&&stage()==='master'){$('action').innerHTML='<span>Click a row to see it in the film. '+esc(help)+'</span>';}
   else{$('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';}
 }
 function form(o){
   if(o.action==='REJECT'){return '<div class="form" id="f-'+esc(o.slide)+'"><input class="w" placeholder="Why? (optional)"><button class="go">Save</button><button class="no">Close</button></div>';}   // design/98 R1
-  return '<div class="form" id="f-'+esc(o.slide)+'"><label>start ±frames</label><input class="f" type="number" value="0"><label>end ±frames</label><input class="f" type="number" value="0"><button class="go">Record trim</button><button class="no">Cancel</button><span class="ds">Source frames; a frame is 1/25 s. The scene must keep its length: trim one shot and lengthen another.</span></div>';
+  if(o.action==='OTHERS'){return others(o);}
+  // SK, 23 Nov 2026 (VW-25): a trim is typed in seconds, with what the shot can lose and gain; the server checks it when it is recorded. Older way retired on the page: source frames
+  return '<div class="form" id="f-'+esc(o.slide)+'"><label>Start later by</label><input class="f" type="number" step="0.1" value="0"><label>s</label><label>End earlier by</label><input class="f" type="number" step="0.1" value="0"><label>s</label>'
+    +'<button class="go">Record trim</button><button class="no">Cancel</button><span class="ds"><span class="room">'+esc(o.room||'')+'</span> A minus value lengthens that end. If the scene no longer adds up, the page says so and offers the shots that can take the time.</span></div>';
+}
+function others(o){
+  const l=o.list; let h='<div class="oth" id="f-'+esc(o.slide)+'">';
+  if(!l){return h+'<span class="ds"><span class="spin"></span>Finding other clips…</span></div>';}
+  h+='<div class="ds">'+(l.pieces.length?'Other clips for '+esc(l.title)+' ('+esc(l.seconds)+' s), best first. “Use this” puts the clip here; no other answer changes. The review film is not made again: the master film shows it.':esc(l.empty))+'</div>';
+  l.pieces.slice(0,o.shown).forEach(p=>{
+    const m=p.media||{};
+    h+='<div class="pc'+(p.chosen?' sel':'')+'">'+(m.key?'<video controls muted playsinline preload="metadata" src="/runs/'+code+'/film/'+m.key.split('/').map(encodeURIComponent).join('/')+'#t='+m.in_s+','+m.out_s+'"></video>':'<div class="nopv">No preview here'+(p.library?' (library clip)':'')+'</div>')
+      +'<div><div class="t">'+esc(p.clip||p.sub_clip_id)+(p.grade?' · grade '+esc(p.grade):'')+'</div><div class="ds">'+esc(KINDS[p.kind]||p.kind)+(p.chapter?' · chapter “'+esc(p.chapter)+'”':'')+'</div>'
+      +(p.what?'<div class="words">'+esc(p.what)+'</div>':'')+(p.flags&&p.flags.length?'<div class="q">'+esc('Has: '+p.flags.join('; '))+'</div>':'')+'</div>'
+      +'<div>'+(p.chosen?'<span class="ok">In use here</span>':p.can?'<button class="use" data-sub="'+esc(p.sub_clip_id)+'">Use this</button>':'<span class="ds">Cannot be used: '+esc(p.why)+'</span>')+'</div></div>';
+  });
+  return h+'<div class="form">'+(l.pieces.length>o.shown?'<button class="more">Show '+Math.min(6,l.pieces.length-o.shown)+' more</button>':'')+(o.ai?'<button class="ask">None of these: ask the assistant</button>':'')+'<button class="no">Close</button></div></div>';
 }
 async function choose(slide,action){
   if(action==='REJECT'){open=null;const j=await send({action:'decide',slide,decision:'REJECT'});if(j){open={slide,action};draw();}return;}   // design/98 R1: recorded at once; a reason may follow
-  if(action==='TRIM'){open={slide,action};draw();return;}
+  if(action==='TRIM'){
+    open={slide,action,room:''};draw();
+    try{const j=await act({action:'room',slide});if(open&&open.slide===slide&&open.action==='TRIM'){open.room=j.text;const el=$('f-'+slide)&&$('f-'+slide).querySelector('.room');if(el)el.textContent=j.text;}}catch(err){msg(err.message,true);}
+    return;}
+  if(action==='OTHERS'){
+    const s=data.slides.find(x=>x.slide===slide);open={slide,action,list:null,shown:6,ai:!!(s&&s.type==='ai')};draw();
+    try{const j=await act({action:'others',slide});if(open&&open.slide===slide&&open.action==='OTHERS'){open.list=j;draw();}}catch(err){open=null;draw();msg(err.message,true);}
+    return;}
   open=null;await send({action:'decide',slide,decision:action});
 }
 async function submit(slide){
   const f=$('f-'+slide); if(!f||!open)return;
   if(open.action==='REJECT'){const why=f.querySelector('input').value.trim();if(!why){open=null;draw();return;}await send({action:'decide',slide,decision:'REJECT',note:why});return;}
-  const v=[...f.querySelectorAll('input')].map(i=>parseInt(i.value||'0',10)||0);
-  await send({action:'decide',slide,decision:'TRIM',edit:'in:'+v[0]+',out:'+v[1]});
+  const v=[...f.querySelectorAll('input')].map(i=>parseFloat(i.value||'0')||0);
+  if(!v[0]&&!v[1]){msg('Give the seconds to trim, at the start or at the end.',true);return;}
+  await send({action:'decide',slide,decision:'TRIM',edit:'start:'+v[0]+',end:'+v[1]});
 }
 async function send(body){
   msg('Recording #'+body.slide+'…',false,true);
-  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action)+' recorded ('+j.decided+' of '+j.of+').');
+  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+({SWAP:'other clip',TRIM:'trim ('+j.edit_text+')'}[j.action]||String(j.action))+' recorded ('+j.decided+' of '+j.of+').');
     if(j.view){data=j.view;draw();fit();}else{await load();}
-    if(waitingFor===body.slide){resume();}
+    const w=waitingFor&&data&&data.slides?data.slides.find(x=>x.slide===waitingFor):null;
+    if(waitingFor&&(!w||!w.needs_answer||w.answer)){resume();}   // answered, or it no longer needs an answer (its shot was kept): the film goes on
     return j;}
   catch(err){msg(err.message,true);return null;}   // the film stays paused; nothing is recorded twice (one request at a time)
 }
-function seek(slide){const c=cue(slide);if(!c||!filmKey)return;const f=$('film');f.currentTime=c[0];passed.delete(slide);f.play().catch(()=>{});}
-function resume(){waitingFor=null;$('wait').hidden=true;const f=$('film');if(f.paused&&filmKey){f.play().catch(()=>{});}}
+function unwait(){waitingFor=null;$('wait').hidden=true;}
+function seek(slide){const c=cue(slide);if(!c||!filmKey)return;const f=$('film');unwait();f.currentTime=c[0];passed.delete(slide);f.play().catch(()=>{});}
+function resume(){unwait();const f=$('film');if(f.paused&&filmKey){f.play().catch(()=>{});}}
 $('goon').addEventListener('click',()=>{if(waitingFor){passed.add(waitingFor);}resume();});
+// SK, 23 Nov 2026 (VW-25): Play pressed on the film itself, or a click on a row, while the film waited for an answer left the wait set, and the film then
+// never stopped at any later shot. Play on the film is now the same as Continue; a click on a row ends the wait (seek above).
+$('film').addEventListener('play',()=>{if(waitingFor){passed.add(waitingFor);unwait();}});
 $('film').addEventListener('timeupdate',()=>{
   if(!data||!data.cues)return;const f=$('film'), t=f.currentTime;let best=null,bt=-1;
   for(const s of data.slides){const c=cue(s.slide);if(!c)continue;

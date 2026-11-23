@@ -118,7 +118,7 @@ def decide(store, slide, action, edit=None):
     ('1.1', 'KEEP', r'Scene 1 · Shot 1 is made with AI inside the scene: it needs no answer'),
     ('1.2', 'KEEP_WITH_EDIT', r'KEEP_WITH_EDIT is retired: use TRIM on the shot'),
     ('1.2', 'DROP', r'DROP is retired: answer the shot KEEP, REJECT or TRIM'),
-    ('1.2', 'TRIM', r'TRIM needs --edit "in:±frames,out:±frames"'),
+    ('1.2', 'TRIM', r'TRIM needs --edit "start:<seconds>,end:<seconds>"'),   # 23 Nov 2026: a trim is said in seconds
     ('2.1', 'TRIM', r'Scene 2 · Shot 1 is made with AI: Keep AI \(KEEP\) or Find footage \(REJECT\)'),
     ('1.3A1', 'KEEP', r'answer Scene 1 · Shot 3 first: its alternatives open when it is rejected'),
     ('1A', 'KEEP', r'No slide #1A: the labels are now 1\.2 \(Scene 1 · Shot 2\)'),

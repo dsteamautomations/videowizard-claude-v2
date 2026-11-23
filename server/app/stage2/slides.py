@@ -93,7 +93,7 @@ def slides(doc, pk, fps):
             at += k
             if ev.get('blank'):
                 out.append({**common, 'no': label, 'type': 'ai', 'title': name, 'intent': ev.get('intent', ''),
-                            **({'ai_only': True, 'hint': 'the whole scene made with AI; Keep AI leaves it to AI, Find footage sends it back to look for footage'}
+                            **({'ai_only': True, 'hint': 'the whole scene made with AI; Keep AI leaves it to AI, Find footage shows the clips that can go here'}
                                if ai_only else {'hint': 'made with AI later; nothing to answer'}),
                             'lines': [f'{name} · made with AI', f'Time: {_seconds(k, fps)}'] + said_lines(said)
                             + wrap('For AI: ' + str(ev.get('intent', '')))})
@@ -105,7 +105,7 @@ def slides(doc, pk, fps):
                         'library': row.get('library_from') if ev.get('match') == 'library' else None,   # design/147 L4: a library proposal names its film
                         'note': ev.get('note') if isinstance(ev.get('note'), dict) else None, 'flags': warnings(row),
                         'marker_reasons': {k: v for k, v in (ev.get('marker_reasons') or {}).items() if str(v or '').strip()} or None,   # design/142 R4: shown to the operator
-                        'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it',
+                        'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it, Other clips puts another clip here',
                         'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said) + has_lines(row)})
             for m, alt in enumerate(ev.get('alternatives') or [], 1):
                 arow = rows.get(alt.get('sub_clip_id')) or {'clip_id': '', 'clip_name': alt.get('sub_clip_id', '')}

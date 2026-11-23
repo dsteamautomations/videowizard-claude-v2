@@ -31,8 +31,8 @@ def test_a_full_narration_is_sent_on_the_second_click():
 
 
 def test_narrate_again_reads_as_a_paid_button_without_the_character_count():
-    assert '<button class="tw-go paid" type="button" data-v="${esc(n.voice_id)}" disabled>Narrate again (paid)</button>' in PAGE
-    assert 'This makes another full narration and is charged again.' in PAGE
+    assert '<button class="tw-go paid" type="button" data-v="${esc(n.voice_id)}" disabled>Narrate again with this tag (paid)</button>' in PAGE
+    assert "${n.behind?'Also uses the approved words (list '+esc(data.words.version)+'). ':''}One narration, charged once." in PAGE   # one call carries both
     assert 'narrate again — paid, ~' not in PAGE and "again with the final words · paid, ~" not in PAGE
     assert '.v2 button.paid{' in PAGE and '.v2 button.armed,.v2 .foot .go.armed{' in PAGE   # 23 Nov 2026: every armed button turns red, also the bar's Narrate
 
@@ -40,3 +40,26 @@ def test_narrate_again_reads_as_a_paid_button_without_the_character_count():
 def test_the_button_is_off_without_a_tag_and_while_a_narration_is_being_made():
     assert "box.querySelector('.tw-t').addEventListener('input'" in PAGE
     assert 'A narration is being made' in PAGE and 'function making()' in PAGE
+
+
+def test_each_narrate_again_button_says_what_one_narration_carries():
+    """SK, 23 Nov: the two buttons name their action, and each says the other change travels in the same single narration."""
+    assert "Narrate again with the approved words (paid)</button>" in PAGE and "Keeps this narration's sentence tags. One narration, charged once." in PAGE
+    assert 'Narrate again (paid)' not in PAGE and 'charged again' not in PAGE   # older way retired: the bare label and the two "charged again" notes
+    web = (Path(__file__).resolve().parents[1] / 'app' / 'web.py').read_text(encoding='utf-8')
+    assert "user, run, outputs, body['voice_id'], rid, 'page', list(body.get('tweaks') or []) or None)" in web   # no tags sent: the stored ones are kept
+
+
+def test_a_tag_already_in_force_names_the_words_button_when_the_words_are_newer():
+    from app import voices
+    plain = voices.tag_in_force('[reassuring]', False)
+    assert plain == 'This sentence is already read as [reassuring]; pick a different tag. Nothing was narrated.'
+    assert voices.tag_in_force('[reassuring]', True) == plain + " To get the approved words, press 'Narrate again with the approved words'."
+
+
+def test_the_done_message_is_not_covered_by_the_script_box():
+    """SK, 23 Nov: the open directed script sat in the sticky top and covered the Final step's box."""
+    top = PAGE.split('<div class="top">', 1)[1].split('<div class="msg" id="msg">', 1)[0]
+    assert top.index('</div>\n<details id="scriptbox"') > top.index('id="dir"')   # the script box follows the top bar, outside it
+    assert "$('scriptbox').hidden=true;go('final');window.scrollTo(0,0);" in PAGE   # after the final: closed, and the box at the top is in view
+    assert '<b class="donehere">' in PAGE and "what is next for '+esc(code)+'</code></b> <button data-copy=" in PAGE and 'copyBind(tray)' in PAGE

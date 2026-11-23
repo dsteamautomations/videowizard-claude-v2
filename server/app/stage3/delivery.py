@@ -468,19 +468,53 @@ def clip_frames(clips, clip_id):
     return int(round(float(c.get('duration_s') or 0) * float(Fraction(str(c.get('fps') or 25))))) or None
 
 
+MATCH_WORDS = {'direct': 'matches the words', 'b_roll': 'B-roll', 'library': 'library clip'}
+CROP_PURPOSE = {'solver': 'keeps the person who speaks to the camera out of the frame; the work stays in view', 'hands_only': 'tight on the hands'}
+
+
+def shot_info(ev, r, master):
+    """SK, 23 Nov 2026 (VW-25, Phase 4b): what the editor is told about a camera cut besides its numbers: its name on the review page and the
+    words under it, exact match or B-roll, the crop and what the crop is for (so it can be refined knowing what must stay in and out), the
+    warnings, and what the operator decided at review. A master built before this release has no name: the rest is still said."""
+    s = ev.get('shot') or {}
+    d = ((master or {}).get('decisions') or {}).get(str(s.get('slide'))) or {}
+    review = [x for x in (f"trimmed by the operator ({d.get('edit_text') or ev['edited']})" if ev.get('edited') else '',
+                          ('the operator chose this clip in place of ' + ('an AI shot' if ev['swapped_from'] == 'AI' else ev['swapped_from'])) if ev.get('swapped_from') else '',
+                          f"taken from alternative {ev['from_alternative']}: the operator rejected the first choice" if ev.get('from_alternative') else '',
+                          f"the operator's note: {d['note']}" if d.get('note') else '') if x]
+    cropped = ev.get('crop') in CROP_PURPOSE and r.get('crop_rect')
+    return {'name': s.get('title'), 'slide': s.get('slide'), 'words': s.get('words'), 'match': MATCH_WORDS.get(s.get('match'), s.get('match')),
+            'crop': {'rect': r['crop_rect'], 'purpose': CROP_PURPOSE[ev['crop']]} if cropped else None,
+            'warnings': list(r.get('risk_flags') or []), 'review': review, 'hold_last_frame': bool(ev.get('hold_last_frame'))}
+
+
+def shot_note(info):
+    """The same in short form, for the marker's note and the cut list."""
+    c = info['crop']
+    return '; '.join(x for x in (info['name'], info['match'], f"words: “{info['words']}”" if info['words'] else '',
+                                 f"crop: {c['purpose']} (x {c['rect'][0]:g}, y {c['rect'][1]:g}, w {c['rect'][2]:g}, h {c['rect'][3]:g} of the frame)" if c else '',
+                                 'warnings: ' + ', '.join(info['warnings']) if info['warnings'] else '', *info['review'],
+                                 'hold the last frame to fill the shot (freeze it in Resolve)' if info['hold_last_frame'] else '') if x)
+
+
 def resolve_events(assembly, pk, master, clips=None):
     """What the Resolve timeline must contain: per event the file, source in/out, record in/out, zoom/pan/tilt/rotation, marker, colour group,
-    the file's length (clips: the media summary's clips by id)."""
+    the file's length (clips: the media summary's clips by id). SK, 23 Nov 2026: and for a camera cut its `shot` block (shot_info); the marker
+    keeps the clip's id as its name and shows the readable name (`title`). Pan and tilt are pixels of the film's frame, as Resolve's own Pan
+    and Tilt are; the timeline file converts them to its unit."""
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     out = []
     for ev in assembly['events']:
         if ev['kind'] == 'event':
             r = rows[ev['sub_clip_id']]
             crop = ev.get('crop') in ('solver', 'hands_only') and r.get('zoom')
+            info = shot_info(ev, r, master)
+            said = {'shot': info, 'hold_last_frame': info['hold_last_frame']}
+            mark = lambda lead: {'name': ev['sub_clip_id'], 'title': info['name'] or ev['sub_clip_id'], 'note': '; '.join(x for x in (lead, shot_note(info)) if x), 'colour': 'Blue'}
             if ev.get('stabilize'):   # the stabilised render is the source; crop and zoom are already applied in it
                 out.append({'file': layout('normalised', f"{ev['sub_clip_id'].replace(':', '-')}-{ev['timeline_in_frame']}.mp4"), 'kind': 'camera', 'clip_id': r['clip_id'], 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'],
                             'record_in_frame': ev['timeline_in_frame'], 'record_out_frame': ev['timeline_out_frame'], 'source_fps': str(pk['timeline']['fps']), 'zoom': 1.0, 'pan': 0.0, 'tilt': 0.0,
-                            'rotation': 0.0, 'color_group': r.get('color_group'), 'marker': {'name': ev['sub_clip_id'], 'note': f"option #{ev.get('approved_from_option')}, stabilised copy", 'colour': 'Blue'},
+                            'rotation': 0.0, 'color_group': r.get('color_group'), 'marker': mark(f"option #{ev.get('approved_from_option')}, stabilised copy"), **said,
                             'a2': ev.get('a2_intervals') or [], 'stabilized': True,   # review 27 Oct: the clip id for the relink list; the nat sound stays on the original, in the original's frames
                             'a2_file': layout('original', r['clip_name']), 'a2_source_fps': r['source_fps'], 'a2_source_in_frame': ev['source_in_frame'],
                             'source_frames': ev['timeline_frames'], 'a2_source_frames': clip_frames(clips, r['clip_id'])})
@@ -488,7 +522,7 @@ def resolve_events(assembly, pk, master, clips=None):
             out.append({'file': layout('original', r['clip_name']), 'kind': 'camera', 'clip_id': r['clip_id'], 'source_in_frame': ev['source_in_frame'], 'source_out_frame': ev['source_out_frame'],
                         'record_in_frame': ev['timeline_in_frame'], 'record_out_frame': ev['timeline_out_frame'], 'source_fps': r['source_fps'],
                         'zoom': r['zoom'] if crop else 1.0, 'pan': (r['position'] or [0, 0])[0] if crop else 0.0, 'tilt': (r['position'] or [0, 0])[1] if crop else 0.0,
-                        'rotation': r.get('horizon_rotation_deg') or 0.0, 'color_group': r.get('color_group'), 'marker': {'name': ev['sub_clip_id'], 'note': f"option #{ev.get('approved_from_option')}", 'colour': 'Blue'},
+                        'rotation': r.get('horizon_rotation_deg') or 0.0, 'color_group': r.get('color_group'), 'marker': mark(f"option #{ev.get('approved_from_option')}"), **said,
                         'a2': ev.get('a2_intervals') or [], 'stabilized': False, 'source_frames': clip_frames(clips, r['clip_id'])})
         else:
             name = ev['shot_id'] + '.mp4'   # review 27 Oct: the file assembly rendered and the bundle carries (a still is rendered to an .mp4 too)

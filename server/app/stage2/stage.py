@@ -13,8 +13,9 @@ from pathlib import Path
 from psycopg.types.json import Jsonb
 
 from .. import core, film, jobs, runlog
+from ..clip_log import solver
 from ..errors import Problem
-from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, looks, narration as NR, package as P, slides as SL, validator as V
+from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, ledger as LG, looks, narration as NR, package as P, review as RV, slides as SL, validator as V
 
 def timeline(run):
     """design/139 R1: the cut's timeline from the operator's recorded shape and rate; a film from before keeps 1920 x 1080 at 25."""
@@ -141,7 +142,12 @@ def library(conn, store, user, run, outputs):
     return out
 
 
-def need_scenes(approved, words=None, process_stages=None):
+CHAPTERS_UNKNOWN = ('`chapters_unknown` lists the chapter names the clip studies carry that are not chapters of this film (a study reused from another film keeps '
+                    "that film's names); their pieces fit no scene by chapter until the scenes file maps them. Add `chapter_map` to out/scenes.json: each name with the chapter of "
+                    'this film that shows the same thing (`nearest` is a hint, not an answer), or "" when none does; show the map to the operator with the scenes.')
+
+
+def need_scenes(approved, words=None, process_stages=None, unknown=None):
     """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph.
     Defect 53 (VW-24, 15 Nov 2026): a scene names its first word by its id, and the ids were only in the options files, which exist after this
     step has prepared. The refusal now carries what a scene split is made from: every sentence with the id of its first word, the shape of the
@@ -150,11 +156,11 @@ def need_scenes(approved, words=None, process_stages=None):
         extra = {}
         if words:
             extra = {'sentences': [{'first_word_id': words[a]['id'], 'last_word_id': words[b]['id'], 'text': ' '.join(w['text'] for w in words[a:b + 1])} for a, b in NR.sentence_ranges(words)],
-                     'shape': P.SCENES_SHAPE, 'process_stages': list(process_stages or [])}
+                     'shape': P.SCENES_SHAPE, 'process_stages': list(process_stages or []), **({'chapters_unknown': unknown} if unknown else {})}
         raise Problem(422, 'SCENES_NOT_APPROVED', 'No scene split is approved yet. A scene starts at the first word of a sentence: `sentences` in this answer lists every sentence '
                       'with the id of its first word (first_word_id) and of its last (for a pause after it), `shape` is the form of out/scenes.json, and `process_stages` '
                       'are the brief\'s chapters. Propose the scenes to the operator, write out/scenes.json, record it with '
-                      '`vw options scenes --file out/scenes.json --quote "<their words>"`, then prepare again.', **extra)
+                      '`vw options scenes --file out/scenes.json --quote "<their words>"`, then prepare again.' + (' ' + CHAPTERS_UNKNOWN if unknown else ''), **extra)
     return approved
 
 
@@ -176,18 +182,10 @@ def prepare(conn, store, user, run, outputs):
         fail('The script has no beats; re-record the script on this build.')
     session = session_of(store, run, create=True)
     words = timing['words']
-    approved = need_scenes(session.get('scenes'), words, production.get('process_stages'))
-    duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
-    try:
-        plan, to_tl = NR.plan(words, duration, timeline(run)['fps'], approved['document'].get('pauses') or [])
-        windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, timeline(run)['fps'])
-    except ValueError as exc:
-        fail(exc)
-    narration = {**plan, 'scenes_approved': bool(approved), 'words': NR.word_rows(words, timeline(run)['fps'], to_tl),
-                 'sentences': NR.sentences(words, timeline(run)['fps'], to_tl), 'silences': NR.silences(words, timeline(run)['fps'], to_tl, plan['total_frames']),
-                 'pause_rules': {'only_after_sentence_end': True, 'max_seconds': NR.MAX_PAUSE_S, 'seconds_means': 'total silence wanted; the recording\'s own gap counts toward it'}}
     clips = {c['id']: c for c in media_o['summary']['clips']}
-    cards, rows, landmarks, entities, policy, identities = [], [], set(), [], None, []
+    cards, rows, landmarks, entities, policy, identities, other_count = [], [], set(), [], None, [], []
+    from ..analysis import sentence_beats
+    spoken_script = [b['text'] for b in sentence_beats(script)]   # the sentences the clip study numbered
     for o in outputs:
         if o['stage'] != 'analysis' or o['unit'] is None or o['summary'].get('excluded'):
             continue
@@ -198,9 +196,13 @@ def prepare(conn, store, user, run, outputs):
         log, clip = doc['log'], clips.get(o['unit'])
         if not clip:
             continue
+        if log.get('sub_clips'):   # SK, 23 Nov 2026 (VW-25): which pieces are allowed is the server's own rule and costs nothing; a stored study is judged by today's rule, under the policy it was studied with
+            solver.solve(log, (log['sub_clips'][0].get('stage15') or {}).get('policy') or doc['identity'].get('speaker_policy') or {}, clip, timeline(run))
         policy = policy or (doc['identity'].get('speaker_policy') or {})
         identities.append(doc['identity'])
-        by_sentence = int(doc['identity'].get('sentences') or 0) if doc['identity'].get('fit_unit') == 'sentence' else 0   # design/193
+        by_sentence = P.study_sentences(doc['identity'], len(spoken_script))   # design/193; 0 for a study of another count of sentences (23 Nov 2026)
+        if doc['identity'].get('fit_unit') == 'sentence' and not by_sentence:
+            other_count.append(clip['name'])
         cards.append({'clip_id': clip['id'], 'clip_name': clip['name'], 'descriptive_name': log.get('descriptive_name'), 'lines': log.get('summary_card_lines') or []})
         for sub in log.get('sub_clips') or []:
             rows.append(P.sub_clip_row(clip, log, sub, timeline(run)['fps'], by_sentence))
@@ -211,9 +213,23 @@ def prepare(conn, store, user, run, outputs):
     grouped = looks.groups({o['unit']: o['summary'].get('look') for o in outputs if o['stage'] == 'analysis' and o['unit'] is not None and not o['summary'].get('excluded')})
     for r in rows:   # design/142 R5: the colour group is the server's own measure, not the analysis's label
         r['color_group'] = grouped.get(r['clip_id'])
-    unit, fit_note = P.fit_unit(identities, len(narration['sentences']))   # design/193: by sentence only when every clip was studied so and the counts agree
-    if unit == 'sentence':
-        P.scene_fits_by_sentence(rows, windows, narration['sentences'])
+    stages = production.get('process_stages') or []
+    unknown = P.apply_chapter_map(rows, stages, ((session.get('scenes') or {}).get('document') or {}).get('chapter_map') or {})   # 23 Nov 2026 (VW-25): a reused study carries another film's chapter names
+    approved = need_scenes(session.get('scenes'), words, stages, unknown)
+    duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
+    try:
+        plan, to_tl = NR.plan(words, duration, timeline(run)['fps'], approved['document'].get('pauses') or [])
+        windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, timeline(run)['fps'])
+    except ValueError as exc:
+        fail(exc)
+    narration = {**plan, 'scenes_approved': bool(approved), 'words': NR.word_rows(words, timeline(run)['fps'], to_tl),
+                 'sentences': NR.sentences(words, timeline(run)['fps'], to_tl), 'silences': NR.silences(words, timeline(run)['fps'], to_tl, plan['total_frames']),
+                 'pause_rules': {'only_after_sentence_end': True, 'max_seconds': NR.MAX_PAUSE_S, 'seconds_means': 'total silence wanted; the recording\'s own gap counts toward it'}}
+    unit, fit_note = P.fit_unit(identities)   # design/193: by sentence only when every clip was studied so
+    if unit == 'sentence':   # 23 Nov 2026 (VW-25): the script's sentences are paired with the narration's by their words; a count difference costs no other sentence its fits
+        pair = P.pair_sentences(spoken_script, [s['text'] for s in narration['sentences']])
+        fit_note = P.pairing_note(spoken_script, len(narration['sentences']), pair, [f for r in rows for f in r.get('sentence_fits') or []], other_count)
+        P.scene_fits_by_sentence(rows, windows, narration['sentences'], pair)
     else:
         for r in rows:   # by paragraph: a sentence number means nothing here
             r.pop('sentence_fits', None)
@@ -236,7 +252,7 @@ def prepare(conn, store, user, run, outputs):
     eligible = sum(1 for r in rows if r['eligibility'].startswith('ELIGIBLE'))
     return {'package': saved, 'beats': len(windows), 'clips': len(cards), 'sub_clips': len(rows), 'eligible_sub_clips': eligible, 'coverage': pk['coverage'],
             'learned_rules': len(rules), 'scenes_approved': bool(approved), 'pauses': len(plan['cuts']), 'sentences': len(narration['sentences']),
-            **skipped_note(run), 'next': prepare_next(bool(approved))}
+            **({'fit_note': fit_note} if fit_note else {}), **({'chapters_unknown': unknown, 'chapters_note': CHAPTERS_UNKNOWN + ' Then record the scenes again.'} if unknown else {}), **skipped_note(run), 'next': prepare_next(bool(approved))}
 
 
 def prepare_next(approved):
@@ -258,7 +274,7 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     stages = (brief_o['summary'].get('production') or {}).get('process_stages') or []
     duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
     try:
-        document = {**document, 'scenes': NR.normalise_scenes(document.get('scenes'))}
+        document = {**document, 'scenes': NR.normalise_scenes(document.get('scenes')), 'chapter_map': P.chapter_map_of(document, stages)}
         NR.validate_scenes(words, document.get('scenes'), stages)
         intake_o = next((o for o in outputs if o['stage'] == 'intake' and o['unit'] is None), None)
         NR.scenes_cover(document.get('scenes'), stages, document.get('dropped_chapters'), ((intake_o or {}).get('summary') or {}).get('intended_visuals'))   # design/142 R8, R9
@@ -268,7 +284,7 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
         fail(exc)
     session = session_of(store, run, create=True)
     version = (session.get('scenes') or {}).get('version', 0) + 1
-    record = {'version': version, 'document': {'scenes': document['scenes'], 'pauses': document.get('pauses') or [], 'dropped_chapters': document.get('dropped_chapters') or []}, 'quote': quote, 'by': user['id'],
+    record = {'version': version, 'document': {'scenes': document['scenes'], 'pauses': document.get('pauses') or [], 'dropped_chapters': document.get('dropped_chapters') or [], 'chapter_map': document['chapter_map']}, 'quote': quote, 'by': user['id'],
               'at': datetime.now(timezone.utc).isoformat()}
     saved = save_json(store, key(run, f'scenes-v{version}.json'), record)
     session['scenes'] = {**record, 'file': saved, 'digest': digest(record['document'])}
@@ -345,6 +361,7 @@ def propose(conn, store, user, run, doc):
     result = V.validate_options(work, pk, session['package']['policy'])
     result['refusals'] += V.cut_reasons(doc, {r['sub_clip_id']: r for r in pk['sub_clips']})   # design/142 R2
     if result['refusals']:
+        LG.write(None, run, len(session['versions']) + 1, LG.refusal_rows(pk, result['refusals']))   # its own connection: the request's is rolled back
         _bump(conn, run, 'options', result['refusals'])
     for o in work['options']:
         for ev in o['events']:
@@ -358,6 +375,7 @@ def propose(conn, store, user, run, doc):
     identity = digest(work)
     session['versions'].append({'version': version, 'file': saved, 'digest': identity, 'flags': result['flags'], 'options': len(work['options']), 'gaps': [],   # design/129 old way 10: a declared gap is refused at propose (design/125 P13)
                                 'slides': slides, 'scenes': scenes, 'second_look': second})
+    LG.write(conn, run, version, LG.rows(pk, work))   # the clip ledger, builder only: why each piece was or was not used
     session['current'] = identity
     session['accepted'] = None
     session['decisions'] = {}
@@ -646,8 +664,12 @@ def slide_label(value):
 
 
 ANSWERED = ('shot', 'alternative')   # design/127: the rows answered KEEP / REJECT (/ TRIM); the one AI shot of an all-AI scene too
-RETIRED_ACTIONS = {'KEEP_WITH_EDIT': 'KEEP_WITH_EDIT is retired: use TRIM on the shot (--edit "in:±frames,out:±frames").',
+RETIRED_ACTIONS = {'KEEP_WITH_EDIT': 'KEEP_WITH_EDIT is retired: use TRIM on the shot (--edit "start:seconds,end:seconds").',
                    'DROP': 'DROP is retired: answer the shot KEEP, REJECT or TRIM.'}
+# SK, 23 Nov 2026 (VW-25): a trim is said in seconds. Older way kept until the next release: source frames.
+TRIM_NEEDS = ('TRIM needs --edit "start:<seconds>,end:<seconds>": start later by, end earlier by; a minus value lengthens that end (start:0.5,end:0 starts half a second later). '
+              'Older way, kept until the next release: "in:±frames,out:±frames" in source frames.')
+FRAMES_EDIT = re.compile(r'^\s*(in|out):[+-]?\d+(\s*,\s*(in|out):[+-]?\d+)?\s*$')
 
 
 def _action(decisions, slide):
@@ -695,7 +717,7 @@ def _slide_rows(sl, decisions, fps):
         needs, why = needs_answer(s, sl, decisions)
         rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'library', 'note', 'of', 'ai_only', 'intent', 'marker_reasons', 'flags')},
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
-                     'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
+                     'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'edit_text', 'swap', 'by', 'at')} if d else None)})
     return rows
 
 
@@ -708,8 +730,117 @@ def slides_view(store, run):
     """Every row of the current version with the answer so far, and the labels still waiting (design/44 8.1)."""
     session = session_of(store, run)
     doc, entry = current(store, session)
-    rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {}, timeline(run)['fps'])
-    return {'version': entry['version'], 'slides': rows, **_progress(rows)}
+    sl = _slides(store, session, doc, entry)
+    rows = _slide_rows(sl, session.get('decisions') or {}, timeline(run)['fps'])
+    return {'version': entry['version'], 'slides': rows, **_progress(rows), 'balance': _balance(store, run, session, doc, sl)}
+
+
+def _balance(store, run, session, doc, sl):
+    """SK, 23 Nov 2026 (VW-25): the scenes a trim left short or long, each with the shots that can take the time (review.balance).
+    [] without a trim: a view with none reads nothing more."""
+    decisions = session.get('decisions') or {}
+    if not any(d.get('action') == 'TRIM' for d in decisions.values()):
+        return []
+    pk = _package(store, session)
+    return RV.balance((doc or current(store, session)[0])['options'], decisions, sl, {r['sub_clip_id']: r for r in pk['sub_clips']},
+                      {b['beat_id']: b['target_beat_frames'] for b in pk['beats']}, timeline(run)['fps'])
+
+
+def _row_named(sl, slide_no):
+    lab = slide_label(slide_no)
+    return lab, next((x for x in sl if str(x['no']).upper() == lab), None)
+
+
+def _shot_event(doc, s):
+    return next(o for o in doc['options'] if o['option_number'] == s['option_number'])['events'][s['event_index']]
+
+
+def _in_cut(sl, decisions, but=None):
+    """The pieces in the cut as answered so far: every shot not rejected or swapped, a kept alternative of a rejected shot, a swapped-in piece.
+    `but`: a row left out (its own piece is the one being replaced)."""
+    out = set()
+    for s in sl:
+        d = decisions.get(str(s['no'])) or {}
+        if str(s['no']) == but:
+            continue
+        if d.get('action') == 'SWAP':
+            out.add(d['swap']['sub_clip_id'])
+        elif s['type'] == 'shot' and d.get('action') != 'REJECT':
+            out.add(s.get('sub_clip_id'))
+        elif s['type'] == 'alternative' and d.get('action') == 'KEEP' and needs_answer(s, sl, decisions)[0]:
+            out.add(s.get('sub_clip_id'))
+    return out
+
+
+def _swap_row(sl, lab):
+    s = next((x for x in sl if str(x['no']).upper() == lab), None)
+    if not s or not (s['type'] == 'shot' or (s['type'] == 'ai' and s.get('ai_only'))):
+        fail(f'Other clips are for a footage shot or the AI shot of an all-AI scene; #{lab} is neither.')
+    return s
+
+
+def others(store, run, slide_no):
+    """SK, 23 Nov 2026 (VW-25): "Other clips" of one row, a footage shot or the AI shot of an all-AI scene ("Find footage"): the scene's allowed
+    pieces in the server's one order (package.ranked: the assistant's files, the ledger and this list read it), each with whether it can be
+    used on this row and, when not, why. A read; the page and `vw master others` call it."""
+    session = session_of(store, run)
+    doc, entry = current(store, session)
+    sl = _slides(store, session, doc, entry)
+    lab = slide_label(slide_no)
+    s = _swap_row(sl, lab)
+    pk = _package(store, session)
+    rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
+    bid = next(o for o in doc['options'] if o['option_number'] == s['option_number'])['beat_id']
+    decisions = session.get('decisions') or {}
+    used, fps, clips = _in_cut(sl, decisions, lab), timeline(run)['fps'], session['package'].get('clips') or {}
+    chosen = ((decisions.get(lab) or {}).get('swap') or {}).get('sub_clip_id')
+    pieces = []
+    for x in P.ranked(pk['sub_clips'], next(b for b in pk['beats'] if b['beat_id'] == bid), used):
+        if x['sub_clip_id'] == s.get('sub_clip_id'):   # the row's own piece: Keep brings it back
+            continue
+        row = rows[x['sub_clip_id']]
+        fit = RV.fit_piece(row, s['frames'], fps, partial=s['type'] == 'ai')
+        a, z = (row['in_frame'], row['out_frame']) if isinstance(fit, str) else fit[:2]
+        k, src = clip_key(run, clips.get(row['clip_id']) or {'name': row.get('clip_name')}), Fraction(str(row['source_fps']))
+        in_cut = x['sub_clip_id'] in used
+        pieces.append({**x, 'clip': row.get('clip_name'), 'what': row.get('what'), 'chapter': row.get('process_stage'), 'grade': row.get('grade'), 'flags': list(row.get('risk_flags') or []),
+                       'library': bool(row.get('library')), 'chosen': x['sub_clip_id'] == chosen, 'in_cut': in_cut, 'can': not in_cut and not isinstance(fit, str),
+                       'why': 'already in the cut' if in_cut else fit if isinstance(fit, str) else '',
+                       # a library clip's file is in another film's folder, which this film's page does not serve: no preview
+                       'media': {'key': k if k.startswith(f"{run['id']}/") else None, 'in_s': round(float(a / src), 2), 'out_s': round(float(z / src), 2)}})
+    return {'slide': lab, 'title': s['title'], 'seconds': round(s['frames'] / fps, 2), 'pieces': pieces,
+            'empty': '' if pieces else 'No clip fits this scene. Keep AI.' if s['type'] == 'ai' else 'No other clip fits this scene.'}
+
+
+def trim_room(store, run, slide_no):
+    """What the trim form says before the operator types: the shot's length and how much it can lose and gain, in seconds. A read."""
+    session = session_of(store, run)
+    doc, entry = current(store, session)
+    lab, s = _row_named(_slides(store, session, doc, entry), slide_no)
+    if not s or s['type'] != 'shot':
+        fail(f'A trim is for a footage shot; #{lab} is not one.')
+    ev = _shot_event(doc, s)
+    return {'slide': lab, 'text': RV.room_text(ev['source_in_frame'], ev['source_out_frame'], _row(store, session, ev['sub_clip_id'])[1])}
+
+
+def _swap(run, session, pk, doc, sl, s, sub_clip_id):
+    """SWAP: the piece the operator chose under Other clips, fitted to the row's length around its main action (review.fit_piece); refused
+    with the reason when it cannot be used there. Returns what the master places."""
+    if not sub_clip_id:
+        fail('SWAP needs the piece: --sub <sub-clip id>, from `vw master others --slide <label>`.')
+    row = next((r for r in pk['sub_clips'] if r['sub_clip_id'] == sub_clip_id), None)
+    if not row:
+        fail(f'{sub_clip_id} is not a piece of this film.')
+    if sub_clip_id in _in_cut(sl, session['decisions'], str(s['no'])):
+        fail(f'{sub_clip_id} is already in the cut.')
+    if not str(row.get('eligibility')).startswith('ELIGIBLE'):
+        fail(f"{sub_clip_id} is not allowed in the film ({row.get('eligibility')}).")
+    fit = RV.fit_piece(row, s['frames'], timeline(run)['fps'], partial=s['type'] == 'ai')
+    if isinstance(fit, str):
+        fail(f"{sub_clip_id} cannot be used on {s['title']}: {fit}.")
+    kind = P.rank_kind(row, next(o for o in doc['options'] if o['option_number'] == s['option_number'])['beat_id'])
+    return {'sub_clip_id': sub_clip_id, 'source_in_frame': fit[0], 'source_out_frame': fit[1], 'timeline_frames': fit[2], 'crop': 'solver' if row['eligibility'] == 'ELIGIBLE_WITH_CROP' else 'full',
+            'match': 'library' if row.get('library') else 'direct' if kind in ('exact', 'partly') else 'b_roll', 'clip': row.get('clip_name')}
 
 
 def slide_cues(plan, fps):
@@ -775,7 +906,7 @@ def review_view(conn, store, run):
     return {'state': 'prepared', 'version': entry['version'], 'digest': entry['digest'], 'slides': rows, **_progress(rows), 'film': film, 'cues': cues,
             'render': ({'status': r.get('status'), 'error': r.get('error'), 'current': is_current} if r else None),
             'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'approved_by': accepted.get('approved_by'), 'master_built': bool(session.get('master')),
-            'second_look': entry.get('second_look')}   # design/129 P4
+            'second_look': entry.get('second_look'), 'balance': _balance(store, run, session, None, sl)}   # design/129 P4
 
 
 def master_state(master, render, exists):
@@ -809,8 +940,8 @@ def _refuse_answer(s, sl, decisions, lab, action, edit):
     """design/127: the answer each row takes, refused by name otherwise."""
     if action in RETIRED_ACTIONS:
         fail(RETIRED_ACTIONS[action])
-    if action not in ('KEEP', 'REJECT', 'TRIM'):
-        fail('action must be KEEP, REJECT or TRIM')
+    if action not in ('KEEP', 'REJECT', 'TRIM', 'SWAP'):
+        fail('action must be KEEP, REJECT, TRIM or SWAP')
     if s['type'] == 'scene':
         shots = [x['no'] for x in sl if x['number'] == s['number'] and x['type'] == 'shot']
         fail(f"Scene {s['number']} is a header: decide its shots: {', '.join(shots)}." if shots else
@@ -822,16 +953,19 @@ def _refuse_answer(s, sl, decisions, lab, action, edit):
     if action == 'TRIM' and s['type'] != 'shot':
         fail(f"TRIM is for a footage shot; {s['title']} takes KEEP or REJECT.")
     if action == 'TRIM' and not edit:
-        fail('TRIM needs --edit "in:±frames,out:±frames" (source frames; a frame is 1/25 s on the timeline).')
+        fail(TRIM_NEEDS)
+    if action == 'SWAP':
+        _swap_row(sl, lab)
     if s['type'] == 'alternative':
         needs, why = needs_answer(s, sl, decisions)
         if not needs:
             fail(why + ': its alternatives open when it is rejected.' if why.startswith('answer') else why + '.')
 
 
-def decide(conn, store, user, run, slide_no, action, note, edit):
+def decide(conn, store, user, run, slide_no, action, note, edit, sub_clip_id=None):
     """design/127: the operator answers by row: a footage shot KEEP, REJECT or TRIM; the AI shot of an all-AI scene KEEP (Keep AI) or REJECT
-    (Find footage); an alternative KEEP or REJECT once its shot is rejected. design/98: the first answer approves the options (the options output
+    (Find footage); an alternative KEEP or REJECT once its shot is rejected. SK, 23 Nov 2026 (VW-25): SWAP puts another piece on a footage shot or
+    on an all-AI scene (`sub_clip_id`, from `others`); a TRIM is in seconds and is checked here, when it is recorded, not at the master. design/98: the first answer approves the options (the options output
     recorded in the same call, once the review film is rendered); a REJECT needs no reason."""
     session = session_of(store, run)
     doc, entry = current(store, session)
@@ -842,6 +976,17 @@ def decide(conn, store, user, run, slide_no, action, note, edit):
     if not s:
         fail(f"No slide #{lab}: the labels are now " + ', '.join(f"{x['no']} ({x['title']})" for x in sl if _answerable(x)) + '.')
     _refuse_answer(s, sl, session['decisions'], lab, action, edit)
+    more = {}
+    if action == 'SWAP':
+        more = {'swap': _swap(run, session, _package(store, session), doc, sl, s, sub_clip_id)}
+    if action == 'TRIM':
+        ev = _shot_event(doc, s)
+        row = _row(store, session, ev['sub_clip_id'])[1]
+        edit = RV.seconds_edit(edit, row) or str(edit)
+        if not FRAMES_EDIT.match(edit):
+            fail(TRIM_NEEDS)
+        _trim(deepcopy(ev), edit, row, timeline(run)['fps'], s['title'])
+        more = {'edit': edit, 'edit_text': RV.edit_text(edit, row)}
     approved_now = not session.get('accepted')
     if approved_now:   # design/98 D2: the first answer approves these options, with what was answered
         record_options(conn, store, user, run, f'Approved by answering the review slides: first answer #{lab} {action}' + (f' — {note.strip()}' if str(note or '').strip() else ''),
@@ -849,12 +994,12 @@ def decide(conn, store, user, run, slide_no, action, note, edit):
         session = session_of(store, run)
     if action == 'REJECT' and s.get('library') and s.get('sub_clip_id'):   # design/147 L4 (E9): a rejected library proposal is not offered again on this film
         session['library_rejected'] = sorted(set(session.get('library_rejected') or []) | {s['sub_clip_id']})
-    session['decisions'][lab] = {'action': action, 'type': s['type'], **({'edit': edit} if action == 'TRIM' else {}),
+    session['decisions'][lab] = {'action': action, 'type': s['type'], **more,
                                  'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session['master'] = None
     save_session(store, run, session)
     progress = _progress(_slide_rows(sl, session['decisions'], timeline(run)['fps']))
-    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': progress['answered'], 'of': progress['of'],
+    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': progress['answered'], 'of': progress['of'], **more,
             **({'options_approved': True} if approved_now else {})}
 
 
@@ -870,30 +1015,30 @@ def add_rule(store, user, run, text, quote=''):
     return {'rules': len(session['extra_rules'])}
 
 
-def _parse_edit(edit):
-    out = {'in': 0, 'out': 0}
-    for part in str(edit).split(','):
-        k, _, v = part.strip().partition(':')
-        if k in out:
-            out[k] = int(v)
-    return out
-
-
 def _trim(ev, edit, row, tl_fps, title):
     """design/127: TRIM on one footage shot: its in and out moved by source frames, inside its usable window, its action peak and its hold."""
-    e = _parse_edit(edit)
+    e = RV.parse_edit(edit)
+    room = '. ' + RV.room_text(ev['source_in_frame'], ev['source_out_frame'], row)   # SK, 23 Nov 2026: a refused trim says what the shot can lose and gain
     a, z = ev['source_in_frame'] + e['in'], ev['source_out_frame'] + e['out']
     if not (row['in_frame'] <= a < z <= row['out_frame']):
-        fail(f"the trim leaves {title} outside its usable window {row['in_frame']}-{row['out_frame']}")
+        fail(f"the trim leaves {title} outside its usable window {row['in_frame']}-{row['out_frame']}" + room)
     peak = row.get('action_peak')
     if peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
-        fail(f"the trim drops the action peak {peak['in_frame']}-{peak['out_frame']} of {title}")
+        fail(f"the trim drops the action peak {peak['in_frame']}-{peak['out_frame']} of {title}" + room)
     if (z - a) / Fraction(row['source_fps']) < row['min_hold_s']:
-        fail(f"the trim makes {title} shorter than its hold {row['min_hold_s']} s")
+        fail(f"the trim makes {title} shorter than its hold {row['min_hold_s']} s" + room)
     ev['source_in_frame'], ev['source_out_frame'] = a, z
     ev['timeline_frames'] = int(round((z - a) * Fraction(str(tl_fps)) / Fraction(row['source_fps'])))
     ev['edited'] = edit
     return ev
+
+
+SWAP_KEYS = ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop', 'match')   # what a swapped-in piece gives the master
+
+
+def _shot_name(s, ev):
+    """SK, 23 Nov 2026 (Phase 4b): what the editor is told a cut is: its row on the review page, its name, the words under it, how it matches them."""
+    return {'slide': s['no'], 'title': s['title'], 'words': s.get('words') or '', 'match': ev.get('match')}
 
 
 def _overview(card):
@@ -920,23 +1065,34 @@ def build_master(conn, store, user, run):
         fail(f"Every shot needs an answer; missing: {', '.join(missing)}")
     row_of = {(s['option_number'], s['type'], s.get('event_index'), s.get('alt_index')): s for s in sl}
     fps = timeline(run)['fps']
-    kept = {}
+    kept, turned = {}, {}
     for o in deepcopy(doc['options']):
         n_scene = row_of[(o['option_number'], 'scene', None, None)]['number']
         events = []
         for i, ev in enumerate(o['events']):
             if ev.get('blank'):
                 s = row_of[(o['option_number'], 'ai', i, None)]
+                if s.get('ai_only') and _action(decisions, s) == 'SWAP':   # SK, 23 Nov 2026: Find footage chose a piece; AI keeps what the piece does not fill
+                    sw = decisions[s['no']]['swap']
+                    events.append({**{k: sw[k] for k in SWAP_KEYS}, 'swapped_from': 'AI', 'shot': _shot_name(s, sw)})
+                    if ev['timeline_frames'] > sw['timeline_frames']:
+                        events.append({**ev, 'timeline_frames': ev['timeline_frames'] - sw['timeline_frames']})
+                    continue
                 if s.get('ai_only') and _action(decisions, s) == 'REJECT':
-                    fail(f"Scene {n_scene}: the operator asked to find footage (Find footage on {s['no']}): propose the scene again with footage "
-                         "(`vw options propose`), or the operator answers Keep AI.")
+                    fail(f"Scene {n_scene}: the operator asked to find footage (Find footage on {s['no']}): they pick a piece under Other clips "
+                         f"(`vw master others --slide {s['no']}`), or answer Keep AI, or the scene is proposed again with footage (`vw options propose`).")
                 events.append(ev)
                 continue
             s = row_of[(o['option_number'], 'shot', i, None)]
             act = _action(decisions, s)
             if act == 'TRIM':
                 ev = _trim(ev, decisions[s['no']]['edit'], rows[ev['sub_clip_id']], fps, s['title'])
+            if act == 'SWAP':   # SK, 23 Nov 2026: the operator's own choice under Other clips takes the shot's place and its length
+                sw = decisions[s['no']]['swap']
+                turned[(o['option_number'], i)] = f"the operator chose {sw['sub_clip_id']} instead"
+                ev = {**{k: sw[k] for k in SWAP_KEYS}, 'swapped_from': ev['sub_clip_id']}
             if act == 'REJECT':
+                turned[(o['option_number'], i)] = str((decisions.get(str(s['no'])) or {}).get('note') or '').strip()
                 alt = next((row_of[(o['option_number'], 'alternative', i, m)] for m in range(len(ev.get('alternatives') or []))
                             if _action(decisions, row_of[(o['option_number'], 'alternative', i, m)]) == 'KEEP'), None)
                 if alt:
@@ -948,7 +1104,7 @@ def build_master(conn, store, user, run):
                           'rejected': s['no'], 'title': s['title']}
             elif (ev.get('note') or {}).get('kind') == 'reuse':
                 ev['reuse_approved'] = True
-            events.append(ev)
+            events.append(ev if ev.get('blank') else {**ev, 'shot': _shot_name(s, ev)})
         total = sum(ev['timeline_frames'] for ev in events)
         target = next(b['target_beat_frames'] for b in beats if b['beat_id'] == o['beat_id'])
         if total != target:
@@ -990,7 +1146,8 @@ def build_master(conn, store, user, run):
             events.append({'kind': 'event', 'beat_id': b['beat_id'], 'approved_from_option': o['option_number'], **{k2: ev[k2] for k2 in ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_frames')},
                            'crop': ev.get('crop', 'full'), 'hold_last_frame': bool(ev.get('hold_last_frame')), 'a2_intervals': ev.get('a2_intervals') or [], 'marker': ev.get('marker'),
                            'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'edited': ev.get('edited'), 'reuse_approved': bool(ev.get('reuse_approved')),
-                           **({'from_alternative': ev['from_alternative']} if ev.get('from_alternative') else {})})
+                           **({'from_alternative': ev['from_alternative']} if ev.get('from_alternative') else {}),
+                           **({'swapped_from': ev['swapped_from']} if ev.get('swapped_from') else {}), 'shot': ev['shot']})
             cursor += n
     plan = {'contract': CONTRACT_MASTER, 'run_id': str(run['id']), 'options_version': entry['version'], 'options_digest': entry['digest'], 'timeline': timeline(run), 'events': events,
             'gaps': gaps, 'duration_frames': cursor, 'decisions': decisions, 'extra_rules': session['extra_rules'],
@@ -1004,6 +1161,7 @@ def build_master(conn, store, user, run):
     session['master'] = {'version': version, 'digest': digest(plan), 'file': saved, 'plan': plan, 'gaps': [g['shot_id'] for g in gaps], 'events': len([e for e in events if e['kind'] == 'event']), 'flags': result['flags']}
     session['renders'].pop('master', None)
     save_session(store, run, session)
+    LG.write(conn, run, entry['version'], [r for r in LG.rows(pk, doc, turned) if r['decided_by'] == 'operator'])   # the operator's Reject, with the note
     return {'version': version, 'events': session['master']['events'], 'gaps': session['master']['gaps'], 'flags': result['flags'], 'duration_frames': cursor,
             'next': '`vw master render`, fetch, let the operator watch, then `vw master record --quote`'}
 

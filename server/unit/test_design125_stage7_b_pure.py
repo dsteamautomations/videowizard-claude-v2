@@ -28,13 +28,16 @@ def test_p4_c0093_one_silent_worker_is_used_as_is():
     assert elig(sub([0.26, 0, 0.72, 1.0], [0.43, 0, 0.28, 0.16], [0, 0.05, 0.85, 0.95]))[0] == 'ELIGIBLE_AS_IS'
 
 
-def test_p4_a_visible_mouth_with_speech_heard_is_still_a_speaker():
+def test_p4_a_visible_mouth_with_speech_heard_is_cropped_when_a_clean_crop_exists():
     assert elig(sub([0.18, 0, 0.45, 0.45], [0.47, 0, 0.15, 0.2], [0, 0.25, 0.85, 0.65], speech=True))[0] == 'ELIGIBLE_WITH_CROP'   # cropped from the top, not as is
 
 
-def test_p4_a_person_looking_at_the_lens_with_no_feasible_crop_stays_rejected():
+def test_p4_retired_a_person_looking_at_the_lens_without_speaking_is_a_glance_not_a_speaker():
+    """SK, 23 Nov 2026 (VW-25): design/125 P4 took a look at the lens alone for the speaker and refused the piece; unit/test_speaker_rule_pure.py has the rule in force."""
     e, sol, _ = elig(sub([0.3, 0.2, 0.4, 0.8], [0.4, 0.3, 0.15, 0.2], [0.1, 0.1, 0.8, 0.8], mouth=False, lens=True))
-    assert e == 'REJECT_VIDEO_KEEP_AUDIO_CONTEXT' and sol['feasible'] is False
+    assert e == 'ELIGIBLE_AS_IS' and sol is None
+    e, sol, _ = elig(sub([0.3, 0.2, 0.4, 0.8], [0.4, 0.3, 0.15, 0.2], [0.1, 0.1, 0.8, 0.8], speech=True, lens=True))
+    assert e == 'REJECT_VIDEO_KEEP_AUDIO_CONTEXT' and sol['feasible'] is False   # looks at the lens and speaks, no feasible crop: stays out
 
 
 # ---------- P5: crop from the top or the bottom ----------
@@ -50,13 +53,14 @@ def test_p5_speaker_below_the_work_is_cropped_from_the_bottom():
 
 
 def test_p5_a_speaker_whose_head_overlaps_the_work_on_every_side_stays_rejected():
-    e, sol, _ = elig(sub([0.35, 0.3, 0.2, 0.6], [0.4, 0.4, 0.1, 0.1], [0.1, 0.1, 0.8, 0.8], speech=True))
+    e, sol, _ = elig(sub([0.35, 0.3, 0.2, 0.6], [0.4, 0.4, 0.1, 0.1], [0.1, 0.1, 0.8, 0.8], speech=True, lens=True))   # 23 Nov 2026: a speaker looks at the lens
     assert e == 'REJECT_VIDEO_KEEP_AUDIO_CONTEXT' and sol['feasible'] is False
+    assert elig(sub([0.35, 0.3, 0.2, 0.6], [0.4, 0.4, 0.1, 0.1], [0.1, 0.1, 0.8, 0.8], speech=True))[0] == 'ELIGIBLE_AS_IS'   # speaks away from the lens: used as it is
 
 
-def test_p5_a_top_crop_over_the_zoom_limit_stays_rejected():
+def test_p5_a_top_crop_over_the_zoom_limit_is_soft_to_165_and_rejected_beyond():
     sol = solver.compute_davinci_crop([0.55, 0.15, 0.3, 0.73], [0.0, 0.55, 0.65, 0.45], 1920, 1080, 1920, 1080, 1.35, head_box=[0.62, 0.15, 0.1, 0.2])
-    assert sol['feasible'] is False
+    assert sol['feasible'] is (sol.get('total_cumulative_zoom', 9) <= 1.65) and not sol.get('within_safe_zoom_limit')   # 23 Nov 2026: over 1.35 it is never "within the limit"
 
 
 # ---------- P6: up to 10 % of the area to keep may be trimmed at its edge ----------

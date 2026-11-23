@@ -1,0 +1,1005 @@
+[
+{
+"piece": "C0058_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "A",
+"what": "The man looks down at the terracotta Mangalore roof tile held in his left hand and repeatedly taps its underside with the metal trowel in his right hand before ",
+"roles": [
+"Worker_Silent"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": false,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.38,
+0.03,
+0.18,
+0.27
+],
+[
+0.26,
+0.03,
+0.52,
+0.97
+],
+[
+0.44,
+0.47,
+0.34,
+0.53
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0058_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The man looks directly toward the camera while holding the Mangalore roof tile and trowel steady, then speaks briefly to the camera operator around 4.0 s.",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.38,
+0.03,
+0.18,
+0.27
+],
+[
+0.26,
+0.03,
+0.52,
+0.97
+],
+[
+0.44,
+0.5,
+0.34,
+0.5
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0058_1 03",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "The man stands steady holding the Mangalore roof tile vertically in his left hand and the metal trowel rested against the tile in his right hand, looking toward",
+"roles": [
+"Worker_Silent"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.38,
+0.03,
+0.18,
+0.27
+],
+[
+0.26,
+0.03,
+0.52,
+0.97
+],
+[
+0.44,
+0.5,
+0.34,
+0.5
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0091_1 04",
+"was": "REJECT_ALL",
+"was_reason": null,
+"width": 1920,
+"height": 1080,
+"grade": "REJECT",
+"what": "Camera abruptly tilts up from the concrete panel revealing the mason leaning over, then whips rapidly left across the dirt work yard past a parked motorcycle, c",
+"roles": [
+"Worker_Silent"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": false,
+"mouth_visible": false,
+"speech": true,
+"boxes": null,
+"sharp": true,
+"rotation": 0.0,
+"stabilize": true
+},
+{
+"piece": "C0025_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "Static wide shot of an outdoor workshop yard. On the left, a worker bends forward over a grid of thin steel bars and a metal channel on the sandy ground, holdin",
+"roles": [
+"Worker_Silent",
+"Worker_Silent"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": false,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.29,
+0.18,
+0.09,
+0.15
+],
+[
+0.22,
+0.18,
+0.25,
+0.48
+],
+[
+0.13,
+0.45,
+0.87,
+0.5
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0014_1 03",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The worker maintains his bent-over stance holding the white measuring tape across the steel reinforcement bars on the ground, but keeps his head lifted and look",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.38,
+0.25,
+0.08,
+0.14
+],
+[
+0.35,
+0.25,
+0.25,
+0.62
+],
+[
+0.15,
+0.68,
+0.75,
+0.29
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0026_1 05",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "As the camera continues sliding left behind the out-of-focus foreground pillar (which covers up to ~19% of the left edge), the worker lifts his gaze toward the ",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.37,
+0.23,
+0.08,
+0.13
+],
+[
+0.19,
+0.23,
+0.31,
+0.57
+],
+[
+0.3,
+0.54,
+0.58,
+0.3
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0019_1 03",
+"was": "REJECT_ALL",
+"was_reason": null,
+"width": 1920,
+"height": 1080,
+"grade": "REJECT",
+"what": "The camera tilts rapidly upward off the worker's hands and I-beam as the worker pulls the hammer back, ending on out-of-focus sandy ground and a blurred concret",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": false,
+"mouth_visible": false,
+"speech": false,
+"boxes": null,
+"sharp": true,
+"rotation": 0.0,
+"stabilize": true
+},
+{
+"piece": "C0098_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "Medium-wide shot as the worker steps around the upper-left corner of the demonstration slab, places the wooden screed bar along the far edge, and pulls it acros",
+"roles": [
+"Worker_Silent",
+"Subject_Speaking",
+"Bystander"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": false,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.31,
+0.33,
+0.17,
+0.16
+],
+[
+0.12,
+0.33,
+0.36,
+0.62
+],
+[
+0.22,
+0.68,
+0.72,
+0.32
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0027_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "Camera glides slowly right past an out-of-focus foreground pillar on the left while a man in a cream shirt bends forward holding a thin steel rod on a lined fla",
+"roles": [
+"Worker_Silent",
+"Bystander"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.3,
+0.21,
+0.14,
+0.14
+],
+[
+0.17,
+0.21,
+0.33,
+0.6
+],
+[
+0.29,
+0.52,
+0.66,
+0.36
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0027_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The camera continues gliding slowly right as the foreground blur on the left clears around 3.2 s. Alone in frame, the bending worker holds the thin steel rod st",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.25,
+0.21,
+0.14,
+0.14
+],
+[
+0.13,
+0.21,
+0.33,
+0.6
+],
+[
+0.25,
+0.52,
+0.66,
+0.36
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0027_1 04",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "Combined post-bystander window where the camera glides smoothly right, foreground blur clears around 3.2 s, and the worker holds the thin steel rod steady befor",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.2,
+0.21,
+0.19,
+0.14
+],
+[
+0.04,
+0.21,
+0.42,
+0.63
+],
+[
+0.2,
+0.52,
+0.71,
+0.36
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0041_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "crop boxes are outside 0-1 or have zero size",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "An adult man wearing a cream striped shirt with a lapel microphone stands outdoors under green tree foliage in a waist-up medium shot, looking directly into the",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.41,
+0.11,
+0.19,
+0.34
+],
+[
+0.24,
+0.11,
+0.52,
+0.89
+],
+[
+0.0,
+0.0,
+0.0,
+0.0
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0041_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "crop boxes are outside 0-1 or have zero size",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "After finishing his statement, the man stands still under the trees with his mouth closed, looking directly into the camera lens until the clip ends at 10.08 s.",
+"roles": [
+"Subject_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.41,
+0.11,
+0.19,
+0.34
+],
+[
+0.24,
+0.11,
+0.52,
+0.89
+],
+[
+0.0,
+0.0,
+0.0,
+0.0
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0039_1 02",
+"was": "REJECT_ALL",
+"was_reason": null,
+"width": 1920,
+"height": 1080,
+"grade": "REJECT",
+"what": "Camera abruptly tilts upward off the rebar grid, showing a worker's trouser-clad legs and open-sandal feet walking left to right past green plastic containers a",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": false,
+"mouth_visible": false,
+"speech": false,
+"boxes": null,
+"sharp": true,
+"rotation": 0.0,
+"stabilize": true
+},
+{
+"piece": "C0083_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "The man stands facing the camera, begins speaking at approximately 0.9 s while alternating gaze between the lens and something off-camera below the bottom frame",
+"roles": [
+"Subject_Speaking",
+"Bystander"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.38,
+0.07,
+0.13,
+0.27
+],
+[
+0.27,
+0.07,
+0.41,
+0.93
+],
+[
+0.27,
+0.07,
+0.41,
+0.93
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0083_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "The man stands still with his mouth closed, looking steadily into the camera lens as tree leaves sway gently in the background.",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.38,
+0.07,
+0.13,
+0.27
+],
+[
+0.27,
+0.07,
+0.37,
+0.93
+],
+[
+0.27,
+0.07,
+0.37,
+0.93
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0040_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "A man in a cream striped shirt stands stationary under trees looking directly at the camera lens while waiting to begin speaking; his lips move slightly around ",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.4,
+0.09,
+0.19,
+0.35
+],
+[
+0.24,
+0.09,
+0.51,
+0.91
+],
+[
+0.24,
+0.09,
+0.51,
+0.91
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0040_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "The man in the cream striped shirt raises his hands together in a folded-hands greeting (namaskaram) from 3.5 to 4.5 s, lowers his hands, and speaks continuousl",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.4,
+0.09,
+0.19,
+0.35
+],
+[
+0.24,
+0.09,
+0.51,
+0.91
+],
+[
+0.35,
+0.35,
+0.3,
+0.4
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0040_1 03",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The man in the cream striped shirt stands still facing forward with his mouth closed, maintaining direct eye contact with the camera lens after finishing his sp",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.4,
+0.09,
+0.19,
+0.35
+],
+[
+0.24,
+0.09,
+0.51,
+0.91
+],
+[
+0.24,
+0.09,
+0.51,
+0.91
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0059_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The worker holds a terracotta Mangalore tile upright in his left hand, points to its underside projecting lugs with a trowel in his right hand, briefly tilts th",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.29,
+0.04,
+0.2,
+0.32
+],
+[
+0.19,
+0.04,
+0.53,
+0.96
+],
+[
+0.34,
+0.35,
+0.38,
+0.63
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0059_1 03",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The worker looks at the lens while speaking in Tamil (16.0-17.5 s), then flips the Mangalore tile over with both hands (17.6-19.2 s) to show how it is inverted/",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.27,
+0.04,
+0.21,
+0.32
+],
+[
+0.18,
+0.04,
+0.5,
+0.96
+],
+[
+0.29,
+0.35,
+0.39,
+0.6
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0015_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "A male worker bends forward over flat shuttering panels holding a white measuring tape taut across steel rebar lines (0.00-0.44s), then wind-blown out-of-focus ",
+"roles": [
+"Worker_Silent"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": false,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.26,
+0.25,
+0.07,
+0.12
+],
+[
+0.21,
+0.25,
+0.27,
+0.61
+],
+[
+0.16,
+0.62,
+0.45,
+0.28
+]
+],
+"sharp": false,
+"rotation": 0.0,
+"stabilize": true
+},
+{
+"piece": "C0103_1 01",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Action box clipped by aspect-locked crop window",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "A middle-aged man stands stationary center-left of frame on a shaded dirt yard, looking at the camera lens and speaking continuously while keeping his arms at h",
+"roles": [
+"Subject_Speaking"
+],
+"audio": "ON_CAMERA_SPEECH",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.38,
+0.09,
+0.13,
+0.25
+],
+[
+0.25,
+0.09,
+0.38,
+0.91
+],
+[
+0.64,
+0.15,
+0.36,
+0.85
+]
+],
+"sharp": false,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0103_1 02",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Action box clipped by aspect-locked crop window",
+"width": 1920,
+"height": 1080,
+"grade": "C",
+"what": "The man stands still in the same spot on the dirt yard, silent and looking directly at the camera lens with his mouth closed.",
+"roles": [
+"Subject_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": true,
+"mouth_visible": true,
+"speech": false,
+"boxes": [
+[
+0.38,
+0.09,
+0.13,
+0.25
+],
+[
+0.25,
+0.09,
+0.38,
+0.91
+],
+[
+0.64,
+0.15,
+0.36,
+0.85
+]
+],
+"sharp": false,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0066_1 05",
+"was": "REJECT_ALL",
+"was_reason": null,
+"width": 1920,
+"height": 1080,
+"grade": "REJECT",
+"what": "As the worker pulls the wooden straightedge away to the left, the camera abruptly pans and tilts upward-left with heavy motion blur, revealing the rear wheel of",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": false,
+"mouth_visible": false,
+"speech": false,
+"boxes": null,
+"sharp": true,
+"rotation": 0.0,
+"stabilize": true
+},
+{
+"piece": "C0050_1 04",
+"was": "REJECT_VIDEO_KEEP_AUDIO_CONTEXT",
+"was_reason": "Speaker horizontally overlaps must_preserve_action_box",
+"width": 1920,
+"height": 1080,
+"grade": "B",
+"what": "The bending worker places and aligns coconut shells around the central terracotta disc, receives additional shells from the standing helper at 15.6 s, 24.0 s, a",
+"roles": [
+"Worker_Silent",
+"Subject_Speaking"
+],
+"audio": "OFF_CAMERA_SPEECH",
+"looking_at_lens": false,
+"mouth_visible": true,
+"speech": true,
+"boxes": [
+[
+0.35,
+0.0,
+0.25,
+0.23
+],
+[
+0.27,
+0.0,
+0.35,
+0.68
+],
+[
+0.0,
+0.48,
+0.96,
+0.52
+]
+],
+"sharp": true,
+"rotation": 0.0,
+"stabilize": false
+},
+{
+"piece": "C0063_1 05",
+"was": "REJECT_ALL",
+"was_reason": null,
+"width": 1920,
+"height": 1080,
+"grade": "REJECT",
+"what": "End-of-take abrupt camera tilt up and pan left moving off the Mangalore tiles onto empty sandy ground and an out-of-focus printed cardboard box before the recor",
+"roles": [
+"Worker_Silent"
+],
+"audio": "NAT_SOUND_ONLY",
+"looking_at_lens": false,
+"mouth_visible": false,
+"speech": false,
+"boxes": null,
+"sharp": true,
+"rotation": 0.0,
+"stabilize": true
+}
+]

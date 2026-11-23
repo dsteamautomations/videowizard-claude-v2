@@ -6,6 +6,7 @@ from fractions import Fraction
 ELIGIBLE = ('ELIGIBLE_AS_IS', 'ELIGIBLE_WITH_CROP', 'ELIGIBLE_A_ROLL_SPEAKER', 'REJECT_VIDEO_KEEP_AUDIO_CONTEXT', 'REJECT_ALL')
 SHOT_SIZES = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
 STABILIZE_ZOOM = 1.08
+SOFT_ZOOM = 1.65   # SK, 23 Nov 2026 (VW-25): a crop that starts below (or ends above) the speaker's head may zoom this far on a source of the film's own size; the picture is softer and the piece carries a warning
 
 
 TRIM = 0.10   # design/125 P6: each edge of the must-keep box may lose up to 10 % of its width (left, right) or height (top, bottom)
@@ -27,10 +28,15 @@ def compute_davinci_crop(exclude_box, preserve_box, source_w, source_h, timeline
         return side
     hx, hy, hw, hh = head_box
     top = round(hy + hh + 0.02, 2)
-    ok = [s for s in (_crop(_vertical_window(top, round(1.0 - top, 2), preserve_box, arf), preserve_box, timeline_w, timeline_h, max_safe_zoom, rotation_deg, stabilize, arf),
-                      _crop(_vertical_window(0.0, round(hy - 0.02, 2), preserve_box, arf), preserve_box, timeline_w, timeline_h, max_safe_zoom, rotation_deg, stabilize, arf))
-          if s['feasible']]
-    return min(ok, key=lambda s: s['total_cumulative_zoom']) if ok else side
+    soft = max(max_safe_zoom, SOFT_ZOOM)
+    tries = [_crop(_vertical_window(top, round(1.0 - top, 2), preserve_box, arf), preserve_box, timeline_w, timeline_h, soft, rotation_deg, stabilize, arf),
+             _crop(_vertical_window(0.0, round(hy - 0.02, 2), preserve_box, arf), preserve_box, timeline_w, timeline_h, soft, rotation_deg, stabilize, arf)]
+    ok = [s for s in tries if s['feasible']]
+    if ok:
+        best = min(ok, key=lambda s: s['total_cumulative_zoom'])
+        return {**best, 'within_safe_zoom_limit': best['total_cumulative_zoom'] <= max_safe_zoom}   # False: allowed, with the warning "soft picture"
+    over = [s['total_cumulative_zoom'] for s in tries if s.get('total_cumulative_zoom')]
+    return {**side, 'reason': f"{side['reason']}; a crop below or above the head needs zoom {min(over)}, the limit is {soft}"} if over else side   # the true reason, not only the side crop's
 
 
 def _side_window(exclude_box, preserve_box, arf):
@@ -121,6 +127,24 @@ def client_safety(sub, policy):
     return bool(flags) and not kept, kept, gone
 
 
+def is_speaker(p):
+    """SK, 23 Nov 2026 (VW-25; retires design/125 P4, "looks at the lens, or mouth visible with speech"): the speaker on camera is a person who
+    looks at the lens and speaks, or the shot's own subject posed to the lens between two sentences (a role the study names Subject_...).
+    A worker who speaks to someone else without looking at the lens is not: the lips are cropped out when a crop within the usual zoom exists
+    (as design/125 P5 did), else the piece is used as it is. Nor is one who only glances at the lens. `warnings` says both to whoever chooses."""
+    speaks = bool(p.get('mouth_visible') and p.get('speech_translation_block'))
+    posed = any(str(r).lower().startswith('subject') for r in p.get('people_roles') or [])
+    return bool(p.get('looking_at_lens')) and (speaks or posed)
+
+
+def warnings(sub, elig, sol):
+    """What whoever chooses is told about an allowed piece; the operator decides (design/195)."""
+    p = sub.get('people_and_speaker_analysis') or {}
+    return ((['glances at the camera'] if elig == 'ELIGIBLE_AS_IS' and p.get('looking_at_lens') else [])
+            + (['a person speaks on camera'] if elig == 'ELIGIBLE_AS_IS' and p.get('mouth_visible') and p.get('speech_translation_block') and p.get('audio_nature') == 'ON_CAMERA_SPEECH' else [])
+            + ([f"soft picture, zoom {sol['total_cumulative_zoom']}"] if elig == 'ELIGIBLE_WITH_CROP' and sol and not sol.get('within_safe_zoom_limit', True) else []))
+
+
 def eligibility(sub, policy, max_zoom, src_w, src_h, timeline_w, timeline_h):
     """Returns (eligibility, crop_solution_or_None, notes[])."""
     p = sub['people_and_speaker_analysis']
@@ -130,12 +154,22 @@ def eligibility(sub, policy, max_zoom, src_w, src_h, timeline_w, timeline_h):
     if gone and safe and not sub['client_safe']:
         notes.append('client-safe after operator waiver of: ' + ', '.join(gone))
     if sub['usability_grade'] == 'REJECT':   # design/195 (SK, 14 Nov 2026): "not safe" is a warning on the shot, the operator decides; only a reject grade removes a piece
-        return 'REJECT_ALL', None, notes
-    talking = bool(p.get('looking_at_lens') or (p.get('mouth_visible') and p.get('speech_translation_block')))   # design/125 P4
-    if not talking:
-        return 'ELIGIBLE_AS_IS', None, notes            # silent worker (no speech heard) / hidden lips rule
+        what = ' '.join(str(sub.get('visual_action_observed') or '').split())   # 23 Nov 2026: the record says why, in the study's own words
+        return 'REJECT_ALL', {'feasible': False, 'reason': 'the clip study graded it REJECT' + (f': {what[:240]}' if what else '')}, notes
+    speaker = is_speaker(p)
+    if not speaker and not (p.get('mouth_visible') and p.get('speech_translation_block')):
+        return 'ELIGIBLE_AS_IS', None, notes            # a silent worker, hidden lips, or a glance at the lens (a warning)
     if policy.get('show_speaker_video'):
         return 'ELIGIBLE_A_ROLL_SPEAKER', None, notes
+    elig, sol, more = _crop_out(p, qc, max_zoom, src_w, src_h, timeline_w, timeline_h)
+    if speaker or (elig == 'ELIGIBLE_WITH_CROP' and sol.get('within_safe_zoom_limit', True)):
+        return elig, sol, notes + more
+    return 'ELIGIBLE_AS_IS', None, notes                # speaks, but not to the lens, and no clean crop hides the lips: used as it is (a warning), never refused
+
+
+def _crop_out(p, qc, max_zoom, src_w, src_h, timeline_w, timeline_h):
+    """The crop that takes the speaking person out of the picture: (eligibility, crop solution, notes)."""
+    notes = []
     m = p.get('speaker_crop_module')
     if not m:
         return 'REJECT_VIDEO_KEEP_AUDIO_CONTEXT', {'feasible': False, 'reason': 'speaker visible but no crop boxes logged'}, notes
@@ -176,7 +210,7 @@ def solve(log, policy, clip, timeline):
             sub['tc_confidence'] = 'NEEDS_BOUNDARY_CHECK'
         zoom = (sol or {}).get('zoom_x') if elig == 'ELIGIBLE_WITH_CROP' else None
         safe, kept_flags, waived_flags = client_safety(sub, policy)
-        sub['stage15'] = {'visual_eligibility': elig, 'crop_solution': sol, 'client_safe_effective': safe, 'risk_flags_effective': kept_flags, 'risk_flags_waived': waived_flags,
+        sub['stage15'] = {'visual_eligibility': elig, 'crop_solution': sol, 'client_safe_effective': safe, 'risk_flags_effective': kept_flags + warnings(sub, elig, sol), 'risk_flags_waived': waived_flags,
                           'still_frame_dynamic_zoom_eligible': not cam.get('has_3d_parallax') and not cam.get('has_internal_scene_motion'),
                           'effective_post_crop_shot_size': effective_post_crop_shot_size(cam.get('native_shot_size'), zoom),
                           'time_manipulation_options': options, 'ui_path': ui_path(sol) if elig == 'ELIGIBLE_WITH_CROP' else None,
