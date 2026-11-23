@@ -1352,7 +1352,7 @@ def look_parent(session, provider, body, element, n):
     looks = (session.get('treatment') or {}).get('direction_look') or []
     entry = looks[0] if len(looks) == 1 else next((x for x in looks if x['look'].rstrip('.') in body['prompt']), None)
     board = look_board(session, entry) if entry else None
-    return ({k: board[k] for k in ('id', 'key', 'sha256')}, LOOK_PARENT.format(n=n + 1)) if board else (None, '')
+    return ({**{k: board[k] for k in ('id', 'key', 'sha256')}, 'look': True}, LOOK_PARENT.format(n=n + 1)) if board else (None, '')   # `look`: not a reference of the run; the parent check leaves it out
 
 
 def look_boards(conn, store, user, run, outputs, make=None):
@@ -3469,6 +3469,7 @@ def image_bytes(raw):
     need(0 < len(raw) <= 16 * 1024 * 1024, 'Reference image must be at most 16 MiB.')
     with Image.open(BytesIO(raw)) as image:
         need(image.format in ('PNG', 'JPEG', 'WEBP'), 'Use a PNG, JPEG or WebP image: an SVG, PDF or design file is not read; export it as a PNG.')
+        need(image.width * image.height <= 100_000_000, 'This picture is over 100 megapixels: give a smaller one.')   # before it is decoded
         image.load()
         if image.width * image.height > MAX_PIXELS:   # release 3 (V7): a large camera photo is made smaller on the way in, not refused
             k = (MAX_PIXELS / (image.width * image.height)) ** 0.5

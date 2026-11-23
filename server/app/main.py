@@ -227,7 +227,7 @@ class Note(Write):
 
 class VisualPlan(Write):
     plan: dict[str, Any]
-    pictures: list[str] | None = Field(default=None, max_length=500)   # SK, 23 Nov 2026 (no footage, release 3): the pictures in the run folder's in/, as the tool lists them
+    pictures: list[str] | None = None   # SK, 23 Nov 2026 (no footage, release 3): the pictures in the run folder's in/, as the tool lists them
     answers: str = Field(default='', max_length=200)   # release 3, C2: the item of a question the operator answered; the proposal that follows it (`vw visuals propose --answers`)
 
 

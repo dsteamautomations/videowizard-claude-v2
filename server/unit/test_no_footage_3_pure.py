@@ -143,7 +143,7 @@ def test_a_file_that_is_not_a_picture_the_server_reads_is_refused_in_plain_words
 def test_the_ai_list_names_the_operators_picture_supplied_on_every_kind_of_shot():
     ev = lambda **media: {'kind': 'fill', 'source': 'reference', 'shot_id': 's1', 'media': media}
     own, none = {'s1': {'reference_kind': 'supplied'}}, {'s1': {}}
-    assert D.ai_kind(ev(kind='still', graphic=True), own) == 'supplied' and D.ai_kind(ev(kind='sequence'), own) == 'supplied' and D.ai_kind(ev(kind='still'), own) == 'supplied'
+    assert D.ai_kind(ev(kind='still', graphic=True), own) == 'supplied' and D.ai_kind(ev(kind='sequence'), own) == 'supplied' and D.ai_kind(ev(kind='still'), own) is None   # a still: left out, as before
     assert D.ai_kind(ev(kind='still', graphic=True), none) == 'graphic' and D.ai_kind(ev(kind='still'), none) == 'AI still' and D.ai_kind(ev(kind='movie'), none) == 'AI video'   # as before
     assert D.ai_kind(ev(kind='still'), {'s1': {'reference_kind': 'frame'}}) is None   # a footage frame: as before
     assert D.ai_kind({'kind': 'fill', 'source': 'asset', 'shot_id': 's1', 'media': {'kind': 'still', 'graphic': True}}, {'s1': {'supplied': True}}) == 'supplied'

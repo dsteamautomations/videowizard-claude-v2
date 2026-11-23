@@ -350,7 +350,7 @@ def code_checks(ref, result, parents):
 
 def code_only(session, ref):
     """design/214: the record of a picture no model checks (a picture of a v2 round's set: Claude's look answers its lines): the code checks alone."""
-    parents = [session['references'].get(p.get('id')) or {} for p in (ref.get('generation') or {}).get('parents') or []]
+    parents = [session['references'].get(p.get('id')) or {} for p in [p for p in (ref.get('generation') or {}).get('parents') or [] if not p.get('look')]]
     return {'code': code_checks(ref, {'width': ref.get('width'), 'height': ref.get('height')}, parents)}
 
 
@@ -513,7 +513,7 @@ def check_lines(store, session, ref, lines, transport_factory):
 
 def _model_check(store, session, ref, result, transport_factory, png=None, lines=None):
     """Gemini's part of the check: the lines and the code checks. Never raises."""
-    gen_parents = (ref.get('generation') or {}).get('parents') or []
+    gen_parents = [p for p in (ref.get('generation') or {}).get('parents') or [] if not p.get('look')]
     parents = [{**(session['references'].get(p.get('id')) or {}), **({'key': p['key']} if p.get('crop') and p.get('key') else {})} for p in gen_parents]   # design/119 rule 1: the check sees the crop the model saw
     lines = lines or lines_of(ref)
     record = {'code': code_checks(ref, result, parents), 'lines': [], 'must_failed': [], 'model': CHECK_MODEL}

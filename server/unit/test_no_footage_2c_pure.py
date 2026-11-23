@@ -78,9 +78,15 @@ ELEMENT = {'kind': 'object'}
 def test_nano_banana_is_handed_the_look_board_as_a_reference():
     s, _ = film(TWO, [(1, 1, 1), (2, 2, 2)])
     entry, line = VS.look_parent(s, 'gemini', BODY, ELEMENT, 2)
-    assert entry == {'id': 'b1', 'key': 'k1', 'sha256': 's1'} and 'Image 3' in line and 'look board' in line   # the board of the period the prompt names
+    assert entry == {'id': 'b1', 'key': 'k1', 'sha256': 's1', 'look': True} and 'Image 3' in line and 'look board' in line   # the board of the period the prompt names
     one, _ = film(TWO[:1], [(1, 1, 1)])
     assert VS.look_parent(one, 'gemini', {'kind': 'isolated', 'prompt': 'x'}, ELEMENT, 0)[0]['id'] == 'b0'
+
+
+def test_the_look_board_is_not_judged_as_a_parent_of_the_picture():
+    ref = {'kind': 'keyframe', 'generation': {'parents': [{'id': 'b1', 'key': 'k1', 'sha256': 's1', 'look': True}]}}
+    lines = IC.code_only({'references': {}}, ref)['code']
+    assert not [l for l in lines if l['check'] == 'parent']
 
 
 def test_no_board_is_handed_where_it_does_not_belong():
