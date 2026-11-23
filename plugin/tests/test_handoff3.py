@@ -12,7 +12,7 @@ import handoff as H
 import resolve_bridge as RB
 import stages_av as AV
 import vw
-from test_handoff import fcp, edit
+from test_handoff import fcp, edit, listed
 
 
 # ---------- the media stage ----------
@@ -165,11 +165,11 @@ def test_open_on_studio_imports_and_reports_and_on_free_shows_the_steps(cli, mon
     manifest['resolve_events'] = [{'file': 'Media/Camera/C1.MP4', 'source_in_frame': 250, 'source_out_frame': 350, 'record_in_frame': 0, 'record_out_frame': 100, 'source_fps': '25'},
                                   {'file': 'Media/AI/VS1.mp4', 'source_in_frame': 0, 'source_out_frame': 300, 'record_in_frame': 100, 'record_out_frame': 400, 'source_fps': '25'}]
     manifest['narration_pieces'] = [{'file': 'Media/Voiceover/narration.mp3', 'source_in_frame': 0, 'source_out_frame': 400, 'record_in_frame': 0}]
-    (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True, exist_ok=True)
-    (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+    st = listed(tmp_path, manifest, resolve=None)
     H.write_timeline_for(d, manifest, base=str(d))
     monkeypatch.setenv('VW2_RESOLVE_FAKE', '1')
-    monkeypatch.setattr(vw, 'call', lambda *a, **k: {'bundle': {}, 'resolve': None})   # review 27 Oct: `open` reads the ledger first
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: st)   # review 27 Oct: `open` reads the ledger first
+    monkeypatch.setattr(vw, 'upload_file', lambda m, stage, path, sha, size: {'key': 'run-1/delivery/VW-9.drt', 'sha256': sha, 'bytes': size})   # 23 Nov: the timeline file is kept on the server
     monkeypatch.setattr(vw.handoff, 'find_resolve', lambda: {'found': True, 'version': '21.1', 'edition': 'studio'})
     code, out, err = run(args(what='open'), capsys)
     assert code == 0 and out['report']['drt_verified'] and [s[0] for s in sent] == ['resolve/reserve', 'resolve/mark', 'resolve/mark'] and sent[2][1]['report']['route'] == 'studio'

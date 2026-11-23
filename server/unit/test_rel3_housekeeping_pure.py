@@ -40,4 +40,5 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     # design/223, the new take process (22 Nov): rows 316 to 333
     assert all('design/223' in rows[str(n)] for n in range(316, 334)) and '360p' in rows['316'] and 'price by size' in rows['329'] and 'Kept' in rows['332'] and 'Kept' in rows['333']
     assert 'one click' in rows['334'] and 'design/223' in rows['334']   # SK, 22 Nov: "Use take n after all" asks no second question
-    assert 'defect 62' in rows['335'] and 'portable' in rows['335'] and 'already here' in rows['336'] and '337' not in rows   # defect 62 (23 Nov): the download's check and its lines
+    assert 'defect 62' in rows['335'] and 'portable' in rows['335'] and 'already here' in rows['336']   # defect 62 (23 Nov): the download's check and its lines
+    assert 'drt' in rows['337'] and 'current one' in rows['338'] and 'camera copies' in rows['339'] and 'every member' in rows['340'] and '341' not in rows   # the hand-over stoppers and films for the team (23 Nov)

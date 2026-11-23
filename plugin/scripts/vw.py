@@ -3776,6 +3776,36 @@ def download_bundle(m, manifest, into=None, roles=('original', 'normalised', 'na
     return paths
 
 
+def _current_list(m, st, fetch=False):
+    """Hand-over stoppers, fix 2 (SK, 23 Nov 2026): the package list on this computer is the server's current one. `download` brings it (nothing moves
+    when it is already here); `open` and `confirm` refuse on an old one, because every later check reads it. Before: fetched only when none was here."""
+    ref = (st.get('bundle') or {}).get('manifest')
+    if not ref:
+        emit({'action': 'refused', 'message': 'No bundle yet; run `vw delivery bundle` first.'}, 2)
+    here = workspace(m['code']) / 'work' / 'manifest.json'
+    if fetch:
+        _download(m, ref['key'], 'work/manifest.json', expect=ref)
+    if not here.exists() or _sha256_of(here) != ref['sha256']:
+        emit({'action': 'refused', 'message': 'The package list on this computer is not the current one: the package was made again, or was never downloaded here. Run `vw delivery download` first.'}, 2)
+    return _json_file(m, 'work/manifest.json')
+
+
+def _kept_timeline(m, report):
+    """Hand-over stoppers, fix 1 (SK, 23 Nov 2026): the Resolve timeline file is kept on the server too. `drt` becomes its stored record and `drt_path`
+    says where it lies here. An upload that fails never stops the hand-over: the final then records no timeline file. Before: `drt` was the path."""
+    import contextlib
+    import io
+    path = Path(report.pop('drt'))
+    report['drt_path'] = str(path)
+    try:
+        data = path.read_bytes()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):   # a refusal inside the upload is not this command's answer
+            report['drt'] = upload_file(m, 'delivery', path, hashlib.sha256(data).hexdigest(), len(data))
+    except (SystemExit, Exception):
+        pass
+    return report
+
+
 def cmd_delivery(a):
     m = active()
     run = m['run_id']
@@ -3814,9 +3844,7 @@ def cmd_delivery(a):
             emit({'action': 'refused', 'resolve': found, 'needed_bytes': needed, 'free_bytes': free, 'message': words}, 2)
         if a.what == 'check':
             emit({'resolve': found, 'needed_bytes': needed, 'free_bytes': free, 'message': words}, 0, words + ' Next: `vw delivery download`.')
-        if not (ws / 'work' / 'manifest.json').exists():
-            _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
-        manifest = _json_file(m, 'work/manifest.json')
+        manifest = _current_list(m, st, fetch=True)
         edit_dir = ws / 'edit'
         skip = () if a.camera else ('original',)   # design/115 H2: the camera copies are low resolution and the editor has the originals; `--camera` brings them
         download_bundle(m, manifest, into=edit_dir, roles=None if a.camera else [r for r in {f['role'] for f in manifest['files']} if r != 'original'])
@@ -3835,12 +3863,13 @@ def cmd_delivery(a):
     if a.what == 'open':   # design/107 Step F: Studio imports the timeline by scripting and reads it back; free Resolve gets the three steps
         found = handoff.find_resolve()
         if found.get('edition') == 'studio':
-            led = call('GET', f'/api/runs/{run}/stage3').get('resolve') or {}   # review 27 Oct: never imported twice
+            st = call('GET', f'/api/runs/{run}/stage3')
+            led = st.get('resolve') or {}   # review 27 Oct: never imported twice
             if led.get('state') in ('reserved', 'dispatched', 'reported'):
                 emit({'action': 'refused', 'ledger': led, 'message': f"The Resolve step is already {led['state']} on {led.get('machine')}: the timeline is in Resolve there. Next: `vw delivery zip`, or `vw delivery resolve --inspect`."}, 2)
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import resolve_bridge
-            manifest = _json_file(m, 'work/manifest.json')
+            manifest = _current_list(m, st)
             relinked = None
             if a.originals:   # design/115 H4: the relink check first; its corrected timeline is the one imported
                 import csv
@@ -3858,10 +3887,12 @@ def cmd_delivery(a):
                 report = resolve_bridge.studio_import(resolve_bridge.adapter(), ws / 'edit', manifest, m['code'], timeline=relinked)
             except (SystemExit, Exception) as exc:   # Resolve not running, scripting off, or an import failure: the free route still works
                 emit({'open': handoff.free_route_text(m['code']), 'studio_error': str(exc)}, 0, f'Resolve Studio could not import by scripting ({exc}). ' + handoff.free_route_text(m['code']))
+            report = _kept_timeline(m, report)
+            kept = ' The timeline file is kept on the server too.' if isinstance(report.get('drt'), dict) else ' The timeline file could not be uploaded: the delivery record will hold no Resolve timeline file; the hand-over goes on.'
             write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': 'Resolve Studio import by the plugin'})
             write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
             led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported', 'report': {'route': 'studio', 'timeline_verified': report['drt_verified'], **report}})
-            emit({'report': report, 'ledger': led}, 0, (f"Imported into Resolve Studio: {report['readback_events']} cuts read back, 0 frames off; .drp and .drt in Timeline/. Next: `vw delivery zip`." if report['drt_verified']
+            emit({'report': report, 'ledger': led}, 0, (f"Imported into Resolve Studio: {report['readback_events']} cuts read back, 0 frames off; .drp and .drt in Timeline/.{kept} Next: `vw delivery zip`." if report['drt_verified']
                                                         else f"Imported, but the readback differs from the plan in {len(report['differences'])} place(s): " + '; '.join(f"cut {d['cut']} {d['field']} {d['timeline']} vs {d['plan']}" for d in report['differences'][:5]) + '. Tell the builder.'))
         emit({'open': handoff.free_route_text(m['code'])}, 0, handoff.free_route_text(m['code']))
     if a.what == 'relink-check':   # design/107 §6
@@ -3881,10 +3912,12 @@ def cmd_delivery(a):
     if a.what == 'confirm':   # design/107 Step F, free route: the operator's side-by-side check goes on the ledger
         if not (a.quote or '').strip():
             emit({'action': 'refused', 'message': 'The operator\'s words are required: that the start, the middle and the end match the approved film (`--quote`).'}, 2)
-        manifest = _json_file(m, 'work/manifest.json')
-        rep = handoff.cross_check(ws / 'edit', manifest)
+        manifest = _current_list(m, call('GET', f'/api/runs/{run}/stage3'))
+        cam = [f['name'] for f in manifest['files'] if f.get('role') == 'original']
+        skip = () if any((ws / 'edit' / n).exists() for n in cam) else ('original',)   # hand-over stoppers, fix 3 (23 Nov): the default download left the camera copies out; none here means they are not counted. Before: always counted
+        rep = handoff.cross_check(ws / 'edit', manifest, skip_roles=skip)
         if not rep['ok']:
-            emit({'action': 'refused', 'check': rep, 'message': 'The edit folder does not pass the cross-check: ' + '; '.join(rep['problems'][:6]) + '. Run `vw delivery download` again first.'}, 2)
+            emit({'action': 'refused', 'check': rep, 'message': 'The edit folder does not pass the cross-check: ' + '; '.join(rep['problems'][:6]) + f". Run `vw delivery download{'' if skip or not cam else ' --camera'}` again first."}, 2)
         write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': a.quote})
         write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
         led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported',
@@ -3896,7 +3929,8 @@ def cmd_delivery(a):
         z = handoff.zip_edit(ws / 'edit', m['code'])
         emit({'zip': str(z), 'bytes': z.stat().st_size}, 0, f'{z} ({z.stat().st_size / 1e6:.0f} MB): hand this to the editor.')
     if a.what == 'final':
-        emit(write(base + '/final', {'quote': a.quote}), 0, 'Delivery recorded; `vw close` when the operator is done.')
+        out = write(base + '/final', {'quote': a.quote})
+        emit(out, 0, 'Delivery recorded' + ('' if out.get('timeline_file', True) else ' (without the Resolve timeline file: it was not uploaded)') + '; `vw close` when the operator is done.')
 
 
 def cmd_pull(a):

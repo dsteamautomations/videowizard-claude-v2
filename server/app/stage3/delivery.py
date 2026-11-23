@@ -568,8 +568,8 @@ def final(conn, store, user, run, outputs, quote):
         if f['key'] not in {x['key'] for x in files}:
             files.append({'name': f['name'], **{k: f[k] for k in ('key', 'sha256', 'bytes')}, 'location': 'library' if f.get('source_film') else 'storage', 'receipt': True})   # defect 59: a library original's receipt is its source film's
     for name in ('drt', 'report'):
-        ref = rep.get(name)
-        if ref:
+        ref = rep.get(name)   # hand-over stoppers, fix 1 (23 Nov): only a file stored for this run; a path on the editing computer (plugins up to 0.106.1) is left out
+        if isinstance(ref, dict) and all(ref.get(k) for k in ('key', 'sha256', 'bytes')) and str(ref['key']).startswith(f"{run['id']}/"):
             files.append({'name': 'Approved-timeline.drt' if name == 'drt' else 'resolve-report.json', **{k: ref[k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True})
     for f in files:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
@@ -579,7 +579,7 @@ def final(conn, store, user, run, outputs, quote):
     led['state'] = 'closed'
     session['final'] = {'output': str(out['id']), 'at': datetime.now(timezone.utc).isoformat()}
     save_session(store, run, session)
-    return {'output': str(out['id']), 'files': len(files), 'next': '`vw close`'}
+    return {'output': str(out['id']), 'files': len(files), 'timeline_file': any(f['name'] == 'Approved-timeline.drt' for f in files), 'next': '`vw close`'}
 
 
 KEEP_STAGES = ('delivery', 'voice', 'visuals')

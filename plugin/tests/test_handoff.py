@@ -136,6 +136,14 @@ def cli(monkeypatch, tmp_path):
     return m, sent, tmp_path
 
 
+def listed(tmp_path, manifest, **more):
+    """The package list on this computer, and the server's answer that names it as the current one (hand-over stoppers, 23 Nov)."""
+    text = json.dumps(manifest).encode('utf-8')
+    (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True, exist_ok=True)
+    (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_bytes(text)
+    return {'bundle': {'manifest': {'key': 'k-man', 'sha256': hashlib.sha256(text).hexdigest(), 'bytes': len(text)}, 'bytes': 10}, **more}
+
+
 def args(**kw):
     base = {'what': 'check', 'check': False, 'run_it': False, 'inspect': False, 'close': False, 'authorization': None, 'note': None, 'quote': None, 'camera': False, 'originals': None}
     return argparse.Namespace(**{**base, **kw})
@@ -161,10 +169,9 @@ def test_download_checks_downloads_cross_checks_and_writes_the_timeline(cli, mon
     m, sent, tmp_path = cli
     d, manifest = edit(tmp_path)
     monkeypatch.setattr(vw.handoff, 'find_resolve', lambda: {'found': True, 'version': '21.1', 'edition': 'free'})
-    monkeypatch.setattr(vw, 'call', lambda *a, **k: {'bundle': {'manifest': {'key': 'k-man'}, 'bytes': 10}})
+    st = listed(tmp_path, manifest)
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: st)
     monkeypatch.setattr(vw, '_download', lambda m, key, rel, expect=None: str(tmp_path / 'runs' / 'VW-9' / rel))
-    (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True, exist_ok=True)
-    (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
     got = []
     monkeypatch.setattr(vw, 'download_bundle', lambda m, man, into=None, **kw: got.append(into) or {})
     code, out, err = run(args(what='download'), capsys)
@@ -175,8 +182,8 @@ def test_download_checks_downloads_cross_checks_and_writes_the_timeline(cli, mon
 def test_confirm_records_the_operators_side_by_side_check_on_the_ledger(cli, monkeypatch, capsys):
     m, sent, tmp_path = cli
     d, manifest = edit(tmp_path)
-    (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True, exist_ok=True)
-    (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+    st = listed(tmp_path, manifest)
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: st)
     code, out, err = run(args(what='confirm', quote='Yes, the start, middle and end match the film.'), capsys)
     assert code == 0 and [s[0] for s in sent] == ['resolve/reserve', 'resolve/mark', 'resolve/mark']
     rep = sent[2][1]['report']

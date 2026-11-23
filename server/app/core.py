@@ -225,8 +225,8 @@ def try_lock(conn, run_id):
 
 def load_run(conn, user, run_id, lock=False, stage=None, shots=()):
     row = conn.execute('select * from vw2_runs where id = %s', (run_id,)).fetchone()
-    if not row or (row['owner_id'] != user['id'] and not is_admin(user)):
-        raise Problem(404, 'NOT_FOUND', 'Run not found.')  # 404 so run ids are not probeable
+    if not row:   # SK, 23 Nov 2026: every signed-in member of the application opens every film (sign-in admits members only); before, its owner and Admins
+        raise Problem(404, 'NOT_FOUND', 'Run not found.')
     if lock:
         conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run_id),))
         need_free(open_defect_rows(conn, run_id), stage, shots)   # design/48 O.2; release 3, C6: a write waits for the builder only when an open defect holds it
@@ -260,9 +260,7 @@ def defect_open(d, shots=()):
 
 def list_runs(conn, user):
     sql = 'select id, code, title, client, owner_id, owner_name, procedure_version, image_provider, drawn_route, status, created_at, closed_at from vw2_runs'   # design/192: `vw last`
-    if is_admin(user):
-        return conn.execute(sql + ' order by created_at desc limit 200').fetchall()
-    return conn.execute(sql + ' where owner_id = %s order by created_at desc limit 200', (user['id'],)).fetchall()
+    return conn.execute(sql + ' order by created_at desc limit 200').fetchall()   # SK, 23 Nov 2026: every member sees every film; `vw last` picks the member's own by owner_id
 
 
 def current_outputs(conn, run_id):
