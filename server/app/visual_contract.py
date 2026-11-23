@@ -1154,8 +1154,9 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                 for sh in (s for sc in scenes for s in sc.shots):
                     need(not sh.transition_out or sh.id == last, f'shot {sh.id}: transition_out is for the last shot of a gap; set the next shot\'s transition_in instead.')
                     if new_film:   # design/139 R8 (SK, 2 Nov 2026, design/138 B6): the plan decides every join; a dissolve or a match gives its reason
-                        need(sh.transition_in and (sh.id != last or sh.transition_out), f"shot {sh.id}: name its join: transition_in (cut, dissolve or match)"
-                             + (' and transition_out, into what follows the gap' if sh.id == last else '') + '; the plan decides every join.')
+                        out_due = sh.id == last and join_out_due(source_gaps, gap.gap_id, film_frames)   # release 4 (V5)
+                        need(sh.transition_in and (sh.transition_out or not out_due), f"shot {sh.id}: name its join: transition_in (cut, dissolve or match)"
+                             + (' and transition_out, into what follows the gap' if out_due else '') + '; the plan decides every join.')
                         need(not ({sh.transition_in, sh.transition_out} & {'dissolve', 'match'}) or sh.transition_reason.strip(), f'shot {sh.id}: a dissolve or a match needs its reason (transition_reason).')
                     else:   # a film from before: the older way, a graphic dissolving 8 frames and a cut elsewhere unless chosen (design/35, until it closes)
                         need(not (sh.transition_in or sh.transition_out) or sh.transition_reason.strip(), f'shot {sh.id}: a chosen transition needs its reason (transition_reason); '
@@ -1490,6 +1491,13 @@ WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missi
                      'people_alike', 'palette_missing',   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
                      'camera_words', 'continues_apart', 'end_change_large',   # fix set M1, M2, M4 (19 Nov 2026): settled with the plan, not at the build
                      'labels_missing')   # release 3, C4 (SK, 20 Nov 2026): a drawn shot that carries text and lists no labels, named at the plan
+
+
+def join_out_due(source_gaps, gap_id, film_frames):
+    """SK, 23 Nov 2026 (no footage, release 4, V5): the last shot of a gap names its join out only when a camera cut follows the gap: not when
+    another gap starts where it ends (the next shot's join in decides), and not when the film ends there."""
+    end = (source_gaps.get(gap_id) or {}).get('end_frame')
+    return not (end is not None and (any(g.get('start_frame') == end for k, g in source_gaps.items() if k != gap_id) or (film_frames and end >= film_frames)))
 
 
 def supplied_warnings(plan):

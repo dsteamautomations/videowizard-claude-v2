@@ -389,8 +389,9 @@ def _beside(session, plan, gap, sh, take_rows):
         what = W['route_video'] if V.route_of(other) == 'video' else W['route_still'] if V.route_of(other) == 'still' else W['route_other']
         key, mark = (frame, str((sel.get('take') or {}).get('sha256') or '')) if frame else (ref.get('key'), str(ref.get('sha256') or ''))
         return {'_key': key, '_mark': mark, 'label': words.format(what=what)} if key else None
-    before = shot_pic(row[i - 1], W['before_shot'], True) if i > 0 else ({'_key': foot_before['key'], '_mark': str(foot_before.get('sha256') or ''), 'label': W['before_footage']} if foot_before else None)
-    after = shot_pic(row[i + 1], W['after_shot'], False) if i + 1 < len(row) else ({'_key': foot_after['key'], '_mark': str(foot_after.get('sha256') or ''), 'label': W['after_footage']} if foot_after else None)
+    far_before, far_after = V.across(plan, session, sh)   # SK, 23 Nov 2026 (release 4, V4): at the gap's edge, the shot of the touching gap
+    before = shot_pic(row[i - 1], W['before_shot'], True) if i > 0 else shot_pic(far_before, W['before_shot'], True) if far_before else ({'_key': foot_before['key'], '_mark': str(foot_before.get('sha256') or ''), 'label': W['before_footage']} if foot_before else None)
+    after = shot_pic(row[i + 1], W['after_shot'], False) if i + 1 < len(row) else shot_pic(far_after, W['after_shot'], False) if far_after else ({'_key': foot_after['key'], '_mark': str(foot_after.get('sha256') or ''), 'label': W['after_footage']} if foot_after else None)
     return ([{**before, 'role': 'before'}] if before else []), ([{**after, 'role': 'after'}] if after else [])
 
 

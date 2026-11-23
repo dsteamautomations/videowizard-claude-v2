@@ -5705,6 +5705,13 @@ def heading_words(marks, facing):
     return str(facing or '')
 
 
+def across(plan, session, shot):
+    """SK, 23 Nov 2026 (no footage, release 4, V4): the accepted shot that ends where this one starts and the one that starts where it ends, in
+    film order, whatever their gap: (before, after); None where a camera clip, or nothing, stands there."""
+    rows = [s for _, s in _accepted_shots(plan, session) if s['id'] != shot['id']]
+    return next((s for s in rows if s['end_frame'] == shot['start_frame']), None), next((s for s in rows if s['start_frame'] == shot['end_frame']), None)
+
+
 def packet_context(session, plan, gap, shot):
     """design/86 K7: what the writer should know beyond the shot. None of it goes into the prompt sent to the model."""
     scenes = chosen_scenes(gap, session['choice_selections'].get(gap['gap_id']))
@@ -5716,6 +5723,8 @@ def packet_context(session, plan, gap, shot):
     i = next((n for n, sh in enumerate(shots) if sh['id'] == shot['id']), None)
     prev_shot = shots[i - 1] if i else None
     next_shot = shots[i + 1] if i is not None and i + 1 < len(shots) else None
+    if i is not None:   # release 4 (V4): at the gap's edge, the shot of the touching gap, in film order
+        prev_shot, next_shot = prev_shot or across(plan, session, shot)[0], next_shot or across(plan, session, shot)[1]
     neighbours = {'previous': {'shot_id': prev_shot['id'], 'ends': [{'element_id': s['element_id'], **(s.get('end') or {})} for s in prev_shot.get('subjects') or []]} if prev_shot else None,
                   'next': {'shot_id': next_shot['id'], 'starts': [{'element_id': s['element_id'], **(s.get('start') or {})} for s in next_shot.get('subjects') or []]} if next_shot else None}
     rejected = [{'reference_id': r['id'], 'element_id': r.get('element_id'), 'name': r.get('name'), 'kind': r.get('kind'), 'notes': (r.get('rejection') or {}).get('notes') or ''}
