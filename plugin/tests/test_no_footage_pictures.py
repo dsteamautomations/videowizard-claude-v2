@@ -13,9 +13,9 @@ def test_the_pictures_of_the_run_folder_are_listed(tmp_path):
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_bytes(b'x')
     assert vw.in_pictures(tmp_path) == (['in/photos/press.png', 'in/site.JPG'], ['in/logo.svg'])
-    line = vw.pictures_line(tmp_path)
+    line = vw.in_pictures_line(tmp_path)
     assert '2 pictures' in line and 'in/site.JPG' in line and 'in/logo.svg' in line and 'PNG, JPEG or WebP' in line
 
 
 def test_a_run_folder_with_no_picture_says_nothing(tmp_path):
-    assert vw.in_pictures(tmp_path) == ([], []) and vw.pictures_line(tmp_path) == ''
+    assert vw.in_pictures(tmp_path) == ([], []) and vw.in_pictures_line(tmp_path) == ''

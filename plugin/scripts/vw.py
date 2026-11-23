@@ -2032,7 +2032,7 @@ def in_pictures(ws):
     return [rel(p) for p in files if p.suffix.lower() in OWN_TYPES], [rel(p) for p in files if p.suffix.lower() in NOT_READ_TYPES]
 
 
-def pictures_line(ws):
+def in_pictures_line(ws):
     read, not_read = in_pictures(ws)
     return ((f"The operator gave {len(read)} picture{'' if len(read) == 1 else 's'} in in/ ({', '.join(read)}): look at each before the treatment. " if read else '')
             + (f"Not read by the server ({', '.join(not_read)}): pictures are PNG, JPEG or WebP, up to 15 MB; ask the operator for a PNG of each. " if not_read else ''))
@@ -2473,7 +2473,7 @@ def cmd_visuals(a):
         emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0,   # design/188: no page link; the operator decides in the chat
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, then part-preparation.md (what to read first). "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
-             + cap_line(out) + told + pictures_line(ws))   # no page link: the server's visuals page is not the operator's; they get the footage line
+             + cap_line(out) + told + in_pictures_line(ws))   # no page link: the server's visuals page is not the operator's; they get the footage line
     if a.what == 'footage':   # design/88 F4: the measured footage, told; a correction only with the operator's words
         if not (a.camera or a.support or a.look):
             f = call('GET', base).get('footage') or {}
@@ -2481,7 +2481,7 @@ def cmd_visuals(a):
         out = write(base + '/footage', {'camera': a.camera, 'support': a.support, 'look': a.look, 'quote': a.quote})
         emit(out, 0, f"Corrected with the operator's words. {out.get('line')}")
     if a.what in ('check', 'propose'):
-        out = write(base + '/' + a.what, {'plan': _json_file(m, a.file), 'pictures': in_pictures(ws)[0], **({'answers': a.answers} if a.what == 'propose' and getattr(a, 'answers', None) else {})})   # release 3, C2: the question whose answer this plan follows
+        out = write(base + '/' + a.what, {'plan': _json_file(m, a.file), **({'pictures': in_pictures(ws)[0]} if in_pictures(ws)[0] else {}), **({'answers': a.answers} if a.what == 'propose' and getattr(a, 'answers', None) else {})})   # release 3, C2: the question whose answer this plan follows
         line = f"{a.what}: {out.get('status', 'saved')}"
         r = out.get('routes') or {}
         if r:   # design/65 C2: the routes, the images and the cost against the cap
