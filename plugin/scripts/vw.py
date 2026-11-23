@@ -3783,6 +3783,18 @@ def cmd_assembly(a):
         emit(out, 0, f"Assembly recorded (watched and listened); next {out.get('next') or '`vw delivery bundle`'}.")
 
 
+def download_words(manifest, skip, studio, code):
+    """(how to open the edit, what to say of the camera copies) after a download. SK, 23 Nov 2026: a package with no camera file (a film with no
+    clip in its cut) names no originals, no copies and no relink."""
+    camera = any(f.get('role') == 'original' for f in manifest['files'])
+    how = handoff.free_route_text(code) if not studio else \
+        'Resolve Studio found: `vw delivery open --originals "<folder>"` links the camera cuts to the originals and imports the timeline into Resolve (Resolve must be running with external scripting on).' if camera else \
+        'Resolve Studio found: `vw delivery open` imports the timeline into Resolve (Resolve must be running with external scripting on).'
+    copies = " The camera copies were left out: the cuts name your originals (`vw delivery download --camera` brings the copies)." if skip and camera else ''
+    copies += " The camera files are copies made by an editor: get the originals' folder and run `vw delivery relink-check --originals \"<folder>\"` before the handover." if manifest.get('camera_copies') == 'copies' else ''   # design/107 §6
+    return how, copies
+
+
 def download_bundle(m, manifest, into=None, roles=('original', 'normalised', 'narration')):
     """design/47 12.4: three at a time, one line per finished file; a failure stops before dispatch. design/107 Step C: `into` a folder (runs/VW-n/edit/),
     every file of the manifest when `roles` is None."""
@@ -3889,13 +3901,7 @@ def cmd_delivery(a):
         if not rep['ok']:
             emit({'action': 'refused', 'check': rep, 'message': 'The download is incomplete or wrong: ' + '; '.join(rep['problems'][:6]) + '. Run `vw delivery download` again: only what is missing or wrong moves.'}, 2)
         handoff.write_timeline_for(edit_dir, manifest)
-        how = handoff.free_route_text(m['code']) if found.get('edition') != 'studio' else \
-            'Resolve Studio found: `vw delivery open --originals "<folder>"` links the camera cuts to the originals and imports the timeline into Resolve (Resolve must be running with external scripting on).'
-        if skip:
-            copies = " The camera copies were left out: the cuts name your originals (`vw delivery download --camera` brings the copies)."
-        else:
-            copies = ''
-        copies += " The camera files are copies made by an editor: get the originals' folder and run `vw delivery relink-check --originals \"<folder>\"` before the handover." if manifest.get('camera_copies') == 'copies' else ''   # design/107 §6
+        how, copies = download_words(manifest, skip, found.get('edition') == 'studio', m['code'])
         emit({'resolve': found, 'check': rep, 'edit': str(edit_dir), 'open': how, 'camera_copies': manifest.get('camera_copies')}, 0, f"{words} {rep['present']} checked, {rep['cuts']} cuts, {rep['timeline_frames']} frames: the edit is in {edit_dir}.{copies} {how}")
     if a.what == 'open':   # design/107 Step F: Studio imports the timeline by scripting and reads it back; free Resolve gets the three steps
         found = handoff.find_resolve()

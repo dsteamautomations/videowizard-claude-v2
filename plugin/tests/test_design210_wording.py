@@ -4,6 +4,7 @@ waits on the page is not sent to the chat. F8: `vw next` at the visuals stage. F
 (the command file, the drawing skill, the visuals parts of version 3) say the same."""
 import argparse
 import json
+import sys
 
 import pytest
 
@@ -13,7 +14,10 @@ import vw
 
 ON_PAGE = 'on the page (`vw visuals page`)'
 CMD = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-VISUALS = next(s for s in json.loads((REPO / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+sys.path.insert(0, str(REPO / 'server'))
+from app import core as _core   # noqa: E402  SK, 23 Nov 2026: v3.json is read as a film with footage is served it
+
+VISUALS = _core.for_footage(next(s for s in json.loads((REPO / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'), 'own')
 PART = {p['name']: p['text'] for p in VISUALS['parts']}
 
 

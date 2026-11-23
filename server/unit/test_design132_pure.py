@@ -113,7 +113,8 @@ def test_the_last_recorded_gap_points_to_the_package():
 
 
 def test_the_procedure_puts_the_package_before_the_assembly():
-    d = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+    from app import core   # SK, 23 Nov 2026: v3.json as a film with footage is served it
+    d = core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')
     st = {s['name']: s for s in d['stages']}
     asm, dl = st['assembly']['steps'], st['delivery']['steps']
     assert '`vw delivery bundle`' in asm[0] and "editor's package" in asm[0] and '`vw assembly prepare`' in asm[1]

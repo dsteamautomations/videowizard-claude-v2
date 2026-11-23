@@ -154,7 +154,26 @@ def srt(cues_, fps):
     return '\n'.join(lines) + '\n'
 
 
-def open_edit_text(code):
+NO_CAMERA = (   # SK, 23 Nov 2026: what the words lose when the cut has no camera file (no clip of the film's own, no library clip)
+    ("`Media/Voiceover/` (the final narration), `Relink-list.csv` (every camera file the film uses, with its length, frame rate, timecode and fingerprint), `manifest.json`.\n"
+     "The camera files themselves are not in this folder: you hold the originals. The timeline names them by their file names, and every cut carries its source in and out.\n\n",
+     "`Media/Voiceover/` (the final narration), `manifest.json`.\nEverything the film shows is in `Media/AI/`: no other file is needed.\n\n"),
+    ('1. `vw delivery open --originals "<the folder with the camera originals>"` imports the timeline into a project named after the run and links the camera cuts to the originals in one step; ',
+     '1. `vw delivery open` imports the timeline into a project named after the run; '),
+    ("; then in the Media Pool select the camera clips, right-click, Relink, and pick the originals' folder.\n", '.\n'),
+    ("Each camera cut's marker, and its note in the cut list, says its scene and shot, the words spoken under it, whether it is B-roll, the crop and what the crop is for, any warning (a soft picture, a glance at the camera) "
+     "and what the operator decided at review (a trim, another clip). ", ''))
+
+
+def open_edit_text(code, camera=True):
+    text = _open_edit_text(code)
+    for a, b in () if camera else NO_CAMERA:
+        assert a in text, a[:60]
+        text = text.replace(a, b)
+    return text
+
+
+def _open_edit_text(code):
     return (f"# {code}: the editor's package (made once every shot was placed, before the server's assembly)\n\n"
             "What is here: `Timeline/` (the FCPXML timeline, an EDL, `Cut-list.csv`, the captions `.srt`), `Media/AI/` (every AI take, picture and drawing, the only copies),\n"
             "`Media/Voiceover/` (the final narration), `Relink-list.csv` (every camera file the film uses, with its length, frame rate, timecode and fingerprint), `manifest.json`.\n"

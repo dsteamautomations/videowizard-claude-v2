@@ -61,7 +61,8 @@ def checklist_of(assembly_summary, pk, master_summary, brief=None):
     check = ((assembly_summary.get('loudness') or {}).get('check') or {})   # design/47 12.3: what the film is, not the blueprint's figures for a film with music
     measured = (f"measured {check['integrated_lufs']} LUFS, peak {check['true_peak_dbfs']} dBTP" if check.get('integrated_lufs') is not None and check.get('true_peak_dbfs') is not None
                 else 'not measured')
-    items += [{'where': 'Fairlight', 'item': 'A2 nat-sound pieces are placed at unity in the timeline; the film used 4-frame fades and −27 dBFS peaks (API cannot set fades); match if re-rendering'},
+    items += [*([{'where': 'Fairlight', 'item': 'A2 nat-sound pieces are placed at unity in the timeline; the film used 4-frame fades and −27 dBFS peaks (API cannot set fades); match if re-rendering'}]
+                if rows else []),   # SK, 23 Nov 2026: a cut with no clip has no camera sound to match
               {'where': 'Fairlight bus', 'item': f"Master bus: the approved film is rendered to {check.get('integrated_target_lufs', -16)} LUFS integrated (the narration's target; v2 adds no music) "
                                                 f"with a {check.get('peak_ceiling_dbtp', -3)} dBTP ceiling; it {measured}. Keep that if re-rendering"},
               {'where': 'Deliver page', 'item': 'Subtitles: burn in or deliver the SRT alongside (SRT is in the package)'},
@@ -266,8 +267,8 @@ def bundle(conn, store, user, run, outputs):
     md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n' + editors_table_md(table)
     checklist = checklist + [{'section': 'editor', 'kind': r['kind'], 'rule': r['rule'], 'where': r['where'], 'shot': r['shot'], 'item': r['line']} for r in table]
     csv_text = media_pool_csv(pk).encode('utf-8')
-    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots)).encode('utf-8')
     events = resolve_events(assembly, pk, master, clips)
+    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots), camera=any(e.get('clip_id') for e in events)).encode('utf-8')
     pieces = [{'file': layout('narration', 'narration.mp3'), 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
               for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': assembly['duration_frames'], 'timeline_start_frame': 0}])]
     used = [e['clip_id'] for e in events if e.get('clip_id')]
@@ -332,7 +333,7 @@ def bundle_early(conn, store, user, run, outputs, session):
                  f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
                  f"{run['code']}.srt": (captions.encode('utf-8'), 'text/plain'), 'Cut-list.csv': (E.cut_list_csv(events, fps).encode('utf-8'), 'text/csv'),
                  'Relink-list.csv': (TL.relink_csv(clips.values(), set(used), cuts_per_clip).encode('utf-8'), 'text/csv'),
-                 'OPEN-EDIT.md': (E.open_edit_text(run['code']).encode('utf-8'), 'text/markdown')}
+                 'OPEN-EDIT.md': (E.open_edit_text(run['code'], camera=bool(used)).encode('utf-8'), 'text/markdown')}
     for name, (data, mime) in generated.items():
         k = key(run, 'delivery/' + name)
         store.put(k, data, mime)
@@ -347,7 +348,13 @@ def bundle_early(conn, store, user, run, outputs, session):
                          'inputs': early_inputs(outputs)}   # design/132 E2: the assembly's gate compares these
     save_session(store, run, session)
     return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'early': True, 'cuts': len(events),
-            'next': "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download` (no camera copies by default), then `vw delivery open --originals \"<folder>\"` on Resolve Studio."}
+            'next': early_next(bool(used))}
+
+
+def early_next(camera):
+    """What follows the early package. SK, 23 Nov 2026: a cut with no camera file asks for no folder of originals."""
+    return ("the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download` (no camera copies by default), then `vw delivery open --originals \"<folder>\"` on Resolve Studio."
+            if camera else "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download`, then `vw delivery open` on Resolve Studio.")
 
 
 NAMES = {'youtube': 'YouTube', 'tiktok': 'TikTok', 'linkedin': 'LinkedIn', 'twitter': 'X'}
@@ -384,7 +391,7 @@ def brand_lines(card, fetched):
     return items
 
 
-def open_edit_text(run, card=None, differences=None, ai=False):
+def open_edit_text(run, card=None, differences=None, ai=False, camera=True):   # camera False (SK, 23 Nov 2026): no camera file in the cut, so nothing to relink
     """OPEN-EDIT.md (design/107: a timeline file any Resolve imports, then relink to the originals; design/105: the Editor's table and the AI-shot list;
     design/50: the brand section and the recorded differences). On the operator's computer, Windows or Mac."""
     code = run['code']
@@ -397,7 +404,11 @@ def open_edit_text(run, card=None, differences=None, ai=False):
             "5. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do, and ends with the Editor's table: suggestions from the film's data, one line each; nothing in it is applied.\n")
     if ai:   # design/105 E-c
         text += "6. AI-shots.md lists every AI shot with its timecode: tick the platform's AI-generated or altered-content option when uploading.\n"
-    text += ("\n## Relink to the full-quality originals\n\n"
+    if not camera:
+        text = text.replace(' and the nat sound on A2; A3 and A4 are yours.', '; the other sound tracks are yours.')
+    text += ("\nEvery file of this film is in this folder (Media/AI/ and Media/Voiceover/): nothing has to be linked to another file.\n"
+             "\nOn Resolve Studio the plugin can do the import itself and export the project (.drp) and the timeline (.drt) into Timeline/.\n") if not camera else (
+             "\n## Relink to the full-quality originals\n\n"
              "Media/Camera/ holds the camera files as they were uploaded, which may be compressed copies. Media/AI/ and Media/Voiceover/ are made by VideoWizard and never need relinking.\n\n"
              "1. In the Media Pool, select the camera clips, right-click, Relink, and pick the folder that holds the originals. Resolve matches by file name and timecode; every cut moves to the original.\n"
              "2. Relink-list.csv has one line per camera file: name, length, frame rate, size and timecode, so a renamed original can be found. When the originals' names differ, import the relinked timeline the relink check writes instead.\n"
