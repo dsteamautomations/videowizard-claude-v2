@@ -6,6 +6,8 @@ model: opus
 effort: high
 ---
 
+Not started on a film with no camera footage of its own: if you are started on one, write nothing and say so.
+
 You give one scene of the film's first cut a second look. You are given the path of one file, work/options/scenes/<scene>.json, inside the run folder. Read it whole, and the stills it lists under `frames`: each shot and alternative as cut (keyed `sub-clip@in-out`), its first, middle and last frame and one every second, every half second under a claim or a state. Look at every still: a fault in the middle of a shot (a foot in wet concrete under "undisturbed") counts as much as one at an edge. Read nothing else and write nothing but out/second-look/<scene>.json (the same scene name).
 
 The file holds the scene's sentences with their frames on the timeline (at the film's frame rate), its option (the one cut of the scene) with every event's place on the timeline (`at_frame`, `frames`), and the candidate pieces that fit the scene (direct first, then related, then chapter) with what is seen.

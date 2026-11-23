@@ -2402,14 +2402,15 @@ def health():
 
 
 @app.get('/api/procedures/{version}/{stage}')
-def procedure(version: str, stage: str, user=User):
-    """Procedure text for the executor only: it is never written to disk by the plugin and never shown in the UI."""
+def procedure(version: str, stage: str, run: UUID | None = None, user=User, conn=DB):
+    """Procedure text for the executor only: it is never written to disk by the plugin and never shown in the UI. With `run` (the tool always
+    sends it), the text is the one that run reads: a film with no camera footage is never given a step about clips (SK, 23 Nov 2026)."""
     if user['kind'] != 'executor':
         raise Problem(403, 'EXECUTOR_ONLY', 'Procedures are available to the operator tool only.')
     stages = core.stage_table(version)
     if stages is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
-    st = core._stage(stages, stage)
+    st = core._stage(stages, stage, core.footage_of(core.load_run(conn, user, run)) if run else 'own')
     return Response({k: st.get(k) for k in core.PROCEDURE_KEYS})
 
 

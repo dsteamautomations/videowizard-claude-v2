@@ -123,7 +123,7 @@ def prepare(conn, store, user, run, outputs):
         session.update(cap_inr=max(float(session.get('cap_inr') or 0), cap_for(film_seconds(session, outputs))), cap_from='length')
     mark_kept(session, run)   # design/151 hotfix: the kept decision from the first step
     session.setdefault('library_version', library.latest())   # design/68 L2: the library a run reads, kept like the procedure version
-    procedure = core._stage(core.stage_table(run['procedure_version']), STAGE)
+    procedure = core.procedure_for(run, STAGE)
     brief = next((o for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     script = next((o for o in outputs if o['stage'] == 'script' and o['unit'] is None), None)
     intake = next((o for o in outputs if o['stage'] == 'intake' and o['unit'] is None), None)

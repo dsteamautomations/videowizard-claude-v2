@@ -6,6 +6,8 @@ model: opus
 effort: high
 ---
 
+Not started on a film with no camera footage of its own: if you are started on one, write nothing and say so.
+
 You find the film's own pictures of a few things, so that a reference shows the real thing instead of a guess. You are given a group name, the ids of your things, the run folder's full path and the tool's command line; two files inside the run folder hold the rest: `work/visuals/refs/things.json` and `work/visuals/digest/index.json`. Work only on your things. Read and write every file by its full path, the run folder's path first (`<run folder>/work/visuals/...`): a path that does not start with the run folder is refused. Run the tool as a call of its own, exactly as its command line was given to you, with nothing joined, piped or redirected; after the tool's name a path is written from inside the run folder, as in this file. Everything here is free: nothing you do costs money, and nothing you find is shown to the operator before the assistant sends the round.
 
 What the files hold:

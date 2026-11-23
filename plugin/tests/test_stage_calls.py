@@ -31,6 +31,8 @@ class Fake:
             return STAGES['intake'], 0
         if path == '/api/runs/run-1':
             return self.run, 0
+        if path.endswith('/film'):   # the footage answer, recorded with the title (SK, 23 Nov 2026)
+            return {'film': {'footage': {'value': kw['json']['value']}}}, 0
         if path.endswith('/output'):
             row = {'id': 'out-1234567890', 'stage': 'intake'}
             if self.record_next:
@@ -77,7 +79,7 @@ def test_prepare_fetches_run_and_procedure_side_by_side(harness, capsys):
     elapsed = time.monotonic() - started
     assert code == 0, err
     paths = sorted(p for _, p, _ in fake.calls)
-    assert paths == ['/api/procedures/2/intake', '/api/runs/run-1'] and '/api/runs/run-1/next' not in paths
+    assert paths == ['/api/procedures/2/intake?run=run-1', '/api/runs/run-1'] and '/api/runs/run-1/next' not in paths   # the run is sent: the text is the one this film reads
     assert all(t != 'MainThread' for _, _, t in fake.calls) and elapsed < 0.35   # side by side: not 0.4 s of serial waiting
     assert out['not_shareable'].startswith('The stage prompt') and 'VW-3: Earlier film' in out['prompt']
 
@@ -94,10 +96,10 @@ def test_record_fetches_the_run_alone_uploads_in_parallel_and_prints_next(harnes
     run(vw.cmd_stage, args(), capsys)
     fake.calls.clear()
     (ws / 'out' / 'intake.json').write_text(json.dumps({'remove': [], 'titles': ['Earth Blocks - Explainer'], 'notes': ''}), encoding='utf-8')
-    code, out, err = run(vw.cmd_stage, args(step='record', title='Earth Blocks - Explainer', quote='yes'), capsys)
+    code, out, err = run(vw.cmd_stage, args(step='record', title='Earth Blocks - Explainer', quote='yes', footage='none'), capsys)
     assert code == 0, err
     paths = [p for _, p, _ in fake.calls]
-    assert paths == ['/api/runs/run-1', '/api/runs/run-1/output']   # no next, no procedure
+    assert paths == ['/api/runs/run-1', '/api/runs/run-1/film', '/api/runs/run-1/output']   # no next, no procedure; the footage answer first
     assert sorted(n for n, _ in uploaded) == ['intake.json', 'original.txt', 'source.txt']
     assert all(t != 'MainThread' for _, t in uploaded)
     assert 'Recorded intake. Next: brief.' in err
@@ -109,7 +111,7 @@ def test_record_on_an_older_server_still_says_run_next(harness, capsys, ws):
     fake.record_next = False
     run(vw.cmd_stage, args(), capsys)
     (ws / 'out' / 'intake.json').write_text(json.dumps({'remove': [], 'titles': ['Earth Blocks - Explainer'], 'notes': ''}), encoding='utf-8')
-    code, _, err = run(vw.cmd_stage, args(step='record', title='Earth Blocks - Explainer', quote='yes'), capsys)
+    code, _, err = run(vw.cmd_stage, args(step='record', title='Earth Blocks - Explainer', quote='yes', footage='none'), capsys)
     assert code == 0 and 'Run `vw next`' in err
 
 
@@ -120,7 +122,7 @@ def test_old_manifest_without_version_falls_back_to_serial_calls(harness, capsys
     vw.save_json(ws / 'manifest.json', m)
     code, _, err = run(vw.cmd_stage, args(), capsys)
     assert code == 0, err
-    assert [p for _, p, _ in fake.calls] == ['/api/runs/run-1', '/api/procedures/2/intake']
+    assert [p for _, p, _ in fake.calls] == ['/api/runs/run-1', '/api/procedures/2/intake?run=run-1']
     assert all(t == 'MainThread' for _, _, t in fake.calls)
 
 
@@ -163,3 +165,19 @@ def test_start_keeps_last_brief_and_client_rules_and_tolerates_their_absence(mon
         m = vw.load_json(tmp_path / 'runs' / code / 'manifest.json')
         assert (m['last_brief'] is not None) is expect_brief and len(m['client_rules']) == expect_rules and m['version'] == '2'
         assert (m['last_voice'] is not None) is expect_brief   # design/39 4.2: present with the brief, absent on an older server
+
+
+def test_intake_record_waits_for_the_footage_answer_until_the_run_has_one(harness, capsys, ws):
+    """SK, 23 Nov 2026: the footage answer is asked with the title; the record refuses without it, and a run that has it is not asked again."""
+    fake, _ = harness
+    run(vw.cmd_stage, args(), capsys)
+    (ws / 'out' / 'intake.json').write_text(json.dumps({'remove': [], 'titles': ['Earth Blocks - Explainer'], 'notes': ''}), encoding='utf-8')
+    fake.calls.clear()
+    code, out, _ = run(vw.cmd_stage, args(step='record', title='Earth Blocks - Explainer', quote='yes'), capsys)
+    assert code == 2 and out['action'] == 'refused' and '--footage own' in out['message'] and '--footage none' in out['message']
+    assert not any(p.endswith(('/film', '/output')) for _, p, _ in fake.calls)   # nothing was recorded
+    fake.run['film'] = {'footage': {'value': 'own'}}
+    fake.calls.clear()
+    code, _, err = run(vw.cmd_stage, args(step='record', title='Earth Blocks - Explainer', quote='yes'), capsys)
+    assert code == 0, err
+    assert [p for _, p, _ in fake.calls] == ['/api/runs/run-1', '/api/runs/run-1/output']

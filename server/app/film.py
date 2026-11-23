@@ -23,7 +23,8 @@ RETIRED_SHAPES = ('1:1', '4:5', 'square')   # SK, 2 Nov 2026 (design/138 A3): ke
 RATES = (24, 25, 30, 50, 60)                # design/139 Q2: whole rates; 23.976, 29.97 and 59.94 are offered as 24, 30 and 60
 FONTS = {'Noto Sans': 'NotoSans-Variable.ttf', 'Inter': 'Inter-Variable.ttf', 'Roboto': 'Roboto-Variable.ttf',
          'Montserrat': 'Montserrat-Variable.ttf', 'Lato': 'Lato-Regular.ttf'}   # design/139 Q4: files under server/fonts (renders have no network)
-LOCKS = {'category': 'visuals', 'shape': 'analysis', 'colours': None, 'font': None, 'motion': None}   # the stage whose first job fixes the choice
+LOCKS = {'category': 'visuals', 'shape': 'analysis', 'colours': None, 'font': None, 'motion': None, 'footage': None}   # the stage whose first job fixes the choice (footage: fixed by the media record, in `record`)
+FOOTAGE = ('own', 'none')   # SK, 23 Nov 2026: camera footage of the film's own, or none (asked with the title)
 OLDER = {'category': library.DEFAULT_CATEGORY, 'frame': '16:9', 'fps': 25, 'font': 'Noto Sans'}
 
 
@@ -183,6 +184,12 @@ def _value(run, key):
     return ((choices(run) or {}).get(key) or {})
 
 
+def footage(run):
+    """'none' when the operator said the film has no camera footage of its own; 'own' otherwise (every film from before the question)."""
+    from . import core
+    return core.footage_of(run)
+
+
 def category(run):
     return OLDER['category'] if older(run) else _value(run, 'category').get('value')
 
@@ -267,6 +274,10 @@ def check(key, value, video=None, fps=None, scripts=None):
         if value not in library.CATEGORIES:
             raise Problem(422, 'FILM_CHOICE', f'{value!r} is not a category; use one of: {", ".join(library.CATEGORIES)}.')
         return {'value': value}
+    if key == 'footage':
+        if value not in FOOTAGE:
+            raise Problem(422, 'FILM_CHOICE', 'Does this film have camera footage of its own? Record `own` (it has clips shot for it) or `none` (it has no clips: pictures and AI only).')
+        return {'value': value}
     if key == 'shape':
         for v in (value, video):
             if v in RETIRED_SHAPES:
@@ -317,6 +328,8 @@ def record(conn, user, run, key, value, quote, video=None, fps=None, scripts=Non
         if key == 'shape':
             raise Problem(409, 'FILM_LOCKED', f'The shape cannot change now: {why}. Ask the builder if the film must change shape.')
         raise Problem(409, 'FILM_LOCKED', f'The {key} cannot change now: {why}.')
+    if key == 'footage' and conn.execute("select 1 from vw2_stage_outputs where run_id=%s and stage='media' and not stale limit 1", (run['id'],)).fetchone():
+        raise Problem(409, 'FILM_LOCKED', 'The footage answer cannot change now: the media step is recorded with it. Ask the builder if the film must change.')
     doc = {**doc, **({'scripts': sorted(scripts)} if key == 'font' and scripts else {}), 'quote': quote, 'by': user.get('name') or user.get('id'), 'at': datetime.now(timezone.utc).isoformat()}
     row = conn.execute("update vw2_runs set film = coalesce(film, '{}'::jsonb) || jsonb_build_object(%s::text, %s::jsonb) where id=%s returning film",
                        (key, Json(doc), run['id'])).fetchone()

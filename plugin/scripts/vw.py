@@ -1396,6 +1396,14 @@ def cmd_stage(a):
                 if not (a.quote or '').strip():
                     emit({'action': 'refused', 'message': "--category is the operator's answer: pass their words with --quote. Nothing was recorded."}, 2)
                 write(f"/api/runs/{m['run_id']}/film", {'key': 'category', 'value': a.category, 'quote': a.quote})
+            footage = getattr(a, 'footage', None)   # SK, 23 Nov 2026: asked with the title; the media step and every instruction after it read it
+            if footage:
+                if not (a.quote or '').strip():
+                    emit({'action': 'refused', 'message': "--footage is the operator's answer: pass their words with --quote. Nothing was recorded."}, 2)
+                write(f"/api/runs/{m['run_id']}/film", {'key': 'footage', 'value': footage, 'quote': a.quote})
+            elif not ((full.get('film') or {}).get('footage') or {}).get('value'):
+                emit({'action': 'refused', 'message': 'Ask the operator, with the title: does this film have camera footage of its own? Then `--footage own` (clips were shot for it) '
+                                                      'or `--footage none` (no clips: pictures and AI only). Nothing was recorded.'}, 2)
             result = record(ws, procedure, prior, a.title, m.get('client') or '')
         elif a.stage == 'brief':
             result = record(ws, procedure, prior, client_card=m.get('client_card') or {})   # design/50 C
@@ -1445,16 +1453,16 @@ def run_and_procedure(m, stage, with_procedure):
     version = m.get('version')
     if not with_procedure or not version:
         full = call('GET', f"/api/runs/{m['run_id']}")
-        return full, (call('GET', f"/api/procedures/{full['procedure_version']}/{stage}") if with_procedure else None)
+        return full, (call('GET', f"/api/procedures/{full['procedure_version']}/{stage}?run={m['run_id']}") if with_procedure else None)
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=2) as pool:
         f_run = pool.submit(request, 'GET', f"/api/runs/{m['run_id']}")
-        f_proc = pool.submit(request, 'GET', f"/api/procedures/{version}/{stage}")
+        f_proc = pool.submit(request, 'GET', f"/api/procedures/{version}/{stage}?run={m['run_id']}")
         (full, code_run), (procedure, code_proc) = f_run.result(), f_proc.result()
     if code_run:
         finish(full, code_run)
     if full.get('procedure_version') != version:  # adopted to another version since start: fetch that one
-        return full, call('GET', f"/api/procedures/{full['procedure_version']}/{stage}")
+        return full, call('GET', f"/api/procedures/{full['procedure_version']}/{stage}?run={m['run_id']}")
     if code_proc:
         finish(procedure, code_proc)
     return full, procedure
@@ -4123,7 +4131,7 @@ def build_parser():
     s = sub.add_parser('defect', help=DEFECT_HELP, description=DEFECT_HELP); s.add_argument('--stage'); s.add_argument('--shot'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('clients'); s.add_argument('--search'); s.set_defaults(fn=cmd_clients)
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
-    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--category', help='intake record: the category the operator chose with the title (design/192)'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
+    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--category', help='intake record: the category the operator chose with the title (design/192)'); s.add_argument('--footage', choices=['own', 'none'], help='intake record: does the film have camera footage of its own (asked with the title)'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
     for f in ('--camera', '--support', '--look', '--footage-note'):   # design/126 ME1: refused by name; the footage is measured at visuals
         s.add_argument(f, help=argparse.SUPPRESS)

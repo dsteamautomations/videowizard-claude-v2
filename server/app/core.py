@@ -286,11 +286,46 @@ def attempts_for(conn, run_id):
 
 # ---------- next ----------
 
-def _stage(stages, name):
+FOOTAGE_MARKS = {'own': '[footage]', 'none': '[no footage]'}
+
+
+def for_footage(value, kind):
+    """SK, 23 Nov 2026 (films with no camera footage): the instruction text as one kind of film reads it. A line that starts `[footage]` is for a
+    film with camera footage of its own, a line that starts `[no footage]` for a film without, a line with no mark for every film; the mark is
+    never shown. A step (a list entry) with nothing left is dropped. Modelled on `library.for_category`; the stored text is not changed."""
+    if kind not in FOOTAGE_MARKS:
+        raise ValueError(f'footage is own or none, not {kind!r}')
+    if isinstance(value, dict):
+        return {k: for_footage(v, kind) for k, v in value.items()}
+    if isinstance(value, list):
+        return [v for v in (for_footage(x, kind) for x in value) if v != '']
+    if not isinstance(value, str) or '[' not in value:
+        return value
+    out = []
+    for line in value.splitlines(keepends=True):
+        mark = next((m for m in FOOTAGE_MARKS.values() if line.lstrip().startswith(m)), None)
+        if not mark:
+            out.append(line)
+        elif mark == FOOTAGE_MARKS[kind]:
+            out.append(line.replace(mark, '', 1).lstrip(' '))
+    return ''.join(out)
+
+
+def footage_of(run):
+    """'none' for a film whose operator said it has no camera footage of its own; 'own' for every other film, those from before the question too."""
+    return (((run or {}).get('film') or {}).get('footage') or {}).get('value') or 'own'
+
+
+def _stage(stages, name, footage='own'):
     st = next((s for s in stages if s['name'] == name), None)
     if not st:
         raise Problem(422, 'UNKNOWN_STAGE', f'Stage {name!r} is not in this procedure version.')
-    return st
+    return for_footage(st, footage)
+
+
+def procedure_for(run, name):
+    """The stage as this run reads it: every reader of instruction text for a run (the procedure route, the first-cut package, the visuals package) goes through here."""
+    return _stage(stage_table(run['procedure_version']), name, footage_of(run))
 
 
 def declared_units(outputs, stage_name):
