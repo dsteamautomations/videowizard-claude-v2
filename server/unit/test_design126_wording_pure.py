@@ -4,7 +4,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v2.json').read_text(encoding='utf-8'))['stages']}
-V3 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages']}
+V3 = {s['name']: __import__('app.core', fromlist=['for_footage']).for_footage(s, 'own')   # as a film with camera footage reads it (SK, 23 Nov 2026: the text is marked per kind of film)
+      for s in json.loads((ROOT / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages']}
 
 
 def flat(t):

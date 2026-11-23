@@ -170,7 +170,9 @@ def learned_rules(conn, run):
 
 def prepare(conn, store, user, run, outputs):
     from .. import brandlib
-    brandlib.need_marked(run)   # design/147 L1: a new film's first cut waits for the brand-generic answer; films from before skip it
+    none = film.footage(run) == 'none'   # SK, 23 Nov 2026: a film with no camera footage of its own has no clip to study and none to mark
+    if not none:
+        brandlib.need_marked(run)   # design/147 L1: a new film's first cut waits for the brand-generic answer; films from before skip it
     procedure = core.procedure_for(run, 'options')
     brief_o, script_o, voice_o, media_o = (_output(outputs, s) for s in ('brief', 'script', 'voice', 'media'))
     brief, _ = _file(store, brief_o, 'brief.json')
@@ -208,8 +210,11 @@ def prepare(conn, store, user, run, outputs):
             rows.append(P.sub_clip_row(clip, log, sub, timeline(run)['fps'], by_sentence))
             landmarks.update((sub.get('continuity_and_story') or {}).get('world_landmarks_and_props') or [])
         entities.extend({'clip_id': clip['id'], **e} for e in log.get('entities') or [])
-    if not rows:
+    if not rows and not none:
         raise Problem(409, 'NOT_ALLOWED', 'No analysed clips; run analysis first.')
+    if none and policy is None:   # no clip log carries the policy: nobody is filmed and no camera sound exists (the library round re-checks its pieces under it)
+        from .. import analysis
+        policy = analysis.speaker_policy(media_o['summary'], production)
     grouped = looks.groups({o['unit']: o['summary'].get('look') for o in outputs if o['stage'] == 'analysis' and o['unit'] is not None and not o['summary'].get('excluded')})
     for r in rows:   # design/142 R5: the colour group is the server's own measure, not the analysis's label
         r['color_group'] = grouped.get(r['clip_id'])
@@ -293,10 +298,54 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     session['renders'].pop('review', None)
     save_session(store, run, session)
     out = prepare(conn, store, user, run, outputs)
+    if film.footage(run) == 'none':
+        out = {**out, **_no_footage_cut(conn, store, user, run, outputs, quote)}
     return {**out, 'scenes': [{k: b[k] for k in ('beat_id', 'title', 'target_beat_frames', 'process_stages')} | {'seconds': round(b['target_beat_frames'] / timeline(run)['fps'], 2),
                                                                                                                   'pauses': [{'after_word_id': p['after_word_id'], 'inserted_s': round(p['inserted_frames'] / timeline(run)['fps'], 2)} for p in b['pauses']]}
                                 for b in bs],
             'film_seconds': round(plan['total_frames'] / timeline(run)['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / timeline(run)['fps'], 2)}   # design/126 OP2: a scene lists every chapter its paragraph covers; no warning
+
+
+NO_FOOTAGE = 'this film has no camera footage of its own'
+LIBRARY_NEXT = ("the client's library holds pieces this film may use: `vw options library` lists them with what each shows. Author out/options.json (shape in shapes.json) with a "
+                'library piece only where it truly shows the words; every other scene is one blank with `none_fit`. Then `vw options check`, `vw options propose`, the review film and '
+                'the master as their answers say.')
+
+
+def blank_options(pk):
+    """SK, 23 Nov 2026: the cut of a film with no clip at all, as the options contract wants it: every scene one blank for the visuals stage."""
+    return {'contract': CONTRACT_OPTIONS, 'qc_self': {f'Q{i}': {'pass': True, 'evidence': NO_FOOTAGE} for i in range(1, 9)},
+            'options': [{'option_number': i + 1, 'beat_id': bt['beat_id'], 'reasoning': NO_FOOTAGE, 'log_fields_cited': ['none'], 'best_unchosen': {'sub_clip_id': '', 'rule': NO_FOOTAGE},
+                         'events': [{'blank': True, 'timeline_frames': bt['target_beat_frames'], 'intent': bt.get('title') or '', 'none_fit': NO_FOOTAGE}]} for i, bt in enumerate(pk['beats'])]}
+
+
+def _no_footage_cut(conn, store, user, run, outputs, quote):
+    """SK, 23 Nov 2026: what follows the approved scenes on a film with no camera footage. The client's library has pieces this film can use:
+    the cut goes the usual way with them (authored, checked, watched, approved). It has none: the server writes the cut itself, every scene one
+    stretch for the visuals stage, and records the options, the master and the first cut with the operator's words on the scenes; no film is
+    rendered and none is watched, since it would show only cards. One flow for the tool and a page: both record scenes through `set_scenes`."""
+    found = library(conn, store, user, run, outputs).get('candidates') or []
+    if found:
+        return {'library': {'pieces': len(found), 'clips': sorted({c['clip_name'] for c in found if c.get('clip_name')})}, 'next': LIBRARY_NEXT}
+    propose(conn, store, user, run, blank_options(_package(store, session_of(store, run))))
+    session = session_of(store, run)
+    doc, entry = current(store, session)
+    at = datetime.now(timezone.utc).isoformat()
+    for sl in _slides(store, session, doc, entry):
+        if _answerable(sl):
+            session['decisions'][str(sl['no'])] = {'action': 'KEEP', 'type': sl['type'], 'note': NO_FOOTAGE, 'by': 'server', 'at': at}
+    save_session(store, run, session)
+    record_options(conn, store, user, run, quote, {'how': 'no_footage'}, film_needed=False)
+    build_master(conn, store, user, run)
+    rec = record_master(conn, store, user, run, quote, film_needed=False)
+    return {'first_cut': 'written', 'gaps': rec['gaps'],
+            'next': 'The server wrote the first cut: every scene is one stretch for the visuals stage, and the options, the master and the first cut are recorded with these words. '
+                    'Nothing is rendered or watched. Next: visuals (`vw next`).'}
+
+
+def _film_less(run):
+    if film.footage(run) != 'none':
+        raise Problem(409, 'NOT_ALLOWED', 'A first cut is recorded with its film; only a film with no camera footage of its own is recorded without one, by the server.')
 
 
 def coverage(store, run):
@@ -623,7 +672,7 @@ def _ready_film(session, kind, plan_digest):
     return r['result']
 
 
-def record_options(conn, store, user, run, quote, approved_by=None):
+def record_options(conn, store, user, run, quote, approved_by=None, film_needed=True):
     """The options output, recorded by the first slide answer (design/98 D2, D6): approved_by {'how': 'first_answer', 'slide': …}. The explicit
     approval beside it is retired (design/125 P14), refused."""
     if not approved_by:
@@ -632,9 +681,11 @@ def record_options(conn, store, user, run, quote, approved_by=None):
     doc, entry = current(store, session)
     _same_package(store, session, entry)
     _refresh(conn, store, run, session)
-    film = _ready_film(session, 'review', entry['digest'])
+    if not film_needed:   # SK, 23 Nov 2026: the server's own record of a cut with no clip in it
+        _film_less(run)
+    review = _ready_film(session, 'review', entry['digest']) if film_needed else None
     files = [{'name': f"options-v{entry['version']}.json", **{k: entry['file'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True},
-             {'name': 'review.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True},
+             *([{'name': 'review.mp4', 'key': review['key'], 'sha256': review['sha256'], 'bytes': review['bytes'], 'location': 'storage', 'receipt': True}] if review else []),
              {'name': 'package.json', **{k: session['package'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True}]
     for f in files:
         jobs.record_file(conn, run['id'], 'options', f['key'], f['name'], f['sha256'], f['bytes'], 'application/json' if f['name'].endswith('.json') else 'video/mp4')
@@ -646,7 +697,7 @@ def record_options(conn, store, user, run, quote, approved_by=None):
                                                     'slides': len(entry.get('slides') or []), 'shots': sum(1 for s in entry.get('slides') or [] if s['type'] == 'shot'),
                                                     'ai_shots': sum(1 for s in entry.get('slides') or [] if s['type'] == 'ai'),
                                                     'alternatives': sum(1 for s in entry.get('slides') or [] if s['type'] == 'alternative'), 'scene_summary': entry.get('scenes'),
-                                                    'review_film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s')}, 'inspection_cost': inspection_cost,
+                                                    'review_film': {'sha256': review['sha256'], 'duration_s': review.get('duration_s')} if review else None, 'inspection_cost': inspection_cost,
                                                     **({'approved_by': approved_by} if approved_by else {})}})
     session['accepted'] = {'version': entry['version'], 'digest': entry['digest'], 'quote': quote, 'output': str(out['id']),
                            **({'approved_by': {**approved_by, 'at': datetime.now(timezone.utc).isoformat()}} if approved_by else {})}
@@ -1185,27 +1236,30 @@ def _finishing(pk, events):
 FIRST_CUT_WORDS = "The approval must say the operator watched the film and listened to it (both words), e.g. 'yes, watched and listened'."
 
 
-def _first_cut_output(conn, user, run, master_id, film, summary, quote):
+def _first_cut_output(conn, user, run, master_id, film, summary, quote, movie=True):   # movie False: a film with no footage; its file is the master's plan
     """The approved master film as the first cut: hash-bound to the film, the master's gaps and timeline (design/17 A50)."""
-    files = [{'name': 'first-cut.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}]
+    files = [{'name': 'first-cut.mp4' if movie else film['name'], 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}]
     return core.output(conn, user, run, {'stage': 'first_cut', 'files': files, 'accepted_quote': quote,
-                                         'summary': {'movie_sha256': film['sha256'], 'master_output': str(master_id), 'plan_digest': summary['plan_digest'], 'fps': summary['fps'],
+                                         'summary': {'movie_sha256': film['sha256'] if movie else None, 'master_output': str(master_id), 'plan_digest': summary['plan_digest'], 'fps': summary['fps'],
                                                      'resolution': summary['resolution'], 'duration_frames': summary['duration_frames'], 'gaps': summary['gaps']}})
 
 
-def record_master(conn, store, user, run, quote):
-    """design/44 8.4: one approval records the master and the first cut; the quote must say watched and listened."""
+def record_master(conn, store, user, run, quote, film_needed=True):
+    """design/44 8.4: one approval records the master and the first cut; the quote must say watched and listened. SK, 23 Nov 2026: the server's own
+    record of a cut with no clip in it (`film_needed` False, a film with no camera footage only) has no film to watch: its words are the scenes'."""
+    if not film_needed:
+        _film_less(run)
     session = session_of(store, run)
     m = session.get('master')
     if not m:
         raise Problem(409, 'NOT_ALLOWED', 'Build the master first.')
     q = (quote or '').lower()
-    if 'watch' not in q or 'listen' not in q:
+    if film_needed and ('watch' not in q or 'listen' not in q):
         fail(FIRST_CUT_WORDS)
     _refresh(conn, store, run, session)
-    film = _ready_film(session, 'master', m['digest'])
+    film = _ready_film(session, 'master', m['digest']) if film_needed else None
     files = [{'name': f"master-v{m['version']}.json", **{k: m['file'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True},
-             {'name': 'master.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}]
+             *([{'name': 'master.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}] if film else [])]
     for f in files:
         jobs.record_file(conn, run['id'], 'master', f['key'], f['name'], f['sha256'], f['bytes'], 'application/json' if f['name'].endswith('.json') else 'video/mp4')
     # learned rules (design/43 7.5): only the rules the operator confirmed; rejection notes stay on this run's decisions
@@ -1216,9 +1270,10 @@ def record_master(conn, store, user, run, quote):
         added += 1
     summary = {'version': m['version'], 'plan_digest': m['digest'], 'fps': str(timeline(run)['fps']), 'resolution': [timeline(run)['width'], timeline(run)['height']], 'duration_frames': plan['duration_frames'],
                'gaps': plan['gaps'], 'units': {'visuals': [g['shot_id'] for g in plan['gaps']]}, 'events': m['events'], 'learned_rules_added': added,
-               'film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s'), 'mix': (film.get('record') or {}).get('mix')}}
+               'film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s'), 'mix': (film.get('record') or {}).get('mix')} if film else None,
+               **({} if film else {'written_by': 'server'})}
     out = core.output(conn, user, run, {'stage': 'master', 'files': files, 'accepted_quote': quote, 'summary': summary})
-    first = _first_cut_output(conn, user, run, out['id'], files[1], summary, quote)
+    first = _first_cut_output(conn, user, run, out['id'], files[-1], summary, quote, movie=bool(film))
     session['recorded']['master'] = str(out['id'])
     session['recorded']['first_cut'] = str(first['id'])
     save_session(store, run, session)

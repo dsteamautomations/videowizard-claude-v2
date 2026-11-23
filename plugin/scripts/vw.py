@@ -3556,6 +3556,8 @@ def cmd_options(a):
     if a.what == 'scenes':
         out = write(base + '/scenes', {'document': _json_file(m, a.file), 'quote': a.quote or ''}, wait=300)
         files = download_options_package(m, out['package']['key'])
+        if out.get('first_cut') or out.get('library'):   # SK, 23 Nov 2026: a film with no camera footage; the server says what follows (it wrote the cut, or the library has pieces)
+            emit({**out, 'files': files}, 0, f"Scenes and pauses recorded: {len(out['scenes'])} scenes, film {out['film_seconds']} s ({out['inserted_seconds']} s of pauses added). {out['next']}")
         emit({**out, 'files': files}, 0, f"Scenes and pauses recorded: {len(out['scenes'])} scenes, film {out['film_seconds']} s ({out['inserted_seconds']} s of pauses added). "
              f"Package refreshed in work/options/ ({len(files)} files); show the coverage report next."
              + (f" FIT NOTE, tell the operator: {out['fit_note']}" if out.get('fit_note') else '') + (f" CHAPTER NAMES: {out['chapters_note']}" if out.get('chapters_note') else ''))
