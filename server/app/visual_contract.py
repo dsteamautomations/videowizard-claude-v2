@@ -1447,6 +1447,7 @@ WARNING_PLAIN = {
     'graphic_short': 'This graphic is on screen too briefly to be read.',
     'still_long': 'This still picture stays on screen longer than a still should.',
     'stills_many': 'Still pictures take up a large part of the film.',   # design/202
+    'over_limit': "The estimate for this film is above its cost limit.",   # SK, 23 Nov 2026 (no footage, V1)
     'still_more_than_agreed': 'This gap has more still picture than you accepted in the treatment.',   # design/207 (SK, 16 Nov 2026): this and the next two are raised by other parts of the server
     'text_card': "This is a card of words; this kind of film carries no words on the picture beyond a diagram's labels.",
     'stand_in_real': 'This person is real and named, but the picture will be a made-up stand-in.',

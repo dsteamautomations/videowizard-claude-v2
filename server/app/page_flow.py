@@ -680,7 +680,7 @@ def _refs_lines(ctx):
         item = items[eid]
         person, drawn = item['_person'], _drawn(session, eid)
         live = [f for f in item['_frames'] if (session['references'].get(f) or {}).get('status') in ('candidate', 'approved')][:4]
-        seen = ('This is how {x} looks in your footage. ' if live else 'Your footage has no picture of {x}. ').format(x='this person' if person else 'it')
+        seen = CF.no_clip_words(session, ('This is how {x} looks in your footage. ' if live else 'Your footage has no picture of {x}. ').format(x='this person' if person else 'it'))
         text = (seen + f"A reference set is made for every person{', even with footage' if live else ''} ({paid}): from the description, or from their photo when you have their permission." if person else
                 seen + f'It has approved reference drawings, so a reference set is made from them, even with footage ({paid}).' if drawn else
                 seen + 'A yes takes the footage picture as its reference: no picture is made and nothing is paid.' if live else

@@ -421,7 +421,7 @@ def _round_items(ctx, every=False):
             elif mine:
                 q, yes = f"{names[eid]}: your own picture is its reference. Use it?", 'Yes, use it'
             else:
-                q, yes = f"{names[eid]}: your footage has no picture of {'this person' if person else 'it'}. Have a reference set made (paid)?", 'Yes, make one'
+                q, yes = no_clip_words(session, f"{names[eid]}: your footage has no picture of {'this person' if person else 'it'}. Have a reference set made (paid)?"), 'Yes, make one'
 
             def run_(choice, quote, words, eid=eid, own=None):
                 s = V.session_of(ctx['store'], run, ctx['outputs'])
@@ -855,6 +855,11 @@ def _used(facts, where, short=False):
     return WORDS['used'].format(shots=_n(len(shots), 'shot'), size=size, where=where.get(near.get('shot')) or WORDS['shot_unnumbered'].format(gap=where.get('#', {}).get(near.get('gap'), '?')))
 
 
+def no_clip_words(session, text):
+    """SK, 23 Nov 2026 (F12): a film with no clip (none of its own, no library clip in its cut) is never told what its footage lacks."""
+    return re.sub(r'Not in your footage\. |[Yy]our footage has no picture of (?:it|this person)\. | not in your footage', '', text) if V.no_real_clip(session) else text
+
+
 def _search_words(found, frames):
     """What the footage has of a thing, from the search record (`ref_find.found_all`) and the pictures that stand: (the sentence, its reason).
     design/212: a thing the footage does not show is said in three words, "Not in your footage.", with the reason behind "why". The clips
@@ -1055,7 +1060,7 @@ def _round_v2(ctx, every, step):
                 tick = {'use': WORDS['tick_use'], 'set': WORDS['tick_set'], 'fix': WORDS['tick_set']}
             elif case == 'closest' and any(x[1] == 'use' for x in acts):
                 tick = {'use': WORDS['tick_closest']}
-            said, why = (WORDS['own_is'], '') if mine else (WORDS['auto'], _search_words(fnd, frames)[1]) if auto else _search_words(fnd, frames)
+            said, why = (WORDS['own_is'], '') if mine else (no_clip_words(session, WORDS['auto']), _search_words(fnd, frames)[1]) if auto else _search_words(fnd, frames)
             tag = {'use': WORDS['tag_use'], 'set': WORDS['set'], 'ignore': WORDS['leave']}.get(sug or want, str(rec))
             group = STEP1_GROUPS[4] if auto else STEP1_GROUPS[0] if not doubt else STEP1_GROUPS[1] if pics else STEP1_GROUPS[3] if rec in ('leave', 'no_set') else STEP1_GROUPS[2]
             desc = str(f.get('description') or by_id[eid].get('description') or '')
@@ -1166,7 +1171,7 @@ def _round_v2(ctx, every, step):
             people = [names[i['_eid']] for i in things if (i['_kept'] or {}).get('auto')]
             items = [i for i in items if not i['_kept']]
             if items and fresh:   # said once, with the first question of the step
-                items[0]['_summary'] = ' '.join(x for x in (_unread(found), WORDS['auto_people'].format(
+                items[0]['_summary'] = ' '.join(x for x in (_unread(found), no_clip_words(session, WORDS['auto_people']).format(
                     people=_n(len(people), 'person') if len(people) == 1 else f'{len(people)} people', get='gets' if len(people) == 1 else 'get', names=', '.join(people)) if people else '') if x)
         for n, i in enumerate(items, 1):
             i['position'] = f'References, {n} of {len(items)}'

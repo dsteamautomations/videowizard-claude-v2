@@ -5,6 +5,7 @@ for a load that takes longer; (b), (d) `how` puts the loading note first, the li
 to another link; (f) the round of step 6 and of step 7 says how many of the step's things are on the page, lists the ones answered earlier, and
 the answer names a thing that is made and has no line. Without a database."""
 import io
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import json
 import sys
 from pathlib import Path
@@ -130,7 +131,7 @@ def test_the_round_of_step_7_counts_its_takes_and_the_ones_answered_earlier_are_
 
 def test_the_served_text_and_the_command_text_say_it_and_the_replaced_sentences_are_retired():
     import fixset5_wording as W
-    stage = next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    stage = next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     assert stage['prompt'].count(W.SAY_NEW) == 1 and W.SAY_NEW not in W.before(stage)['prompt'] and W.before(stage)['prompt'].count(W.SAY) == 1

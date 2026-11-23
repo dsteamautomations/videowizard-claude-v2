@@ -96,13 +96,17 @@ def for_category(text_, category):
     return ''.join(out)
 
 
-def steps(version, category=DEFAULT_CATEGORY):
+NEIGHBOURS = ('library/video/gap-fill.md',)   # SK, 23 Nov 2026: the guidebook on matching the real shots beside a gap; a film with no camera footage has none to match
+CLIP_STEPS = ('frame',)                        # the steps that need a clip
+
+
+def steps(version, category=DEFAULT_CATEGORY, footage='own'):
     """What the plugin writes per step at prepare (design/68 L4): the always-open files, each step's files with their text, the compliance checklist, the two maps.
     design/136: each file's general part plus the film's category part."""
     def files(paths):
-        return [{'path': p, 'text': for_category(text(version, p), category)} for p in paths]
+        return [{'path': p, 'text': for_category(text(version, p), category)} for p in paths if footage != 'none' or p not in NEIGHBOURS]
     return {'version': version, 'category': category, 'always': files(ALWAYS),
-            'steps': {name: {'task': s['task'], 'playbook': s['playbook'], 'when': s['when'], 'files': files(s['files'])} for name, s in STEPS.items()},
+            'steps': {name: {'task': s['task'], 'playbook': s['playbook'], 'when': s['when'], 'files': files(s['files'])} for name, s in STEPS.items() if footage != 'none' or name not in CLIP_STEPS},
             'compliance': {'path': COMPLIANCE, 'text': for_category(text(version, COMPLIANCE), category)},
             'map': text(version, 'VW-MAP.md'), 'field_sources': text(version, 'FIELD-SOURCES.md')}
 
@@ -113,9 +117,9 @@ def steps_of(shot):
     return ['start', 'end', 'take'] if vt == 'video' else ['state'] if vt == 'animation' else ['still-diagram'] if vt == 'diagram' else ['still-scene']
 
 
-def step_files(step, generator=None):
+def step_files(step, generator=None, footage='own'):
     """The step's files, with the sheet of the shot's generator where a generator matters."""
-    paths = [p for p in STEPS[step]['files'] if p not in ALL_SHEETS]
+    paths = [p for p in STEPS[step]['files'] if p not in ALL_SHEETS and (footage != 'none' or p not in NEIGHBOURS)]
     if step == 'take':   # design/136: the video model's sheet is for the take; the start image's size is the server's
         paths += list(MODEL_SHEETS.get((generator or DEFAULT_GENERATOR).get('model')) or ())
     return paths

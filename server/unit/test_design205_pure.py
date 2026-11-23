@@ -1,6 +1,7 @@
 """design/205 (SK, 15 Nov 2026): the Direction alone first, then the gap lines; the motion style chosen on the page, every style shown, the
 recommended one with its reason; the earlier Direction shown whole; the log says what a draft returned and what the page recorded."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 from copy import deepcopy
 from pathlib import Path
 
@@ -192,7 +193,7 @@ def test_a_drafts_log_line_says_what_it_returned():
 # ---------- points 2 to 4: the served words ----------
 
 def served():
-    d = json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+    d = _core.for_footage(json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')
     st = next(s for s in d['stages'] if s['name'] == 'visuals')
     return next(p for p in st['parts'] if p['name'] == 'treatment')['text'], st['steps']
 

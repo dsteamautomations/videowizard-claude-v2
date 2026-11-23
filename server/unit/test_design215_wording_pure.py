@@ -3,6 +3,7 @@ file after `scripts/d215_wording_v3.py`: the three labels, how the making goes, 
 order of authority (the program's), the corrections kept per thing, the search record, the step's new name, the look and an object in use
 by category. The older sentences are retired by name. Without a database."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import re
 import sys
 from pathlib import Path
@@ -14,7 +15,7 @@ import d215_wording_v3 as W   # noqa: E402
 from app import ref_sets as RS   # noqa: E402
 from app.config import Settings   # noqa: E402
 
-STAGE = next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+STAGE = next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')
 PART = {p['name']: p['text'] for p in STAGE['parts']}
 REFS = PART['picture-search']
 CMD = (ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')

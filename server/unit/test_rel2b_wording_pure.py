@@ -2,6 +2,7 @@
 drawings, ready together come as a group, shown side by side in one message with one question for each; "never show two items" no longer
 contradicts it. Through scripts/rel2b_wording.py, registered in scripts/c1_split_v3.py; the replaced words are retired."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import sys
 from pathlib import Path
 
@@ -10,7 +11,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 
 def visuals():
-    return next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    return next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')
 
 
 def test_the_served_text_says_the_group_and_no_longer_forbids_it():

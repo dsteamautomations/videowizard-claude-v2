@@ -1,6 +1,7 @@
 """design/124 C1 (Change 2): the visuals instructions split by step. Version 3 carries a common `prompt` and ordered `parts`; prepare puts the parts
 into the package; version 2 (no parts) gives the package it always gave."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import subprocess
 import sys
 from pathlib import Path
@@ -9,7 +10,7 @@ from app import visuals_stage as VS
 from test_visuals_stage_pure import RUN, USER, FakeConn, session, store_with
 
 ROOT = Path(__file__).resolve().parents[2]
-V3 = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+V3 = _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')
 VIS = next(s for s in V3['stages'] if s['name'] == 'visuals')
 NAMES = ['preparation', 'treatment', 'plan', 'picture-search', 'later']
 

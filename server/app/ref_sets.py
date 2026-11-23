@@ -268,6 +268,12 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def exact_doubt(element, rec, none=False):
+    """A thing that must be the exact real one, proposed without a frame of it, is in doubt. SK, 23 Nov 2026 (N3): not on a film with no clip,
+    where no footage frame can exist; its real picture is the operator's own or a searched one."""
+    return element.get('identity') == 'exact' and rec not in ('footage', 'clean') and not none
+
+
 def _element(plan, eid):
     return next((e for e in plan.get('elements') or [] if e['id'] == eid), None)
 
@@ -974,7 +980,7 @@ def _row_faults(session, plan, kinds, made, row, conn_budget):
     element = _element(plan, eid)
     doubt = bool((row or {}).get('doubt') or any((session['references'].get(f) or {}).get('weak') for f in frames)
                  or (found.get('result') == 'none' and found.get('closest')) or found.get('result') == 'not_searched'
-                 or (element.get('identity') == 'exact' and rec not in ('footage', 'clean'))
+                 or exact_doubt(element, rec, V.no_real_clip(session))
                  or (rec in ('set', 'clean') and V.set_cause(session, plan, eid, conn_budget)))
     listed = {}
     if 'things' in (row or {}):   # design/216b: a place's things, given with its proposal

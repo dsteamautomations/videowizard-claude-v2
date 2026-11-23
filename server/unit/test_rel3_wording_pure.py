@@ -2,6 +2,7 @@
 one at a time during the builds" has a path for a question nobody could foresee. C1 to C4, C6, E2: the served text and the plugin's two texts
 say the new behaviour once each. Through scripts/rel3_wording.py, registered in scripts/c1_split_v3.py; the replaced words are retired."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import sys
 from pathlib import Path
 
@@ -14,7 +15,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 
 def visuals():
-    return next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    return next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')
 
 
 def part(st, name):

@@ -4,6 +4,7 @@ Made by Chromium (Playwright), no AI. "Other" is not drawn; a sample that cannot
 Without a database. The render test runs where Playwright's Chromium is installed (it is on the builder's PC); the others test the rows and
 the HTML the renderer is given."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -139,7 +140,7 @@ def test_the_wording_is_in_once_retired_by_name_and_registered():
     import d218_wording_v3 as W
     import d221_wording_v3 as D221   # design/221: a later script that replaces this one's font sentence (the font first, no brief before it): the text as it was before it
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
-    stage = D221.before(FIX2.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))
+    stage = D221.before(FIX2.before(next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')))
     part = {p['name']: p['text'] for p in stage['parts']}
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing

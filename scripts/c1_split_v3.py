@@ -52,6 +52,9 @@ if __name__ == '__main__':
     for s_old, s_new in zip(old['stages'], d['stages']):   # every other stage as it was
         assert s_old == s_new or s_new['name'] in ('visuals', 'intake', 'brief', 'script', 'voice', 'media', 'analysis', 'options', 'master', 'first_cut', 'assembly', 'delivery'), s_new['name']   # design/125 changed these in version 3; design/132 the assembly and delivery
     if '--check' in sys.argv:
+        sys.path.insert(0, str(ROOT / 'server'))
+        from app import core   # SK, 23 Nov 2026: the split is the text a film with footage is served (the marks for a film with no footage taken out)
+        d = core.for_footage(d, 'own')
         st = next(s for s in d['stages'] if s['name'] == 'visuals')
         sys.path.insert(0, str(ROOT / 'scripts'))
         from c1_part_refs import FIXES   # applied after the split: references naming another part's file

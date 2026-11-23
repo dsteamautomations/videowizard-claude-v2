@@ -2,6 +2,7 @@
 I1-I3 intake wording; B2-B3 brief wording; S1-S3 script wording and the claims handed to visuals; V1 a repeated tag not sent, V2-V3 voice wording;
 M2 media wording; A2 short clips in the plain mode; A3 analysis wording; A4 up to three automatic retries for a passing failure."""
 import json
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,7 @@ from app import analysis, analysis_jobs as AJ, voice_direction as VD, visuals_st
 
 ROOT = Path(__file__).resolve().parents[1]
 V2 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v2.json').read_text(encoding='utf-8'))['stages']}
-V3 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages']}
+V3 = {s['name']: s for s in _core.for_footage(json.loads((ROOT / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages']}
 
 
 def text_of(stage):

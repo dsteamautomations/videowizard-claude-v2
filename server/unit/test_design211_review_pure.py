@@ -2,6 +2,7 @@
 is true; the "what next" sentences; money and limits. One test or more per finding, named by its label (C1 … M6). The film is the shared
 fixture's, walked with the real modules (the harness of `test_design211_together_pure`). Without a database."""
 import copy
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 import json
 import re
 import subprocess
@@ -484,7 +485,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def visuals_text():
-    d = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+    d = _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')
     st = next(s for s in d['stages'] if s['name'] == 'visuals')
     return st, next(p['text'] for p in st['parts'] if p['name'] == 'picture-search')
 
@@ -495,7 +496,7 @@ def test_N3_the_step_list_names_the_rebuilt_way_and_the_older_sentences_are_reti
     assert '`vw visuals digest`' in step and '`vw visuals round --looks`' in step and 'each row a proposal' in step and '`vw visuals frame --file`' not in step and '`vw visuals elements`' not in step
     retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     agents = ' '.join(p.read_text(encoding='utf-8') for p in (ROOT / 'plugin' / 'agents').glob('*.md'))
-    everything = json.dumps(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), ensure_ascii=False) + agents
+    everything = json.dumps(_core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own'), ensure_ascii=False) + agents
     for gone in ('`vw visuals elements`; `vw visuals frame --file`; out/reference-round.json', 'and the tool meeting the material (hands and forearms, no face)',
                  'in one click that shows the total price', 'the server adds the kept preamble', 'each thing gets the footage picture or Ignore this', 'judges them all in one shot'):
         assert gone in retired and gone not in everything, gone

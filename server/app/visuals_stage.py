@@ -257,7 +257,7 @@ def gap_neighbours(store, outputs):
 def footage_view(session, outputs=()):
     """design/88 F4: the line the operator is told, the summary and the per-clip map (design/125: the answer recorded at media is retired)."""
     f = session.get('footage')
-    if not f:
+    if not f or (not f.get('per_clip') and not session.get('footage_correction')):   # SK, 23 Nov 2026 (F10): no clip was measured, so there is no line to tell
         return None
     return {'line': FM.line(f['summary']), 'summary': f['summary'], 'per_clip': f['per_clip'], 'measured': (session.get('footage_measured') or {}).get('summary')}
 
@@ -265,6 +265,7 @@ def footage_view(session, outputs=()):
 def correct_footage(store, user, run, outputs, values, quote):
     """design/88 F4: the operator corrects the measured footage with their words; it wins for the rest of the run, on both front ends."""
     session = session_of(store, run, outputs)
+    need(not no_real_clip(session), 'This film has no camera footage, so there is no footage line to correct. Its look is the one of the Direction the operator chose.')   # SK, 23 Nov 2026 (V9)
     need((quote or '').strip(), "The operator's words are required: say what the footage really is.")
     vals = {k: ((values or {}).get(k) or None) for k in ('camera', 'support', 'look')}
     need(any(vals.values()), 'Give the camera, the support or the look to correct.')
@@ -292,7 +293,7 @@ def category_of(run):
 def library_pack(store, run, outputs):
     """design/68 L3: every step's library files with their text, for the plugin to write once per step; design/136: by the film's category."""
     session = session_of(store, run, outputs)
-    return library.steps(library_version_of(session), category_of(run))
+    return library.steps(library_version_of(session), category_of(run), film.footage(run))
 
 
 def _with_direction(session, document):
@@ -488,6 +489,46 @@ VERTICAL_VIDEO = ('{shots}: AI video is not built for a vertical film yet: the v
                   'Make {these} a still, a drawn graphic or footage in the plan, then check the plan again.')
 
 
+NO_CLIP_SHOT = ('{shot}: this film has no clip (no camera footage of its own and no library clip in its first cut), so a footage shot can be filled by nothing. '
+                'Make it AI video, a still or a drawn graphic.')
+NO_CLIP_SCENE = 'scene {scene}: `continues_footage` is set, but this film has no clip beside any gap. Take it out and give the scene its own first wide shot.'
+NO_CLIP_ROUTE = 'gap {gap}: the route "footage" cannot be used: this film has no clip (no camera footage of its own and no library clip in its first cut). Use video, still, graphic_sequence or drawn.'
+OVER_LIMIT = ("The estimate for this film's pictures and AI video, with the takes likely to be made again, is about \u20b9{estimate}; the film's cost limit is \u20b9{cap}. "
+              'Tell the operator now: the owner lifts the limit (`vw visuals cap`), or the treatment uses fewer seconds of AI video. A paid step is refused once the limit is reached.')
+
+
+def no_real_clip(session):
+    """SK, 23 Nov 2026: True for a film with no clip at all: none of its own (nothing was measured at prepare) and no library clip in its first
+    cut. False for every other film, and for a session not prepared yet (not known, so nothing changes)."""
+    return 'footage_measured' in (session or {}) and not (session['footage_measured'] or {}).get('per_clip') and not session.get('first_cut_events')
+
+
+def no_clip_routes(session, gap_id, routes_):
+    """V3: the treatment's refusal of the route "footage" on a film with no clip; '' when it may stand."""
+    return NO_CLIP_ROUTE.format(gap=gap_id) if no_real_clip(session) and 'footage' in (routes_ or []) else ''
+
+
+def no_clip_plan(session, plan):
+    """V3, V9: on a film with no clip, the plan's footage shots and the scenes that say they continue the footage, each refused in one sentence."""
+    if not no_real_clip(session):
+        return []
+    scenes = [sc for gap in plan['gaps'] for sc in all_scenes(gap)]
+    return ([NO_CLIP_SHOT.format(shot=sh['id']) for sc in scenes for sh in sc['shots'] if sh.get('visual_type') == 'footage']
+            + [NO_CLIP_SCENE.format(scene=sc['id']) for sc in scenes if sc.get('continues_footage')])
+
+
+def footage_frame_needed(session, cited, frames_ok):
+    """F13: a thing whose fact or size cites the footage waits for an approved footage frame; never on a film with no clip, where none can exist."""
+    return bool(cited) and not frames_ok and not no_real_clip(session)
+
+
+def over_limit(estimate_inr, allowance_inr, cap_inr):
+    """V1 (SK, 23 Nov 2026): said at the treatment, for every film, when the estimate with the takes likely to be made again is above the film's
+    cost limit: a warning, never a refusal (the refusal stays before a paid call)."""
+    total = float(estimate_inr) + float(allowance_inr)
+    return [{'kind': 'over_limit', 'message': OVER_LIMIT.format(estimate=f'{total:,.0f}', cap=f'{float(cap_inr):,.0f}')}] if total > float(cap_inr) + 1e-9 else []
+
+
 def vertical_video(run, plan):
     """Release 1, C5 (SK, 20 Nov 2026): vertical AI video is not built. The AI video shots of a film whose shape, or whose AI video shape, is
     vertical, refused in one plain sentence (a refusal of the plan, not a warning); [] for a film with no AI video shot, a horizontal film,
@@ -507,7 +548,7 @@ def check(store, run, outputs, document):
                                        drawn_route(run) == 'motion', not film.older(run))   # design/89 B4; design/124-b item 13; design/130 §12; design/139 R3
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc), 'errors': list(getattr(exc, 'errors', None) or [str(exc)])}   # design/148 A1: every item's first failure, as a list too
-    upright = vertical_video(run, plan)   # release 1, C5: an AI video shot on a vertical film is refused here, at the plan, in one plain sentence
+    upright = vertical_video(run, plan) + no_clip_plan(session, plan)   # release 1, C5: an AI video shot on a vertical film is refused here, at the plan, in one plain sentence; 23 Nov 2026: a footage shot on a film with no clip
     if upright:
         return {'status': 'rejected', 'error': '\n'.join(upright), 'errors': upright}
     departed = _ways_departed(session, plan) if session.get('treatment') else []   # design/207: what only the proposal refused before, so a clean check means the proposal is taken
@@ -537,6 +578,7 @@ def propose(conn, store, user, run, outputs, document, answers=''):
     plan, warnings = guarded(lambda: validate_plan(_with_direction(session, document), session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
                                                    drawn_route(run) == 'motion', not film.older(run)))   # design/130 §12; design/139 R3; design/207: the Direction is placed by the server (the older refusal "starts from the treatment's Direction, word for word" is retired)
     need(not vertical_video(run, plan), '\n'.join(vertical_video(run, plan)))   # release 1, C5: as the check refuses it
+    need(not no_clip_plan(session, plan), '\n'.join(no_clip_plan(session, plan)))   # SK, 23 Nov 2026 (V3, V9): as the check refuses it
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     departed = _ways_departed(session, plan)   # a route that departs from the recorded treatment needs a new treatment, with the reason
     need(not departed, '\n'.join(departed))
@@ -1250,6 +1292,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
                 need(len(routes_) == 1, f"gap {e['gap_id']}: shot {sh.get('id')} uses the route {r!r}, which the entry does not name; name it in routes or change the shot.")
                 routes_.append(r)
         e['routes'] = routes_
+        need(not no_clip_routes(session, e['gap_id'], routes_), no_clip_routes(session, e['gap_id'], routes_))   # SK, 23 Nov 2026 (V3)
         need(str(e.get('picture') or '').strip(), f"gap {e['gap_id']}: say the picture in one line.")
         need(isinstance(e.get('depicts', []), list) and all(isinstance(x, str) and x.strip() for x in e.get('depicts', [])),
              f"gap {e['gap_id']}: depicts is a list of lines, one per graphic, each saying what it shows.")   # design/91 N10
@@ -1290,6 +1333,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         totals['frozen_limit'] = float(session.get('frozen_limit') or FROZEN_SHARE)
     pr = prices()
     estimate = round(totals['images'] * image_price_inr(run) + video_seconds * shot_second_price(), 2)   # design/223: the first take and its full-size video
+    warnings += over_limit(estimate, rerun_allowance(video_seconds, pr), cap_of(session))   # SK, 23 Nov 2026 (V1): a film of AI video alone passes its limit; said here, before anything is paid
     record = {'gaps': entries, 'totals': totals, 'reasons_missing': unreasoned, 'estimate_inr': estimate, 'rerun_allowance_inr': rerun_allowance(video_seconds, pr), 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
               **direction}   # design/124 Change 3; design/203
     if not str(quote or '').strip():   # the draft the page shows for approval
@@ -4321,7 +4365,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
         from .visual_contract import footage_cited
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
         cited = footage_cited(element, plan.get('visual_facts'))
-        need(not cited or frames_ok, f"{element['id']}'s fact or size cites the footage ({cited[:80]}): approve a footage frame of {element['id']} (`vw visuals frame --element {element['id']} ...`) "
+        need(not footage_frame_needed(session, cited, frames_ok), f"{element['id']}'s fact or size cites the footage ({cited[:80]}): approve a footage frame of {element['id']} (`vw visuals frame --element {element['id']} ...`) "
                                      f"before any picture of it, and mark it identity exact in the plan.")
         unknown = [d for d in element.get('size') or [] if d.get('value') is None]   # design/119 rule 8: measure before the first picture
         if frames_ok and unknown and (body['kind'] != 'sheet' or is_set):   # design/151 Q6: a set is the golden picture too, so it waits for the measure
@@ -5539,7 +5583,7 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     steps_ = library.steps_of(shot)   # design/68 L3: the library beside the three instructions; the texts are in work/visuals/library/, written at prepare
     prompt['library'] = {'version': library_version_of(session),
-                         'steps': [{'step': st, 'task': library.STEPS[st]['task'], 'playbook': library.STEPS[st]['playbook'], 'files': library.step_files(st, generator)} for st in steps_],
+                         'steps': [{'step': st, 'task': library.STEPS[st]['task'], 'playbook': library.STEPS[st]['playbook'], 'files': library.step_files(st, generator, film.footage(run))} for st in steps_],
                          'job_forms': {st: library.job_form(st, run=run, plan=plan, gap=gap, scene=scene, shot=shot, refs=refs, generator=generator, brief=brief, card=card, rules=list(rules or []),
                                                             fps=float(Fraction(session['source']['fps']))) for st in steps_}}
     return {'plan_digest': session['current'], 'gap_id': gap['gap_id'], 'shot_id': shot_id, 'preparation_digest': identity, 'preparation': prompt,

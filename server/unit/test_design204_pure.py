@@ -2,6 +2,7 @@
 alone first, then the gaps) from the same items the chat asks, and records the answers the operator gave on the page, in one call, through the
 same decision functions. The server stays the record; the page is the form."""
 from copy import deepcopy
+from app import core as _core   # SK, 23 Nov 2026: v3.json is read as a film with footage is served it
 
 from app import page_flow as CF, visuals_stage as VS
 from test_design126_a_pure import USER, run, treat
@@ -161,6 +162,6 @@ def test_an_older_paragraph_direction_is_shown_as_text():
 def test_the_step_lines_name_the_page_and_do_not_send_the_assistant_to_the_notes_file():
     import json
     from pathlib import Path
-    steps = next(s for s in json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')['steps']
+    steps = next(s for s in _core.for_footage(json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')['steps']
     assert 'intended-visuals' not in steps[0] and 'read prompt.md and gaps.json;' in steps[0]
     assert '`vw visuals page --record`' in steps[1] and '--send-back' not in steps[1] and 'the card where it cannot be shown' in steps[1]
