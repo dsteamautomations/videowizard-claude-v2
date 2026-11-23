@@ -160,7 +160,28 @@ def _inspect(p):
     return {'path': p, 'size': st.st_size, 'mtime': st.st_mtime, 'sha': file_sha256(p), 'meta': probe(p)}
 
 
-def media_prepare(ws, procedure, prior, known=None):   # known: design/147 L2, the server's lookup of files the client's library holds
+PICTURE_SUFFIXES = ('.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff', '.svg', '.pdf')
+
+
+def no_footage_files(ws):
+    """SK, 23 Nov 2026: on a film recorded as having no camera footage of its own, a video file in in/ is refused by name (footage that arrives
+    after the answer is not handled: the builder decides). Returns how many pictures in/ holds: they are taken in at visuals, not here."""
+    folder = ws / 'in'
+    files = sorted(p for p in folder.iterdir() if p.is_file()) if folder.is_dir() else []
+    videos = [p.name for p in files if p.suffix.lower() in VIDEO_SUFFIXES]
+    if videos:
+        raise Refused(f"This film was recorded as having no camera footage of its own, but in/ holds {len(videos)} video file(s): {', '.join(videos[:8])}. "
+                      'Take them out of in/ if they are not for this film. If the film has camera footage after all, stop and tell the builder: the footage answer was given with the title and is not changed here.')
+    return sum(1 for p in files if p.suffix.lower() in PICTURE_SUFFIXES)
+
+
+def media_prepare(ws, procedure, prior, known=None, has_footage='own'):   # known: design/147 L2, the server's lookup of files the client's library holds
+    if has_footage == 'none':   # SK, 23 Nov 2026: nothing to list, probe or upload
+        pictures = no_footage_files(ws)
+        return {'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [], 'clips': [], 'footage': 'none', 'pictures_seen': pictures, 'prepared_at': stamp(ws, 'media'),
+                'output_file': 'out/media.json',
+                'message': 'This film has no camera footage of its own: there is nothing to list or upload. Show the operator `vw shape`, ask the shape and the rate, record them, then record this step.'
+                           + (f' in/ holds {pictures} picture(s): they are taken in at visuals, when its steps ask; leave them where they are.' if pictures else '')}
     files = sorted(p for p in (ws / 'in').iterdir() if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES)
     if not files:
         raise Refused(f"Put the source clips in {ws / 'in'} (mp4/mov/mkv/webm…), then run prepare again.")
@@ -207,7 +228,16 @@ def media_prepare(ws, procedure, prior, known=None):   # known: design/147 L2, t
             'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then ask the camera sound, then record. Do not ask what the footage is: it is measured at visuals. The upload reports when it is done.'}
 
 
-def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, copies=None, shot_on=None):   # design/126 ME1: the footage is measured at visuals, not answered here
+def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, copies=None, shot_on=None, has_footage='own', shape=None):   # `footage` stays a retired word here (design/126 ME1)   # design/126 ME1: the footage is measured at visuals, not answered here
+    if has_footage == 'none':   # SK, 23 Nov 2026: an empty clip list, so the analysis has no unit; no camera question exists for such a film
+        no_footage_files(ws)
+        if not shape:
+            raise Refused('Record the film\'s shape first: show the operator `vw shape`, ask, then `vw shape <horizontal|vertical> --video <horizontal|vertical> --fps <n> --quote "<their words>"`; then record this step.')
+        (ws / 'out').mkdir(parents=True, exist_ok=True)
+        (ws / 'out' / 'media.json').write_text(json.dumps({'clips': []}, indent=1), encoding='utf-8')
+        return {'files': ['out/media.json'], 'stored': [], 'retain': True, 'upload': True,
+                'summary': {'clips': [], 'units': {'analysis': []}, 'total_duration_s': 0, 'footage': 'none', 'camera_audio': 'excluded', 'camera_audio_note': 'no camera footage',
+                            'copies': None, 'shot_on': None, **stamps(ws, 'media')}}
     if copies not in ('originals', 'copies'):   # design/107 §6: asked once, recorded
         raise Refused('Ask the operator once: are these the camera originals or copies made by an editor? Then `--copies originals` or `--copies copies`.')
     if camera_audio not in ('allowed', 'excluded'):   # design/125 M1: asked once, recorded, like the copies answer

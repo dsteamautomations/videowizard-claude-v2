@@ -1217,7 +1217,7 @@ def get_film(run_id: UUID, user=User, conn=DB):
     outputs = core.current_outputs(conn, run['id'])
     scripts, order, offer = _font_offer(conn, run, outputs)
     st = film.styles()
-    return Response({'film': film.choices(run), 'older': film.older(run), 'recommendation': film.recommend((media or {}).get('summary', {}).get('clips') or []) if media else None,
+    return Response({'film': film.choices(run), 'older': film.older(run), 'recommendation': film.recommend((media or {}).get('summary', {}).get('clips') or [], film.footage(run)) if media or film.footage(run) == 'none' else None,   # a film with no footage is asked before its media record
                      'categories': list(library.CATEGORIES), 'fonts': [f['name'] for f in offer],
                      'motion_styles': [{'name': n, 'title': st[n]['title'], 'for': st[n]['for'], 'recommended': i == 0} for i, n in enumerate(order)],   # design/179 S3: the first is the one to recommend
                      'font_offer': offer, 'written_in': sorted(film.SCRIPT_NAMES[s] for s in scripts | {'latin'}),

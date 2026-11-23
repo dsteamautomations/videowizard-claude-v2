@@ -223,6 +223,9 @@ def colours(run):
 def timeline(run):
     """The film's timeline; refused for a new film whose shape is not recorded yet."""
     f, r = frame(run), fps(run)
+    if (not f or not r) and footage(run) == 'none':   # SK, 23 Nov 2026: no clip to count
+        raise Problem(409, 'FILM_SHAPE', 'The film\'s shape is not recorded yet: show the operator `vw shape`, ask the film\'s shape, then the AI video shape, and record both with '
+                                         '`vw shape <horizontal|vertical> --video <horizontal|vertical> --fps <n> --quote "<their words>"`.')
     if not f or not r:
         raise Problem(409, 'FILM_SHAPE', 'The film\'s shape is not recorded yet: show the operator `vw shape` (the clip count and the recommendation), ask the film\'s shape, '
                                          'then the AI video shape, and record both with `vw shape <horizontal|vertical> --video <horizontal|vertical> --fps <n> --quote "<their words>"`.')
@@ -256,15 +259,20 @@ def _orientation(c):
     return 'square' if w == h else 'vertical' if h > w else 'horizontal'
 
 
-def recommend(clips):
+NO_FOOTAGE_SHAPE = ('This film has no camera footage of its own, so there is no clip to count: ask the operator the film\'s shape (horizontal or vertical) and the AI video shape, '
+                    'recommending the film\'s. 25 frames a second unless they want another rate.')
+
+
+def recommend(clips, footage_='own'):
     """design/139 R1: the shape most clips have and the rate most share, with the counts; None on a tie or with no clips (asked plainly)."""
     counts = Counter({'horizontal': 0, 'vertical': 0, 'square': 0})
     counts.update(_orientation(c) for c in clips or [] if c.get('width') and c.get('height'))
     h, v = counts['horizontal'], counts['vertical']
     rates = Counter(r for r in (rate_of(c.get('fps')) for c in clips or []) if r)
     top = rates.most_common(2)
-    return {'counts': dict(counts), 'shape': 'horizontal' if h > v else 'vertical' if v > h else None,
-            'fps_counts': dict(rates.most_common()), 'fps': top[0][0] if top and (len(top) == 1 or top[0][1] > top[1][1]) else None}
+    out = {'counts': dict(counts), 'shape': 'horizontal' if h > v else 'vertical' if v > h else None,
+           'fps_counts': dict(rates.most_common()), 'fps': top[0][0] if top and (len(top) == 1 or top[0][1] > top[1][1]) else None}
+    return {**out, 'fps': 25, 'note': NO_FOOTAGE_SHAPE} if footage_ == 'none' else out   # SK, 23 Nov 2026
 
 
 def check(key, value, video=None, fps=None, scripts=None):
@@ -328,6 +336,8 @@ def record(conn, user, run, key, value, quote, video=None, fps=None, scripts=Non
         if key == 'shape':
             raise Problem(409, 'FILM_LOCKED', f'The shape cannot change now: {why}. Ask the builder if the film must change shape.')
         raise Problem(409, 'FILM_LOCKED', f'The {key} cannot change now: {why}.')
+    if key == 'shape' and conn.execute("select 1 from vw2_stage_outputs where run_id=%s and stage='master' and not stale limit 1", (run['id'],)).fetchone():   # SK, 23 Nov 2026 (B3): a film with no analysis job was never fixed
+        raise Problem(409, 'FILM_LOCKED', 'The shape cannot change now: the first cut is recorded in the shape recorded. Ask the builder if the film must change shape.')
     if key == 'footage' and conn.execute("select 1 from vw2_stage_outputs where run_id=%s and stage='media' and not stale limit 1", (run['id'],)).fetchone():
         raise Problem(409, 'FILM_LOCKED', 'The footage answer cannot change now: the media step is recorded with it. Ask the builder if the film must change.')
     doc = {**doc, **({'scripts': sorted(scripts)} if key == 'font' and scripts else {}), 'quote': quote, 'by': user.get('name') or user.get('id'), 'at': datetime.now(timezone.utc).isoformat()}

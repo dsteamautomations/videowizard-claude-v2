@@ -1373,7 +1373,7 @@ def cmd_stage(a):
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or [], 'last_category': m.get('last_category')} if a.stage == 'intake' else \
                 {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}, 'category': film_category(full), 'library_chapters': m.get('library_chapters') or []} if a.stage == 'brief' else \
                 {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else \
-                {'known': lambda shas: (write(f"/api/runs/{m['run_id']}/library/known", {'shas': shas}) or {}).get('known') or {}} if a.stage == 'media' else {}   # design/147 L2
+                {'known': lambda shas: (write(f"/api/runs/{m['run_id']}/library/known", {'shas': shas}) or {}).get('known') or {}, 'has_footage': film_footage(full)} if a.stage == 'media' else {}   # design/147 L2
             prepared = prepare(ws, procedure, prior, **extra)
             if a.stage in stages_text.STAGES:   # design/192 (intake 8, brief 7): when the assistant's work on a text stage began
                 log_quiet(m, 'step', f'{a.stage} prepare: the inputs and the instructions were given to the assistant')
@@ -1382,7 +1382,8 @@ def cmd_stage(a):
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
                 print(f'uploaded {k}/{n} {name} ({size / 1e6:.0f} MB)', file=sys.stderr, flush=True)
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
-                            camera_audio=a.camera_audio, note=a.note, progress=progress, copies=getattr(a, 'copies', None), shot_on=getattr(a, 'shot_on', None))   # design/107 §6; design/146
+                            camera_audio=a.camera_audio, note=a.note, progress=progress, copies=getattr(a, 'copies', None), shot_on=getattr(a, 'shot_on', None),
+                            has_footage=film_footage(full), shape=(((full.get('film') or {}).get('shape') or {}).get('value')))   # design/107 §6; design/146
         elif a.stage == 'voice':
             job = None
             if a.job:   # design/52 D: the record from a kept narration, fetched for the operator to listen to
@@ -1440,6 +1441,11 @@ def cmd_stage(a):
         row = {**row, 'files': f"{len(row.get('files') or [])} file references, kept on the server", 'summary': {k: v for k, v in (row.get('summary') or {}).items() if k != 'clips'},
                'clips_recorded': len(clips), 'total_mb': round(sum(c.get('bytes') or 0 for c in clips) / 1e6)}
     emit(row, 0, f'Recorded {a.stage}. ' + (next_line(row['next']) if row.get('next') else 'Run `vw next`.') + (f' WARNING: {warning}' if warning else ''))
+
+
+def film_footage(full):
+    """SK, 23 Nov 2026: 'none' when the operator said the film has no camera footage of its own; 'own' otherwise (every film from before the question)."""
+    return (((full or {}).get('film') or {}).get('footage') or {}).get('value') or 'own'
 
 
 def film_category(full):
