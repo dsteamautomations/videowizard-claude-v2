@@ -105,3 +105,18 @@ def test_the_world_of_the_film_is_grouped_under_one_heading_per_kind():
     for needed in ('function world(rows)', "if(line.key==='world') body.appendChild(world(line.rows)); else", "Person:'People'", "label==='The graphic style'",
                    "el('details','group')", "return ['t-open','To read']", 'For reading only: nothing to answer here.'):
         assert needed in html, needed
+
+
+def test_the_page_file_is_readable_before_it_is_published_and_nothing_else_of_the_plugin(tmp_path):
+    """SK, 24 Nov 2026 (VW-25): the Claude app publishes a file only after reading it whole. The guard let the assistant publish the page and
+    not read it, so no page was published and every step fell back to the chat. The page file alone is readable, with or without an active run;
+    it is never writable, and no other file of the plugin outside skills/ is readable."""
+    assert PAGE.is_file()
+    assert guard('Read', {'file_path': str(PAGE)}, tmp_path)[0] == 0
+    assert guard('Read', {'file_path': str(PAGE), 'offset': 800, 'limit': 700}, tmp_path)[0] == 0   # a large file is read in parts
+    assert guard('Read', {'file_path': str(PAGE.parent / '..' / 'pages' / 'decisions.html')}, tmp_path)[0] == 0
+    for tool in ('Write', 'Edit'):
+        assert guard(tool, {'file_path': str(PAGE)}, tmp_path)[0] == 2, tool
+    for other in (PAGE.parent / 'other.html', PAGE.parent, PLUGIN / 'scripts' / 'vw.py', PLUGIN / 'hooks' / 'guard.py'):
+        assert guard('Read', {'file_path': str(other)}, tmp_path)[0] == 2, other
+    assert guard('Grep', {'pattern': 'x', 'path': str(PAGE.parent)}, tmp_path)[0] == 2

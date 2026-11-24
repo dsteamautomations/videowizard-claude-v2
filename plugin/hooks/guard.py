@@ -139,7 +139,8 @@ def decide(tool, inp, cwd, vw):
             t0 = Path(raw0).expanduser()
             t0 = (t0 if t0.is_absolute() else cwd / t0).resolve()
             skills = (vw.parent.parent / 'skills').resolve()
-            if t0 == skills or skills in t0.parents:
+            page = (vw.parent.parent / 'pages' / 'decisions.html').resolve()   # SK, 24 Nov 2026 (VW-25): the Claude app publishes a file only after reading it whole; the page file alone, never the folder
+            if t0 == skills or skills in t0.parents or t0 == page:
                 return None
     if tool in READ_TOOLS:   # VW-22 (12 Nov 2026): an answer of the tool too long for one message is saved by Claude Code under the session's own tool-results folder; reading it back is reading the tool's answer
         raw1 = inp.get('file_path') or inp.get('path') or ''
