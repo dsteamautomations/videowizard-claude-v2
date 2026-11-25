@@ -190,8 +190,13 @@ def _with_pictures(store, page):
     return page
 
 
+def _gap_words(session, key, entry):
+    """VW-25 issue 9: the words under a gap and its time in the film, as the page's rows; the chat's own function."""
+    return [[k, str(v)] for k, v in CF._gap_words(session, key, entry or {})]
+
+
 def _title(item):
-    return CF._split(item['question'])[0].split(' (changed')[0]
+    return CF._split(item['question'], item.get('_name', ''))[0].split(' (changed')[0]
 
 
 def _motion_line(run, draft):
@@ -353,7 +358,8 @@ def _spec_lines(ctx):
         elif v['state'] == 'recorded':
             lines.append({**head, 'state': 'recorded', 'spec': v['spec']})
         elif v['item'] in items:
-            lines.append({**head, 'state': 'open', 'item': v['item'], 'ask': v['ask'], 'spec': v['spec'], 'buttons': _buttons(items[v['item']])})
+            lines.append({**head, 'state': 'open', 'item': v['item'], 'ask': v['ask'], 'spec': v['spec'], 'buttons': _buttons(items[v['item']]),
+                          **({'rows': v['rows']} if v['rows'] else {})})   # VW-25 issues 7 and 8: where it sits, the words under it, what it shows, what was accepted
     return lines
 
 
@@ -559,7 +565,7 @@ def _thing_v2(plan, eid):
 
 
 def _ask(item):
-    q = CF._split(item['question'])[1]
+    q = CF._split(item['question'], item.get('_name', ''))[1]
     return q[:1].upper() + q[1:]
 
 
@@ -1165,7 +1171,9 @@ def _page(conn, store, user, run, outputs):
     first = [motion] if motion else []
     if not draft:
         done = bool(session.get('treatment'))
-        recorded = [{'line': f'l{n:02d}', 'key': k, 'title': 'The direction of the film' if k == 'direction' else f'Gap {k}', 'state': 'recorded'}
+        said = {e.get('gap_id'): e for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
+        recorded = [{'line': f'l{n:02d}', 'key': k, 'title': 'The direction of the film' if k == 'direction' else f'Gap {k}', 'state': 'recorded',
+                     **({'rows': _gap_words(session, k, said.get(k))} if k != 'direction' else {})}   # VW-25 issue 9
                     for n, k in enumerate(V._line_digests(session['treatment']), 1)] if done else []
         if motion and motion['state'] == 'open' and not done:   # asked as early as the preparation
             return {**base, 'open': True, 'lines': first, 'summary': '', 'note': 'Choose the motion style. The Direction appears here when the assistant has written it.'}
@@ -1174,6 +1182,7 @@ def _page(conn, store, user, run, outputs):
     items, summary, _back = CF._treatment_items(ctx)
     by_key = {i['_key']: i for i in items}
     states = draft.get('lines') or {}
+    said = {e.get('gap_id'): e for e in draft.get('gaps') or [] if isinstance(e, dict)}
     direction_open = states.get('direction', {}).get('state') in ('to_accept', 'sent_back')
     lines = []
     film_order = [e.get('gap_id') for e in draft.get('gaps') or [] if e.get('gap_id') in states]   # the film's order, as the draft lists its gaps
@@ -1182,7 +1191,7 @@ def _page(conn, store, user, run, outputs):
         if key != 'direction' and direction_open:
             continue   # no gap is shown until the Direction is accepted
         if st['state'] == 'accepted':
-            lines.append({**head, 'state': 'recorded', 'reopen': True})
+            lines.append({**head, 'state': 'recorded', 'reopen': True, **({'rows': _gap_words(session, key, said.get(key))} if key != 'direction' else {})})   # VW-25 issue 9
         elif st['state'] == 'sent_back':
             lines.append({**head, 'state': 'with_assistant', 'note': st.get('note') or ''})
         elif key in by_key:

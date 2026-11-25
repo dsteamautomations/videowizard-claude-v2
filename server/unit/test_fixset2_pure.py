@@ -254,7 +254,7 @@ def test_a13_several_still_cards_wait_in_the_order_of_the_film_and_are_answered_
     s, plan = plan_of(store)
     cards = [w for w in VS.waiting(s, plan, 'VW-1', []) if w['kind'] == 'still end-frame to approve']
     assert [w['item'] for w in cards] == ['D1', 'D3', 'D4']
-    assert [i['question'].split(':')[0] for i in chat(store, 'still end-frame')] == ['D1', 'D3', 'D4']
+    assert [i['question'].split(':')[0].rsplit('(', 1)[-1].rstrip(')') for i in chat(store, 'still end-frame')] == ['D1', 'D3', 'D4']   # VW-25 issue 7: the name in words, the code last
 
 
 # ---------- A1.4: what can start now, and what waits on what ----------

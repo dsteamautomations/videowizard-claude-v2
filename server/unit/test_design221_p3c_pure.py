@@ -339,7 +339,7 @@ def test_the_still_is_checked_on_its_must_rules_alone_and_comes_to_the_chat_as_a
     assert s['motion_stills']['MO1']['frame_key'] == END
     assert [w['label'] for w in VS.waiting(s, VS.current_plan(store, s), 'VW-9', []) if w['kind'] == 'still end-frame to approve'] == ['Still end-frame · MO1']
     item = chat(store, 'still end-frame')[0]
-    assert item['question'] == 'MO1: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?'
+    assert item['question'] == 'Gap G1, shot 1 (MO1): this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?'
     assert item['show'] == [{'key': END, 'name': 'MO1-still-end.png'}] and [b['label'] for b in item['buttons']] == ['Approve', 'Reject'] and item['buttons'][1]['needs_words']
 
 
@@ -413,7 +413,7 @@ def test_the_stills_of_one_diagram_are_one_card_when_ready_together_else_one_eac
     assert len(one) == 1 and one[0]['show'] == [{'key': 'k1', 'name': 'MO1-still-end.png'}]
     edit_session(store, lambda s: s.update(motion_stills={'MO2': entry(2), 'MO1': entry(1)}))
     both = chat(store, 'still end-frame')
-    assert len(both) == 1 and both[0]['question'] == ('MO1, MO2: the drawing as it stands at the end of each of these shots, in order, before any motion is added. '
+    assert len(both) == 1 and both[0]['question'] == ('Gap G1, shot 1 (MO1), Gap G1, shot 2 (MO2): the drawing as it stands at the end of each of these shots, in order, before any motion is added. '
                                                      'Are they right?')
     assert both[0]['show'] == [{'key': 'k1', 'name': 'MO1-still-end.png'}, {'key': 'k2', 'name': 'MO2-still-end.png'}]
     both[0]['_run']('approve', 'Approve', '')

@@ -144,7 +144,7 @@ def test_the_held_drawing_is_one_chat_card_with_its_open_musts_in_full_and_three
     items = card(store, [drawn_job()])
     assert [i['kind'] for i in items] == ['held drawing']   # never also a take to select
     item = items[0]
-    assert item['question'] == 'MO1: held after round 3: 1 must rule still fails. What do you decide?'
+    assert item['question'] == 'Gap G1, shot 1 (MO1): held after round 3: 1 must rule still fails. What do you decide?'
     assert item['text'] == f'- {SOLID}'
     assert [b['label'] for b in item['buttons']] == ['Select it anyway', 'Reject it', 'One more round'] and not item['buttons'][0].get('needs_words')   # release 1, B1 (the critic's point 10a): one click, no reason asked
     assert item['show'] == [{'key': 'run-1/takes/job-7.mp4', 'name': 'MO1-drawing.mp4'}, {'key': 'run-1/takes/job-7-sheet.jpg', 'name': 'MO1-frames.jpg'}]
@@ -235,7 +235,7 @@ def test_a_finished_drawing_is_shown_once_in_the_chat_with_its_line_and_no_quest
     store.files['run-1/takes/job-7.motion.json'] = json.dumps({'sha256': sha}).encode('utf-8')
     out = nothing_needed(store, [drawn_job()])
     assert out['item'] is None and out['show'] == [{'key': 'run-1/takes/job-7.mp4', 'name': 'MO1-drawing.mp4',
-                                                    'say': 'MO1: made and checked, 1 note. You judge it on the page with the others.'}]
+                                                    'say': 'Gap G1, shot 1 (MO1): made and checked, 1 note. You judge it on the page with the others.'}]
     assert 'ask nothing about it' in out['how']
     assert 'show' not in nothing_needed(store, [drawn_job()])   # shown once
     vw = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
@@ -264,7 +264,7 @@ def test_the_page_stays_closed_until_everything_is_made_and_says_the_line_of_cou
 def test_a_thing_that_could_not_be_made_is_shown_as_such_and_the_page_opens(server):
     pg = emit(server)
     assert pg['open'] and [(c['name'], c['state'], c['note']) for c in pg['layout']['coming']] == [
-        ('The brick kiln at dusk', 'failed', P.W['failed']), ('The kiln at night', 'failed', P.W['failed'])]
+        ('The brick kiln at dusk (S4)', 'failed', P.W['failed']), ('The kiln at night (S5)', 'failed', P.W['failed'])]
     assert pg['layout']['words']['pictures']['coming'] == 'Could not be made'
     assert 'joins the list when it is checked' not in ' '.join(pg['layout']['help'])
 

@@ -201,6 +201,8 @@ if __name__ == '__main__':
         prompt = layoutb2(prompt, parts)
         from d223_wording import apply as d223   # design/223, 22 Nov 2026: the new take process: the first take once at 360p, nobody checks a take, accept or say what is wrong, the correction's route
         prompt = d223(prompt, parts)
+        from vw25_wording import apply as vw25   # VW-25 issues 8 and 9, 25 Nov 2026: the server shows the words under a gap; a drawing's parts named with the accepted line's words
+        prompt = vw25(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

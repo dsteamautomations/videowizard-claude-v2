@@ -872,12 +872,13 @@ def _t(frames, fps):
 def where(session, plan, shot_id):
     """The film-time line of a shot, its gap, and the words under it."""
     fps = float(Fraction(str(V._fps(session) or 25)))
+    name = V.coded(V.shot_names(plan, session), shot_id)   # VW-25 issue 7: the shot in words, its code last
     for gap, sh in V._accepted_shots(plan, session):
         if sh['id'] == shot_id:
             gap_words = f"Gap {gap['gap_id']}" + (f", {gap['title']}" if gap.get('title') else '')
             return {'where': W['where'].format(start=_t(sh['start_frame'], fps), end=_t(sh['end_frame'], fps), secs=f"{(sh['end_frame'] - sh['start_frame']) / fps:.1f}", gap=gap_words),
-                    'at': _t(sh['start_frame'], fps), 'words': str(sh.get('narration') or ''), 'shot': sh, 'gap': gap}
-    return {'where': '', 'at': '', 'words': '', 'shot': None, 'gap': None}
+                    'at': _t(sh['start_frame'], fps), 'words': str(sh.get('narration') or ''), 'shot': sh, 'gap': gap, 'name': name}
+    return {'where': '', 'at': '', 'words': '', 'shot': None, 'gap': None, 'name': name}
 
 
 def footage(session, gap):
@@ -995,7 +996,7 @@ def steps_line(store, session, plan, shot_id, chain, now=None):
                W['say_step_last'].format(k=k, p=k - 1, words='{words}'))
         b = _fix_button(W['correct_step'].format(n=k), W['hint_step'].format(n=k), views[k - 1]['faults'], say)
         buttons.append({**b, 'choice': f'correct:{k}'})
-    return {'kind': 'steps', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_steps'], 'ask': W['ask_steps'].format(n=n), 'where': w['where'], 'film_at': w['at'],
+    return {'kind': 'steps', 'name': w['name'], 'kind_words': W['kind_steps'], 'ask': W['ask_steps'].format(n=n), 'where': w['where'], 'film_at': w['at'],
             'words_head': W['words_head'], 'words': w['words'], 'try': W['try'].format(n=2) if tries else '', 'strip_head': W['strip_head'],
             'foot_head': W['foot_steps_try' if tries else 'foot_steps'], 'pics': before + steps + after + earlier, 'check': check, 'buttons': buttons,
             'details': _details(chain[0]) if chain else []}
@@ -1047,7 +1048,7 @@ def drawn_line(store, session, plan, job, check, fin, motion_take, brief_now=Non
     if listed:
         buttons.append({'label': W['plain'], 'choice': 'plain', 'act': 'plain', 'needs_words': False, 'say': W['say_plain'].format(finish=listed)})
     secs = ev.get('exact_seconds') or ((job.get('request') or {}).get('duration_seconds'))
-    return {'kind': 'drawn', 'name': str((w['shot'] or {}).get('title') or shot_id), 'kind_words': W['kind_drawn'], 'ask': W['ask_drawn'], 'where': w['where'], 'film_at': w['at'],
+    return {'kind': 'drawn', 'name': w['name'], 'kind_words': W['kind_drawn'], 'ask': W['ask_drawn'], 'where': w['where'], 'film_at': w['at'],
             'words_head': W['words_head'], 'words': w['words'], 'try': '', 'foot_head': W['foot_drawn'],
             'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['video'], 'none': W['video_none']},
             'finish': W['finish'].format(finish=listed) if listed else '', 'held': held, 'pics': pics, 'check': view, 'buttons': buttons,
@@ -1242,7 +1243,7 @@ def expected(session, plan, take_rows, now=None):
     """Every thing step 6 must make, from the accepted plan and the session, in film order, then the components: [{kind, id, name, state, job?}];
     kind still, steps, drawn or component; the state in plain words (STATE)."""
     out, refs = [], list(session['references'].values())
-    shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
+    shots, names = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, V.shot_names(plan, session)
     wait = None   # release 2, F11: what the builders of the drawn graphics wait for, worked out once
     for gap, sh in V._accepted_shots(plan, session):
         kind = {'still': 'still', 'graphic_sequence': 'steps', 'drawn': 'drawn'}.get(V.route_of(sh))
@@ -1265,7 +1266,7 @@ def expected(session, plan, take_rows, now=None):
             wait = V.parts_wait(plan, session) if wait is None else wait
             if wait and not turn[0].startswith('check'):   # F11: the shared parts are not the approved ones: no builder is named, and the line says what is waited for
                 turn, due = ('', ''), ' '.join(x for x in (due, wait if turn[0] else '') if x)
-        out.append({'kind': kind, 'id': sid, 'name': str(sh.get('title') or sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
+        out.append({'kind': kind, 'id': sid, 'name': V.coded(names, sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
                     **({'supplied': sh['supplied']} if kind == 'still' and sh.get('supplied') else {}),   # release 3 (N4): it waits for the operator's own picture
                     **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
     names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}

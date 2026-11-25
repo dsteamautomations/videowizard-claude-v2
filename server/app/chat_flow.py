@@ -41,9 +41,10 @@ def _button(label, choice, words=False, tell=''):
     return {'label': label, 'choice': choice, **({'needs_words': True} if words else {}), **({'tell': tell} if tell else {})}
 
 
-def _item(ident, kind, position, question, run, buttons, text='', show=(), more=()):
+def _item(ident, kind, position, question, run, buttons, text='', show=(), more=(), name=''):
+    """`name`: the shot's name the question begins with (VW-25 issue 7): the question is split after it, whatever marks the name holds."""
     return {'id': ident, 'kind': kind, 'position': position, 'question': question, 'text': text, 'show': list(show), 'buttons': list(buttons)[:4],
-            **({'other_choices': list(more)} if more else {}), '_run': run}
+            **({'other_choices': list(more)} if more else {}), **({'_name': name} if name else {}), '_run': run}
 
 
 def _ref_key(run, ref_id):
@@ -145,6 +146,31 @@ def _shot_rows(e, reasons_asked=True):
     return rows
 
 
+def _md(text):
+    """Narration as plain text in the chat: its own *, _, | and ` are not marks."""
+    return re.sub(r'([\\*_|`])', r'\\\1', str(text))
+
+
+def _gap_words(session, key, entry):
+    """VW-25 issue 9 (SK, 25 Nov 2026): the first rows of a gap line of the treatment: the narration under the gap, whole, from the server's own
+    record of the gap as it is now, and the gap's time in the film. Added when the line is shown, never stored: the line's digest and its item id
+    do not change. A gap with no narration says so; a film with no word times (no options package) shows the words the assistant wrote
+    (`words`; the older way, kept for those films), else 'not available'; a gap whose frames are not known has no time row. Never an error."""
+    src = ((session.get('source') or {}).get('gaps') or {}).get(key) or {}
+    timing = src.get('timing')
+    if isinstance(timing, dict):
+        words = ' '.join(str(w.get('text') or '') for w in timing.get('words') or [] if isinstance(w, dict)).strip() or 'none (no narration under this gap)'
+    else:
+        words = ' '.join(str(entry.get('words') or '').split()) or 'not available'
+    rows = [('The words', words)]
+    try:
+        fps, a, b = float(Fraction(str(V._fps(session) or 25))), src['start_frame'], src['end_frame']
+        rows.append(('In the film', f'{P._t(a, fps)} to {P._t(b, fps)} ({(b - a) / fps:.1f} s)'))
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        pass
+    return rows
+
+
 def _treatment_items(ctx):
     session, draft = ctx['session'], ctx['session'].get('treatment_draft')
     if not draft:
@@ -174,11 +200,11 @@ def _treatment_items(ctx):
         else:
             e = entries.get(key) or {}
             head = f'Gap {key}'
-            rows = [('The picture', e.get('picture')), ('Made as', ', '.join(ROUTE_WORDS.get(r, r) for r in e.get('routes') or [])), ('Length', f"{float(e.get('seconds') or 0):g} s"),
+            rows = [*_gap_words(session, key, e), ('The picture', e.get('picture')), ('Made as', ', '.join(ROUTE_WORDS.get(r, r) for r in e.get('routes') or [])), ('Length', f"{float(e.get('seconds') or 0):g} s"),
                     ('Pictures to make', e.get('images')), ('Shows', '; '.join(e.get('depicts') or [])),
                     ('Held still for', f"{float(e['frozen_seconds']):g} s" if e.get('frozen_seconds') else ''), ('Why', e.get('why') or e.get('reason') or ''),
                     *_shot_rows(e, 'reasons_missing' in draft)]   # design/202: each shot's two reasons; the gap's own why stays (a long graphics run gives its reason there)
-            body = '\n'.join(f'- **{k}:** {v}' for k, v in rows if v not in (None, '', []))   # a list: plain line breaks run together in the chat
+            body = '\n'.join(f"- **{k}:** {_md(v) if k == 'The words' else v}" for k, v in rows if v not in (None, '', []))   # a list: plain line breaks run together in the chat
 
         def run(choice, quote, words, key=key):
             if key == 'direction' and choice == 'different':   # design/203: the same path as Change this, with fixed words
@@ -212,10 +238,12 @@ def _gap_rows(session, gap, selection=None):
     offered way (design/206: the page shows the shots of each way before one is taken)."""
     fps, rows, total = session['source'].get('fps') or 25, [], 0.0
     cell = lambda v: ' '.join(str(v or '').split()).replace('|', '/')   # one line, no column break
-    for sc in V.chosen_scenes(gap, selection or session['choice_selections'].get(gap['gap_id'])):
+    scenes = list(V.chosen_scenes(gap, selection or session['choice_selections'].get(gap['gap_id'])))
+    names = V.way_names(gap, scenes)   # VW-25 issue 7: a shot in words, its code last
+    for sc in scenes:
         for s in sc['shots']:
             kind = ROUTE_WORDS.get(V.route_of(s), V.route_of(s)) + (f" (your picture {cell(s['supplied'])})" if s.get('supplied') else '')   # release 3 (F15): the place of the operator's own picture
-            rows.append([str(len(rows) + 1), cell(s.get('title') or s['id']), kind, f'{_seconds(s, fps):.1f} s', cell(s.get('purpose')), cell(s.get('narration'))[:220]])
+            rows.append([str(len(rows) + 1), cell(V.coded(names, s['id'])), kind, f'{_seconds(s, fps):.1f} s', cell(s.get('purpose')), cell(s.get('narration'))[:220]])
             total += _seconds(s, fps)
     return rows, f'{len(rows)} shots, {total:.1f} s in all.'
 
@@ -1517,6 +1545,28 @@ def _spec_text(parts):
     return '\n'.join(rows)[:6000]
 
 
+def _drawing_rows(session, plan, gap, sh, accepted, drawings):
+    """VW-25 issues 7 and 8 (SK, 25 Nov 2026): what stands above a drawing's parts, as [label, text] rows: where it sits in the film (the line
+    step 6 shows, `pictures.where`), the words under it, what it shows (`depicts`), and what the operator accepted at the treatment for the
+    graphics of its gap (a treatment line is not tied to one shot: one line for the gap's one drawing is said of the drawing, anything else of
+    the gap's graphics). Added when the line is shown, never stored. A row that cannot be worked out is left out: it never blocks an approval."""
+    try:
+        w = P.where(session, plan, sh['id'])
+        rows = [['', w['where']], [P.W['words_head'].rstrip(':'), w['words'] or 'none']] if w['where'] else []
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        rows = []
+    rows += [['Shows', str(sh['depicts'])]] if sh.get('depicts') else []
+    said = (accepted.get(gap['gap_id']) or {}).get('depicts') or []
+    lines = [str(x) for x in ([said] if isinstance(said, str) else said) if x]
+    return rows + ([['What you accepted for this drawing' if len(lines) == 1 and drawings == 1 else "What you accepted for this gap's graphics", '; '.join(lines)]] if lines else [])
+
+
+def _rows_text(rows):
+    """The rows above a spec as a list in the chat; narration is plain text."""
+    head = P.W['words_head'].rstrip(':')
+    return ''.join(f"- {f'{k}: ' if k else ''}{_md(v) if k == head else v}\n" for k, v in rows) + ('\n' if rows else '')
+
+
 def _spec_views(ctx):
     """design/209: every material spec and drawing spec of the film as the operator reads it, the materials first, then the drawings in the
     film's order: its title, its state (`open`, `recorded` when approved as it is now, `with_assistant` with the operator's words), the question
@@ -1526,14 +1576,18 @@ def _spec_views(ctx):
     `differs` remark. A line that is back with the assistant confirms nothing."""
     session, plan = ctx['session'], ctx['plan']
     names, approved, corrections = _names(plan), session.get('spec_approvals') or {}, session.get('spec_corrections') or {}
-    rows = [(V.material_key(e['id']), names[e['id']], e['material_spec'], None) for e in plan.get('elements') or [] if e.get('material_spec')]
-    rows += [(sh['id'], sh.get('title') or sh['id'], sh['drawing_spec'], V.spec_view(sh)) for _, sh in V._accepted_shots(plan, session) if sh.get('drawing_spec')]
+    shot_names = V.shot_names(plan, session)   # VW-25 issue 7: a drawing in words, its code last
+    accepted = {e.get('gap_id'): e for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
+    drawn = [(g, sh) for g, sh in V._accepted_shots(plan, session) if sh.get('drawing_spec')]
+    count = lambda gap: sum(1 for g, _ in drawn if g['gap_id'] == gap['gap_id'])
+    rows = [(V.material_key(e['id']), names[e['id']], '', e['material_spec'], None, []) for e in plan.get('elements') or [] if e.get('material_spec')]
+    rows += [(sh['id'], V.coded(shot_names, sh['id']), shot_names[sh['id']], sh['drawing_spec'], V.spec_view(sh), _drawing_rows(session, plan, g, sh, accepted, count(g))) for g, sh in drawn]
     views = []
-    for key, title, spec, view in rows:
+    for key, title, name, spec, view, above in rows:
         digest = V.spec_digest(spec)
         state = 'with_assistant' if V.correction_pending(session, key, spec) else 'recorded' if (approved.get(key) or {}).get('digest') == digest else 'open'
         parts = _spec_parts(spec, view)
-        views.append({'key': key, 'title': title, 'state': state, 'item': f'spec:{key}:{digest[:10]}', 'spec': parts, 'note': (corrections.get(key) or {}).get('words') or '',
+        views.append({'key': key, 'title': title, 'name': name, 'rows': above, 'state': state, 'item': f'spec:{key}:{digest[:10]}', 'spec': parts, 'note': (corrections.get(key) or {}).get('words') or '',
                       'ask': 'Are these facts right?' if view is None else 'Are the parts and the known sizes right?' if parts.get('known') else 'Are the parts right?'})
     sizes = [{(p.strip().lower(), m.strip().lower()): size for p, m, size, _ in v['spec'].get('sizes') or []} for v in views]
     live = [n for n, v in enumerate(views) if v['state'] != 'with_assistant']
@@ -1574,7 +1628,7 @@ def _drawing_items(ctx):
                            text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"drawing-{eid}-{v['id']}.png"} for v in r['views']]))
     if plan and session.get('guides'):   # Area B: the drawing of an AI video shot, before its still
         from . import guide
-        shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
+        shots, shot_names = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, V.shot_names(plan, session)
         for sid in [sid for sid in shots if sid in session['guides']]:   # release 1: in film order (release 2, B4b: the order a group of them keeps; design/35 row 291)
             g = session['guides'][sid]
             d = g.get('drawing') or {}
@@ -1586,11 +1640,12 @@ def _drawing_items(ctx):
                               'change': f'the shot is to change: "{words}"'}[choice], words or quote)
                     return out
                 items.append(_item(f"layout-held:{sid}:{g['sha256'][:10]}", 'held layout', 'Step 7, AI video: a layout that did not pass its check',
-                                   f"{shots[sid].get('title') or sid}: the layout of this shot failed its check {guide.MAX_ROUNDS} times in a row. What should happen to it?", run_,
+                                   f"{V.coded(shot_names, sid)}: the layout of this shot failed its check {guide.MAX_ROUNDS} times in a row. What should happen to it?", run_,
                                    [_button('Use this layout as it is', 'use'), _button('Try once more', 'again'),
                                     _button('Change the shot', 'change', words=True, tell='Ask the operator what the shot should become: cut into shorter shots, another angle, or left out.')],
                                    text=f'The checker still finds: {guide.finding(g)}.',
-                                   show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in (d.get('views') or []) if d.get('sha256') == g['sha256']]))
+                                   show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in (d.get('views') or []) if d.get('sha256') == g['sha256']],
+                                   name=V.coded(shot_names, sid)))
                 continue
             # release 1 (SK, 20 Nov 2026): the fresh checker first, the operator second: the card is offered only when this scene's check passed.
             # (Until this release: as soon as the scene was sent, before its check; 13 of 15 approved layouts were then rebuilt; design/35 row 281.)
@@ -1603,9 +1658,9 @@ def _drawing_items(ctx):
                      'Check that each person faces what they do and that the working hand can reach it.']
             lines += (['Changed from the plan to make the shot possible:'] + [f'- {c}' for c in d['changes']]) if d.get('changes') else []
             lines += (['Notes:'] + [f'- {c}' for c in d['notes']]) if d.get('notes') else []
-            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'Step 7, AI video: the layout drawing of the shot', f"{shots[sid].get('title') or sid}: is the shot laid out right in these two drawings?", run_,
+            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'Step 7, AI video: the layout drawing of the shot', f"{V.coded(shot_names, sid)}: is the shot laid out right in these two drawings?", run_,
                                [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawing of the shot.')],
-                               text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in d['views']]))
+                               text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in d['views']], name=V.coded(shot_names, sid)))
     return items
 
 
@@ -1650,7 +1705,8 @@ def _waiting_items(ctx):
     frames = _round_frames(ctx)
     rows = [w for w in rows if w['kind'] not in ('set to judge', 'set to make') and w['item'] not in frames]   # the round's own items, above; the round's footage pictures, at its step 1
     shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
-    title = lambda sid: (shots.get(sid) or {}).get('title') or sid
+    shot_names = V.shot_names(plan, session)
+    title = lambda sid: V.coded(shot_names, sid)   # VW-25 issue 7: a shot in words, its code last
     items, specs = [], None
     for n, w in enumerate(rows, 1):
         kind, group, it = w['kind'], w['group'], w['item']
@@ -1751,15 +1807,24 @@ def _waiting_items(ctx):
                 _decided(conn, run, user, 'shot ' + ', '.join(ids), 'design/221 row 3 (the still end-frame, approved in the chat)',
                          'the still end-frame approved' if choice == 'approve' else f'the still end-frame rejected: "{words}"', words or quote)
                 return out
-            ask = (f"{ids[0]}: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?" if len(ids) == 1 else
-                   f"{', '.join(ids)}: the drawing as it stands at the end of each of these shots, in order, before any motion is added. Are they right?")
+            named = ', '.join(title(sid) for sid in ids)
+            ask = (f"{named}: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?" if len(ids) == 1 else
+                   f"{named}: the drawing as it stands at the end of each of these shots, in order, before any motion is added. Are they right?")
+            above = ''   # VW-25 issue 7: where each drawing sits in the film and the words under it
+            for sid in ids:
+                try:
+                    w = P.where(session, plan, sid)
+                except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                    continue
+                if w['where']:
+                    above += (f'{title(sid)}:\n\n' if len(ids) > 1 else '') + _rows_text([['', w['where']], [P.W['words_head'].rstrip(':'), w['words'] or 'none']])
             last = lambda sid, st: next((c for c in reversed((session.get('motion_checks') or {}).get(sid) or []) if c.get('still') and c.get('sha256') == st.get('sha256')), None)
             bare = [sid for sid, st in zip(ids, sts) if last(sid, st) and not last(sid, st).get('rules')]
             if bare:   # release 2, F10: the still passed with nothing checked (no rule of its list is one a still can show): the card says so
                 ask += ' No rule could be checked on ' + ('this still' if len(ids) == 1 else 'the still of ' + ', '.join(bare)) + ': judge it by eye.'
             items.append(_item(f"still-end:{it}:{hashlib.sha256(''.join(st['png'] for st in sts).encode()).hexdigest()[:10]}", 'still end-frame', where, ask, run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what to change in the still, in their words.')],
-                               show=[{'key': st['frame_key'], 'name': f'{sid}-still-end.png'} for sid, st in zip(ids, sts)]))
+                               text=above.rstrip('\n'), show=[{'key': st['frame_key'], 'name': f'{sid}-still-end.png'} for sid, st in zip(ids, sts)], name=named))
         elif kind == 'held drawing':   # design/221 row 18: a must still fails after the last round: its frames, the open musts in full, three answers
             job, rec = next((j for j in take_rows if str(j['id']) == str(it)), None), V.held_drawing(session, group)
             if not job or not rec:
@@ -1777,7 +1842,7 @@ def _waiting_items(ctx):
             items.append(_item(f"held:{group}:{str(rec.get('sha256'))[:10]}:{rec.get('round')}", 'held drawing', where,
                                f"{title(group)}: held after round {rec.get('round')}: {len(musts)} must rule{' still fails' if len(musts) == 1 else 's still fail'}. What do you decide?",
                                run_, buttons, text='\n'.join('- ' + m for m in musts),
-                               show=[{'key': k, 'name': f'{group}-{n}'} for k, n in ((res.get('key'), 'drawing.mp4'), (res.get('sheet_key'), 'frames.jpg')) if k]))
+                               show=[{'key': k, 'name': f'{group}-{n}'} for k, n in ((res.get('key'), 'drawing.mp4'), (res.get('sheet_key'), 'frames.jpg')) if k], name=title(group)))
         elif kind in ('drawing spec to approve', 'material spec to approve'):
             key = V.material_key(group) if kind.startswith('material') else group
             specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once
@@ -1789,8 +1854,12 @@ def _waiting_items(ctx):
                 if choice == 'yes':
                     return V.approve_spec(store, user, run, outputs, key, quote)
                 return V.correct_spec(store, user, run, outputs, key, words)
-            items.append(_item(view['item'], 'spec', where, f"{view['title']}: {view['ask'][0].lower()}{view['ask'][1:]}", run_,
-                               [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator which value is wrong and what it should be.')], text=_spec_text(view['spec'])))
+            ask = f"{view['ask'][0].lower()}{view['ask'][1:]}"
+            items.append(_item(view['item'], 'spec', where, f"{view['title']}: {ask}", run_,
+                               [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator which value is wrong and what it should be.')],
+                               text=_rows_text(view['rows']) + _spec_text(view['spec']), name=view['title']))
+            if view['name']:   # VW-25 issue 7: the question in the button panel names the drawing (cut at 80 characters)
+                items[-1]['_ask'] = f"{view['name'][:80]}: {ask}"
         elif kind == 'take to select':   # design/207 (D2): the reuse question is retired; a reuse that passes the checks is kept without the operator
             job = next((j for j in take_rows if str(j['id']) == str(it)), None)
             if not job:
@@ -1863,7 +1932,7 @@ def _waiting_items(ctx):
                 buttons = [_button('Select', 'select', words=hold, tell=why_hold + ': ask the operator why it is right for the film all the same.'),
                            _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with it.')] + ([_button('Take the effect away', 'no-effect')] if fin else [])
             iid, bare, against = P.marked(f"take:{job['id']}", line['check'], line['held']) if line else (f"take:{job['id']}", None, False)   # the critic's point 2: a drawn graphic of step 6
-            item = _item(iid, 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show)
+            item = _item(iid, 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show, name=title(group))
             if line:
                 item.update(_line=line, _bare=bare, _against=against)
             items.append(item)
@@ -1879,9 +1948,10 @@ def _guide_items(ctx):
     # release 1, D2 (SK, 20 Nov 2026): the early cards in batches, in film order: every still's card first (`items`), then every word to shoot (`words`).
     # (Until this release: per shot, in the order the guides were written: a still, a word to shoot, the next shot's still; design/35 row 277.)
     shots, items, words, checking = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, [], [], False
+    shot_names = V.shot_names(plan, session)   # VW-25 issue 7: a shot in words, its code last
     for sid in [sid for sid in shots if sid in session['guides'] and V.route_of(shots[sid]) == 'video']:   # the critic's point 3: only the shots that are AI video today
         g = session['guides'][sid]
-        title = shots[sid].get('title') or sid
+        title = V.coded(shot_names, sid)
         still = next((s for s in g.get('stills') or [] if s.get('status') == 'candidate' and s.get('guide_sha256') == g['sha256'] and s.get('key')), None)
         if still and not P.start_offered(session, still):
             checking = True   # a still is with Claude's look: its card comes first, so the words to shoot wait for it (30 minutes at most: then it is shown as not checked)
@@ -2019,8 +2089,13 @@ def _ctx(conn, store, user, run, outputs):
     return {'conn': conn, 'store': store, 'user': user, 'run': run, 'outputs': outputs, 'session': session, 'plan': plan}
 
 
-def _split(question):
-    """(what the decision is about, the short question itself). 'Gap G1 (changed). Do you accept this line?' -> ('Gap G1 (changed)', 'Do you accept this line?')."""
+def _split(question, name=''):
+    """(what the decision is about, the short question itself). 'Gap G1 (changed). Do you accept this line?' -> ('Gap G1 (changed)', 'Do you accept this line?').
+    A question that begins with a shot's `name` is split after the name (VW-25 issue 7: a title may hold "?", ": " or ". " of its own)."""
+    if name and question.startswith(name + ': '):
+        rest = question[len(name) + 2:]
+        subject, ask = ('', rest) if re.match(r'[^.:]*\?', rest, re.S) else _split(rest)
+        return (f'{name}: {subject}' if subject else name), ask[:1].upper() + ask[1:]
     m = re.match(r'^(.*?)(?:\. |: )(?=[^.:]*\?)(.*)$', question, re.S)
     if not m:
         return '', question
@@ -2069,7 +2144,7 @@ def _typed(item):
 def _message(item, summary):
     """What the operator reads above the question: where it is, what it is about, the content laid out, the totals, and how to ask for a change
     in one step. The question itself comes after, short."""
-    subject, _ask = _split(item['question'])
+    subject, _ask = _split(item['question'], item.get('_name', ''))
     hint = '> To ask for a change in one step, choose **Other** and type what should change.' if _typed(item) else ''
     parts = [f"**{item['position']}**", f'### {subject}' if subject else '', _paragraphs(item.get('text')), f'*{summary}*' if summary else '', hint]
     return '\n\n'.join(x for x in parts if x)
@@ -2081,7 +2156,7 @@ def _public(item, summary, n_waiting, one=False):
             _says(label).replace(' (paid)', '')) if item.get('_v2') else _says   # design/212: no cost at the references
     out['buttons'] = [{**b, 'description': says(b['label'])} for b in out['buttons']]   # the line under each button, the same for every operator
     typed = _typed(item)
-    return {**out, 'message': _message(item, summary), 'ask': _split(item['question'])[1], **({'typed_answer': typed} if typed else {}),
+    return {**out, 'message': _message(item, summary), 'ask': item.get('_ask') or _split(item['question'], item.get('_name', ''))[1], **({'typed_answer': typed} if typed else {}),
             'waiting_after_this': max(0, n_waiting - 1), **({'summary': summary} if summary else {}), 'needed': True, 'say_last': NEEDED,
             'how': ('The tool saved the files of `show` in the run folder: show them to the operator in this order (' + LOOK_ONLY + '). ' if item.get('show') else '')
                    + 'Post `message` as your own text, exactly as it is laid out (its heading, its lines, its totals); add nothing to it. '

@@ -165,7 +165,7 @@ def test_the_servers_round_has_the_fixtures_shape(server):
     assert set(pg['layout']) == set(FIXTURE['layout']) and pg['layout']['words']['pictures'] == FIXTURE['layout']['words']['pictures']
     assert pg['layout']['help'] == FIXTURE['layout']['help'] and 'made' not in pg['layout']   # not shown by the page: `end_foot` says it
     assert set(FIXTURE) - {'layout', 'lines'} <= set(pg) and set(pg) - set(FIXTURE) <= {'how', 'pictures', 'videos', 'pictures_failed', 'pic_docs', 'zoom_docs', 'loading'}   # fix set (a): what the page says while its pictures are sent
-    assert [(c['name'], c['state']) for c in pg['layout']['coming']] == [('The brick kiln at dusk', 'failed'), ('The kiln at night', 'failed')]   # design/221: shown as could not be made
+    assert [(c['name'], c['state']) for c in pg['layout']['coming']] == [('The brick kiln at dusk (S4)', 'failed'), ('The kiln at night (S5)', 'failed')]   # design/221: shown as could not be made
     # the video page copy: `videos` [{code, key}] for the one that was made; "" and `none` for the one that was not
     d1, d2 = (l for l in pg['lines'] if l['kind'] == 'drawn')
     assert pg['videos'] == [{'code': d1['video']['code'], 'key': 'run-1/takes/j1.mp4.page.mp4'}] and d1['video']['code'].startswith('v') and len(d1['video']['code']) == 13
@@ -196,8 +196,8 @@ def test_the_round_drawn_by_the_page_answered_there_and_recorded_by_the_server(s
             view.wait_for_function("(() => { const v = document.querySelector('#pvideo'); return v && v.readyState >= 2; })()")
         if l['kind'] == 'drawn' and not l['video']['code']:
             assert view.locator('#pnone').text_content() == l['video']['none'] and view.locator('#pvideo').count() == 0
-    q, sty, d1, d2 = doc['lines'][0], L['The look of the graphics'], L['What the cavities do'], L['The wall builds itself']
-    s1, s2, g, s3 = L['The finished three-storey building'], L['The kiln worker with the clay pan'], L['Fewer bricks, fewer resources'], [l for l in doc['lines'] if l['kind'] == 'still'][-1]
+    q, sty, d1, d2 = doc['lines'][0], L['The look of the graphics'], L['What the cavities do (D1)'], L['The wall builds itself (D2)']
+    s1, s2, g, s3 = L['The finished three-storey building'], L['The kiln worker with the clay pan'], L['Fewer bricks, fewer resources (G1)'], [l for l in doc['lines'] if l['kind'] == 'still'][-1]
     # answer every line on the page
     plan_ = [(q, 'c2', None), (sty, 'yes', None), (d1, 'plain', None), (d2, 'select', None), (s1, 'no', None),   # release 1, B1: Select and Yes against the check are one click
              (s2, 'yes', None),(g, 'correct:2', 'The icons should turn green.'), (s3, 'correct', 'Two workers, not three.')]

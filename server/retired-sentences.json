@@ -200,6 +200,7 @@
     "Claude checks every ready take before the operator sees it",
     "The server measures the rest: real footage",
     "When every take is made and checked the operator answers them",
-    "then, for each, the cause, the one change and the take"
+    "then, for each, the cause, the one change and the take",
+    "has one entry per gap: `gap_id`; the words under it;"
   ]
 }

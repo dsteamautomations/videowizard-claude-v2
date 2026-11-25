@@ -113,9 +113,7 @@ def video_shots(plan, session):
     return [(g, sh, n, len(rows)) for rows in by_gap.values() for n, (g, sh) in enumerate(rows, 1) if V.route_of(sh) == 'video']
 
 
-def name_of(gap, sh, n, of):
-    """A shot's name is never its id: its title, else its gap's title and its number in the gap."""
-    return str(sh.get('title') or (str(gap.get('title') or f"Gap {gap.get('gap_id')}") + (f', shot {n}' if of > 1 else '')))
+name_of = V.name_of   # a shot's name is never its id: the one rule, used by every card since VW-25 issue 7
 
 
 def jobs_of(take_rows, sid):

@@ -294,7 +294,7 @@ def test_f10_a_still_no_rule_could_be_checked_on_says_so_on_its_card():
     sha = upload(store, 'D1', *SECTION, still=True, rules='# Rules\n1. must (motion): The block is lowered.\n')['sha256']
     still_verdict(store, sha, {}, shot='D1', key=frame('D1'))
     card = next(i for i in chat(store, 'still end-frame') if 'D1' in i['question'])
-    assert card['question'] == ('D1: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right? '
+    assert card['question'] == ('Gap G1, shot 1 (D1): this is the drawing as it stands at the end of the shot, before any motion is added. Is it right? '
                                 'No rule could be checked on this still: judge it by eye.')
     checked = load()
     still(checked, 'D1', SECTION)
@@ -332,7 +332,7 @@ def test_f12_a_comparison_that_comes_due_on_a_selected_drawing_is_said_and_a_fai
     item = drawn(store, [j])['D1']
     assert item['state'] == 'being checked by Claude' and 'D1: its comparison with D4 is due' in item['due'] and 'D1: its comparison with D4 is due' in line(store, [j])
     assert verdict(store, 'D1', d1, {SAME: True})['next'].startswith('Passed')
-    assert drawn(store, [j])['D1'] == {'kind': 'drawn', 'id': 'D1', 'name': 'D1', 'state': 'answered'}   # judged and passed: the selection stands, nothing more is said
+    assert drawn(store, [j])['D1'] == {'kind': 'drawn', 'id': 'D1', 'name': 'Gap G1, shot 1 (D1)', 'state': 'answered'}   # judged and passed: the selection stands, nothing more is said
     still(store, 'D4', ABOVE, png=b'\x89PNG-4b', more='wider {}')   # replaced again; this time the comparison fails
     approve(store, 'D4')
     assert verdict(store, 'D1', d1, {SAME: False})['failed'] == [SAME]
@@ -346,7 +346,7 @@ def test_f12_a_comparison_that_comes_due_on_a_selected_drawing_is_said_and_a_fai
     assert 'D1' not in P.starts(P.expected(*plan_of(store), [j]))   # no builder of D1 is named
     new = upload(store, 'D1', *SECTION, rules=comparing('D4'), more='c {}')['sha256']
     verdict(store, 'D1', new, {**ALL_OK, SAME: True}, rnd=2)   # a later project of it that holds the comparison: nothing more is said
-    assert drawn(store, [j])['D1'] == {'kind': 'drawn', 'id': 'D1', 'name': 'D1', 'state': 'answered'}
+    assert drawn(store, [j])['D1'] == {'kind': 'drawn', 'id': 'D1', 'name': 'Gap G1, shot 1 (D1)', 'state': 'answered'}
 
 
 # ---------- F14: a picture record naming a file of another run ----------

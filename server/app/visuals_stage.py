@@ -1880,7 +1880,8 @@ def plain_warnings(session, gap, plan=None):
 def warning_lines(session, gap, plan):
     """design/207: the plain sentences of a gap as the operator reads them on the plan page and in the chat, each once; a shot's sentence is led by
     the shot's title. From the same function the server's page uses (one flow, two front ends)."""
-    titles = {sh['id']: sh.get('title') or sh['id'] for sc in _every_scene(gap) for sh in sc['shots']}
+    ways = [c['scenes'] for c in gap.get('choices') or [] if c.get('scenes')] or [gap.get('scenes') or []]
+    titles = {sid: coded(names, sid) for names in (way_names(gap, w) for w in ways) for sid in names}   # VW-25 issue 7: in words, the code last
     return list(dict.fromkeys((f"{titles[w['shot_id']]}: " if w.get('shot_id') in titles else '') + w['plain'] for w in plain_warnings(session, gap, plan)))
 
 
@@ -1980,6 +1981,31 @@ def _accepted_shots(plan, session):
             continue
         out += [(gap, sh) for sc in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])) for sh in sc['shots']]
     return sorted(out, key=lambda gs: gs[1]['start_frame'])
+
+
+def name_of(gap, sh, n, of):
+    """A shot's name is never its id: its title, else its gap's title and its number in the gap."""
+    return str(sh.get('title') or (str(gap.get('title') or f"Gap {gap.get('gap_id')}") + (f', shot {n}' if of > 1 else '')))
+
+
+def way_names(gap, scenes):
+    """VW-25 issue 7 (SK, 25 Nov 2026): {shot id: its name} for one way of a gap; the number counts inside that way."""
+    shots = [sh for sc in scenes or [] for sh in sc.get('shots') or []]
+    return {sh['id']: name_of(gap, sh, n, len(shots)) for n, sh in enumerate(shots, 1)}
+
+
+def shot_names(plan, session):
+    """VW-25 issue 7: {shot id: its name} for every accepted shot, numbered in the film's order inside its gap (as `takes.video_shots` does)."""
+    by_gap = {}
+    for gap, sh in _accepted_shots(plan, session):
+        by_gap.setdefault(gap['gap_id'], []).append((gap, sh))
+    return {sh['id']: name_of(gap, sh, n, len(rows)) for rows in by_gap.values() for n, (gap, sh) in enumerate(rows, 1)}
+
+
+def coded(names, sid):
+    """The name with the code last, in brackets: the assistant and the builders find the shot by it. (Until 25 Nov 2026 a card showed the title,
+    else the bare code; retired.) An id with no name stays as it is."""
+    return f'{names[sid]} ({sid})' if sid in names else str(sid)
 
 
 # ---------- design/110 F3: the start shows the action not yet done ----------

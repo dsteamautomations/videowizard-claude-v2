@@ -45,7 +45,7 @@ def test_the_plan_step_shows_every_gap_with_its_shots_as_a_table():
     assert p['step'] == 'Plan' and p['open'] is True and [l['key'] for l in p['lines']] == ['G1', 'G2', 'G3'] and all(l['state'] == 'open' for l in p['lines'])
     g = p['lines'][0]
     assert g['line'] == 'l01' and g['title'] == 'Gap G1 · Title 1' and g['item'].startswith('gap:G1:')
-    assert g['cols'] == C.GAP_COLS and g['table'] == [['1', 'Shot G1-S1', 'a still picture', '4.0 s', 'It shows the wall', 'words']]
+    assert g['cols'] == C.GAP_COLS and g['table'] == [['1', 'Shot G1-S1 (G1-S1)', 'a still picture', '4.0 s', 'It shows the wall', 'words']]
     assert g['total'] == '1 shots, 4.0 s in all.' and g['mix'] == 'Made as: 1 × a still picture'
     assert g['text'] == 'What you accepted in the treatment: the wall from the street' and 'text' not in p['lines'][1]
     assert [(b['choice'], b['needs_words']) for b in g['buttons']] == [('accept', False), ('change', True)]
@@ -78,7 +78,7 @@ def test_a_gap_offered_two_ways_shows_both_and_taking_a_way_accepts_the_gap_in_t
     p = page(store, conn)
     g = by_key(p)['G2']
     assert [l['key'] for l in p['lines']] == ['G1', 'G2', 'G3'], 'the film\'s order, a choice among the gaps'
-    assert [(w['title'], w['recommended'], w['table'][0][1], w['total']) for w in g['ways']] == [('Way a', True, 'Shot G2-S1', '1 shots, 4.0 s in all.'), ('Way b', False, 'Shot G2-S1', '1 shots, 4.0 s in all.')]
+    assert [(w['title'], w['recommended'], w['table'][0][1], w['total']) for w in g['ways']] == [('Way a', True, 'Shot G2-S1 (G2-S1)', '1 shots, 4.0 s in all.'), ('Way b', False, 'Shot G2-S1 (G2-S1)', '1 shots, 4.0 s in all.')]
     assert g['ways'][0]['rows'] == [['What it is', 'd'], ['Why', 'w'], ['The cost of it', 't']] and g['cols'] == C.GAP_COLS
     assert [(b['label'], b['choice'], b['needs_words']) for b in g['buttons']] == [('Take Way a (advised)', 'way:a', False), ('Take Way b', 'way:b', False), ('Change this', 'change', True)]
     r = record(store, conn, [ans(g, 'way:b')])

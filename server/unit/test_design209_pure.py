@@ -133,7 +133,7 @@ def test_the_step_lists_the_materials_first_then_the_drawings_in_the_films_order
     store, conn = start(plan_with([drawing([dim('box', 'length', 600)]), None, drawing([dim('lid', 'thickness')])], PANEL))
     p = page(store, conn)
     assert p['step'] == 'Sizes, materials and graphic specs' and p['open'] is True
-    assert [(l['line'], l['key'], l['title'], l['state']) for l in p['lines']] == [('l01', 'element:panel', 'Floor panel', 'open'), ('l02', 'G1-S1', 'Shot G1-S1', 'open'), ('l03', 'G3-S1', 'Shot G3-S1', 'open')]
+    assert [(l['line'], l['key'], l['title'], l['state']) for l in p['lines']] == [('l01', 'element:panel', 'Floor panel', 'open'), ('l02', 'G1-S1', 'Shot G1-S1 (G1-S1)', 'open'), ('l03', 'G3-S1', 'Shot G3-S1 (G3-S1)', 'open')]   # VW-25 issue 7: the code last, in brackets
     assert [l['item'] for l in p['lines']] == [i['id'] for i in chat(store, conn)] and all(l['item'].startswith('spec:' + l['key'] + ':') for l in p['lines'])
     assert [l['ask'] for l in p['lines']] == ['Are these facts right?', 'Are the parts and the known sizes right?', 'Are the parts right?']
     assert all([(b['label'], b['choice'], b['needs_words']) for b in l['buttons']] == [('Yes', 'yes', False), ('Correct it', 'correct', True)] for l in p['lines'])
@@ -167,7 +167,7 @@ def test_the_same_part_and_measure_with_another_value_is_shown_in_full_in_both_a
     store, conn = start(plan_with([drawing([dim('box', 'length', 600)]), drawing([dim('Box', 'Length', 650)])]))
     a, b = page(store, conn)['lines']
     assert a['spec']['sizes'] == [['box', 'length', '600 mm', SOURCE]] and b['spec']['sizes'] == [['Box', 'Length', '650 mm', SOURCE]]
-    assert a['spec']['differs'] == ['box length: differs from Shot G2-S1: 650 mm'] and b['spec']['differs'] == ['Box Length: differs from Shot G1-S1: 600 mm']
+    assert a['spec']['differs'] == ['box length: differs from Shot G2-S1 (G2-S1): 650 mm'] and b['spec']['differs'] == ['Box Length: differs from Shot G1-S1 (G1-S1): 600 mm']
     assert 'confirmed' not in a['spec'] and 'confirmed' not in b['spec']
 
 
@@ -178,7 +178,7 @@ def test_a_size_approved_in_an_earlier_round_and_repeated_in_another_drawing_is_
     assert r['recorded'] == ['G2-S1'] and a['state'] == 'open' and a['spec']['confirmed'] == 'lid: length 300 mm' and 'sizes' not in a['spec']
     assert b['state'] == 'recorded' and len(b['spec']['sizes']) == 2, 'what was approved is read back in full'
     item, = chat(store, conn)   # the chat, one at a time, in the same words
-    assert item['question'] == 'Shot G1-S1: are the parts and the known sizes right?' and C._split(item['question']) == ('Shot G1-S1', 'Are the parts and the known sizes right?')
+    assert item['question'] == 'Shot G1-S1 (G1-S1): are the parts and the known sizes right?' and C._split(item['question'], item['_name']) == ('Shot G1-S1 (G1-S1)', 'Are the parts and the known sizes right?')
     assert 'Already confirmed: lid: length 300 mm' in item['text'] and 'Sizes to confirm' not in item['text'] and 'Drawn as: a cutaway (it shows what is inside)' in item['text']
     assert 'Parts: box, lid' in item['text'] and not [f for f in FIELDS if f in item['text']]
 
@@ -187,7 +187,7 @@ def test_the_chat_question_of_a_material_and_of_a_drawing_with_unknown_sizes_rea
     store, conn = start(plan_with([drawing([dim('box', 'length', 600), dim('box', 'wall thickness')])], PANEL))
     m, d = chat(store, conn)
     assert m['question'] == 'Floor panel: are these facts right?' and '- panel length: 410 mm (from ' + SOURCE + ')' in m['text'] and 'How it is laid: flat, the long side to the viewer' in m['text']
-    assert d['question'] == 'Shot G1-S1: are the parts and the known sizes right?' and 'Not known, so no figure is shown: box wall thickness' in d['text']
+    assert d['question'] == 'Shot G1-S1 (G1-S1): are the parts and the known sizes right?' and 'Not known, so no figure is shown: box wall thickness' in d['text']
     assert 'S_DIAGRAM' not in d['text'] and 'Not to scale. It carries the words "Illustrative, not to scale".' in d['text']
 
 
@@ -252,7 +252,7 @@ def test_a_spec_back_with_the_assistant_is_shown_with_the_operators_words_and_is
     store, conn = start(plan_with([drawing([dim('lid', 'length', 300)]), drawing([dim('lid', 'length', 300)])]))
     V.correct_spec(store, H.USER, H.RUN, {}, 'G1-S1', 'the lid is 320 long')
     a, b = page(store, conn)['lines']
-    assert a == {'line': 'l01', 'key': 'G1-S1', 'title': 'Shot G1-S1', 'state': 'with_assistant', 'note': 'the lid is 320 long'}
+    assert a == {'line': 'l01', 'key': 'G1-S1', 'title': 'Shot G1-S1 (G1-S1)', 'state': 'with_assistant', 'note': 'the lid is 320 long'}
     assert b['state'] == 'open' and b['spec']['sizes'] == [['lid', 'length', '300 mm', SOURCE]] and 'confirmed' not in b['spec']
 
 

@@ -370,9 +370,9 @@ def lines_of(store, conn):
 def test_each_open_gap_of_the_plan_page_carries_its_plain_lines_and_never_a_technical_one():
     store, conn = warned_page()
     lines = lines_of(store, conn)
-    assert lines['G1']['warnings'] == ['Shot G1-S1: ' + VC.WARNING_PLAIN['people_many']]          # the shot's title leads; the technical warning is not told
+    assert lines['G1']['warnings'] == ['Shot G1-S1 (G1-S1): ' + VC.WARNING_PLAIN['people_many']]          # the shot's title leads; the technical warning is not told
     assert lines['G2']['warnings'] == [VC.WARNING_PLAIN['stills_many']]                            # a film-wide line shows on the gap it is attached to
-    assert lines['G3']['warnings'] == ['Shot G3-S1: ' + VC.WARNING_PLAIN['stand_in_real']]         # worked out now: the stored proposal holds no such line
+    assert lines['G3']['warnings'] == ['Shot G3-S1 (G3-S1): ' + VC.WARNING_PLAIN['stand_in_real']]         # worked out now: the stored proposal holds no such line
     assert lines['G1']['table'] and lines['G1']['state'] == 'open'
 
 
@@ -391,4 +391,4 @@ def test_a_gap_offered_two_ways_carries_its_plain_lines_too_and_the_chat_says_th
     line = lines_of(store, conn)['G2']
     assert line['ways'] and line['warnings'] == [VC.WARNING_PLAIN['stills_many']]
     item = next(i for i in H.items(store, conn) if i['id'].startswith('gap:G1:'))
-    assert '**Read before you answer:** Shot G1-S1: ' + VC.WARNING_PLAIN['people_many'] in item['text']
+    assert '**Read before you answer:** Shot G1-S1 (G1-S1): ' + VC.WARNING_PLAIN['people_many'] in item['text']

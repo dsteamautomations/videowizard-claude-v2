@@ -239,7 +239,7 @@ def test_a34_a_finished_drawing_is_shown_while_a_question_waits_and_only_once():
     VS.ask(store, USER, NEW, [], 'IM1', 'Which wall is shown?', ['the north wall', 'the south wall'])
     out = C.next_item(FakeConn([drawn_job()]), store, USER, NEW, [])
     assert out['item']['id'] == 'question:IM1'
-    assert out['show'] == [{'key': 'run-1/takes/job-7.mp4', 'name': 'MO1-drawing.mp4', 'say': 'MO1: made and checked, 1 note. You judge it on the page with the others.'}]
+    assert out['show'] == [{'key': 'run-1/takes/job-7.mp4', 'name': 'MO1-drawing.mp4', 'say': 'Gap G1, shot 1 (MO1): made and checked, 1 note. You judge it on the page with the others.'}]
     assert out['show_how'] == C.SHOW_FIRST and 'ask nothing about it' in C.SHOW_FIRST
     again = C.next_item(FakeConn([drawn_job()]), store, USER, NEW, [])
     assert again['item']['id'] == 'question:IM1' and 'show' not in again   # shown once, as before
