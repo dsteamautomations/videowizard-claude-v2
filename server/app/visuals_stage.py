@@ -6830,12 +6830,19 @@ def need_parts(plan, session):
     need(parts_ready(session), PARTS_WAIT)
 
 
+def _part_names(p, shot):
+    """Issue 15 (VW-25, hotfix 25 Nov 2026): a part that names its drawings (data-shots) is theirs alone, also when it draws a thing of the plan; one
+    that names none is not narrowed. Before: a thing's part was asked from every drawing that names the thing, whatever the part's own list (retired:
+    VW-25's plan named the filler slab on two drawings of a solid slab, the part did not, and no upload of theirs could pass)."""
+    return not p.get('shots') or shot['id'] in p['shots']
+
+
 def shot_parts(session, shot):
     """design/221 row 1: the approved parts a shot uses: those drawing one of its things, and those that draw no thing of the plan. Fix set A1.1:
     a part that names its drawings (data-shots) is used by those; one of no thing that names none is every drawing's, as before."""
     els = set(shot.get('element_ids') or [])
     return [p for p in (session.get('motion_parts_approved') or {}).get('parts') or []
-            if p.get('element') in els or shot['id'] in (p.get('shots') or []) or not (p.get('element') or p.get('shots'))]
+            if _part_names(p, shot) and (p.get('element') in els or shot['id'] in (p.get('shots') or []) or not (p.get('element') or p.get('shots')))]
 
 
 def view_parts(session, shot):
@@ -6844,7 +6851,7 @@ def view_parts(session, shot):
     view = (shot.get('drawing_spec') or {}).get('view') or ''
     out = {}
     for p in (session.get('motion_parts_approved') or {}).get('parts') or []:
-        if view and p.get('view') == view and p.get('element') in (shot.get('element_ids') or []):
+        if view and p.get('view') == view and p.get('element') in (shot.get('element_ids') or []) and _part_names(p, shot):
             out.setdefault(p['element'], []).append(p['id'])
     return out
 
@@ -6859,7 +6866,7 @@ def fit_parts(session, shot):
     view = (shot.get('drawing_spec') or {}).get('view') or ''
     out = {}
     for p in (session.get('motion_parts_approved') or {}).get('parts') or []:
-        if p.get('element') in (shot.get('element_ids') or []):
+        if p.get('element') in (shot.get('element_ids') or []) and _part_names(p, shot):   # issue 15: a thing whose parts all name other drawings is left out: nothing of it is asked, and the brief says nothing
             out.setdefault(p['element'], []).extend([p['id']] if not view or (p.get('view') or view) == view else [])
     return out
 
