@@ -2,6 +2,8 @@
 
 22 Nov 2026. **For SK's approval. No code is written until this list is approved.** Regular lane.
 
+**Withdrawn by SK on 25 Nov 2026. Not built, and not to be built from this note.** It contradicts the hand-over flow SK set on 23 Nov 2026 (person A stops after the visuals, person B takes over on the computer with Resolve), which is live since server 0.123.0. The note is kept for the record only.
+
 **Source:** SK, 22 Nov 2026, after VW-24's operator built the proof film on a Windows computer without Resolve: "The building of film should not happen here ... after this step, the packaging must happen, and the next flow should start in the machine which has Resolve." His choice the same day: "Stop after the package". Earlier words: 1 Nov ("drop this assembly step because it is redundant"), 2 Nov ("Editors package first then followed by assembly"), 11 Nov ("the DaVinci step on a different PC and the smallest step before that"). The whole history is in the workspace file `vw2-flow-after-visuals-22-nov.md`.
 
 **Older way:** once the editor's package exists, the proof film may be prepared, built and rendered from any computer, before the timeline is in DaVinci (design/132, the hand-over of 11 Nov). On a computer without Resolve the tool says "What can be done here: the proof film". **Retired at the deploy for every open run.** VW-24 is the only open run.
