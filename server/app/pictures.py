@@ -1131,7 +1131,7 @@ def _stale(session, plan, job):
     before 0.117.0 names neither and is read as before. ponytail: compares the parts the render placed; a part the project starts to place only
     because a new upload added its id is caught by select_take."""
     req = job.get('request') or {}
-    if req.get('plan_digest') and req['plan_digest'] != V.digest(plan):
+    if V.other_plan(session, plan, job):   # issue 17 (R2): another plan, and this shot is not the same in it
         return True
     now = {p['id']: p.get('digest') for p in (session.get('motion_parts_approved') or {}).get('parts') or []}
     return any(now.get(pid) != dg for pid, dg in (req.get('parts') or {}).items())

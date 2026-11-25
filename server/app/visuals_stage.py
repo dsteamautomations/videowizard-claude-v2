@@ -80,13 +80,51 @@ def save_json(store, k, value):
 
 def session_of(store, run, outputs, create=False):
     try:
-        return load_json(store, key(run, 'session.json'))
+        return _with_shot_prints(store, load_json(store, key(run, 'session.json')))
     except Problem:
         if not create:
             raise Problem(409, 'NOT_ALLOWED', 'Run `vw visuals prepare` first.')
     return {'contract': 'vw2-visuals-session-v1', 'source': gaps_source(store, outputs), 'versions': [], 'current': None,
             'accepted': {}, 'choice_selections': {}, 'references': {}, 'bindings': {}, 'generator_choices': {}, 'preparations': {},
             'reviews': {}, 'selections': {}, 'assets': {}, 'recorded_gaps': {}, 'repeat_rules': 'refuse'}   # design/89: a session begun before batch 1 is warned instead
+
+
+def shot_prints(plan):
+    """Issue 17 (R2, SK 25 Nov 2026): {shot id: the fingerprint of what a video or a render of the shot is made from}: the shot, its scene and its gap
+    without their shots, the things it shows with the facts about them, and the part every gap shares (the foundation, the sequence rules)."""
+    made, shared = {}, {'foundation': plan.get('foundation'), 'sequence_rules': plan.get('sequence_rules') or []}
+    for gap in plan.get('gaps') or []:
+        own = {k: v for k, v in gap.items() if k not in ('scenes', 'choices')}
+        for sc in all_scenes(gap):
+            for s in sc['shots']:
+                used = set(s.get('element_ids') or [])
+                made.setdefault(s['id'], []).append({'shot': s, 'scene': {k: v for k, v in sc.items() if k != 'shots'}, 'gap': own,
+                                                     'elements': [e for e in plan.get('elements') or [] if e['id'] in used],
+                                                     'facts': [f for f in plan.get('visual_facts') or [] if f.get('id') in (s.get('fact_ids') or []) or (f.get('about') and f['about'] in used)]})
+    return {sid: digest({'made_from': m, 'shared': shared}) for sid, m in made.items()}
+
+
+def _with_shot_prints(store, session):
+    """Issue 17 (R2): a plan version recorded before 0.128.4 gets its shots' fingerprints from its file, once (they are kept with the next save).
+    A file that cannot be read adds nothing: work made on that version counts as old, as before."""
+    for v in session.get('versions') or []:
+        if 'shots' not in v:
+            try:
+                v['shots'] = shot_prints(load_json(store, v['file']['key'])['document'])
+            except (Problem, KeyError, TypeError, ValueError):
+                pass
+    return session
+
+
+def other_plan(session, plan, job):
+    """Issue 17 (R2): this video or render was made on another plan AND what it was made from is not the same there as in the plan now: its own
+    shot's fingerprint (`shot_prints`) differs, or the version it was made on is unknown or has none. Work that names no plan is read as before.
+    Retired: any new plan version made every unaccepted video and every render of the film old (the whole plan's fingerprint was compared)."""
+    made_on = (job.get('request') or {}).get('plan_digest')
+    if not made_on or made_on == digest(plan):
+        return False
+    was = next((v.get('shots') or {} for v in session.get('versions') or [] if v.get('plan_digest') == made_on), {}).get(job.get('unit'))
+    return not was or was != shot_prints(plan).get(job.get('unit'))
 
 
 def save_session(store, run, session):
@@ -732,7 +770,7 @@ def new_version(store, run, session, plan, user, warnings, answers=''):
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     pk = save_json(store, key(run, f'plan-v{version}.json'), record)
     identity = digest(plan)
-    session['versions'].append({'version': version, 'file': pk, 'plan_digest': identity, 'warnings': warnings})
+    session['versions'].append({'version': version, 'file': pk, 'plan_digest': identity, 'warnings': warnings, 'shots': shot_prints(plan)})   # issue 17 (R2)
     session['current'] = identity
     was = set(session.get('was_accepted') or {})
     kept, quiet, asked = _carry_acceptances(session, plan, version, prev, answer)
@@ -6947,6 +6985,13 @@ def set_parts(store, user, run, outputs, name, content):
         text = ''
     parts, problems = motion.read_parts(text, {e['id'] for e in plan.get('elements') or []}, drawn_ids(plan, session)) if text else ([], ['the parts file is not UTF-8 text'])
     need(not problems, 'The parts file breaks the rules: ' + '; '.join(problems[:6]))
+    ok = session.get('motion_parts_approved') or {}   # issue 16 (R1): a part whose drawing is the same as in the approved file keeps the approved part's fingerprint,
+    try:   # so a change of its labels alone makes no still, render or brief stale. Retired: any change inside a part's <symbol>, also of its labels or spacing, made them all stale
+        was = motion.part_drawings(store.get(ok['key']).decode('utf-8')) if ok.get('parts') and parts else {}
+    except Exception:   # noqa: BLE001: the approved file cannot be read: nothing is carried, the upload goes on as before
+        was = {}
+    now, kept = motion.part_drawings(text) if was else {}, {p['id']: p['digest'] for p in ok.get('parts') or []}
+    parts = [{**p, 'digest': kept[p['id']]} if p['id'] in kept and was.get(p['id']) and was[p['id']] == now.get(p['id']) else p for p in parts]
     twice = '' if parts else shown_twice(plan, [guarded(lambda sid=sid: locate(store, session, sid))[3] for sid in drawn_ids(plan, session)])
     need(not twice, PARTS_EMPTY.format(things=twice))   # the critic's point 2: an empty file stands only when the server's own list of what repeats is empty
     sha = hashlib.sha256(content).hexdigest()

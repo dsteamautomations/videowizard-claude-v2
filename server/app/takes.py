@@ -177,10 +177,10 @@ def starts(session, plan, take_rows):
 
 # ---------- each shot's state, the line of counts, when the page opens ----------
 
-def _stale(plan, job):
-    """A take shot for another plan than the film has now: `select_take` refuses it. A take queued before design/222 names no plan and is read as before."""
-    req = job.get('request') or {}
-    return bool(req.get('plan_digest')) and req['plan_digest'] != V.digest(plan)
+def _stale(session, plan, job):
+    """A take shot for another plan than the film has now: `select_take` refuses it. A take queued before design/222 names no plan and is read as before.
+    Issue 17 (R2): only when its own shot is not the same in both plans (`V.other_plan`)."""
+    return V.other_plan(session, plan, job)
 
 
 def _ready_to_shoot(g):
@@ -253,7 +253,7 @@ def _state(session, plan, sh, take_rows, now):
             return 'failed', None, False
         if question_open(session, sid):
             return 'chat', None, True
-        return ('stale' if _stale(plan, ready[-1]) else 'done'), ready[-1], False
+        return ('stale' if _stale(session, plan, ready[-1]) else 'done'), ready[-1], False
     if not g:
         return 'none', None, False
     if _still_checking(session, g, now):
@@ -418,7 +418,7 @@ def _take(store, session, plan, sh, job, n, slot, num):
     return {'n': n, 'job': str(job['id']), 'label': W['take_label'].format(n=n), 'tab': W['take_label'].format(n=n), 'size': C.size_of(job), 'how': _how(job, n, num),
             'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['take_label'].format(n=n), 'none': ''},
             'secs': f'{secs:.1f}', 'in_s': round(in_s, 2),
-            'short': W['stale'] if _stale(plan, job) else W['short'].format(s=f'{secs:.1f}', slot=f'{slot:.1f}') if secs and secs < slot - 0.001 else '',
+            'short': W['stale'] if _stale(session, plan, job) else W['short'].format(s=f'{secs:.1f}', slot=f'{slot:.1f}') if secs and secs < slot - 0.001 else '',
             'rejected': W['said'].format(words=notes) if notes else ''}
 
 
@@ -447,7 +447,7 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None):
         return {'label': label, 'choice': choice, 'act': 'select', 'take': t['n'] if choice == 'select' else cur['n'], 'needs_words': False, 'hint': '', 'go': '', 'prefill': '', 'need': '',
                 'note': '' if final else W['paid'], 'say': (W['say_select'].format(n=t['n'], at=at) if final else W['say_copy'].format(n=t['n'])),
                 'end': (W['end_select'].format(n=t['n'], at=at) if final else W['end_copy'].format(n=t['n'])), **({} if final else {'paid': True})}
-    buttons, old_plan = [], _stale(plan, cur_job)   # a take made for an earlier plan cannot be accepted: the operator says what should change (a version stands on today's plan)
+    buttons, old_plan = [], _stale(session, plan, cur_job)   # a take made for an earlier plan cannot be accepted: the operator says what should change (a version stands on today's plan)
     if not old_plan:
         buttons.append(accept(cur, cur_job, 'select', W['select']))
     if True:
@@ -458,7 +458,7 @@ def line(store, session, plan, gap, sh, n, of, take_rows, now=None):
                             'paid': True, 'say': W['say_resend'], 'end': W['end_resend']})
         for t, j in list(zip(takes, js))[:-1]:   # an earlier video may be used after all. SK, 22 Nov 2026: one click: the second question under the button asked the
             # same thing again, and the answer can be undone on the page (until then: asked once, D7; design/35 row 334)
-            if not _stale(plan, j):
+            if not _stale(session, plan, j):
                 buttons.append(accept(t, j, f"old:{t['n']}", W['select_old'].format(n=t['n'])))
     before, after = _beside(session, plan, gap, sh, take_rows)
     still = next((s for s in g.get('stills') or [] if s.get('status') == 'approved' and s.get('key')), None)
@@ -514,7 +514,7 @@ def answer(conn, store, user, run, outputs, shot_id, take_rows, choice, quote, w
                                 'entry': entry, 'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': quoted or quote, 'request_id': None})
 
     def accept(j, n, log):
-        V.need(not _stale(plan, j), W['stale_refuse'])
+        V.need(not _stale(session, plan, j), W['stale_refuse'])
         jid = str(j['id'])
         short = ((j.get('result') or {}).get('evidence') or {}).get('timing_matches_placement') is False
         note = P.W['against_note'] if short else ''   # a take shorter than its place: one click, a fixed note, and the log says so

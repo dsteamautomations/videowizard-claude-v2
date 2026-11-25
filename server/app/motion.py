@@ -192,6 +192,25 @@ PART_VIEWS = ('cutaway', 'plan', 'side', 'elevation')   # the views a drawing sp
 SVG_INNER = re.compile(r'<svg\b[^>]*>(.*)</svg>\s*$', re.S)
 
 
+def part_drawings(text):
+    """Issue 16 (R1, SK 25 Nov 2026): each part's drawing alone, in a normal form: {part id: its <symbol> without the three labels that say who uses
+    it (data-shots, data-element, data-view); spacing, line breaks and the order of attributes do not count}. {} for a file that cannot be read.
+    ponytail: the <defs> and <style> beside the symbols are not part of a part's drawing here, as they never were in its fingerprint."""
+    from xml.etree import ElementTree as ET
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return {}
+    out = {}
+    for el in root:
+        if el.tag.rsplit('}', 1)[-1] == 'symbol' and el.get('id'):
+            for k in ('data-shots', 'data-element', 'data-view'):
+                el.attrib.pop(k, None)
+            el.tail = None
+            out[el.get('id')] = ET.canonicalize(ET.tostring(el, encoding='unicode'), strip_text=True)
+    return out
+
+
 def read_parts(text, elements, drawn=None):
     """design/221 row 1: the film's shared parts file, one <svg> of <symbol id="part-<name>"> (a <title>, a viewBox, data-element naming a thing of
     the plan when it draws one, data-view naming the view it is drawn in when the thing has several), checked like a project: no network, no script,
