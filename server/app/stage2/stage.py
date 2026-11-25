@@ -767,6 +767,7 @@ def _slide_rows(sl, decisions, fps):
         d = decisions.get(lab)
         needs, why = needs_answer(s, sl, decisions)
         rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'library', 'note', 'of', 'ai_only', 'intent', 'marker_reasons', 'flags')},
+                     'fit': (d.get('swap') or {}).get('fit') if d and d.get('action') == 'SWAP' else s.get('fit'),   # VW-25 issue 3a: the mark of the piece now in use
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'edit_text', 'swap', 'by', 'at')} if d else None)})
     return rows
@@ -889,9 +890,12 @@ def _swap(run, session, pk, doc, sl, s, sub_clip_id):
     fit = RV.fit_piece(row, s['frames'], timeline(run)['fps'], partial=s['type'] == 'ai')
     if isinstance(fit, str):
         fail(f"{sub_clip_id} cannot be used on {s['title']}: {fit}.")
-    kind = P.rank_kind(row, next(o for o in doc['options'] if o['option_number'] == s['option_number'])['beat_id'])
+    o = next(o for o in doc['options'] if o['option_number'] == s['option_number'])
+    match = 'library' if row.get('library') else 'direct' if P.rank_kind(row, o['beat_id']) in ('exact', 'partly') else 'b_roll'
+    # SK, 25 Nov 2026 (VW-25 issue 3a): the review page's part-match label follows the piece now on the shot (slides.fit, as for a proposed shot)
+    mark = SL.fit(row, o, next(b for b in pk['beats'] if b['beat_id'] == o['beat_id']), s['event_index'] + 1, s['at_frame'], s['at_frame'] + fit[2]) if match == 'direct' else None
     return {'sub_clip_id': sub_clip_id, 'source_in_frame': fit[0], 'source_out_frame': fit[1], 'timeline_frames': fit[2], 'crop': 'solver' if row['eligibility'] == 'ELIGIBLE_WITH_CROP' else 'full',
-            'match': 'library' if row.get('library') else 'direct' if kind in ('exact', 'partly') else 'b_roll', 'clip': row.get('clip_name')}
+            'match': match, 'clip': row.get('clip_name'), **({'fit': mark} if mark else {})}
 
 
 def slide_cues(plan, fps):
@@ -1098,6 +1102,33 @@ def _overview(card):
     return line.split('OVERVIEW:', 1)[1].strip() if line else str(card.get('descriptive_name') or '')
 
 
+NOTE_NOT_USED = {'KEEP': 'the shot is kept', 'TRIM': 'the shot is trimmed', 'SWAP': "the shot is replaced by the operator's clip"}
+
+
+def note_outcomes(sl, decisions):
+    """SK, 25 Nov 2026 (VW-25 issue 5): what the master build did with every note on an answer, in film order, for the assistant to tell the
+    operator: the row's label and name, the answer, the note (400 characters at most here; whole in the record) and the outcome. Only the note
+    of a rejected shot that becomes an AI stretch is passed on (inside that stretch's request to the visuals stage); every other note is
+    'not used', with why. A note of spaces is no note. A report only: it refuses nothing. Older way retired: a note that was not used was
+    dropped without a word."""
+    out = []
+    for s in sl:
+        d = decisions.get(str(s['no'])) or {}
+        note = str(d.get('note') or '').strip()
+        if not note:
+            continue
+        if s['type'] != 'shot':
+            did = f"not used: a note on {'an alternative' if s['type'] == 'alternative' else 'an AI shot'} is not passed on"
+        elif d.get('action') != 'REJECT':
+            did = 'not used: ' + NOTE_NOT_USED.get(d.get('action'), 'the shot is kept')
+        elif any(x['type'] == 'alternative' and x.get('of') == s['no'] and _action(decisions, x) == 'KEEP' for x in sl):
+            did = "not used: the kept alternative took the shot's place"
+        else:
+            did = 'passed to the visuals stage as the request for this stretch'
+        out.append({'slide': str(s['no']), 'title': s['title'], 'answer': d.get('action'), 'note': note[:400], 'outcome': did})
+    return out
+
+
 def build_master(conn, store, user, run):
     """design/127: per shot: KEEP the shot, TRIM it, or REJECT it for its kept alternative, else an AI stretch with its words; adjacent AI
     stretches merge; an all-AI scene answered Find footage goes back to the assistant."""
@@ -1111,9 +1142,10 @@ def build_master(conn, store, user, run):
     beats = pk['beats']
     decisions = session['decisions']
     sl = _slides(store, session, doc, entry)
-    missing = [f'#{lab}' for lab in missing_answers(sl, decisions)]
-    if missing:
-        fail(f"Every shot needs an answer; missing: {', '.join(missing)}")
+    left = set(missing_answers(sl, decisions))
+    missing = [f"{s['title']} (#{s['no']})" for s in sl if str(s['no']) in left]
+    if missing:   # SK, 25 Nov 2026 (VW-25 issue 4): each missing shot by its name on the page, five at most, then the page (its path: the tool holds the full link). Older way retired: the bare "#2.1"
+        fail(f"Every shot needs an answer; missing: {', '.join(missing[:5])}" + (f' and {len(missing) - 5} more' if len(missing) > 5 else '') + f". Review page: /runs/{run['code']}/review")
     row_of = {(s['option_number'], s['type'], s.get('event_index'), s.get('alt_index')): s for s in sl}
     fps = timeline(run)['fps']
     kept, turned = {}, {}
@@ -1214,7 +1246,7 @@ def build_master(conn, store, user, run):
     save_session(store, run, session)
     LG.write(conn, run, entry['version'], [r for r in LG.rows(pk, doc, turned) if r['decided_by'] == 'operator'])   # the operator's Reject, with the note
     return {'version': version, 'events': session['master']['events'], 'gaps': session['master']['gaps'], 'flags': result['flags'], 'duration_frames': cursor,
-            'next': '`vw master render`, fetch, let the operator watch, then `vw master record --quote`'}
+            'notes': note_outcomes(sl, decisions), 'next': '`vw master render`, fetch, let the operator watch, then `vw master record --quote`'}
 
 
 def _finishing(pk, events):
