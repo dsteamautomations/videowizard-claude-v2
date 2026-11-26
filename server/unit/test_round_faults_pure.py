@@ -142,11 +142,12 @@ def test_an_unanswered_ready_set_is_listed_as_waiting_while_another_is_being_mad
     assert [k for k in kinds if k[0] == 'E2'] and not [k for k in kinds if k[0] == 'E3']
 
 
-def test_done_waits_while_a_set_is_being_made_and_names_it():
+def test_an_answer_on_a_ready_set_is_recorded_while_another_set_is_being_made_and_that_one_is_named():
+    # VW-25 issue 13 (the older way, the whole send refused with "1 set is still being made: Garden hose", is retired)
     store, conn, kiln = making_round()
-    with pytest.raises(Problem, match='1 set is still being made: Garden hose') as e:
-        g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': kiln}}, 'Yes.', conn=conn, partial=True))
-    assert not sheets(saved(store), 'E2', 'approved') and '`' not in e.value.message
+    out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': kiln}, 'E3': {'verdict': 'no'}}, 'Yes.', conn=conn, partial=True)
+    assert out['approved'] == ['E2'] and out['pass'] == 'making' and sheets(saved(store), 'E2', 'approved') and saved(store)['round']['pass'] == 'making'
+    assert out['waiting'] == {'E3': VS.SET_WAITS['making'].format(name='Garden hose')} and '`' not in out['waiting']['E3']
 
 
 def test_the_answer_survives_the_other_set_coming_back():

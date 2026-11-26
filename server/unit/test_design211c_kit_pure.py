@@ -150,7 +150,7 @@ class Film:
         self.save(F.session('making'))
         return {'pass': 'making', 'kept': True, 'queued': list(F.FIRST), 'errors': {}, 'cost_inr': 3 * F.SET_PRICE, 'then': ref_sets.GO1_MAKING.format(k=3, x='105', r=2)}
 
-    def round_sets(self, store, user, run, outputs, verdicts, quote, conn=None, partial=False):
+    def round_sets(self, store, user, run, outputs, verdicts, quote, conn=None, partial=False, each=False):
         if not verdicts:
             raise ValueError('a set still waits for its answer')
         self.note('round_sets', copy.deepcopy(verdicts), quote)

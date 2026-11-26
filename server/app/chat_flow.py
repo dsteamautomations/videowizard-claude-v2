@@ -481,8 +481,7 @@ def _round_items(ctx, every=False):
                 else:
                     ans = {'verdict': choice, 'golden': None, 'words': words if choice == 'correct' else ''}
                 V.set_answer(ctx['store'], ctx['user'], run, ctx['outputs'], eid, ans['verdict'], ans['golden'], ans['words'])
-                out = flush_sets(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], quote)
-                return out if out is not None else {'tell': 'Your answer is kept. It is recorded as soon as the sets still being made are back.'}
+                return _record_set(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], quote, eid)
             if person:
                 buttons = [_button('Yes', 'yes'), _button('No', 'no'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')]
                 more, q = [], f'{names[eid]}: is this set right for this person?'
@@ -1328,8 +1327,9 @@ def _round_v2(ctx, every, step):
             part, n_made, model = sf.get('partial'), int(sf.get('makes') or 0), sf.get('model') or {}
             most = '' if again else WORDS['set_made_max' if person else 'set_made_max_one' if one else 'set_made_max_thing'].format(n=sf.get('makes'))
             added = str(row.get('prompt') or '') if any(i.get('role') == 'footage' for i in beside) else ''
+            remade = V.SET_REMADE.format(name=names[eid]) if V._answer_of(row)[1] else ''   # VW-25 issue 13: an answer stored on the pictures before: said on the set's own line, page and chat, until it is answered
             line = {**head(eid, f, STEP2_GROUPS[0], 'judge', WORDS['tag_rec_' + do] if do else ''),
-                    'text': '\n'.join(x for x in (about(eid, f), most, WORDS['set_changed'] if sf.get('changed') else '') if x),
+                    'text': '\n'.join(x for x in (remade, about(eid, f), most, WORDS['set_changed'] if sf.get('changed') else '') if x), **({'refused': remade} if remade else {}),
                     **({'rec': rec_of(WORDS['rec_use_one' if one and do == 'use' else 'rec_' + do], do, str(proposed.get('reason') or ''))} if do else {}),
                     # design/216: the answer column speaks of the whole set (A3); approving against a "make again" asks once (A6)
                     'answer_head': WORDS['answer_one'] if one else WORDS['answer_all'].format(letters=_and([letter[p['ref']] for p in shown])),
@@ -1356,8 +1356,7 @@ def _round_v2(ctx, every, step):
                 every_pic = choice == 'correct_all'
                 choice = 'correct' if every_pic else choice
                 V.set_answer(store, user, run, outputs, eid, 'yes' if golden else choice, golden, words if choice == 'correct' else '', all=every_pic)
-                out = flush_sets(conn, store, user, run, outputs, quote)
-                return out if out is not None else {'tell': 'Your answer is kept. It is recorded as soon as the sets still being made are back.'}
+                return _record_set(conn, store, user, run, outputs, quote, eid)
             sets.append(_v2_item(f"set:{eid}:{row.get('set')}", 'reference set', '', names[eid], WORDS['ask_person_set' if person else 'ask_one_set' if one else 'ask_thing_set'], run_, chat[:4], line, more=chat[4:],
                                  _key=f'set:{eid}', _eid=eid, _person=person, _rows=sorted(live, key=lambda r: int(r.get('set_n') or 1))[:len(LETTERS)], _kept=V._answered(session, kinds, eid, row),
                                  _first=do != 'use'))
@@ -1949,9 +1948,11 @@ def _record_items(ctx):
 
 
 def flush_sets(conn, store, user, run, outputs, quote=''):
-    """Record every whole answer kept on a reference set (the operator gave each one in the chat). None while a set is still being made, or when
-    there is nothing to record: the answers stay kept. Any other refusal of the server is raised as it is. With no answer kept and no set left
-    to judge at step 2, the round is completed here: the chat (`next_item`) and the page (`page_flow._page`) both pass through this."""
+    """Record every whole answer kept on a reference set (the operator gave each one in the chat or on the page). None when there is nothing to
+    record. With no answer kept and no set left to judge at step 2, the round is completed here: the chat (`next_item`) and the page
+    (`page_flow._page`) both pass through this.
+    VW-25 issue 13 (25 Nov 2026): an answer is recorded at once, whatever the other sets wait for; `round_sets` judges each set by its own state
+    and gives back, by thing, what was not recorded (`waiting`, `refused`). The older way, None while one set is still being made, is retired."""
     s = V.session_of(store, run, outputs)
     rd = s.get('round')
     if not (rd and rd.get('kept') and s.get('current')):
@@ -1973,12 +1974,15 @@ def flush_sets(conn, store, user, run, outputs, quote=''):
             return V.round_sets(store, user, run, outputs, {}, quote or rd.get('quote') or '', conn=conn, partial=True)
         except (ValueError, V.Problem):
             return None   # a set still waits for its answer
-    try:
-        return V.round_sets(store, user, run, outputs, kept, quote, conn=conn, partial=True)
-    except (ValueError, V.Problem) as exc:   # a refusal written with `need` is a ValueError until the API wraps it
-        if 'still being made' in str(getattr(exc, 'message', '') or exc):
-            return None
-        raise
+    return V.round_sets(store, user, run, outputs, kept, quote, conn=conn, partial=True, each=True)
+
+
+def _record_set(conn, store, user, run, outputs, quote, eid):
+    """VW-25 issue 13: the answer just stored on the set of `eid` is recorded at once, with every other stored answer (`flush_sets`). A fault of
+    this thing's own answer is refused by name; what another set waits for never refuses it."""
+    out = flush_sets(conn, store, user, run, outputs, quote) or {}
+    V.need(eid not in (out.get('refused') or {}), (out.get('refused') or {}).get(eid) or '')
+    return out
 
 
 def _candidates(ctx):
@@ -2320,7 +2324,7 @@ def _next_item(conn, store, user, run, outputs, one=False, many=False):
     them one at a time, the older way, kept for a machine that cannot show the card); or that nothing is needed and what is being made."""
     try:
         flush_sets(conn, store, user, run, outputs)
-    except V.Problem:
+    except (ValueError, V.Problem):   # VW-25 issue 13: a refusal written with `need` is a ValueError here; no other card is refused because of a set
         pass   # said again when the operator next answers a set
     ctx = _ctx(conn, store, user, run, outputs)
     items, summary, with_assistant = _candidates(ctx)
@@ -2378,6 +2382,8 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     kind = lambda i: next((p for p in TOGETHER if i['id'].startswith(p)), None)
     pool = [i for i in items if kind(i) == kind(now[0])] if now and len(open_ids) > 1 and kind(now[0]) else now
     current = next((i for i in pool if i['id'] == item_id and item_id in open_ids), None)
+    gone = None if current else V.set_gone(ctx['session'], ctx['plan'], item_id)   # VW-25 issue 13: an answer to a set's card that is recorded already, or of the pictures before
+    V.need(not gone, gone[1] if gone else '')
     V.need(items, 'Nothing waits for an answer now: run `vw visuals next`.')
     V.need(current,
            f"{item_id} is not the decision that is open. The open one is {now[0]['id']} ({now[0]['position']}): show it with `vw visuals next` and record the operator's answer to it. One decision at a time, in the server's order.")

@@ -347,20 +347,23 @@ def test_none_of_these_and_correct_it_make_the_set_again_and_correct_it_needs_wo
     assert r['recorded'] == ['set:E2'] and s['round']['elements']['E2']['corrections'] == ['the chimney is too short'] and len(conn.inserted) == 3 and s['round']['pass'] == 'making'
     assert [(l['key'], l['state']) for l in r['page']['lines']] == [('set:E2', 'making'), ('set:P1', 'open')] and '1 line(s) still wait' in r['then']
     assert 'the chimney is too short' in logged(conn)[-1] and 'Correct it (paid, about' in logged(conn)[-1]
-    r = record(store, conn, [ans(by(r['page'])['set:P1'], 'no')])   # while E2 is being made again: kept until it is back
-    assert r['kept'] == ['set:P1'] and len(conn.inserted) == 3 and r['page']['open'] is False and r['then'].endswith(P.SETS_WAIT)
+    r = record(store, conn, [ans(by(r['page'])['set:P1'], 'no')])   # while E2 is being made again. VW-25 issue 13: recorded at once (the older way, kept until E2 is back, is retired)
+    assert r['recorded'] == ['set:P1'] and r['kept'] == [] and len(conn.inserted) == 4 and r['page']['open'] is False and r['then'].endswith(P.SETS_WAIT)   # None of these: made again, with no words
+    assert [(l['key'], l['state']) for l in r['page']['lines']] == [('set:E2', 'making'), ('set:P1', 'making')]
     back(store)
     now = by(page(store, conn))
-    assert len(conn.inserted) == 4 and now['set:P1']['state'] == 'making' and now['set:E2']['state'] == 'open'   # None of these: made again, with no words
+    assert len(conn.inserted) == 4 and now['set:P1']['state'] == 'open' and now['set:E2']['state'] == 'open'
 
 
-def test_an_answer_to_a_set_made_again_meanwhile_is_stale():
+def test_an_answer_to_a_set_made_again_meanwhile_is_refused_by_name():
     store, conn = at_sets()
     old = by(page(store, conn))['set:E2']
     record(store, conn, [ans(old, 'no')])
     back(store)
     r = record(store, conn, [ans(old, old['pics'][0]['choice'])])
-    assert r['stale'] == ['set:E2'] and r['recorded'] == [] and saved(store)['round']['elements']['E2']['verdict'] == 'no'
+    # VW-25 issue 13: named with its reason (the older way, a silent "stale", is retired for a set's answer)
+    assert [x['key'] for x in r['refused']] == ['set:E2'] and 'made again after this answer was given' in r['refused'][0]['message'] and r['stale'] == []
+    assert r['recorded'] == [] and saved(store)['round']['elements']['E2']['verdict'] == 'no'
     assert by(r['page'])['set:E2']['item'] != old['item'] and by(r['page'])['set:E2']['state'] == 'open'
 
 
@@ -416,7 +419,7 @@ def test_a_remake_the_limit_holds_stays_open_with_the_servers_sentence():
     assert saved(store)['round']['elements']['P1']['answer']['verdict'] == 'no' and saved(store)['round']['pass'] == 2
 
 
-def test_sets_still_being_made_wait_and_an_answer_meanwhile_is_kept_until_they_are_back():
+def test_an_answer_on_a_set_that_is_back_is_recorded_while_another_set_is_still_being_made():   # VW-25 issue 13 (the older way, kept until every set is back, is retired)
     store, conn = film()
     step1(store, conn)
     s = saved(store)
@@ -428,11 +431,11 @@ def test_sets_still_being_made_wait_and_an_answer_meanwhile_is_kept_until_they_a
     assert [(l['key'], l['state']) for l in p['lines']] == [('set:E2', 'open'), ('set:P1', 'making')] and '1 to answer' in p['summary'] and '1 being made' in p['summary']
     r = record(store, conn, [ans(p['lines'][0], p['lines'][0]['pics'][0]['choice'])])
     now = by(r['page'])['set:E2']
-    assert r['kept'] == ['set:E2'] and r['recorded'] == [] and now['kept'] == 'Use A' and now['kept_note'] == P.SETS_KEPT and saved(store)['round']['elements']['E2']['verdict'] == 'approve'
-    assert r['then'].endswith(P.SETS_WAIT)
+    assert r['recorded'] == ['set:E2'] and r['kept'] == [] and now['state'] == 'recorded' and 'kept' not in now and saved(store)['round']['elements']['E2']['verdict'] == 'yes'
+    assert r['then'].endswith(P.SETS_WAIT) and saved(store)['round']['pass'] == 'making'   # the round stays open for the set being made
     back(store)
-    p = page(store, conn)   # the wait is over: the kept answer is recorded, as `vw visuals next` does
-    assert by(p)['set:E2']['state'] == 'recorded' and by(p)['set:P1']['state'] == 'open' and saved(store)['round']['elements']['E2']['verdict'] == 'yes'
+    p = page(store, conn)
+    assert by(p)['set:E2']['state'] == 'recorded' and by(p)['set:P1']['state'] == 'open' and VS._round_pass(saved(store), saved(store)['round']) == 2
 
 
 def test_the_round_complete_goes_on_with_vw_visuals_next():
@@ -534,7 +537,7 @@ def test_the_reference_drawings_point_to_the_references_when_they_are_next():
 def test_the_page_is_told_how_the_operators_own_picture_is_fetched_and_no_line_names_a_kind_of_film():
     assert 'own_fetch' in P.HOW and 'action "read"' in P.HOW and '`vw visuals page --record` again' in P.HOW
     store, conn = at_sets()
-    text = json.dumps([page(store, conn)['lines'], P.REFS_START, P.REFS_GO, P.SETS_WAIT, P.ROUND_NEXT, P.OWN_PERMISSION, P.OWN_MISSING, P.REFS_KEPT, P.SETS_KEPT]).lower()
+    text = json.dumps([page(store, conn)['lines'], P.REFS_START, P.REFS_GO, P.SETS_WAIT, P.ROUND_NEXT, P.OWN_PERMISSION, P.OWN_MISSING, P.REFS_KEPT, P.SETS_HELD]).lower()
     assert not any(w in text for w in ('building', 'construction', 'brick', 'documentary'))   # the kiln's own name aside, nothing here is tied to one kind of film
 
 

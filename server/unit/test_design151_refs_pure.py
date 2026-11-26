@@ -208,7 +208,7 @@ def test_an_older_film_keeps_the_search_the_picks_and_the_sheet_from_words():
     assert out == {'pass': 1, 'elements': 2} and 'refs' not in saved(store)
     with pytest.raises(Problem, match='E2: a verdict is required'):   # the old round's own wording; nothing of design/151 on it
         g(lambda: VS.round_done(store, USER, OLD, [], {'E1': {'verdict': 'approve'}}, 'yes', conn=conn))
-    with pytest.raises(Problem, match='No reference round is waiting for its sets'):
+    with pytest.raises(Problem, match='The reference round is not at step 2'):   # VW-25 issue 13: the older sentence, "no reference round is waiting for its sets", is retired
         g(lambda: VS.round_sets(store, USER, OLD, [], {}, 'yes', conn=conn))
 
 
