@@ -294,5 +294,5 @@ def specs_approved(s, p, spec_digest):
     """The session `s` with BRICK's material spec approved; `spec_digest` is `visuals_stage.spec_digest`."""
     brick = next(e for e in p['elements'] if e['id'] == 'BRICK')
     s.setdefault('spec_approvals', {})['element:BRICK'] = {'digest': spec_digest(brick['material_spec']), 'by': 'u1', 'at': NOW}
-    s.setdefault('not_this', {}).setdefault('BRICK', {'lines': []})   # as an approval leaves it: the material's "not this" list is made (4e: one that is missing is named in every `then`)
+    s.setdefault('not_this', {}).setdefault('BRICK', {'lines': [], 'from': {}})   # as an approval leaves it: the material's "not this" list is made (4e: one that is missing is named in every `then`)
     return s
