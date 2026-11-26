@@ -374,6 +374,10 @@ def test_10_the_older_remake_from_words_is_refused_by_name_where_the_tool_still_
     assert send([{'element_id': 'T_LAY', 'where': ' '}]) == RS.WHERE_EMPTY.format(eid='T_LAY')
     for bad in ('the red rectangle at the right', 'area 1', 'the handle at 1200 px from the left', 'the handle.\nAlso the blade', 'x' * 301):
         assert send([{'element_id': 'T_LAY', 'where': bad}]) == RS.WHERE_SHAPE.format(eid='T_LAY', max=300), bad
+    for fine in ('the red box on the lower shelf', 'the red area of the wall behind the door', 'the red mark on the left tile', 'the marked tile stays'):   # a thing that is red is named as it looks
+        assert not RS.WHERE_NOT.search(fine), fine
+    for bad in ('the marked area', 'inside the red outline', 'mark 2', 'the marked place at the left'):
+        assert RS.WHERE_NOT.search(bad), bad
     assert len(conn.inserted) == 3 and saved(store)['round']['elements']['T_LAY']['rewrite_due']['edit']
     judge(store, conn, {'MASON': {'verdict': 'no'}})                                   # and a where line is no rewrite of a set that waits for "Make again"
     assert send([{'element_id': 'MASON', 'where': WHERE}]) == RS.REWRITE_EMPTY.format(eid='MASON')

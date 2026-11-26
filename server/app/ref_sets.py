@@ -85,7 +85,7 @@ EDIT_NOT_REMAKE = ("{eid}: Minor corrections no longer makes a new set from word
 WHERE_EMPTY = '{eid}: give its where line (`where`), or `unclear` with one question for the operator.'
 WHERE_SHAPE = ('{eid}: the where line is one sentence of at most {max} characters that names the thing and its place in plain words: no pixel numbers, '
                'no "the red rectangle", no "area 1".')
-WHERE_NOT = re.compile(r'\b(red|marked)\s+(rectangle|outline|box|mark|area|stroke)\b|\barea\s*\d|\bmark\s*\d|\d\s*(px|pixels?)\b', re.I)
+WHERE_NOT = re.compile(r'\bred\s+(rectangle|outline)\b|\bmarked\s+(rectangle|outline|box|area|place|stroke)\b|\barea\s*\d|\bmark\s*\d|\d\s*(px|pixels?)\b', re.I)   # words about the mark itself; a thing that is red (a red box) is named as it looks
 MARKS_MAX, MARK_POINTS, WHERE_CHARS = 3, 200, 300
 MARKS_BAD = '{eid}: a mark is a rectangle or a painted stroke on one picture of this set, {max} at most on a picture. Mark the picture again.'
 EDIT_ONE = '{eid}: without "the same correction in every picture of this set", mark the picture to correct.'
