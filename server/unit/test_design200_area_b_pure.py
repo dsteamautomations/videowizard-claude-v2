@@ -129,7 +129,7 @@ def test_a_correction_sends_the_scene_back_and_a_changed_scene_is_drawn_and_appr
 def test_the_operator_is_asked_about_the_shots_drawing_in_the_chat(film):
     store, conn = film
     scene(store, conn)
-    asked = lambda: [i for i in CF._drawing_items({'session': saved(store), 'plan': VS.current_plan(store, saved(store)), 'run': NEW, 'store': store, 'user': USER, 'outputs': [], 'conn': conn})
+    asked = lambda: [i for i in CF._layout_items({'session': saved(store), 'plan': VS.current_plan(store, saved(store)), 'run': NEW, 'store': store, 'user': USER, 'outputs': [], 'conn': conn})
                      if i['id'].startswith('shot-drawing:')]
     assert asked() == []                                                              # release 1 (20 Nov 2026): not before a fresh checker passed the layout
     ready_for_the_still(store, conn)

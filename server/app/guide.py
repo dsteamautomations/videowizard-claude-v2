@@ -90,7 +90,7 @@ def rebuild(g):
 
 def held(g):
     """Release 2, the critic's point 2: the third check in a row failed with no word of the operator between (`rounds_from`: the round at their
-    last word): nothing more is built for the shot; one card asks the operator (`chat_flow._drawing_items`, `held_answer`)."""
+    last word): nothing more is built for the shot; one card asks the operator (`chat_flow._layout_items`, `held_answer`)."""
     v = g.get('verdicts') or []
     return bool(v) and not v[-1].get('pass') and not accepted(g) and int(v[-1].get('round') or 0) - int(g.get('rounds_from') or 0) >= MAX_ROUNDS
 

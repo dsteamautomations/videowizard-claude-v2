@@ -160,7 +160,7 @@ def starts(session, plan, take_rows):
     again = [sid for sid in shots if sid in guides and open_(sid) and guide.rebuild(guides[sid]) and not guide.held(guides[sid]) and not guides[sid].get('change')]
     mine = lambda g, st: st.get('guide_sha256') == g.get('sha256')
     # A guide's checker is named as soon as its check frames are ready and this scene has no verdict: all together, before any layout card is shown
-    # (`chat_flow._drawing_items` offers the card only when the check passed). Never for a scene that has a verdict: passed (its card, its render) or
+    # (`chat_flow._layout_items` offers the card only when the check passed). Never for a scene that has a verdict: passed (its card, its render) or
     # failed (the scene changes first). (Until this release: only after the operator approved the layout; design/35 row 281.)
     check = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('frames') or {}).get('status') == 'ready' and not guides[sid].get('verdicts') and not guide.rebuild(guides[sid])]
     # release 4: a still is named as soon as the first frame of its layout exists; its video renders behind it (until then: only once the video was rendered too)

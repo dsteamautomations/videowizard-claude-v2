@@ -45,7 +45,7 @@ def end(st, sid):
 
 
 def layout(st, sid):
-    """A layout drawing's item, as `_drawing_items` writes it."""
+    """A layout drawing's item, as `_layout_items` writes it."""
     return card(st, f'shot-drawing:{sid}:{"b" * 10}', 'drawing', f'{sid}: is the shot laid out right in these two drawings?', ('Yes', 'Correct'), 'Ask the operator what is wrong in the drawing of the shot.')
 
 
@@ -196,16 +196,16 @@ def test_the_layout_drawings_wait_in_the_order_of_the_film(monkeypatch):
     s = {'guides': {'S3': guide('3' * 64), 'S1': guide('1' * 64), 'S2': guide('2' * 64)}}                      # written in another order than the film's; each passed its check
     monkeypatch.setattr(V, '_accepted_shots', lambda p_, s_: [(g, sh) for g in p_['gaps'] for sc in g['scenes'] for sh in sc['shots']])
     ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
-    items = CF._drawing_items(ctx)
+    items = CF._layout_items(ctx)   # VW-25 issue 14: their own function
     assert [i['id'].split(':')[:2] for i in items] == [['shot-drawing', 'S1'], ['shot-drawing', 'S2'], ['shot-drawing', 'S3']]
     assert all(any(i['id'].startswith(pre) for pre in CF.TOGETHER) for i in items)                             # the ids the group is keyed on
     # release 1 (a layout is checked before its card is shown) holds inside a group: a layout not yet checked, or whose check failed, is no card
     s['guides']['S1']['verdicts'] = []
     s['guides']['S3']['verdicts'] = [{'pass': True}, {'pass': False}]
-    items = CF._drawing_items(ctx)
+    items = CF._layout_items(ctx)
     assert [i['id'].split(':')[1] for i in items] == ['S2'] and CF._together(items, True) == items
     s['guides']['S1']['verdicts'] = [{'pass': True}]                                                           # its check passed since: it joins the next message
     s['guides']['S2']['rounds_before'] = 1                                                                     # a rebuilt layout says so on its own entry
-    items = CF._drawing_items(ctx)
+    items = CF._layout_items(ctx)
     assert [i['id'].split(':')[1] for i in CF._together(items, True)] == ['S1', 'S2']
     assert [G.REDRAWN in CF._entry(i)['text'] for i in items] == [False, True]

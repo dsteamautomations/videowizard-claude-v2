@@ -44,7 +44,7 @@ def state(store):
 def cards(store, conn):
     s = saved(store)
     ctx = {'session': s, 'plan': V.current_plan(store, s), 'run': NEW, 'store': store, 'user': USER, 'outputs': [], 'conn': conn}
-    return [i for i in CF._drawing_items(ctx) if i['id'].startswith('shot-drawing:')]
+    return [i for i in CF._layout_items(ctx) if i['id'].startswith('shot-drawing:')]   # VW-25 issue 14: their own function
 
 
 def verdict(store, conn, sha, ok):
@@ -187,7 +187,7 @@ def live(drawing='approved', verdicts=(), frames='ready', before=0, render=None)
 
 def layout_cards(s, p):
     ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': OP, 'outputs': [], 'conn': None}
-    return [i['id'].split(':')[1] for i in CF._drawing_items(ctx) if i['id'].startswith('shot-drawing:')]
+    return [i['id'].split(':')[1] for i in CF._layout_items(ctx) if i['id'].startswith('shot-drawing:')]
 
 
 def test_the_cards_of_the_layouts_that_passed_come_in_film_order(held):

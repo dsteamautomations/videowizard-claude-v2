@@ -1626,6 +1626,18 @@ def _drawing_items(ctx):
         items.append(_item(f"drawing:{eid}:{r['sha256'][:10]}", 'drawing', f'Reference drawings, {n} of {len(rows)}', f"{names.get(eid) or r.get('name') or eid}: are these reference drawings right?", run_,
                            [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawings.')],
                            text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"drawing-{eid}-{v['id']}.png"} for v in r['views']]))
+    return items
+
+
+LAYOUT = ('shot-drawing:', 'layout-held:')   # the ids of the layout cards of AI video shots
+
+
+def _layout_items(ctx):
+    """VW-25 issue 14 (SK, 25 Nov 2026): the layout cards of AI video shots, in the film's order: a layout that passed its check, and one held
+    after its third failed check. Asked after step 6's own cards (`_candidates`). Older way retired: made inside `_drawing_items`, first in the
+    order, so the shared parts of the drawn graphics waited behind every layout."""
+    session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
+    items = []
     if plan and session.get('guides'):   # Area B: the drawing of an AI video shot, before its still
         from . import guide
         shots, shot_names = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}, V.shot_names(plan, session)
@@ -1965,7 +1977,7 @@ def _guide_items(ctx):
             items.append(_item(P.marked(f"still:{sid}:{still['id']}", P.look_view(still))[0] if V.round_v2(session) else f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',   # the critic's point 2
                                f'{title}: this still starts the shot. On the first picture, does every person and thing sit on the red outlines?', run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show,
-                               text=P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else ''))   # the check's line and its warnings: the operator may approve against them
+                               text=P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else '', name=title))   # the check's line and its warnings: the operator may approve against them
             continue
         if not g.get('take_prompt') or sid in session['selections']:
             continue
@@ -1991,7 +2003,7 @@ def _guide_items(ctx):
                                (f"{title}: the take could not be made. {why} Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
                                 else f"{title}: make the take now? It is {card['seconds']} s and costs about ₹{card['cost_inr']:g}."), run_,
                                [_button('Send it again' if again else 'Shoot', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
-                               text=str(card.get('look_for') or ''), show=show))
+                               text=str(card.get('look_for') or ''), show=show, name=title))
     return items + ([] if checking else words)
 
 
@@ -2061,7 +2073,17 @@ def _candidates(ctx):
     note = [f"Plan: the assistant is revising {', '.join(revising)}."] if revising else []
     if p_items:
         return p_items, '', note
-    for step in (_drawing_items, _round_items, _waiting_items, _guide_items, _record_items):   # design/200: a drawing set is approved before the pictures made from it
+    # VW-25 issue 14 (SK, 25 Nov 2026): a layout card, or what is left of a group of them, that was handed out stays the open one until it is
+    # answered: a card of an earlier step that became ready meanwhile is next, it does not replace the one on the operator's screen.
+    handed = ctx['session'].get('chat_item') or {}
+    open_ids = handed.get('group') or [handed.get('id')]
+    if any(str(i).startswith(LAYOUT) for i in open_ids):
+        left = [i for i in _layout_items(ctx) if i['id'] in open_ids]
+        if left:
+            return left, '', note
+    # design/200: a drawing set is approved before the pictures made from it. Issue 14: step 6's own cards before the layout cards of AI video
+    # (until 25 Nov 2026 the layout cards were first: the shared parts waited and the drawn graphics did not start; retired)
+    for step in (_drawing_items, _round_items, _waiting_items, _layout_items, _guide_items, _record_items):
         items = step(ctx)
         if items:
             return items, str(items[0].get('_summary') or '') if items[0].get('_v2') else '', note   # design/211 review: a v2 round's first question says once what holds for the whole step
@@ -2464,7 +2486,10 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     V.need(not button.get('needs_words') or words, button.get('tell') or 'Ask the operator what to change, in their own words.')
     out = current['_run'](choice, str(quote or '').strip() or button['label'], words)
     session = V.session_of(store, run, outputs)
+    rest = [i for i in open_ids if i != item_id and str(i).startswith(LAYOUT)]
     session.pop('chat_item', None)
+    if rest:   # VW-25 issue 14: the other layout cards of the message stay the open ones (`_candidates`)
+        session['chat_item'] = {'id': rest[0], 'at': handed.get('at'), **({'group': rest} if len(rest) > 1 else {})}
     V.save_session(store, run, session)
     out = out if isinstance(out, dict) else {}
     done = {k: out[k] for k in ('recorded', 'accepted', 'revise', 'for_the_assistant', 'held', 'pass', 'queued', 'errors') if k in out}

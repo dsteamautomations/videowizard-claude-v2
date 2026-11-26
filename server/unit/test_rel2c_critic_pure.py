@@ -44,7 +44,7 @@ def round_(store, conn, n, ok=False):
 def held_cards(store, conn):
     s = saved(store)
     ctx = {'session': s, 'plan': V.current_plan(store, s), 'run': NEW, 'store': store, 'user': USER, 'outputs': [], 'conn': conn}
-    return [i for i in CF._drawing_items(ctx) if i['id'].startswith('layout-held:')]
+    return [i for i in CF._layout_items(ctx) if i['id'].startswith('layout-held:')]   # VW-25 issue 14: their own function
 
 
 def held3(take_film):
