@@ -44,4 +44,5 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert 'drt' in rows['337'] and 'current one' in rows['338'] and 'camera copies' in rows['339'] and 'every member' in rows['340']   # the hand-over stoppers and films for the team (23 Nov)
     assert 'Indian script' in rows['341'] and 'Hindi and Tamil script' in rows['342'] and 'Shift + click' in rows['343'] and 'Confirm: send' in rows['344']   # the voices screen set (23 Nov)
     assert all(str(n) in rows for n in range(345, 359)) and 'paragraph' in rows['345'] and 'pixels' in rows['356']   # the VW-25 set (23 Nov)
-    assert all(str(n) in rows for n in range(359, 368)) and 'issue 9' in rows['359'] and 'issue 14' in rows['362'] and 'Withdrawn' in rows['367'] and '368' not in rows   # the release of 25 Nov (server 0.129.0)
+    assert all(str(n) in rows for n in range(359, 368)) and 'issue 9' in rows['359'] and 'issue 14' in rows['362'] and 'Withdrawn' in rows['367']   # the release of 25 Nov (server 0.129.0)
+    assert 'A1' in rows['368'] and 'Retired' in rows['368'] and 'Kept' in rows['368'] and '369' not in rows   # the layout drawing card retired (26 Nov)

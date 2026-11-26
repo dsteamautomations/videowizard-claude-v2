@@ -883,14 +883,11 @@ def cmd_guide(a):
         paths = _guide_fetch(base, a.shot, folder / 'drawing', names)
         d = (st.get('guide') or {}).get('drawing') or {}
         emit({'shot_id': a.shot, 'sha256': d.get('sha256'), 'status': d.get('status'), 'files': paths, 'changes': d.get('changes') or [], 'notes': d.get('notes') or []}, 0,
-             f"{len(paths)} sheets in work/guide/{a.shot}/drawing/; the drawing is {d.get('status')}. Show them to the operator: each person's pale side is the front, the purple side the back, "
-             f"the orange arm the right arm. Their answer: `vw guide drawing-approve --shot {a.shot} --sha {d.get('sha256')} --quote \"…\"` or `vw guide drawing-reject … --notes \"<what is wrong>\" --quote \"…\"`.")
-    if a.what in ('drawing-approve', 'drawing-reject'):
-        if not (a.sha and a.quote) or (a.what == 'drawing-reject' and not a.notes):
-            emit({'action': 'refused', 'message': "`vw guide drawing-approve --shot S --sha <the scene's sha256> --quote \"<the operator's words>\"`; "
-                                                  "`vw guide drawing-reject --shot S --sha <the scene's sha256> --notes \"<what is wrong>\" --quote \"<the operator's words>\"`."}, 2)
-        out = write(base + '/guide/drawing', {'shot_id': a.shot, 'sha256': a.sha, 'approved': a.what == 'drawing-approve', 'quote': a.quote, 'notes': a.notes or ''})
-        emit(out, 0, out.get('next'))
+             f"{len(paths)} sheets in work/guide/{a.shot}/drawing/. Each person's pale side is the front, the purple side the back, the orange arm the right arm. "
+             "Nobody approves the drawing: the still is ordered once the layout's check has passed.")
+    if a.what in ('drawing-approve', 'drawing-reject'):   # A1 (SK, 25 Nov 2026): the older way, refused by name (the server refuses it too, for an older tool)
+        emit({'action': 'refused', 'message': "The operator's approval of a layout drawing is retired (25 Nov 2026): the checker decides. "
+                                              "A fault in the layout is said on the still's card."}, 2)
     if a.what == 'scene':
         spec = _guide_json(ws, a.file, 'scene')
         out = write(base + '/guide/scene', {'shot_id': a.shot, 'scene': spec, 'overrides': {'support': a.override} if a.override else {}})
@@ -2580,7 +2577,7 @@ def cmd_visuals(a):
             return (first + f"{card['step']}: {card['entries']} entries on one card ({card['id']}). Say: \"{card['say_before']}\" Card file: {card['card_file']}. "
                     f"Write the answers to: {card['answers_path']}. Then: vw visuals card --file {card['answers_file']}. " + out['how'])
         group = out.get('group')
-        if group:   # release 2, B4 and B4b: several end-frames, or layout drawings, ready together: one message, one question for each
+        if group:   # release 2, B4 and B4b: several end-frames ready together: one message, one question for each (until 25 Nov 2026 also layout drawings; retired)
             (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
             for e in group['items']:
                 e['show_files'] = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in e.get('show') or []]

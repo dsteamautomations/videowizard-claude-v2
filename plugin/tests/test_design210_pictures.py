@@ -190,7 +190,7 @@ def test_publishing_again_passes_the_capabilities_again_and_a_drawing_in_the_cha
             'how': 'HOW', 'show': []}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'item': dict(item)})
     assert run(args(what='next', one=False), capsys)[2].startswith('The reference drawings are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. ')
-    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'item': {**item, 'id': 'shot-drawing:S1:abc'}})
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'item': {**item, 'id': 'layout-held:S1:abc'}})   # a layout card of AI video (until 25 Nov 2026: 'shot-drawing:'; retired)
     assert 'on the page' not in run(args(what='next', one=False), capsys)[2]
 
 

@@ -1,6 +1,7 @@
 """The critic's points on releases 3 and 4 (20 Nov 2026).
 1. A defect filed with `--shot S` holds S on every path: the chat's answers and the page's buttons reach the same server functions as the tool,
    and those functions refuse while an open defect holds the shot (`visuals_stage.need_free`); another shot goes on.
+   Until 25 Nov 2026 also the verdict on a shot's layout drawing; retired (A1): that call is refused by name, held or not.
 2. The drawings that continue from a held shot are held by the server too, not only by the next-step sentence (`visuals_stage.held_chain`).
 3. An answer about a thing accepts, with no card, only its own change: the thing's record and its place in `element_ids` of the shots that showed
    it in the plan in force; any other change of those shots, or a shot that did not show it, brings the card as before.
@@ -11,11 +12,11 @@ import contextlib
 
 import pytest
 
-from app import chat_flow as CF, core, guide_worker as W, main as API, visuals_stage as V, web
+from app import chat_flow as CF, core, guide as G, guide_worker as W, main as API, visuals_stage as V, web
 from app import storage as storage_mod
 from app.errors import Problem
 from test_design151_refs_pure import NEW
-from test_guide_route_pure import still_made, take_film   # noqa: F401 (take_film: the fixture)
+from test_guide_route_pure import refused, still_made, take_film   # noqa: F401 (take_film: the fixture)
 from test_hotfix_guide_lane_pure import Conn as LaneConn
 from test_rel4_first_frame_pure import back, start, to_the_take
 from test_visuals_stage_pure import USER, saved
@@ -90,15 +91,17 @@ def test_the_chat_cannot_approve_a_held_shots_still(take_film, monkeypatch):
     assert saved(store)['guides']['VS1']['stills'][0]['status'] == 'approved'
 
 
-def test_the_chat_cannot_record_a_verdict_on_a_held_shots_drawing(take_film, monkeypatch):
-    store, conn = start(take_film, layout=False)
-    sid = item(store, conn, 'shot-drawing:VS1')
-    defects(monkeypatch, {'defect': 7, 'shot': 'VS1'})
-    held(lambda: CF.answer(conn, store, USER, NEW, [], sid, 'yes', 'yes, that is the shot'))
-    assert saved(store)['guides']['VS1']['drawing']['status'] == 'proposed'
-    defects(monkeypatch, *OTHERS)
-    CF.answer(conn, store, USER, NEW, [], sid, 'yes', 'yes, that is the shot')
-    assert saved(store)['guides']['VS1']['drawing']['status'] == 'approved'
+def test_the_verdict_on_a_shots_drawing_is_refused_by_name_whether_a_defect_holds_the_shot_or_not(take_film, monkeypatch):
+    """Until 25 Nov 2026 the chat's Yes on a layout drawing was held by an open defect on its shot and recorded otherwise; retired (A1)."""
+    store, conn = start(take_film)
+    sha = saved(store)['guides']['VS1']['sha256']
+    for rows in (({'defect': 7, 'shot': 'VS1'},), OTHERS):
+        defects(monkeypatch, *rows)
+        assert refused(lambda: CF.answer(conn, store, USER, NEW, [], f'shot-drawing:VS1:{sha[:10]}', 'yes', 'yes, that is the shot')) == G.DRAWING_RETIRED + ' Run `vw visuals next`.'
+        assert refused(lambda: G.drawing_verdict(conn, store, USER, NEW, [], 'VS1', sha, True, 'yes, that is the shot')) == G.DRAWING_RETIRED   # the tool's own path
+        assert saved(store)['guides']['VS1']['drawing']['status'] == 'proposed'
+    out = CF.next_item(conn, store, USER, NEW, [])
+    assert out['item'] is None and out['needed'] is False                                        # and no such card is handed out: nothing waits for the operator
 
 
 # ---------- 1. the page ----------

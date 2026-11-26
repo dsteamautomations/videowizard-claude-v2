@@ -154,7 +154,7 @@ def test_the_wording_is_in_once_retired_by_name_and_registered():
     everything = stage['prompt'] + ''.join(part.values())
     assert all(s in retired and s not in everything for s in W.RETIRED)
     cmd = (ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert all(FIX2.now('commands/vw.md', new) in cmd for _, new in W.COMMANDS) and '`vw font --sample`' in cmd   # design/222 replaced the end of this sentence (the finished takes are answered on the page); named in fixset2_wording
+    assert all(__import__('a1_wording').now('commands/vw.md', FIX2.now('commands/vw.md', new)) in cmd for _, new in W.COMMANDS) and '`vw font --sample`' in cmd   # design/222 replaced the end of this sentence (the finished takes are answered on the page); named in fixset2_wording
     assert FS.NOT_AVAILABLE in part['later'] and 'Step 6, the pictures and drawn graphics, is answered on the page too' in stage['prompt']
     split = (ROOT / 'scripts' / 'c1_split_v3.py').read_text(encoding='utf-8')
     assert split.index('d217(prompt, parts)') < split.index('d218(prompt, parts)')

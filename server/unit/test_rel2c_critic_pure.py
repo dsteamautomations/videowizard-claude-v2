@@ -8,14 +8,15 @@
 4. An answer to an item of the handed-out group is taken although an earlier item became ready meanwhile.
 7. Words in brackets after `must` or `should` are a mark only when they hold `still`, `motion` or `with`; both `still` and `motion` is refused.
 8. A scene gets one verdict.
-(Point 1 and 6: test_hotfix_guide_lane_pure.py. Point 5: test_rel2f_pure.py.)"""
+(Point 1 and 6: test_hotfix_guide_lane_pure.py. Point 5: test_rel2f_pure.py.)
+Until 25 Nov 2026 a layout that passed got the operator's card and "Correct it" sent it back; retired (A1): a pass has no card, the held card is the only layout card."""
 import pytest
 
 from app import chat_flow as CF, guide as G, pictures as P, takes as T, visuals_stage as V
 from app.errors import Problem
 from test_design151_refs_pure import NEW
 from test_guide_route_pure import OTHER, frames_back, refused, scene, spec10, take_film   # noqa: F401 (take_film: the fixture)
-from test_rel1d_layout_check_pure import AGAIN, CHECK, START, cards, film, rendered, said, state, verdict
+from test_rel1d_layout_check_pure import CAN_ORDER, CHECK, START, cards, corrected_the_older_way, film, rendered, said, state, verdict   # cards: every layout card
 from test_rel2b_group_pure import chat, end   # noqa: F401 (chat: the fixture)
 from test_visuals_stage_pure import USER, saved
 
@@ -69,15 +70,16 @@ def test_2_the_first_and_the_second_failed_check_are_rebuilt_with_no_card(take_f
         out = round_(store, conn, n)
         assert out['next'] == 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.'   # no "show the operator" at round 2
         assert said(store) == START + REBUILD.format(ids='VS1', n=1) + '.' and state(store) == ['being redone']
-        assert held_cards(store, conn) == [] and cards(store, conn) == []
+        assert cards(store, conn) == []                                                                   # no layout card of any kind
         assert 'change the scene' in G.status(conn, store, NEW, [], 'VS1')['next']                         # the status says what the line says
 
 
 def test_2_the_third_failed_check_in_a_row_holds_the_shot_with_one_card(take_film):
     store, conn = held3(take_film)
     g = saved(store)['guides']['VS1']
-    assert G.held(g) and said(store) == '' and state(store) == ['waiting for you in the chat'] and cards(store, conn) == []   # not named for a rebuild
+    assert G.held(g) and said(store) == '' and state(store) == ['waiting for you in the chat']             # not named for a rebuild
     (card,) = held_cards(store, conn)
+    assert [i['id'] for i in cards(store, conn)] == [card['id']]                                           # the one layout card
     assert card['id'] == f"layout-held:VS1:{g['sha256'][:10]}" and card['kind'] == 'held layout' and card['position'] == 'Step 7, AI video: a layout that did not pass its check'
     assert card['question'].endswith(': the layout of this shot failed its check 3 times in a row. What should happen to it?')
     assert card['text'] == f'The checker still finds: {FINDING}.'
@@ -96,7 +98,7 @@ def test_2_use_it_as_it_is_counts_as_checked_and_approved_against_the_check(take
     g = saved(store)['guides']['VS1']
     assert G.checked(g) and not G.rebuild(g) and not G.held(g) and g['drawing']['status'] == 'approved' and g['drawing']['verdict']['against_check'] is True
     assert g['render']['status'] == 'queued' and 'against its check' in out['next']                          # rendered as after a pass
-    assert held_cards(store, conn) == [] and cards(store, conn) == [] and state(store) == ['being made'] and said(store) == ''
+    assert cards(store, conn) == [] and state(store) == ['being made'] and said(store) == ''
     logs = [p for sql, p in conn.sql if 'insert into vw2_log' in sql]
     assert len(logs) == 1 and 'used as it is, against its check: nothing floats' in str(logs[0]) and 'Use it, it reads fine.' in str(logs[0])   # the operator's decision, in the log
     rendered(store)
@@ -127,12 +129,15 @@ def test_2_change_the_shot_needs_the_operators_words_and_the_line_says_what_to_d
     assert due(store) == ''
 
 
-def test_2_a_pass_at_round_2_is_the_normal_card(take_film):
+def test_2_a_pass_at_round_2_goes_on_with_no_card(take_film):
+    """Until 25 Nov 2026: the normal layout card, with "This drawing replaces an earlier one"; retired (A1)."""
     store, conn = film(take_film)
     round_(store, conn, 0)
     round_(store, conn, 1, ok=True)
-    (card,) = cards(store, conn)
-    assert card['text'].startswith(AGAIN) and held_cards(store, conn) == [] and state(store) == ['waiting for you in the chat']
+    g = saved(store)['guides']['VS1']
+    assert g['verdicts'][-1]['round'] == 2 and not G.held(g) and cards(store, conn) == [] and state(store) == ['being made']
+    rendered(store)
+    assert state(store) == [CAN_ORDER]
 
 
 def test_2_a_live_film_whose_third_failure_came_before_this_release_is_held_at_once(take_film):
@@ -160,12 +165,11 @@ def test_8_a_second_verdict_on_the_same_scene_is_refused(take_film):
     verdict(store, conn, sha, True)
     job = saved(store)['guides']['VS1']['render']['job_id']
     msg = refused(lambda: verdict(store, conn, sha, False))                                                  # a second checker of the same scene, failing after the pass
-    assert msg == ('This scene of VS1 is already judged (round 1: passed): a scene gets one verdict. Its guide is rendered and its layout drawing goes to the operator '
-                   '(`vw guide status --shot VS1`).')
+    assert msg == ('This scene of VS1 is already judged (round 1: passed): a scene gets one verdict. Its first frame is made, then its still is ordered '
+                   '(`vw guide status --shot VS1`).')                                                         # until 25 Nov 2026: "... and its layout drawing goes to the operator"; retired (A1)
     g = saved(store)['guides']['VS1']
-    assert len(g['verdicts']) == 1 and G.checked(g) and g['render']['job_id'] == job and len(cards(store, conn)) == 1   # nothing flipped
-    G.drawing_verdict(conn, store, USER, NEW, [], 'VS1', sha, False, 'no', 'the mother faces the wrong way')   # corrected: a new scene, which fails
-    round_(store, conn, 1)
+    assert len(g['verdicts']) == 1 and G.checked(g) and g['render']['job_id'] == job and cards(store, conn) == [] and state(store) == ['being made']   # nothing flipped
+    round_(store, conn, 1)                                                                                   # a new scene, which fails
     msg = refused(lambda: verdict(store, conn, saved(store)['guides']['VS1']['sha256'], True))
     assert msg == 'This scene of VS1 is already judged (round 2: failed): a scene gets one verdict. Change the scene and send it again (`vw guide scene --shot VS1 --file …`).'
     assert CHECK.format(ids='VS1', n=1) not in said(store)                                                   # and the line never asks for a second one
@@ -184,7 +188,8 @@ def test_3_a_shot_with_no_guide_and_a_shot_to_rebuild_are_two_groups(take_film):
     round_(store, conn, 1, ok=True)
     assert scene(store, conn, variant(1))['next'] == 'This scene is already stored; nothing was queued.'     # a scene that stands: as before
     sha = saved(store)['guides']['VS1']['sha256']
-    G.drawing_verdict(conn, store, USER, NEW, [], 'VS1', sha, False, 'no', 'the mother faces the wrong way')
+    assert sha == saved(store)['guides']['VS1']['drawing']['sha256']
+    corrected_the_older_way(store, 'the mother faces the wrong way')                                         # a "Correct it" recorded until 25 Nov 2026 (its card is retired, A1): it still holds
     assert said(store) == START + REBUILD.format(ids='VS1', n=1) + '.'
     assert scene(store, conn, variant(1))['next'] ==('This is the scene whose layout the operator corrected (the mother faces the wrong way): nothing was queued. '
                                                       'The new scene must differ from it: make their correction and send it again.')

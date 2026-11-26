@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 def test_the_served_text_says_it_and_the_replaced_words_are_retired():
     import rel1b_wording as W
     import d223_wording   # design/223 retired the take sentences this script wrote (Select, Make another, Reject; the takes' checkers): the text is read as it was before it
-    stage = d223_wording.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))
+    stage = d223_wording.before(__import__('a1_wording').before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))   # A1 (25 Nov 2026) replaced "no still before their Yes", which this script's sentence follows
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     later = next(p for p in stage['parts'] if p['name'] == 'later')['text']
@@ -26,6 +26,7 @@ def test_the_served_text_says_it_and_the_replaced_words_are_retired():
         assert said in later, said
     for file, old, new in W.HELPERS:   # D4b: the helper and the skill give the form of `changed_from_plan`
         md = (ROOT / 'plugin' / file).read_text(encoding='utf-8').replace('\r\n', '\n')
+        new = __import__('a1_wording').now(file, new)   # A1 (25 Nov 2026): the lines are shown with the still, not with the shot's drawing
         assert md.count(new) == 1 and (new.startswith(old) or old not in md), file
     everything = stage['prompt'] + ''.join(p['text'] for p in stage['parts']) + ''.join((ROOT / 'plugin' / f).read_text(encoding='utf-8') for f, _, _ in W.HELPERS)
     retired = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']

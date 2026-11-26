@@ -447,7 +447,7 @@ def test_the_served_text_and_the_helpers_say_it_and_the_older_ways_are_named():
     for where, old, new in W.PAIRS:
         assert where == 'later' and later.count(new) == 1 and was.count(old) == 1 and new not in was, old[:50]
     for file, old, new in W.HELPERS:
-        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').replace('\r\n', '\n').count(new) == 1, (file, old[:50])
+        assert (ROOT / 'plugin' / file).read_text(encoding='utf-8').replace('\r\n', '\n').count(__import__('a1_wording').now(file, new)) == 1, (file, old[:50])   # A1 (25 Nov 2026) took "layout drawing" out of this script's sentence of the command file
     for said in ('all started in one message', 'the order of the film, before any motion is built', '`must (still, with D1):`', 'rules-round.md',
                  'not only the things of the plan', 'State there the count of each shape that repeats', 'a verdict with an empty rule list', 'in the same go'):
         assert said in later, said

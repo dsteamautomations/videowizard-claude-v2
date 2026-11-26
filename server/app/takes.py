@@ -4,8 +4,8 @@ Each shot's first take is made once, small (360p), and shown as it is: nobody ch
 makes it again on its own. The operator answers every take on the page, all together, once every take of the film is made: they accept it, or
 say what is wrong in plain words. An accepted 360p take gets its full-size video; words of what is wrong become a correction, whose route the
 assistant chooses (`corrections`). Every later video of a shot (a version) is shown beside the one it was made from, and beside its neighbouring
-shots. There is no limit on rounds. What is decided before a take is paid for (the shot's layout drawing, the still, the word to make the first
-take) stays a card in the chat.
+shots. There is no limit on rounds. What is decided before a take is paid for (the still, the word to make the first take) stays a card in
+the chat; a layout is put to the operator only when it failed its check three times in a row (A1, 25 Nov 2026).
 
 One flow, two front ends: the page's line and the chat's item are built here from the same words; every answer goes through `answer`. No amount
 of money is in any word of the page.
@@ -66,7 +66,7 @@ W = {
     'reject_retired': ('"Reject" as an answer to a take is retired (design/223): the operator accepts the take or says what is wrong with it (the answer "again", with their words); '
                        'when their words mean the shot itself must change, the route of the correction is "none" and the plan is revised.'),
     # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
-    'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: a layout is shown to the operator, and its guide is rendered, only after its check passes)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
+    'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: its guide is rendered, and its still can be ordered, only after its check passes)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
     'start_words': "the writers of the take's words of {ids} ({n}) (`vw guide prompt --shot S --file take.txt`)",
     'video_wait': ' Everything else for its take is ready: its word to shoot is asked when the video is ready; go on with the other shots.',   # release 4
     'start_scenes': 'the writers of the scene descriptions of {ids} ({n})',
@@ -144,7 +144,7 @@ def starts(session, plan, take_rows):
     """Release 1, D1 (SK, 20 Nov 2026): the helpers of step 7 that can start now, to be started together in one message, in film order: the writers
     of the scene descriptions (a shot with no guide yet) and the checkers of the stills. '' when none. design/223: a take has no checker.
     The critic's point 4: the line is complete: also the guides whose check frames wait for their fresh checker, the stills that can be ordered
-    (the layout approved, the guide's first frame rendered, no still yet) and the takes' words that can be written (the still approved); each group is named
+    (the layout's check passed, the guide's first frame rendered, no still yet) and the takes' words that can be written (the still approved); each group is named
     only when the server's own gate takes it (`guide.verdict`, `guide.request_still`, `guide.set_prompt`). Point 10c: a shot that shows a
     person of the footage about whom the operator was never asked is not named for its still: that question is said first, in the same line."""
     if not plan or not V.round_v2(session):
@@ -159,9 +159,9 @@ def starts(session, plan, take_rows):
     none = [sid for sid in shots if sid not in guides and sid not in (session.get('selections') or {}) and not jobs_of(take_rows, sid)]
     again = [sid for sid in shots if sid in guides and open_(sid) and guide.rebuild(guides[sid]) and not guide.held(guides[sid]) and not guides[sid].get('change')]
     mine = lambda g, st: st.get('guide_sha256') == g.get('sha256')
-    # A guide's checker is named as soon as its check frames are ready and this scene has no verdict: all together, before any layout card is shown
-    # (`chat_flow._layout_items` offers the card only when the check passed). Never for a scene that has a verdict: passed (its card, its render) or
-    # failed (the scene changes first). (Until this release: only after the operator approved the layout; design/35 row 281.)
+    # A guide's checker is named as soon as its check frames are ready and this scene has no verdict: all together. Never for a scene that has a
+    # verdict: passed (its render, then its still) or failed (the scene changes first). (Until release 1: only after the operator approved the
+    # layout; design/35 row 281. Until 25 Nov 2026 a passed layout was then shown to the operator on a card; retired, A1.)
     check = [sid for sid in shots if sid in guides and open_(sid) and (guides[sid].get('frames') or {}).get('status') == 'ready' and not guides[sid].get('verdicts') and not guide.rebuild(guides[sid])]
     # release 4: a still is named as soon as the first frame of its layout exists; its video renders behind it (until then: only once the video was rendered too)
     order = [sid for sid in shots if sid in guides and open_(sid) and _still_due(guides[sid]) and not jobs_of(take_rows, sid)]
@@ -187,10 +187,11 @@ def _ready_to_shoot(g):
 
 
 def _still_due(g):
-    """Release 4: the still can be ordered: the first frame of the layout exists, the operator approved this scene's layout, and no still of it is
-    being made, waits or was approved (`guide.request_still` gates the same; the video may still be rendering)."""
-    d = g.get('drawing') or {}
-    return bool((g.get('render') or {}).get('frame1_key') and d.get('status') == 'approved' and d.get('sha256') == g.get('sha256')
+    """Release 4: the still can be ordered: the first frame of the layout exists, this scene's check passed (A1, SK 25 Nov 2026; until then: the
+    operator approved this scene's layout drawing), and no still of it is being made, waits or was approved (`guide.request_still` gates the
+    same; the video may still be rendering)."""
+    from . import guide
+    return bool((g.get('render') or {}).get('frame1_key') and guide.checked(g) and not guide.rebuild(g)
                 and not any(st.get('status') == 'generating' or (st.get('guide_sha256') == g.get('sha256') and st.get('status') in ('candidate', 'approved')) for st in g.get('stills') or []))
 
 
@@ -215,11 +216,8 @@ def render_due(session, plan):
 
 
 def _card_waits(g):
-    """A card of this shot waits in the chat: its layout drawing (release 1: only once the scene's check passed), or a still to approve."""
-    from . import guide
-    d = g.get('drawing') or {}
-    return (d.get('status') == 'proposed' and d.get('sha256') == g.get('sha256') and guide.checked(g)) \
-        or any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') for s in g.get('stills') or [])
+    """A card of this shot waits in the chat: a still to approve. (Until 25 Nov 2026 also its layout drawing, once the check passed; retired, A1.)"""
+    return any(s.get('status') == 'candidate' and s.get('guide_sha256') == g.get('sha256') and s.get('key') for s in g.get('stills') or [])
 
 
 def _still_checking(session, g, now=None):
@@ -262,9 +260,9 @@ def _state(session, plan, sh, take_rows, now):
     if guide.rebuild(g):
         return 'redo', None, False  # release 1: its check failed, or the operator corrected its layout: the scene is being rebuilt
     if (g.get('frames') or {}).get('status') == 'ready' and not guide.checked(g):
-        return 'checking', None, False   # release 1: the layout is with its fresh checker; its card comes only when it passes
+        return 'checking', None, False   # release 1: the layout is with its fresh checker
     if _card_waits(g) or _ready_to_shoot(g):
-        return 'chat', None, False   # a card waits in the chat: the layout drawing, the still, or the word to make the take
+        return 'chat', None, False   # a card waits in the chat: the still, or the word to make the take
     if _video_waits(g):
         return 'video', None, False   # release 4: the still is approved and the words are written: only the layout video is awaited
     if _still_due(g):

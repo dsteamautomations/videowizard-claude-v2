@@ -201,6 +201,12 @@
     "The server measures the rest: real footage",
     "When every take is made and checked the operator answers them",
     "then, for each, the cause, the one change and the take",
-    "has one entry per gap: `gap_id`; the words under it;"
+    "has one entry per gap: `gap_id`; the words under it;",
+    "no still before their Yes",
+    "asks the operator whether the shot is laid out right",
+    "before any layout card is shown",
+    "or several layout drawings of AI video shots",
+    "the operator is shown the shot's layout drawing only after it passes",
+    "the operator approves that drawing in the chat before any still"
   ]
 }

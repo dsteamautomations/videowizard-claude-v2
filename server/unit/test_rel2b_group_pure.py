@@ -1,9 +1,10 @@
-"""Release 2, B4 and B4b (SK, 20 Nov 2026, the end-frame answer): several still end-frames of drawn graphics that are ready together, and
-several layout drawings of AI video shots, are handed out in ONE message: a group of at most four, in the order of the film, each with its
-own answer. Still one decision per picture: each answer is recorded on its own, in any order; one that is not answered stays open and is
-handed out again, alone or with what became ready since. Only one ready: exactly as before. A tool that does not say it can take a group
-(an older plugin), and `--one`, get one item at a time as before; an answer to anything outside what was handed out is refused with the
-same sentence as before. Both kinds go through one function (`chat_flow._together`). Without a database."""
+"""Release 2, B4 (SK, 20 Nov 2026, the end-frame answer): several still end-frames of drawn graphics that are ready together are handed
+out in ONE message: a group of at most four, in the order of the film, each with its own answer. Still one decision per picture: each answer
+is recorded on its own, in any order; one that is not answered stays open and is handed out again, alone or with what became ready since.
+Only one ready: exactly as before. A tool that does not say it can take a group (an older plugin), and `--one`, get one item at a time as
+before; an answer to anything outside what was handed out is refused with the same sentence as before. The group is made in one function
+(`chat_flow._together`). Until 25 Nov 2026 also several layout drawings of AI video shots (B4b); retired (A1) with their card: a layout that
+passed its check has no card, and an answer to one is refused by name. Without a database."""
 import pytest
 
 from app import chat_flow as CF, guide as G, visuals_stage as V
@@ -45,7 +46,7 @@ def end(st, sid):
 
 
 def layout(st, sid):
-    """A layout drawing's item, as `_layout_items` writes it."""
+    """A layout drawing's item, as `_layout_items` wrote it until 25 Nov 2026 (retired, A1)."""
     return card(st, f'shot-drawing:{sid}:{"b" * 10}', 'drawing', f'{sid}: is the shot laid out right in these two drawings?', ('Yes', 'Correct'), 'Ask the operator what is wrong in the drawing of the shot.')
 
 
@@ -168,44 +169,54 @@ def test_a_film_in_mid_step_with_one_item_handed_out_by_the_older_server_keeps_w
     assert chat['answers'] == [(d1, 'approve', '')] and ids(out) == ['D2']
 
 
-# ---------- B4b: layout drawings of AI video shots ----------
-
-def test_layout_drawings_go_through_the_same_group(chat):
-    chat['add'](*(layout(chat, s) for s in ('S1', 'S2', 'S3', 'S4', 'S5')))
+def test_one_answer_of_a_full_group_is_recorded_on_its_own_and_the_fifth_joins_the_next_message(chat):
+    """The rule B4b's test proved on layout drawings (until 25 Nov 2026; retired, A1), on the kind that is still grouped."""
+    chat['add'](*(end(chat, s) for s in ('D1', 'D2', 'D3', 'D4', 'D5')))
     out = chat['next'](many=True)
-    assert ids(out) == ['S1', 'S2', 'S3', 'S4'] and out['waiting_after_this'] == 1 and out['group']['kind'] == 'layout drawing' and '4 layout drawings' in out['group']['heading']
-    assert out['group']['items'][1]['ask'] == 'S2: Is the shot laid out right in these two drawings?'
-    s2 = chat['items'][1]['id']
-    assert refused(lambda: chat['answer'](s2, 'correct')) == 'Ask the operator what is wrong in the drawing of the shot.'
-    out = chat['answer'](s2, 'correct', 'The mason faces away from the wall.')
-    assert chat['answers'] == [(s2, 'correct', 'The mason faces away from the wall.')] and ids(out) == ['S1', 'S3', 'S4', 'S5']
+    assert ids(out) == ['D1', 'D2', 'D3', 'D4'] and out['waiting_after_this'] == 1 and out['group']['kind'] == 'still end-frame' and '4 still end-frames' in out['group']['heading']
+    assert out['group']['items'][1]['ask'].startswith('D2: ')
+    d2 = chat['items'][1]['id']
+    assert refused(lambda: chat['answer'](d2, 'reject')) == 'Ask the operator what to change in the still, in their words.'
+    out = chat['answer'](d2, 'reject', 'The arrow points away from the wall.')
+    assert chat['answers'] == [(d2, 'reject', 'The arrow points away from the wall.')] and ids(out) == ['D1', 'D3', 'D4', 'D5']
+
+
+# ---------- B4b: layout drawings of AI video shots: until 25 Nov 2026; retired (A1) ----------
+
+def test_layout_drawings_are_no_longer_a_group_and_an_answer_to_one_is_refused_by_name(chat):
+    chat['add'](*(layout(chat, s) for s in ('S1', 'S2', 'S3')))                                               # as the older server made them; `_layout_items` makes none (the last test)
+    assert 'shot-drawing:' not in CF.TOGETHER and not any(i['id'].startswith(CF.LAYOUT) for i in chat['items'])   # not a kind of group, not a layout card
+    assert CF._together(chat['items'], True) == chat['items'][:1]
+    out = chat['next'](many=True)
+    assert 'group' not in out and ids(out) == ['S1']
+    for choice, words in (('yes', ''), ('correct', 'The mason faces away from the wall.')):
+        assert refused(lambda: chat['answer'](chat['items'][0]['id'], choice, words)) == G.DRAWING_RETIRED + ' Run `vw visuals next`.'
+    assert chat['answers'] == []                                                                               # nothing is recorded
 
 
 def test_reference_drawings_and_other_kinds_are_not_grouped(chat):
     ref = card(chat, 'drawing:E1:' + 'd' * 10, 'drawing', 'The kiln: are these reference drawings right?', ('Yes', 'Correct'), 'Ask.')
-    chat['add'](ref, layout(chat, 'S1'), layout(chat, 'S2'))
+    chat['add'](ref, layout(chat, 'S1'), layout(chat, 'S2'), end(chat, 'D1'), end(chat, 'D2'))
     out = chat['next'](many=True)
     assert 'group' not in out and ids(out) == ['E1']
-    assert CF._together(chat['items'][1:], True) == chat['items'][1:] and CF._together(chat['items'], True) == [ref] and CF._together([], True) == []
-    assert sorted(CF.TOGETHER) == ['shot-drawing:', 'still-end:'] and CF.GROUP_MAX == 4                        # the question card takes four questions
+    assert CF._together(chat['items'][3:], True) == chat['items'][3:] and CF._together(chat['items'], True) == [ref] and CF._together([], True) == []
+    assert CF._together(chat['items'][1:], True) == chat['items'][1:2]                                         # a layout drawing's id is no group's any more: one item
+    assert sorted(CF.TOGETHER) == ['still-end:'] and CF.GROUP_MAX == 4                                         # the question card takes four questions
 
 
-def test_the_layout_drawings_wait_in_the_order_of_the_film(monkeypatch):
+def test_the_layouts_that_passed_have_no_card_and_the_held_ones_wait_alone_in_the_order_of_the_film(monkeypatch):
     p = plan(shot('S1', start=0), shot('S2', start=130), shot('S3', start=260))
     guide = lambda sha: {'sha256': sha, 'verdicts': [{'pass': True}], 'drawing': {'status': 'proposed', 'sha256': sha, 'views': [{'id': 'camera', 'labelled_key': 'k/' + sha}]}}
     s = {'guides': {'S3': guide('3' * 64), 'S1': guide('1' * 64), 'S2': guide('2' * 64)}}                      # written in another order than the film's; each passed its check
     monkeypatch.setattr(V, '_accepted_shots', lambda p_, s_: [(g, sh) for g in p_['gaps'] for sc in g['scenes'] for sh in sc['shots']])
     ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
-    items = CF._layout_items(ctx)   # VW-25 issue 14: their own function
-    assert [i['id'].split(':')[:2] for i in items] == [['shot-drawing', 'S1'], ['shot-drawing', 'S2'], ['shot-drawing', 'S3']]
-    assert all(any(i['id'].startswith(pre) for pre in CF.TOGETHER) for i in items)                             # the ids the group is keyed on
-    # release 1 (a layout is checked before its card is shown) holds inside a group: a layout not yet checked, or whose check failed, is no card
-    s['guides']['S1']['verdicts'] = []
+    assert CF._layout_items(ctx) == []   # VW-25 issue 14: their own function. Until 25 Nov 2026: a card for each, a group in film order; retired (A1)
+    s['guides']['S2']['rounds_before'] = 1                                                                     # nor for a rebuilt layout that passed
+    s['guides']['S1']['verdicts'] = []                                                                         # nor, as before, for a layout not yet checked or whose check failed
     s['guides']['S3']['verdicts'] = [{'pass': True}, {'pass': False}]
+    assert CF._layout_items(ctx) == [] and not hasattr(G, 'REDRAWN')
+    for sid in ('S3', 'S1'):                                                                                   # the third failed check in a row: held
+        s['guides'][sid]['verdicts'] = [{'pass': False, 'round': G.MAX_ROUNDS, 'looks': [{'look': 'nothing floats', 'pass': False}]}]
     items = CF._layout_items(ctx)
-    assert [i['id'].split(':')[1] for i in items] == ['S2'] and CF._together(items, True) == items
-    s['guides']['S1']['verdicts'] = [{'pass': True}]                                                           # its check passed since: it joins the next message
-    s['guides']['S2']['rounds_before'] = 1                                                                     # a rebuilt layout says so on its own entry
-    items = CF._layout_items(ctx)
-    assert [i['id'].split(':')[1] for i in CF._together(items, True)] == ['S1', 'S2']
-    assert [G.REDRAWN in CF._entry(i)['text'] for i in items] == [False, True]
+    assert [i['id'].split(':')[:2] for i in items] == [['layout-held', 'S1'], ['layout-held', 'S3']]
+    assert not any(i['id'].startswith(pre) for i in items for pre in CF.TOGETHER) and CF._together(items, True) == items[:1]   # asked alone, one after the other

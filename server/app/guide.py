@@ -45,8 +45,11 @@ RIGHT_HAND_WORDS = ('Right-handed staging: each person works with the right hand
                     'The left hand does nothing: it rests.')
 LOOK_WORDS = ('Image {n} is a look reference. Keep its look in your picture: its real surface textures, its light, its true colours and the way it reads as an ordinary photograph. '
               'Take nothing else from it: not the positions, not the arrangement, not the state of any thing, not the people. Where it differs from Image 1 or from the facts, Image 1 and the facts win.')
-NOT_APPROVED = ("The operator has not approved this shot's drawing yet. It is shown in the chat (`vw visuals next`); or fetch it with `vw guide drawing --shot {shot}` and record their answer with "
-                "`vw guide drawing-approve --shot {shot} --sha {sha} --quote \"<the operator's words>\"`.")
+# A1 (SK, 25 Nov 2026: "checker decides"): the operator's Yes on each layout drawing before its still is retired; the check's pass is the approval.
+# A layout the operator corrected under the older way (its drawing `rejected`) still changes first (`rebuild`).
+DRAWING_RETIRED = ("The operator's approval of a layout drawing is retired (25 Nov 2026): the checker decides. "
+                   "A fault in the layout is said on the still's card.")
+CORRECTED = 'The operator corrected the layout of {shot} ({words}): change the scene and send it again (`vw guide scene --shot {shot} --file …`).'
 
 # what a take prompt never carries (the 48 failed methods; the single-run ones are precautions): (pattern, what to say)
 NEVER = [
@@ -59,10 +62,9 @@ NEVER = [
 ]
 
 
-# release 1 (SK, 20 Nov 2026): a layout is checked before its card is shown: the fresh checker first, the operator second (design/35 row 281)
+# release 1 (SK, 20 Nov 2026): a layout is checked by a fresh checker (design/35 row 281). A1: its pass is what the still waits for; nobody else is asked.
 NOT_CHECKED = ('The layout of {shot} is not checked yet: a fresh `vw-guide-check` helper passes its check frames first (`vw guide status --shot {shot}`); '
-               'its drawing is shown to the operator after that.')
-REDRAWN = 'This drawing replaces an earlier one of this shot: the layout was rebuilt after its check.'
+               'the still is ordered after that.')
 
 
 def now():
@@ -76,14 +78,15 @@ def accepted(g):
 
 def checked(g):
     """The fresh checker passed the check frames of this scene (its verdicts are this scene's: a new scene starts with none). Then, and only
-    then, the layout drawing's card is offered to the operator; it is also when the guide is rendered (`verdict`). A layout the operator took
-    as it is, against its check, counts as checked."""
+    then, the guide is rendered (`verdict`) and the still can be ordered (A1: the operator is not asked about the layout). A layout the operator
+    took as it is, against its check, counts as checked."""
     v = g.get('verdicts') or []
     return (bool(v) and bool(v[-1].get('pass'))) or accepted(g)
 
 
 def rebuild(g):
-    """The scene must change before anything else of the shot: its check failed, or the operator corrected its layout drawing."""
+    """The scene must change before anything else of the shot: its check failed, or the operator corrected its layout drawing (the older way,
+    until 25 Nov 2026: a correction recorded then still holds)."""
     v, d = g.get('verdicts') or [], g.get('drawing') or {}
     return bool(v and not v[-1].get('pass') and not accepted(g)) or (d.get('status') == 'rejected' and d.get('sha256') == g.get('sha256'))
 
@@ -217,7 +220,8 @@ def _things(store, session):
 
 
 def _draw(store, run, session, spec, sha):
-    """design/200: the shot's drawing, from the scene's own numbers: through the camera and from above, both sheets of each stored. Free. It waits for the operator."""
+    """design/200: the shot's drawing, from the scene's own numbers: through the camera and from above, both sheets of each stored. Free. It goes
+    with the still's request; its record keeps `status` 'proposed' (A1: nobody approves it any more)."""
     import hashlib
     from . import drawings
     d, notes = guide_drawing.description(spec, _things(store, session))
@@ -237,32 +241,27 @@ def _draw(store, run, session, spec, sha):
 
 
 def _ensure_drawing(store, run, session, g, spec):
-    """A guide made before design/200 has no drawing: it is made now (free) and waits for the operator like any other."""
+    """A guide made before design/200 has no drawing: it is made now (free)."""
     if (g.get('drawing') or {}).get('sha256') != g['sha256']:
         g['drawing'] = _draw(store, run, session, spec, g['sha256'])
         VS.save_session(store, run, session)
     return g['drawing']
 
 
-def drawing_verdict(conn, store, user, run, outputs, shot_id, sha256, approved, quote, notes=''):
-    """The operator's verdict on a shot's drawing, by the scene it was made from: approved with their words, or a correction in words (the scene is then changed)."""
-    VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
-    session = VS.session_of(store, run, outputs)
-    g = entry_of(session, shot_id)
-    d = _ensure_drawing(store, run, session, g, VS.load_json(store, g['key']))
-    need(d['sha256'] == sha256, 'The scene changed since this drawing was looked at; look at the current drawing (`vw guide drawing`).')
-    need(str(quote or '').strip(), "A verdict carries the operator's own words.")
-    notes = str(notes or '').strip()
-    need(approved or notes, "A correction says what is wrong, in the operator's words.")
-    need(not approved or checked(g), NOT_CHECKED.format(shot=shot_id))   # release 1: no Yes on a layout its checker has not passed (a correction is taken at any time)
-    if not approved:
-        g['rounds_from'] = int((g.get('verdicts') or [{}])[-1].get('round') or g.get('rounds_before') or 0)   # the critic's point 2: their word: the rounds in a row are counted from here
-    d.update(status='approved' if approved else 'rejected', verdict={'approved': bool(approved), 'quote': str(quote).strip()[:500], 'notes': notes[:2000], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
-    VS.save_session(store, run, session)
-    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'shot drawing approved' if approved else 'shot drawing corrected', 'sha256': sha256, 'quote': d['verdict']['quote'], 'notes': notes[:2000],
-                                                    'by': user['id'], 'by_name': user.get('name') or ''})
-    return {'shot_id': shot_id, 'status': d['status'],
-            'next': "The shot's drawing is approved; it goes with the still's request." if approved else 'Change the scene with the correction (one thing at a time) and upload it again: `vw guide scene`.'}
+def drawing_verdict(*args, **kw):
+    """The operator's Yes or correction on a shot's layout drawing (design/200 Area B; release 1): retired, refused by name. The route stays for
+    an older tool (`vw guide drawing-approve`, `drawing-reject`)."""
+    need(False, DRAWING_RETIRED)
+
+
+def layout_lines(g):
+    """A1: what the retired layout card showed of the layout, now on the still's card: what the scene changed from the plan, and the drawing's
+    notes. [] when it has neither, or when the drawing is of another scene."""
+    d = g.get('drawing') or {}
+    if d.get('sha256') != g.get('sha256'):
+        return []
+    return ((['Changed from the plan to make the shot possible:'] + [f'- {c}' for c in d['changes']]) if d.get('changes') else []) \
+        + ((['Notes:'] + [f'- {c}' for c in d['notes']]) if d.get('notes') else [])
 
 
 def _drawn_facts(session, parents):
@@ -330,7 +329,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
                        'checks': rows, 'overrides': [{'check': c, 'reason': why, 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()} for c, why in overrides.items()],
                        'frames': {'job_id': job_id, 'status': 'queued'}, 'verdicts': [], 'rounds_before': len(old.get('verdicts') or []) + int(old.get('rounds_before') or 0),
                        **carried(old), **({'rounds_from': old['rounds_from']} if old.get('rounds_from') else {}), 'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
-    guides[shot_id]['drawing'] = _draw(store, run, session, spec, sha)   # design/200: free; the operator approves it before the still
+    guides[shot_id]['drawing'] = _draw(store, run, session, spec, sha)   # design/200: free; it goes with the still's request
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'scene', 'sha256': sha, 'key': k, 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'seconds': spec['seconds'],
                                                     'checks': [{'check': r['check'], 'level': r['level'], 'message': r['message']} for r in rows if r['level'] != 'info'],
@@ -339,7 +338,7 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
             'warnings': [r['message'] for r in rows if r['level'] == 'warn'], 'info': [r['message'] for r in rows if r['level'] == 'info'],
             'cannot_see': G.BLIND, 'layout': G.layout_block(spec), 'drawing_notes': guides[shot_id]['drawing']['notes'],
             'next': f'Check frames {frames} are being rendered (free). Then a fresh vw-guide-check helper looks at them: `vw guide frames --shot {shot_id}`, `vw guide verdict --shot {shot_id} --file …`. '
-                    "The shot's drawing is made (free); it is shown to the operator only after that check passes, and they approve it in the chat before the still."}
+                    'After the check passes the still is ordered: the operator is not asked about the layout.'}
 
 
 def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, notes=''):
@@ -356,7 +355,7 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
     # release 2, the critic's point 8: one verdict per scene (two checkers on one scene: the later one, failing after a pass, flipped a shot whose render, card or still had moved on)
     last = (g['verdicts'] or [{}])[-1]
     need(not g['verdicts'], JUDGED.format(shot=shot_id, round=last.get('round'), how='passed' if last.get('pass') else 'failed',
-                                         then=f'Its guide is rendered and its layout drawing goes to the operator (`vw guide status --shot {shot_id}`).' if last.get('pass')
+                                         then=f'Its first frame is made, then its still is ordered (`vw guide status --shot {shot_id}`).' if last.get('pass')
                                          else f'The operator took the layout as it is (`vw guide status --shot {shot_id}`).' if accepted(g)
                                          else HELD.format(shot=shot_id, n=MAX_ROUNDS) if held(g) else f'Change the scene and send it again (`vw guide scene --shot {shot_id} --file …`).'))
     rnd = len(g['verdicts']) + int(g.get('rounds_before') or 0) + 1
@@ -367,8 +366,7 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
         _render(conn, store, run, shot_id, g)   # release 4: the first frame, then the video (until then: one `guide-render` job for both)
         r = g['render']
         out.update(job_id=r.get('job_id'), next=('The first frame and the video of this scene were rendered before and are used again: the still can be ordered '
-                                                  f'(`vw guide still --shot {shot_id} --file …`).' if r.get('status') == 'ready' else RENDER_NEXT.format(shot=shot_id))
-                   + ('' if (g.get('drawing') or {}).get('status') == 'approved' else " The shot's layout drawing is shown to the operator now (`vw visuals next`): no still before their Yes."))
+                                                  f'(`vw guide still --shot {shot_id} --file …`).' if r.get('status') == 'ready' else RENDER_NEXT.format(shot=shot_id)))
     elif not passed:
         # release 2, the critic's point 2: the third failure in a row holds the shot (until then: "show the operator what is still open" from round 2, with no card and no gate; design/35 row 293)
         out['next'] = (f'Round {rnd} failed, the third check in a row: the shot is held and the operator is asked in the chat (`vw visuals next`). Send no new scene of it until they answer. '
@@ -416,7 +414,10 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
     still = video_generators.STILL
     sheets = []
     d = _ensure_drawing(store, run, session, g, spec)   # design/200, Area B
-    need(d['status'] == 'approved', NOT_APPROVED.format(shot=shot_id, sha=g['sha256']))   # release 1: a masked repair too (a still kept from an earlier scene is not repaired under a layout nobody approved)
+    # A1: the scene's check passed, or the operator took a held layout as it is; a masked repair too (a still kept from an earlier scene is not
+    # repaired under a layout nobody checked). (Until 25 Nov 2026: the operator's Yes on this scene's layout drawing; retired.)
+    need(checked(g), NOT_CHECKED.format(shot=shot_id))
+    need(not rebuild(g), CORRECTED.format(shot=shot_id, words=(d.get('verdict') or {}).get('notes')))
     if repair_of:
         base = next((s for s in g['stills'] if s['id'] == repair_of and s.get('key') and s.get('status') in ('candidate', 'approved')), None)
         need(base, f'{repair_of} is not a finished still of this shot.')
@@ -729,10 +730,8 @@ def status(conn, store, run, outputs, shot_id):
                                     else 'Still missing before the take: ' + ', '.join(rest) + '.' if rest
                                     else 'Everything else for the take is ready: the word to shoot is asked when the layout video is ready.'), render_line(shot_id, g)) if x)
     d = g.get('drawing') or {}
-    if d.get('status') == 'proposed' and checked(g):   # design/200: no still before the operator's Yes on the shot's drawing; release 1: it waits for them only once its check passed
-        nxt = f"The shot's drawing waits for the operator's answer (`vw visuals next`, or `vw guide drawing --shot {shot_id}`); no still is made before their Yes. " + nxt
-    elif d.get('status') == 'rejected':
-        nxt = f"The operator corrected the shot's drawing ({(d.get('verdict') or {}).get('notes')}): change the scene and send it again (`vw guide scene --shot {shot_id} --file …`). " + nxt
+    if d.get('status') == 'rejected' and d.get('sha256') == g.get('sha256'):   # a correction of the older way (until 25 Nov 2026): the scene changes first, whatever else is ready
+        nxt = CORRECTED.format(shot=shot_id, words=(d.get('verdict') or {}).get('notes'))
     return {'shot_id': shot_id, 'guide': v, 'files': names, 'next': nxt}
 
 

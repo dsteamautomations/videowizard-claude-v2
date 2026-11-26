@@ -1459,7 +1459,7 @@ class ChatAnswer(Write):   # design/188: the operator's answer to the one decisi
     quote: str = Field(default='', max_length=2000)
     notes: str = Field(default='', max_length=4000)
     one: bool = False   # design/190: what comes next is asked one at a time, never on a card
-    many: bool = False   # release 2, B4: this tool can show a group (several end-frames, or layout drawings, in one message)
+    many: bool = False   # release 2, B4: this tool can show a group (several end-frames in one message)
 
 
 class ChatNext(Write):   # design/190: `one` asks the treatment's lines and the plan's gaps one at a time (a machine that cannot show the card)
@@ -1661,7 +1661,7 @@ class GuideStill(Write):
     look: str | None = None   # design/200: a look reference, an approved picture of this film
 
 
-class GuideDrawingVerdict(Write):   # design/200: the operator's verdict on a shot's drawing
+class GuideDrawingVerdict(Write):   # design/200: the operator's verdict on a shot's drawing; retired (A1, 25 Nov 2026): the route refuses it by name, for an older tool
     shot_id: str
     sha256: str
     approved: bool

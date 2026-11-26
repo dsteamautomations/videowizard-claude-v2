@@ -89,7 +89,7 @@ def test_the_operators_answer_goes_with_the_exact_content_and_their_words(harnes
 
 # ---------- the shot's drawing, and the still's look reference ----------
 
-def test_the_shots_drawing_is_fetched_and_answered(harness, sent, monkeypatch, capsys):
+def test_the_shots_drawing_is_fetched_and_its_old_answers_are_refused_by_name(harness, sent, monkeypatch, capsys):
     ws, _ = harness
 
     def call(method, path, wait=None, **kw):
@@ -100,13 +100,12 @@ def test_the_shots_drawing_is_fetched_and_answered(harness, sent, monkeypatch, c
     monkeypatch.setattr(vw, 'call', call)
     code, out, err = run(vw.cmd_guide, guide(what='drawing', shot='VS1'), capsys)
     assert code == 0 and len(out['files']) == 2 and out['changes'] == ['mirrored'] and (ws / 'work' / 'guide' / 'VS1' / 'drawing' / 'drawing-camera.png').exists()
-    assert 'the purple side the back' in err and 'drawing-approve' in err
-    assert run(vw.cmd_guide, guide(what='drawing-approve', shot='VS1', quote='yes'), capsys)[0] == 2         # no sha
-    assert run(vw.cmd_guide, guide(what='drawing-reject', shot='VS1', sha='c' * 64, quote='no'), capsys)[0] == 2   # no reason
-    run(vw.cmd_guide, guide(what='drawing-approve', shot='VS1', sha='c' * 64, quote='yes'), capsys)
-    run(vw.cmd_guide, guide(what='drawing-reject', shot='VS1', sha='c' * 64, quote='no', notes='she faces the wrong way'), capsys)
-    assert sent == [('/api/runs/run-1/visuals/guide/drawing', {'shot_id': 'VS1', 'sha256': 'c' * 64, 'approved': True, 'quote': 'yes', 'notes': ''}),
-                    ('/api/runs/run-1/visuals/guide/drawing', {'shot_id': 'VS1', 'sha256': 'c' * 64, 'approved': False, 'quote': 'no', 'notes': 'she faces the wrong way'})]
+    assert 'the purple side the back' in err and 'Nobody approves the drawing' in err and 'drawing-approve' not in err and 'Show them to the operator' not in err
+    # A1 (SK, 25 Nov 2026): the operator's Yes or correction on a layout drawing is retired: refused by name, nothing is sent
+    for what, more in (('drawing-approve', {}), ('drawing-reject', {'notes': 'she faces the wrong way'})):
+        code, out, _ = run(vw.cmd_guide, guide(what=what, shot='VS1', sha='c' * 64, quote='yes', **more), capsys)
+        assert code == 2 and out['action'] == 'refused' and 'is retired (25 Nov 2026): the checker decides' in out['message'] and "said on the still's card" in out['message']
+    assert sent == []
 
 
 def test_a_shot_with_no_drawing_yet_says_to_send_its_scene(harness, monkeypatch, capsys):
@@ -149,6 +148,7 @@ def test_the_skill_and_the_helper_exist_and_agree_with_the_guard():
     for text in (PLUGIN / 'operator-CLAUDE.md', PLUGIN / 'commands' / 'vw.md'):
         assert 'vw-drawing' in text.read_text(encoding='utf-8'), text.name
     guide_skill = (PLUGIN / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8')
-    for word in ('watches', 'drawn_as', 'changed_from_plan', 'drawing-approve', '"look"', 'Images 2 and 3', 'start at Image 4'):
+    for word in ('watches', 'drawn_as', 'changed_from_plan', 'after the check passes, order the still', '"look"', 'Images 2 and 3', 'start at Image 4'):
         assert word in guide_skill, word
+    assert 'drawing-approve' not in guide_skill and 'their Yes' not in guide_skill   # A1: nobody approves the shot's drawing
     assert 'posture' in (PLUGIN / 'agents' / 'vw-guide-scene.md').read_text(encoding='utf-8')

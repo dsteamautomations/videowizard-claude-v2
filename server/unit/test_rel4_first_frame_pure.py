@@ -5,6 +5,7 @@ minutes for an 8-second shot), one job at a time, so the still of every shot wai
 is needed only when the take is ordered. Now a passing check queues two jobs: the first frame (its own quick job, in the quick lane with the
 check frames, frame 1 first) and the video (the render lane, as before). The still is ordered as soon as the first frame exists; `shoot`
 refuses, in a sentence, until the video is ready. Files of the same scene still in storage are used again. Each test failed first.
+Until 25 Nov 2026 the still also waited for the operator's Yes on the layout drawing; retired (A1): the check's pass and the first frame open it.
 Without a database; Blender is faked as in test_guide_worker_pure.py."""
 import hashlib
 import json
@@ -44,12 +45,10 @@ def back(store, kind, ok=True, error=None):
     return entry
 
 
-def start(take_film, layout=True):
-    """A scene whose check passed; the operator's Yes on its layout drawing."""
+def start(take_film):
+    """A scene whose check passed. (Until 25 Nov 2026 also the operator's Yes on its layout drawing; retired, A1.)"""
     store, conn = R1.film(take_film)
     passed(store, conn)
-    if layout:
-        GD.drawing_verdict(conn, store, USER, NEW, [], 'VS1', saved(store)['guides']['VS1']['sha256'], True, 'yes, that is the shot')
     return store, conn
 
 
@@ -82,7 +81,7 @@ def shoot_cards(store, conn):
 # ---------- a pass queues two jobs: the first frame, then the video ----------
 
 def test_a_pass_queues_the_first_frame_and_then_the_video(take_film):
-    store, conn = start(take_film, layout=False)
+    store, conn = start(take_film)
     g = saved(store)['guides']['VS1']
     assert kinds(conn) == ['guide-frames', 'guide-frame1', 'guide-render']
     same = {'shot_id': 'VS1', 'sha256': g['sha256'], 'spec_key': g['key'], 'seconds': 10}
@@ -113,7 +112,7 @@ def test_the_still_is_ordered_as_soon_as_the_first_frame_is_ready_and_shoot_wait
     g = saved(store)['guides']['VS1']
     assert g['render'] == {'frame1_job_id': 'job-2', 'job_id': 'job-3', 'status': 'queued', 'frame1_key': base(store) + '/frame1.png', 'frame1_sha256': 'sha-f1'}
     assert R1.said(store) == R1.START + R1.STILLS.format(ids='VS1', n=1) + '.'                      # named for its still while its video renders
-    assert R1.state(store) == [STILL_DUE]
+    assert R1.state(store) == [STILL_DUE] and g['drawing']['status'] == 'proposed'                  # the first frame alone opens the still: nobody approved the layout drawing (A1)
     s = saved(store)
     assert T.status_line(T.expected(s, VS.current_plan(store, s), [])) == 'AI video: 1 first frame ready: the still can be ordered.'
     out = GD.status(conn, store, NEW, [], 'VS1')
@@ -137,13 +136,6 @@ def test_the_still_is_ordered_as_soon_as_the_first_frame_is_ready_and_shoot_wait
     GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Yes, shoot it.')
     snap = json.loads(store.files[conn.queued[-1]['request']['request_key']])
     assert snap['guide'] == {'key': base(store) + '/guide.mp4', 'sha256': 'sha-guide', 'seconds': 10, 'scene_sha256': g['sha256']}   # what the take uploads and its checks read
-
-
-def test_the_first_frame_alone_does_not_open_the_still_before_the_layout_is_approved(take_film):
-    store, conn = start(take_film, layout=False)
-    back(store, 'guide-frame1')
-    assert "has not approved this shot's drawing yet" in refused(lambda: still_made(store, conn)) and R1.said(store) == ''
-    assert R1.state(store) == ['waiting for you in the chat']                                      # the layout card, as before
 
 
 # ---------- failures ----------
@@ -241,7 +233,6 @@ def test_only_the_first_frame_in_storage_queues_only_the_video(take_film):
     passed(store, conn)
     g = saved(store)['guides']['VS1']
     assert kinds(conn) == ['guide-frames', 'guide-render'] and g['render']['status'] == 'queued' and g['render']['frame1_key'] == base(store) + '/frame1.png'
-    GD.drawing_verdict(conn, store, USER, NEW, [], 'VS1', g['sha256'], True, 'yes')
     assert R1.said(store) == R1.START + R1.STILLS.format(ids='VS1', n=1) + '.'
 
 

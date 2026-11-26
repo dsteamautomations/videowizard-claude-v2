@@ -106,7 +106,7 @@ def test_a_frame_grabbed_alone_is_a_candidate_for_the_round_not_approved_by_its_
 def test_the_command_file_says_where_each_decision_is_taken():
     assert ('The treatment, the plan, the sizes, materials and graphic specs, the reference drawings, the two steps of the references, the pictures and drawn graphics and the finished AI video takes are answered '
             "on the page (`vw visuals page`), and in the chat only a question the server says is asked there (the film's font: show the picture of `vw font --sample` first, "
-            "then ask as before) or where the page cannot be shown; an AI video shot's layout drawing, its still and the word to make its first take, and the recording, are asked in the chat, one at a time;") in CMD   # design/218; design/217; design/222: the finished takes on the page
+            "then ask as before) or where the page cannot be shown; an AI video shot's still and the word to make its first take, and the recording, are asked in the chat, one at a time;") in CMD and 'drawing-approve' not in CMD and 'nobody approves that drawing' in CMD   # design/218; design/217; design/222: the finished takes on the page
     assert 'the AI video and the recording are asked in the chat, one at a time' not in CMD   # design/222: retired
     assert 'every other decision of this stage is asked in the chat' not in CMD
     assert "the card's buttons" not in CMD and '`vw visuals next` hands' in CMD                       # C2: a question is handed out by `vw visuals next`

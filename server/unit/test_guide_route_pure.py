@@ -104,8 +104,7 @@ def rendered(store, conn):
     g = s['guides']['VS1']
     job = {'id': g['render']['job_id'], 'request': {'kind': 'guide-render', 'shot_id': 'VS1', 'sha256': g['sha256']}}
     GD.apply_result(s, job, 'ready', {'guide_key': 'run-1/visuals/guides/x/guide.mp4', 'sha256': 'sha-guide', 'bytes': 9, 'frame1_key': 'run-1/visuals/guides/x/frame1.png', 'frame1_sha256': 'sha-f1', 'render_seconds': 600}, None)
-    VS.save_session(store, NEW, s)
-    GD.drawing_verdict(conn, store, USER, NEW, [], 'VS1', g['sha256'], True, 'yes, that is the shot')   # design/200: the operator approves the shot's drawing before the still
+    VS.save_session(store, NEW, s)   # A1 (25 Nov 2026): the check's pass is the approval; until then the operator approved the shot's drawing here (design/200)
 
 
 def still_made(store, conn, ok=True):
