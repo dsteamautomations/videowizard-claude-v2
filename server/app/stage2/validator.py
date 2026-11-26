@@ -131,6 +131,7 @@ def validate_options(doc, package, policy):
         total = 0
         prev = None
         sizes = []
+        cut_short = []   # per footage shot since the last blank: its cut relies on `short` (G5, below)
         cursor = beat['timeline_start_frame']
         for i, ev in enumerate(events):
             if ev.get('blank'):   # design/21: a stretch left for AI video or animation; the narration runs on
@@ -149,7 +150,7 @@ def validate_options(doc, package, policy):
                 ev['_timeline_frames'], ev['_fps_ratio'] = k, '1'
                 total += k
                 cursor += k
-                prev, sizes = None, []
+                prev, sizes, cut_short = None, [], []
                 continue
             sid = ev.get('sub_clip_id')
             row = rows.get(sid)
@@ -177,6 +178,7 @@ def validate_options(doc, package, policy):
                 continue
             if how['alone']:
                 alone.append(tag)
+            cut_short.append(bool(how['short']))
             a, z = ev['source_in_frame'], ev['source_out_frame']
             src_fps = Fraction(row['source_fps'])
             hold_s = row['min_hold_s'] + (1.0 if row['effective_shot_size'] in ('WS', 'EWS') else 0.0) - (0.5 if row['effective_shot_size'] in ('CU', 'ECU') else 0.0)
@@ -224,7 +226,9 @@ def validate_options(doc, package, policy):
                     flags.append(f'{tag}: G5 adjacent shots of the same size ({cs})')
                     if prev['clip_id'] == row['clip_id']:   # design/125 O7: two parts of one clip side by side at one size is a jump cut
                         refusals.append(f'{tag}: G5 two parts of clip {row["clip_id"]} side by side at the same size ({cs}): put another shot between them or change the size')
-                    if len(sizes) >= 2:
+                    # SK, 26 Nov 2026 ("Yes, exempt"): three shots that are each cut short (a run of list items, close-ups of one size) may be of one
+                    # size; the warning above stays on each pair. Before: refused like any three, so a run of short close-ups could not stand.
+                    if len(sizes) >= 2 and not all(cut_short[-3:]):
                         refusals.append(f'{tag}: G5 three shots of the same size in a row')
                 else:
                     sizes = []

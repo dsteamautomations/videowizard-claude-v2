@@ -6,6 +6,7 @@ In v3.json (the replaced words are in server/retired-sentences.json):
 - options, rule 1: each thing a sentence names has its own shot, a blank, or a note for the operator (the check's flag N18);
 - options, the rules the server enforces: the hold, but for a shot marked `short`;
 - options, the step that authors the cut: N18 among the flags to act on;
+- options, the rules the server enforces: three shots in a row that are each cut short may be of one size (SK, 26 Nov 2026: "Yes, exempt");
 - master, the build step: "a blank under 3 s" leaves the list of refusals (no code ever made that refusal).
 In the plugin: two lines of `vw-scene-review` (the second look knows the field and the list rule). They ride on the next plugin release.
 No sentence of an earlier wording script is changed, so no older pin chains through this one. The visuals stage is not touched: the
@@ -34,10 +35,13 @@ HOLD = 'respect min_comprehension_hold_s;'
 HOLD_NEW = 'respect min_comprehension_hold_s (but for a shot marked `short`, rule 2);'
 FLAGS = 'N17 (claims), N14; each says what to do'
 FLAGS_NEW = 'N17 (claims), N14, N18 (lists); each says what to do'
+SIZES = 'never three of the same size;'   # SK, 26 Nov 2026 ("Yes, exempt"): the things of a list are close-ups of one size
+SIZES_NEW = 'never three of the same size (three in a row that are each cut short, rule 2, may be);'
 BUILD = "(a scene sent back to find footage, a blank under 3 s, a trim that changes a scene's length, a clip used twice)"
 BUILD_NEW = "(a scene sent back to find footage, a trim that changes a scene's length, a clip used twice)"
 # (the stage, the sentence as it is, the sentence as it becomes); each is looked for in the stage's prompt and steps
-PAIRS = [('options', RULE2, RULE2_NEW), ('options', RULE1, RULE1_NEW), ('options', HOLD, HOLD_NEW), ('options', FLAGS, FLAGS_NEW), ('master', BUILD, BUILD_NEW)]
+PAIRS = [('options', RULE2, RULE2_NEW), ('options', RULE1, RULE1_NEW), ('options', HOLD, HOLD_NEW), ('options', FLAGS, FLAGS_NEW), ('options', SIZES, SIZES_NEW),
+         ('master', BUILD, BUILD_NEW)]
 
 LAST = 'say why in `carries_over_seen`.'
 SHORT_LINE = ("- A shot that carries `short` (list_item, thing, kinds, repeated_action, recap, b_roll) may be shorter than its piece's hold, down to 1 s: keep the field on a "
