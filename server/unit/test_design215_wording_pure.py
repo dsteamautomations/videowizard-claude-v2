@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import d215_wording_v3 as W   # noqa: E402
+import minor_edit_wording as MINOR   # noqa: E402  (Minor corrections as an edit, 25 Nov 2026: a later script still; it changes the sentences on step 2)
 
 from app import ref_sets as RS   # noqa: E402
 from app.config import Settings   # noqa: E402
@@ -24,12 +25,13 @@ FINDER = (ROOT / 'plugin' / 'agents' / 'vw-reference-finder.md').read_text(encod
 
 
 def test_every_new_sentence_is_in_and_applying_twice_changes_nothing():
-    st = json.loads(json.dumps(STAGE))
-    assert W.apply(st['prompt'], st['parts']) == STAGE['prompt'] and st['parts'] == STAGE['parts']
+    was = MINOR.before(STAGE)   # the text as this script left it: a later script changes its sentence on the step 2 answers
+    st = json.loads(json.dumps(was))
+    assert W.apply(st['prompt'], st['parts']) == was['prompt'] and st['parts'] == was['parts']
     for where, old, new in W.PAIRS:
-        text = STAGE['prompt'] if where == 'common' else PART[where]
+        text = was['prompt'] if where == 'common' else next(p['text'] for p in was['parts'] if p['name'] == where)
         assert new in text and (old in new or old not in text), old[:60]
-    before = W.before(STAGE)
+    before = W.before(was)
     for where, old, new in W.PAIRS:   # each anchor was there once before the script
         text = before['prompt'] if where == 'common' else next(p['text'] for p in before['parts'] if p['name'] == where)
         assert text.count(old) == 1, old[:60]

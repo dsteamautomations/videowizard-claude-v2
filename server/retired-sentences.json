@@ -213,6 +213,10 @@
     "The card is the way back for the treatment and the plan,",
     "for the treatment's lines and for the plan's gaps",
     "and refused when the spec is approved",
-    "one visit, then `vw visuals page --record`); in the chat, one at a time"
+    "one visit, then `vw visuals page --record`); in the chat, one at a time",
+    "Minor corrections with their words, or Make again",
+    "After Make again or Minor corrections nothing is made until you rewrite that request",
+    "rows {element_id, prompt}, sent with",
+    "at step 2 a set is made again from the request you rewrite with"
   ]
 }

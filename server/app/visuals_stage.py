@@ -4098,20 +4098,24 @@ def _queue_sets(conn, store, user, run, outputs, eids):
 NOT_AT_SETS = 'The reference round is not at step 2: there is no set to answer now.'
 SET_WAITS = {'making': '{name}: its set is being made. An answer is taken when it is back.',
              'looking': '{name}: the assistant is looking at its set. An answer is taken after that.',
-             'rewrite': '{name}: its answer is recorded. Its set is made again from those words; the new set is answered when it is back.'}
+             'rewrite': '{name}: its answer is recorded. Its set is made again from those words; the new set is answered when it is back.',
+             'edit': '{name}: its answer is recorded. Its pictures are being corrected; the corrected set is answered when it is back.'}   # Minor corrections as an edit (SK, 25 Nov 2026)
 SET_REMADE = '{name}: its set was made again after this answer was given. The answer was for the earlier pictures, so it is not recorded. Look at the new set and answer it.'
 SET_RECORDED = '{name}: its answer is recorded already.'
 
 
 def _set_wait(session, eid, row):
     """What one set waits for before the operator's answer on it is recorded: 'making' (it is being made), 'rewrite' (its answer is recorded and its
-    request is written again), 'looking' (it is made and the assistant's look is not recorded). None: it is ready, or it was never made."""
+    request is written again), 'edit' (its answer is recorded and its own pictures wait to be corrected), 'looking' (it is made and the assistant's
+    look is not recorded). None: it is ready, or it was never made."""
     if _set_rows(session, eid, row.get('set'), ('generating',)):
         return 'making'
     if not round_v2(session):
         return None
     from . import ref_sets
-    return 'rewrite' if row.get('rewrite_due') else 'looking' if _set_rows(session, eid, row.get('set')) and not ref_sets.looked(session, eid, row) else None
+    if row.get('rewrite_due'):
+        return 'edit' if row['rewrite_due'].get('edit') else 'rewrite'
+    return 'looking' if _set_rows(session, eid, row.get('set')) and not ref_sets.looked(session, eid, row) else None
 
 
 def set_gone(session, plan, item_id):
@@ -4144,7 +4148,11 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     before. `each` (the page and the chat, `chat_flow.flush_sets`): an answer with a fault of its own comes back in `refused` and the other answers are
     still recorded; without it one fault refuses the send, as before. An answer stored on the pictures before (the set was made again since) is never
     recorded (`_answer_of`); the set's own line says so until it is answered (SET_REMADE). Retired: the refusal of the whole send while one set is
-    being made, has no look, or the round is with the assistant."""
+    being made, has no look, or the round is with the assistant.
+    Minor corrections as an edit (SK, 25 Nov 2026): in a v2 round "Correct it" no longer rejects the set: its pictures stay to be judged and wait
+    for Claude's where line (`rewrite_due` with `edit`: the operator's marks per picture, the tick `every`, their own pictures when the answer
+    names them); the corrected set takes their place when it is back (`ref_sets.edit_back`). The three makes and the film's limit hold it as they
+    hold a remake. "No" stays the fresh set, now with the operator's comment. Retired: a new set made from the words of "Correct it"."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
     v2 = round_v2(session)
@@ -4182,7 +4190,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
             rows = _set_rows(session, eid, r.get('set'))
             if v['verdict'] == 'yes':
-                need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no or correct it to make it again.")
+                need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no{'' if v2 else ' or correct it'} to make it again.")
                 need(not (kinds.get(eid) == 'person' and (r.get('made') or {}).get('photo') and not likeness_of(session, eid)),   # design/207 (D1): for the page and the chat alike
                      f"{eid}: this set was made from the person's photo and the permission is no longer recorded: it cannot be approved. Make it again (`vw visuals round --make {eid}`); it is then made from the description.")
                 if kinds.get(eid) != 'person':
@@ -4191,6 +4199,12 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
                     need(_golden_ok(session, kinds.get(eid), eid, v['golden'], rows), f"{eid}: the starting picture chosen is not a picture of its set now (the set was made again since): choose it again.")   # R19: no picture id in a message
             if v['verdict'] == 'correct':
                 need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
+            if v2 and v['verdict'] == 'correct':   # an edit: of the set's pictures, or of the operator's own pictures of the thing that the answer names
+                own = [str(x) for x in v.get('own') or []]
+                need(not own or (kinds.get(eid) != 'person' and all(_own_golden(session, eid, x) for x in own)), ref_sets.EDIT_OWN.format(eid=eid))
+                need(own or rows, ref_sets.EDIT_NO_PICTURE.format(eid=eid))
+                verdicts[eid] = v = {**v, 'own': own, 'marks': ref_sets.marks_checked(eid, v.get('marks'), own or [x['id'] for x in rows])}
+                need(v.get('every') is not False or v['marks'], ref_sets.EDIT_ONE.format(eid=eid))
             if v2 and v['verdict'] != 'yes' and v.get('all') and str(v.get('words') or '').strip():   # design/215 (change 5): checked once, here, before anything is recorded: later requests carry these words without reading them again
                 try:
                     library.check_prompt(' '.join(str(v['words']).split()), placed=False)
@@ -4212,11 +4226,12 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             continue
         if v['verdict'] != 'yes' and room is not None and len(again) >= room:   # the cap: nothing is rejected and nothing queued; the answer waits, stored
             r['answer'] = {'verdict': v['verdict'], 'golden': None, 'words': ' '.join(str(v.get('words') or '').split()), 'set': r.get('set'), 'by': user['id'], 'at': stamp['at'],
-                           **({'all': True} if v.get('all') else {})}
+                           **({'all': True} if v.get('all') else {}), **{k: v[k] for k in ('marks', 'every', 'own') if v.get(k) not in (None, {}, [])}}
             held[eid] = ref_sets.LIMIT_PLAIN if v2 else f'the spend cap of ₹{budget[1]:,.0f} is reached (₹{budget[0]:,.0f} spent): the set is not made again; its answer is kept and waits'   # design/213: no amount in a v2 round
             continue
         r['verdict'] = v['verdict']
         r.pop('answer', None)   # recorded: nothing stored is left behind
+        r.pop('edit_note', None)   # why an earlier correction was not made: said until the set is answered again
         if v['verdict'] == 'yes':
             if v2 and ref_sets.approved_against(eid, r):   # SK, 19 Nov 2026: an approval beside a check that did not say "use" is said in the decision log
                 against.append((eid, ref_sets.approved_against(eid, r)))
@@ -4226,14 +4241,16 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             session.setdefault('golden', {})[eid] = v['golden'] if kinds.get(eid) != 'person' or _own_golden(session, eid, v.get('golden')) else min(rows, key=lambda x: int(x.get('set_n') or 1))['id']
             continue
         words = ' '.join(str(v.get('words') or '').split())
-        for x in rows:
+        edit = v2 and v['verdict'] == 'correct'   # Minor corrections: nothing is rejected: the pictures stay to be judged until the corrected set is back (ref_sets.edit_back)
+        for x in rows if not edit else ():
             x.update(status='rejected', rejection={**stamp, 'notes': words})
             _feedback_image(session, run, user, x, 'reject', quote, words)
         if v2:   # design/211: nothing is ordered here: Claude rewrites the request from these words first (ref_sets.round_rewrite); the earlier request is kept
             r.setdefault('operator_words', []).extend([words] if words else [])
             if words and v.get('all'):   # design/215 (change 5): kept for the thing, in the same save as the answer: every later request of it carries them (checked above)
                 ref_sets.correction_kept(session, user, eid, words, r.get('set'))
-            r['rewrite_due'] = {'words': words, 'set': r.get('set'), 'at': stamp['at']}
+            r['rewrite_due'] = {'words': words, 'set': r.get('set'), 'at': stamp['at'],
+                                **({'edit': {'marks': v['marks'], 'every': v.get('every') is not False, 'by': user['id'], 'quote': quote, **({'own': v['own']} if v['own'] else {})}} if edit else {})}
         elif words:
             r.setdefault('corrections', []).append(words)
         again.append(eid)
@@ -4280,7 +4297,7 @@ def _answer_of(row):
         return None, False
     if a.get('set') != row.get('set'):
         return None, True
-    return {**{k: a.get(k) for k in ('verdict', 'golden', 'words')}, **({'all': True} if a.get('all') else {})}, False
+    return {**{k: a.get(k) for k in ('verdict', 'golden', 'words')}, **({'all': True} if a.get('all') else {}), **{k: a[k] for k in ('marks', 'every', 'own') if a.get(k) is not None}}, False
 
 
 def _answered(session, kinds, eid, row):
@@ -4303,16 +4320,19 @@ def _round_row(session, element_id, where, answering=False):
     return row
 
 
-def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None, words='', all=False):
+def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None, words='', all=False, marks=None, every=None, own=None):
     """R13: one answer of step 2, stored as it is made and not recorded until Done: the starting picture, Yes / No / Correct it, the words. It is sent whole
-    at every change, so the later writer wins. An answer whose starting picture belongs to a set made again since is discarded, not stored."""
+    at every change, so the later writer wins. An answer whose starting picture belongs to a set made again since is discarded, not stored.
+    Minor corrections as an edit (SK, 25 Nov 2026), for the page and the chat alike: with "Correct it" in a v2 round the answer also keeps the
+    operator's marks per picture (`marks`, `ref_sets.marks_checked`), the tick "the same correction in every picture of this set" (`every`;
+    None is ticked) and their own pictures of the thing to correct in place of the set's (`own`). The chat gives the words alone."""
     session = session_of(store, run, outputs)
     v2 = round_v2(session)
     row = _round_row(session, element_id, (2, 'making', 'looking', 'rewrite') if v2 else (2, 'making'), answering=True)
     need(verdict in (None, 'yes', 'no', 'correct'), f'{element_id}: the answer is Yes, No or Correct it.')
     rows = _set_rows(session, element_id, row.get('set'))
     need(rows or not _set_rows(session, element_id, row.get('set'), ('generating',)), f'{element_id}: its set is being made: there is nothing to answer yet.')
-    need(rows or not row.get('rewrite_due'), SET_WAITS['rewrite'].format(name=element_id))   # VW-25 issue 13: what it waits for, by name
+    need(not row.get('rewrite_due'), SET_WAITS[_set_wait(session, element_id, row) or 'rewrite'].format(name=element_id))   # VW-25 issue 13: what it waits for, by name
     need(rows, f'{element_id}: its set is approved already; it needs no answer.' if _set_rows(session, element_id, row.get('set'), ('approved',)) else f'{element_id}: its set was not made: there is nothing to answer yet.')
     if v2:   # design/211: no answer before the look; after three makes "No" and "Correct it" are held
         from . import ref_sets
@@ -4326,8 +4346,13 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
         row.pop('answer', None)
         save_session(store, run, session)
         return {'element_id': element_id, 'stored': False, 'discarded': True, 'next': f'{element_id}: made again since; judge the new set.'}
+    edit = {}
+    if v2 and verdict == 'correct':   # checked before it is stored, so a fault is said on its line at once
+        own = [str(x) for x in own or []]
+        need(not own or (kind != 'person' and not [x for x in own if not _own_golden(session, element_id, x)]), ref_sets.EDIT_OWN.format(eid=element_id))
+        edit = {k: x for k, x in (('marks', ref_sets.marks_checked(element_id, marks, own or [x['id'] for x in rows])), ('every', every), ('own', own)) if x not in (None, {}, [])}
     row['answer'] = {'verdict': verdict, 'golden': golden, 'words': str(words or '').strip(), 'set': row.get('set'), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
-                     **({'all': True} if all and v2 and verdict == 'correct' else {})}   # design/215: the correction applies to every picture of the thing
+                     **({'all': True} if all and v2 and verdict == 'correct' else {}), **edit}   # design/215: the correction applies to every picture of the thing
     save_session(store, run, session)
     return {'element_id': element_id, 'stored': True, 'answer': _answer_of(row)[0]}
 
@@ -5433,6 +5458,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
                'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents] + ([board] if board else []),
                **({'set': True, 'views': list(body.get('views') or [])} if body.get('set') else {}), **({'search': True} if body.get('search') else {}),   # design/151; section 13: the views, one per turn
                **({'view_names': list(body['view_names'])} if body.get('set') and body.get('view_names') else {}),   # design/211: the short name of each view, written on its picture
+               **({'edit': body['edit']} if body.get('edit') else {}),   # Minor corrections as an edit: the turns of the conversation (ref_sets._edit_order)
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
                              **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
                              **({'golden_candidate': True} if body.get('golden') else {})},   # design/96 X3; design/106 T1; design/111 F11
@@ -8509,6 +8535,9 @@ def reconcile(conn, run, session):
         job = conn.execute('select status, result, error, cost from vw2_jobs where id=%s', (ref['job_id'],)).fetchone()
         if job and apply_image_result(conn, run['id'], ref, job['status'], job['result'] or {}, job['error'], job['cost']):
             fixed += 1
+            if ref.get('edit_of'):   # Minor corrections as an edit: the set before goes to the versions, or stays when nothing came
+                from . import ref_sets
+                ref_sets.edit_back(session, ref)
     return fixed
 
 

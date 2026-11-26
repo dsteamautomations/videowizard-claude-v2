@@ -385,7 +385,7 @@ def test_the_round_moves_through_its_states_and_the_stored_pass_keeps_its_four_v
     look(store, only=['MASON', 'STREET'])
     assert state(store) == 'looking'                                    # one set still has no look
     assert look(store)['then'] == RS.SETS_PAGE and state(store) == 2
-    out = judge(store, conn, {'T_LAY': {'verdict': 'correct', 'words': 'Show the hand pressing the brick down.'}})
+    out = judge(store, conn, {'T_LAY': {'verdict': 'no', 'words': 'Show the hand pressing the brick down.'}})
     assert state(store) == 'rewrite' == out['pass'] and saved(store)['round']['pass'] == 2
     VS.guarded(lambda: RS.round_rewrite(conn, store, USER, RUN, [], [{'element_id': 'T_LAY', 'prompt': 'The right hand presses the wet brick into the mortar bed.'}]))
     assert state(store) == 'making'
@@ -609,18 +609,18 @@ def test_when_the_limit_has_no_room_for_all_of_them_none_is_ordered():
     assert len(conn.inserted) == 3 and saved(store)['round']['rest'] == ['BRICK', 'TILE'] and saved(store)['round']['go'] == 1 and state(store) == 2
 
 
-# ---------- "No" and "Correct it": the rewrite ----------
+# ---------- "No", with the operator's comment or without: the rewrite ("Correct it" corrects the set's own pictures: test_minor_edit_pure) ----------
 
 def test_no_orders_nothing_and_waits_for_the_rewrite():
     store, conn = at_two()
     before = saved(store)['round']['elements']['T_LAY']['set']
-    out = judge(store, conn, {'T_LAY': {'verdict': 'correct', 'words': 'Show the hand pressing the brick down.'}, 'STREET': {'verdict': 'no'}})
+    out = judge(store, conn, {'T_LAY': {'verdict': 'no', 'words': 'Show the hand pressing the brick down.'}, 'STREET': {'verdict': 'no'}})
     assert out['queued'] == [] and out['rewrite'] == ['STREET', 'T_LAY'] and out['pass'] == 'rewrite' and len(conn.inserted) == 3 and out['then'] == RS.rewrite_due(saved(store)) and out['then'].startswith('2 set(s) wait for your rewrite: STREET (no words')
     s = saved(store)
     lay, street = s['round']['elements']['T_LAY'], s['round']['elements']['STREET']
     assert lay['rewrite_due'] == {'words': 'Show the hand pressing the brick down.', 'set': before, 'at': lay['rewrite_due']['at']} and lay['operator_words'] == ['Show the hand pressing the brick down.']
     assert street['rewrite_due']['words'] == '' and street['operator_words'] == ['The street is wider than it looks.'] and lay['corrections'] == [] == street['corrections']
-    assert all(s['references'][r]['status'] == 'rejected' for r in (before, before + '-2', before + '-3')) and lay['verdict'] == 'correct' and lay['round'] == 1
+    assert all(s['references'][r]['status'] == 'rejected' for r in (before, before + '-2', before + '-3')) and lay['verdict'] == 'no' and lay['round'] == 1
 
 
 def rewritten(store, conn, prompt='The right hand presses the wet brick into the mortar bed.', eid='T_LAY'):
@@ -630,7 +630,7 @@ def rewritten(store, conn, prompt='The right hand presses the wet brick into the
 def test_the_rewrite_keeps_the_earlier_request_and_orders_the_set_once():
     store, conn = at_two()
     before = saved(store)['round']['elements']['T_LAY']['set']
-    judge(store, conn, {'T_LAY': {'verdict': 'correct', 'words': 'Show the hand pressing the brick down.'}})
+    judge(store, conn, {'T_LAY': {'verdict': 'no', 'words': 'Show the hand pressing the brick down.'}})
     out = rewritten(store, conn)
     assert out == {'pass': 'making', 'queued': ['T_LAY'], 'errors': {}, 'then': RS.REWRITE_MAKING.format(n=1)} and len(conn.inserted) == 4
     s = saved(store)

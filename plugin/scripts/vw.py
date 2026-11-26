@@ -2063,7 +2063,7 @@ def page_own(folder, base, answers):
             wait.append({**a, 'own': own, 'permission': words})
             fetch += [i for i, files in found.items() if not files and i not in fetch]
             continue
-        eid, refs, errors, asked = str(a.get('key') or '').split(':', 1)[-1], [], [], not words
+        eid, refs, errors, asked, mine = str(a.get('key') or '').split(':', 1)[-1], [], [], not words, {}
         for p in pics:
             files, name, error = found[p['id']], str(p.get('name') or '')[:80], ''
             if not files:
@@ -2085,12 +2085,15 @@ def page_own(folder, base, answers):
                     asked = True   # a person's permission is recorded once, before the first picture
                     if path == '/own':
                         refs.append(str(payload.get('id') or ''))
+                        mine[p['id']] = refs[-1]
             if error:
                 errors.append(f'{name}: {error}' if len(pics) > 1 and name else error)   # one of several is named
         if not pics:
             errors.append('the page gave no picture with this answer')
         if refs:
             a['own_refs'] = refs
+        if isinstance(a.get('marks'), dict):   # Minor corrections on the operator's own picture: the page names a mark by the picture's id in its file store; the server by its own
+            a['marks'] = {mine[k]: v for k, v in a['marks'].items() if k in mine}
         if errors:
             a['own_error'] = '; '.join(errors)[:600]   # the server's limit of the field
         out.append(a)
@@ -2761,7 +2764,10 @@ def cmd_visuals(a):
                 if isinstance(d, dict) and d.get('key') and d.get('choice'):
                     answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000],
                                     **({'own': d['own']} if isinstance(d.get('own'), (dict, list)) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {}),
-                                    **({'pics': {str(k)[:80]: str(v)[:8] for k, v in list(d['pics'].items())[:8]}} if isinstance(d.get('pics'), dict) and d['pics'] else {})})   # design/211: a picture answered on its own
+                                    **({'pics': {str(k)[:80]: str(v)[:8] for k, v in list(d['pics'].items())[:8]}} if isinstance(d.get('pics'), dict) and d['pics'] else {}),   # design/211: a picture answered on its own
+                                    # Minor corrections as an edit: the operator's marks per picture and the tick go to the server as the page saved them; the server checks them
+                                    **({'marks': {str(k)[:80]: [m for m in v[:3] if isinstance(m, dict)] for k, v in list(d['marks'].items())[:8] if isinstance(v, list)}} if isinstance(d.get('marks'), dict) and d['marks'] else {}),
+                                    **({'every': d['every']} if isinstance(d.get('every'), bool) else {}), **({'fix': True} if d.get('fix') is True else {})})
             answers, own_fetch = page_own(folder, base, answers)   # design/210 part 2: the operator's own pictures reach the server before their lines are recorded
             out = write(base + '/page/record', {'answers': answers}, wait=PAGE_WAIT)
             taken = folder / 'answers' / 'rounds' / rnd / 'answers'
@@ -2911,8 +2917,25 @@ def cmd_visuals(a):
         if getattr(a, 'things', None):   # design/216b: Claude's list of the things shown in each place; a place that waited for it is ordered then
             out = write(base + '/round/things', {'rows': _rows(m, a.things, ('element_id', 'things', 'reason'))})
             emit(out, 0, out.get('then'))
-        if getattr(a, 'rewrite', None):   # the requests the operator sent back, rewritten: the sets are made then
-            out = write(base + '/round/rewrite', {'rows': _rows(m, a.rewrite, ('element_id', 'prompt'))})
+        if getattr(a, 'rewrite', None) is True:   # Minor corrections as an edit: the sets that wait for Claude's where line (or its rewrite), with their pictures, marked where the operator marked them
+            out = call('GET', base + '/round/rewrite')
+            for s in out.get('sets') or []:
+                folder = 'work/visuals/sets/' + re.sub(r'[^A-Za-z0-9._-]', '-', str(s.get('element_id')))
+                for pic in s.get('pictures') or []:
+                    if pic.get('key'):
+                        pic['file'] = f"{folder}/correct-{pic.get('n')}{'.png' if pic['key'].endswith('.png') else '.jpg'}"
+                        _download(m, pic['key'], pic['file'])
+            (ws / 'work' / 'visuals' / 'sets').mkdir(parents=True, exist_ok=True)
+            (ws / 'work' / 'visuals' / 'sets' / 'rewrites.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+            emit({'file': 'work/visuals/sets/rewrites.json', 'sets': [s.get('element_id') for s in out.get('sets') or []], 'then': out.get('then')}, 0,
+                 'Read work/visuals/sets/rewrites.json: `how` says how a where line is written; look at each picture file. Then write out/round-rewrites.json '
+                 'and send it: `vw visuals round --rewrite out/round-rewrites.json`.')
+        if getattr(a, 'rewrite', None):   # Claude's where lines (Minor corrections) and the requests written again (Make again): the sets are corrected or made then
+            rows = _rows(m, a.rewrite, ('element_id',))
+            if not all(r.get('prompt') or r.get('where') or r.get('unclear') for r in rows):
+                emit({'action': 'refused', 'message': f'{a.rewrite} must be a list of {{element_id, prompt}} rows (a set to make again) or {{element_id, where}} rows (a set to correct; '
+                                                      '`unclear` in place of `where` asks the operator one question).'}, 2)
+            out = write(base + '/round/rewrite', {'rows': rows})
             emit(out, 0, out.get('then'))
         if any(getattr(a, k, None) for k in ROUND_ONE + ('verdict', 'golden', 'words')):
             _round_one(a, base)
@@ -4210,7 +4233,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded', '--answers'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
-    s.add_argument('--rest', action='store_true', help="round: make the other sets, on the operator's word (design/211)"); s.add_argument('--rewrite', help='round: the file of the rewritten requests, rows {element_id, prompt} (design/211)')
+    s.add_argument('--rest', action='store_true', help="round: make the other sets, on the operator's word (design/211)"); s.add_argument('--rewrite', nargs='?', const=True, default=None, help='round: alone, list the sets that wait for a where line or a rewrite and fetch their pictures; with a file, send the rows {element_id, where} (Minor corrections) or {element_id, prompt} (Make again)')
     s.add_argument('--looks', nargs='?', const=True, default=None, help='round: alone, list the sets to look at and fetch their pictures; with a file, record the looks (design/211)')
     s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')

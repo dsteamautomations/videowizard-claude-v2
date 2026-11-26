@@ -238,7 +238,7 @@ def test_S13_step_2_names_no_money_and_the_chat_says_the_same_words():
 
 def test_S14_a_set_made_again_shows_the_set_before_in_the_chat_too():
     film = at_step_2()
-    film.record(ans(film.lines()['set:T_LAY'], 'correct', 'Show the hand pressing the brick down.'))
+    film.record(ans(film.lines()['set:T_LAY'], 'no', 'Show the hand pressing the brick down.'))
     film.rewrite([{'element_id': 'T_LAY', 'prompt': 'The right hand presses the wet brick into the mortar bed.'}])
     film.back()
     film.set_looks()
@@ -336,7 +336,7 @@ def test_N6_N9_with_the_plan_accepted_and_no_round_the_chat_says_what_comes_next
 def test_N7_the_rewrite_sentence_names_the_things_and_the_operators_words():
     film = at_step_2()
     lines = film.lines()
-    out = film.record(ans(lines['set:T_LAY'], 'correct', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], lines['set:STREET']['buttons'][0]['choice']),
+    out = film.record(ans(lines['set:T_LAY'], 'no', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], lines['set:STREET']['buttons'][0]['choice']),
                       ans(lines['sets:rest'], 'rest_out'))
     said = RS.rewrite_due(film.session())
     assert said.startswith('2 set(s) wait for your rewrite: MASON (no words: from the check and your look); T_LAY ("Show the hand pressing the brick down."). For each,')
@@ -400,7 +400,7 @@ def made_three_times(film):
         film.back()
         film.set_looks()
         if n == 2:
-            film.record(ans(film.lines()['set:T_LAY'], 'correct', 'Not yet.'))
+            film.record(ans(film.lines()['set:T_LAY'], 'no', 'Not yet.'))
     return film
 
 

@@ -29,7 +29,7 @@ def test_the_page_holds_none_of_the_older_words_and_no_amount():
 def test_the_fixture_carries_the_servers_words():
     w = ROUND['layout']['words']
     assert w['leave'] == 'No reference needed' and w['leave_set'] == 'Go on without a reference' and w['wait_out'] == 'Not made'
-    assert btn(PERSON, 'fix')['all'] == {'label': 'This applies to every picture of this thing', 'choice': 'correct_all', 'say': CF.WORDS['say_fix_all']} and btn(PERSON, 'fix')['go'] == 'Make it again with these words'
+    assert btn(PERSON, 'fix')['all'] == {'label': 'This applies to every picture of this thing', 'choice': 'correct_all', 'say': CF.WORDS['say_fix_all']} and btn(PERSON, 'fix')['go'] == 'Correct with these words'   # Minor corrections as an edit (25 Nov 2026); before: 'Make it again with these words'
 
 
 # design/216: the tick of the sets screen is checked in test_design216_browser_pure (test_the_words_box_and_its_tick)

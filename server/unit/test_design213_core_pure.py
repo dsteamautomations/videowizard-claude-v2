@@ -203,7 +203,7 @@ def test_set_facts_gives_each_pictures_notes_the_sets_notes_once_what_the_model_
     s = F.session('2')
     row = s['round']['elements']['T_LAY']
     f = RS.set_facts(s, F.plan(), 'T_LAY', row)
-    assert set(f) == {'pictures', 'inputs', 'from', 'notes', 'sources', 'partial', 'rec', 'makes', 'makes_left', 'asked', 'history', 'changed', 'fail', 'model', 'footage', 'searched'}
+    assert set(f) == {'pictures', 'inputs', 'from', 'notes', 'sources', 'partial', 'rec', 'makes', 'makes_left', 'asked', 'edited', 'edit_note', 'history', 'changed', 'fail', 'model', 'footage', 'searched'}
     assert f['notes'].startswith('(1) One method') and f['notes'].count('(1) One method') == 1 and [p['notes'] for p in f['pictures']] == ['', '', '']   # stored before the notes were split: said once, of the set
     assert f['model'] is None and f['footage'] == []
     for n, rid in enumerate(('s-t_lay-1', 's-t_lay-1-2', 's-t_lay-1-3'), 1):

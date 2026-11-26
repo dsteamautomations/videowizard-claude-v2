@@ -331,6 +331,20 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .spanel .group{border:0;padding:0}
 .sacts{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
 .smsg{color:var(--stop);margin:6px 0}
+/* Minor corrections as an edit (SK, 25 Nov 2026): the marking control. The picture large, in place; the canvas lies over it and takes the mouse and the finger */
+.smark{display:flex;flex-direction:column;gap:10px;min-width:0} .smtools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#sets .smtools .sbtn{padding:7px 12px} #sets .smtools .sbtn[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+.smwrap{position:relative;align-self:flex-start;width:100%;line-height:0;border-radius:10px;overflow:hidden;background:var(--line)}   /* as wide as its room, as high as 58% of the window: `sMarkView` sets the most from the picture's own shape */
+#sets .smwrap .sbigb{display:block;position:static;width:100%;height:auto;border-radius:0;cursor:default}
+.smwrap .sbigb img,.smwrap .smimg{position:static;display:block;width:100%;height:auto}
+.smwrap .sbigb .ph{min-width:320px;min-height:180px;line-height:1.4}
+.smcv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.smrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.smrow textarea{width:100%;min-height:70px} .smrow label{display:block;font-weight:600;margin-bottom:6px} .smrow .stick{font-weight:400;margin:8px 0;display:flex;gap:8px;align-items:center}
+.smtold{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);white-space:pre-line;font-size:.9rem}
+.smlist{list-style:none;margin:8px 0 0;padding:0;font-size:.9rem;color:var(--muted)}
+.smdo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:760px} .smdo p{margin:4px 0 0;font-size:.85rem;color:var(--muted)}
+@media (max-width:860px){ .smrow,.smdo{grid-template-columns:minmax(0,1fr)} }
 .sgate{color:var(--muted);font-size:13px;margin:4px 0}
 .sownp{margin:2px 0 8px}
 .smore{margin-top:22px;border-top:1px solid var(--line);max-width:900px}
@@ -675,7 +689,9 @@ function ownBox(line){   // design/210 part 2: "Use my own picture". The files g
     perm=el('input'); perm.type='text'; perm.maxLength=300; perm.id='ownp-'+line.line; perm.placeholder="Your words: that you have this person's permission"; perm.setAttribute('aria-label',"Your words that you have this person's permission");
     perm.value=drafts['p:'+line.line]||''; perm.addEventListener('input',()=>{drafts['p:'+line.line]=perm.value;}); wrap.appendChild(perm); }
   const words=()=>perm?perm.value.trim():'';
+  const fixB=!o.person&&!$('sets').hidden&&line.case==='judge'&&SW().mark&&(line.buttons||[]).find(b=>b.mark);   // Minor corrections: the operator's own picture is marked and corrected like a picture of the set
   if(list.length) wrap.appendChild(mk('ul',{class:'ownlist'},list.map((p,i)=>mk('li',{},mk('img',{class:'ownpic',alt:'',src:p.url}),mk('span',{},p.name||'Picture '+(i+1)),   // each one small, with its name; removable before "done"
+    fixB&&mk('button',{type:'button','data-own':p.id,disabled:st.busy,on:{click:()=>sMark(line,p.id,true)}},SW().mark.own),
     mk('button',{type:'button',disabled:st.busy,'aria-label':w.remove+' '+(p.name||'picture '+(i+1)),on:{click:()=>{ st.msgs=[]; ownSave(line,list.filter((x,j)=>j!==i)); }}},w.remove)))));
   const file=el('input'); file.type='file'; file.accept=OWN_TYPES.join(','); file.multiple=max>1; file.disabled=st.busy; file.setAttribute('aria-label',o.label);   // image/png,image/jpeg,image/webp
   file.addEventListener('change',()=>{
@@ -1094,7 +1110,7 @@ const tFold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!targ
 // The list holds only what needs an answer, numbered, then "The other N sets"; one set at a time: its large picture, its small pictures below, and
 // beside it one answer for the whole set. Every word is the server's: the line's own (its heading, its buttons, what each answer will do) and the
 // screen's (`layout.words.sets`). Answers are written as every line's answer is written (`write`, `ref`); nothing is recorded before "done".
-const S={round:'',cur:null,panel:null,msg:'',timer:0,help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{},chk:{}};   // chk: the check boxes the operator opened, by item (release 1, B3)
+const S={round:'',cur:null,panel:null,msg:'',timer:0,help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{},chk:{},mk:null,marks:{},hist:{},every:{},later:{},tool:'rect',brush:.04};   // chk: the check boxes the operator opened, by item (release 1, B3)
 const PIC=()=>!!round&&(round.layout||{}).kind==='pictures';   // design/217: step 6 uses this frame with its own lines and words (`layout.words.pictures`)
 const TK=()=>!!round&&(round.layout||{}).kind==='takes';   // design/222: step 7 uses this frame too, with `layout.words.takes`
 const SW=()=>(PIC()?W().pictures:TK()?W().takes:W().sets)||{};
@@ -1107,7 +1123,7 @@ const sDone=l=>!!(sAns(l)||l.kept);
 const sWaiting=()=>{ const r=sRest(); return r?sLines().filter(l=>(r.covers||[]).indexOf(l.key)>=0):[]; };
 const sItems=()=>sLines().filter(l=>l.state==='open').concat(sRest()&&sWaiting().length?[sRest()]:[]);   // what needs an answer, then the other sets (A10)
 const sJudged=()=>sLines().every(l=>l.case!=='judge'||sDone(l));
-const sBtn=(l,a)=>a.choice==='own'?{act:'own',label:(l.own||{}).label,say:(l.own||{}).say}:(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{};
+const sBtn=(l,a)=>a.choice==='own'?(a.fix&&(l.buttons||[]).find(b=>b.mark))||{act:'own',label:(l.own||{}).label,say:(l.own||{}).say}:(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{};
 const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); if(TK()) return false;   /* design/223: a take has no check, so no answer goes against one */ if(PIC()) return !!(b&&(b.against||b.sure)); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
 function sMain(l){ const m=sMade(l), a=sAns(l), c=S.pick[l.line]; return m.find(p=>c?p.code===c:!!a&&!!p.choice&&p.choice===a.choice)||m[0]; }   // A7: A, unless another is made the main picture
 function sSays(l){   // the answer as it stands, in the server's words: the main picture's sentence, else the button's
@@ -1115,7 +1131,7 @@ function sSays(l){   // the answer as it stands, in the server's words: the main
   const p=(l.pics||[]).find(x=>x.choice&&x.choice===a.choice), b=sBtn(l,a), all=!!b.all&&b.all.choice===a.choice;
   return [w.answer,String((p&&p.say)||(all?b.all.say:b.say)||b.label||a.choice).replace('{words}',a.notes||'')]; }
 function sRefuse(m){ S.msg=m||''; const e=$('smsg'); if(e){ e.textContent=S.msg; e.hidden=!S.msg; } }
-function sGo(id){ clearTimeout(S.timer); S.cur=id; S.panel=null; S.msg=''; S.help=false; S.open={}; S.over=null; sDraw(); $('smain').scrollTop=0; }
+function sGo(id){ clearTimeout(S.timer); S.cur=id; S.panel=null; S.mk=null; S.msg=''; S.help=false; S.open={}; S.over=null; sDraw(); $('smain').scrollTop=0; }
 function sAnswer(l,choice,notes,more){   // as every line's answer is written; after a moment the next thing that needs an answer opens
   S.panel=null; S.msg=''; write(l,choice,notes||'',more||{}); clearTimeout(S.timer);
   S.timer=setTimeout(()=>{ if(S.cur!==l.line) return; const n=sItems().find(x=>x.line!==l.line&&!sDone(x)); sGo(n?n.line:null); },1100); }
@@ -1124,6 +1140,7 @@ function sUndo(l){ clearTimeout(S.timer); if(!db||!round) return; ref(l).delete(
 function sOpen(p){ S.panel=p; S.msg=''; clearTimeout(S.timer); sMainDraw(); const box=$('spanel'); if(box) box.scrollIntoView({block:'nearest'}); const f=$('sback')||document.querySelector('#spanel textarea, #spanel input, #spanel button'); if(f) f.focus(); }
 function sAct(l,b,i){
   if(b.act==='approve'){ if(l.sure) return sOpen(S.panel==='sure'?null:'sure'); const p=l.pick&&sMain(l); return sAnswer(l,p?p.choice:b.choice,''); }   // A6: against "make again", asked once
+  if(b.mark&&SW().mark&&l.case==='judge'&&sMade(l).length) return sMark(l,(sMade(l).find(p=>p.code===S.view[l.line])||sMain(l)).code);   // Minor corrections: the marking control, on the picture shown
   if(b.needs_words||b.act==='again'||b.act==='leave') return sOpen(S.panel==='b'+i?null:'b'+i);
   sAnswer(l,b.choice,'');
 }
@@ -1154,13 +1171,97 @@ function sPanel(l){   // what opens under the buttons: the against-advice questi
         sAnswer(l,tick&&tick.checked?b.all.choice:b.choice,t); }}},b.go||b.label),cancel)]; }
   if(b.act==='leave'){ const loss=l.loss||{}; return [mk('label',{},loss.text||''),(loss.shots||[]).length?mk('p',{},loss.shots.join(', ')):null,
     mk('div',{class:'sacts'},mk('button',{class:'sbtn danger',id:'sleave',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},b.label),cancel)]; }
-  return [mk('label',{},b.ask||''),mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sagain',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},w.again_go),cancel)];
+  const cm=b.comment&&mk('textarea',{id:'sagainw',maxlength:String(MAX),'aria-label':b.comment,placeholder:b.comment});   // "Make again" takes the operator's comment with it
+  return [mk('label',{},b.ask||''),cm,mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sagain',type:'button',on:{click:()=>sAnswer(l,b.choice,cm?cm.value.trim().slice(0,MAX):'')}},w.again_go),cancel)];
+}
+// ---------- Minor corrections as an edit (SK, 25 Nov 2026): the marking control of the sets screen ----------
+// "Mark the place" under a picture of a set (and "Correct this picture" on the operator's own) opens it large, in place. One row of tools: Rectangle
+// (chosen first), Paint with its brush size, Undo, Redo, Clear marks. A mark has a red outline and a light tint, three at most on a picture, each
+// numbered, the same numbers in the list beside the words box. One words box, what the correction does well and poorly beside it, the tick, and
+// "Minor corrections" and "Make again" side by side. A mark is kept as fractions of the picture, {r:[x,y,w,h]} or {p:[x,y,x,y,...],s:brush}, by
+// the picture's own id; the picture is never changed here. Every word is the server's (the screen's `mark` words; the button's `every`).
+const MK_MAX=3, MK_PTS=200;
+const mkList=(l,key)=>((S.marks[l.line]||{})[key])||[];
+function mkSet(l,key,list){   // one step: the marks before are kept for Undo, and Redo starts over
+  const h=S.hist[l.line]||(S.hist[l.line]={u:[],r:[]}), all=S.marks[l.line]||(S.marks[l.line]={}); h.u.push(JSON.stringify(all)); h.r=[];
+  if(list.length) all[key]=list; else delete all[key]; S.msg=''; sMainDraw(); }
+function mkStep(l,from,to){ const h=S.hist[l.line]; if(!h||!h[from].length) return; h[to].push(JSON.stringify(S.marks[l.line]||{})); S.marks[l.line]=JSON.parse(h[from].pop()); S.msg=''; sMainDraw(); }
+function mkPaint(cv,list){   // the marks on the canvas over the picture
+  const c=cv.getContext('2d'), W=cv.width, H=cv.height; c.clearRect(0,0,W,H); c.lineJoin=c.lineCap='round'; c.font='bold '+Math.max(14,Math.round(W/45))+'px sans-serif'; c.textBaseline='top';
+  list.forEach((m,i)=>{ let at;
+    if(m.r){ const x=m.r[0]*W, y=m.r[1]*H, w=m.r[2]*W, h=m.r[3]*H; c.fillStyle='rgba(255,0,0,.15)'; c.fillRect(x,y,w,h); c.strokeStyle='#f00'; c.lineWidth=Math.max(2,W/400); c.strokeRect(x,y,w,h); at=[x+6,y+4]; }
+    else { c.strokeStyle='rgba(255,0,0,.35)'; c.lineWidth=Math.max(2,m.s*W); c.beginPath(); c.moveTo(m.p[0]*W,m.p[1]*H); for(let j=2;j<m.p.length;j+=2) c.lineTo(m.p[j]*W,m.p[j+1]*H); if(m.p.length===2) c.lineTo(m.p[0]*W+.1,m.p[1]*H); c.stroke(); at=[m.p[0]*W,m.p[1]*H]; }
+    c.lineWidth=3; c.strokeStyle='#fff'; c.strokeText(String(i+1),at[0],at[1]); c.fillStyle='#f00'; c.fillText(String(i+1),at[0],at[1]); }); }
+function mkCanvas(l,key,w){   // mouse and touch alike (pointer events)
+  const cv=mk('canvas',{class:'smcv',id:'smcv','aria-label':w.hint}), list=mkList(l,key); let live=null, start=null;
+  const at=e=>{ const b=cv.getBoundingClientRect(); return [(e.clientX-b.left)/b.width,(e.clientY-b.top)/b.height].map(v=>Math.round(Math.min(1,Math.max(0,v))*1e4)/1e4); };
+  const show=()=>mkPaint(cv,live?list.concat([live]):list);
+  cv._fit=()=>{ const b=cv.getBoundingClientRect(); if(b.width&&b.height){ cv.width=Math.round(b.width); cv.height=Math.round(b.height); } show(); };
+  cv.addEventListener('pointerdown',e=>{ if(list.length>=MK_MAX) return sRefuse(w.most); e.preventDefault(); try{ cv.setPointerCapture(e.pointerId); }catch(x){}
+    start=at(e); live=S.tool==='paint'?{p:[start[0],start[1]],s:S.brush}:{r:[start[0],start[1],0,0]}; show(); });
+  cv.addEventListener('pointermove',e=>{ if(!live) return; const q=at(e);
+    if(live.p){ const n=live.p.length; if(n<2*MK_PTS&&Math.hypot(q[0]-live.p[n-2],q[1]-live.p[n-1])>=.006) live.p.push(q[0],q[1]); }
+    else live.r=[Math.min(start[0],q[0]),Math.min(start[1],q[1]),Math.round(Math.abs(q[0]-start[0])*1e4)/1e4,Math.round(Math.abs(q[1]-start[1])*1e4)/1e4];
+    show(); });
+  const end=()=>{ const m=live; live=null; if(!m) return; if(m.r&&(m.r[2]<.01||m.r[3]<.01)) return show();   // a click with no drag is no rectangle
+    mkSet(l,key,list.concat([m])); };
+  cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end);
+  if(window.ResizeObserver) new ResizeObserver(()=>cv._fit()).observe(cv);   // the large copy arrives, the window changes: the marks keep their place
+  return cv; }
+function sMark(l,code,own){ clearTimeout(S.timer); const a=answers[l.line];
+  if(!S.marks[l.line]&&a&&a.marks){ S.marks[l.line]=JSON.parse(JSON.stringify(a.marks)); if(a.every===false) S.every[l.line]=false; }   // an answer saved before (a reload): its marks and its tick are shown again
+  S.mk=code==null?null:{line:l.line,code:code,own:!!own}; S.panel=null; S.msg=''; sMainDraw(); const f=$('smark'); if(f) f.scrollIntoView({block:'nearest'}); }
+function sMarkView(l,b,m,gate,check){
+  const t=SW(), w=t.mark, own=S.mk.own, pics=own?ownOf(answers[l.line]):m, p=pics.find(x=>(own?x.id:x.code)===S.mk.code)||pics[0];
+  if(!p){ S.mk=null; return null; }
+  const key=own?p.id:p.ref, list=mkList(l,key), h=S.hist[l.line]||{u:[],r:[]}, one=pics.length<2, again=!own&&(l.buttons||[]).find(x=>x.act==='again');
+  const cv=mkCanvas(l,key,w), wrap=mk('div',{class:'smwrap',id:'smwrap'}), fit=()=>{ check(); const i=wrap.querySelector('img');
+    if(i&&i.naturalHeight) wrap.style.maxWidth='calc(58vh * '+(i.naturalWidth/i.naturalHeight).toFixed(4)+')'; cv._fit(); };
+  const tool=(id,name,label)=>mk('button',{class:'sbtn',id:id,type:'button','aria-pressed':String(S.tool===name),on:{click:()=>{ S.tool=name; sMainDraw(); }}},label);
+  const brush=mk('input',{type:'range',id:'smbrush',min:'1',max:'15','aria-label':w.brush}); brush.value=String(Math.round(S.brush*100)); brush.disabled=S.tool!=='paint'; brush.addEventListener('input',()=>{ S.brush=+brush.value/100; });
+  const step=(id,label,off,fn)=>{ const x=mk('button',{class:'sbtn',id:id,type:'button',on:{click:fn}},label); x.disabled=off; return x; };
+  let pic;
+  if(own){ pic=mk('img',{class:'smimg',alt:p.name||'',src:p.url}); pic.addEventListener('load',fit); } else pic=sBig(p,m,fit)[0];
+  const th=x=>{ const id=own?x.id:x.code, n=mkList(l,own?x.id:x.ref).length, on=x===p;
+    return mk('button',{class:'sth'+(on?' on':''),type:'button','aria-pressed':String(on),'aria-label':own?(x.name||''):x.label,'data-code':id,on:{click:()=>{ S.mk.code=id; S.msg=''; sMainDraw(); }}},
+      own?mk('img',{alt:'',src:x.url}):mk('span',{class:'ph'},x.missing?t.missing:t.loading),mk('span',{class:'sthl'},own?(x.name||''):[x.letter&&mk('b',{},x.letter),' '+(x.view||x.label)]),n?mk('em',{},w.count.replace('{n}',n)):null); };
+  const strip=one?null:mk('div',{class:'sths',id:'smset'},pics.map(th));
+  if(strip&&!own) Array.prototype.forEach.call(strip.querySelectorAll('.sth'),btn=>{ const x=m.find(y=>y.code===btn.getAttribute('data-code')); if(x&&!x.missing) loadThumb(x,btn,check,0); });
+  const ta=mk('textarea',{id:'sfix',maxlength:String(MAX)}); ta.value=S.words[l.line]||''; ta.addEventListener('input',()=>{ S.words[l.line]=ta.value; });
+  const every=!one&&b.every&&mk('input',{type:'checkbox',id:'severy'}), all=!own&&b.all&&mk('input',{type:'checkbox',id:'sall'});
+  if(every){ every.checked=S.every[l.line]!==false; every.addEventListener('change',()=>{ S.every[l.line]=every.checked; }); }
+  if(all){ all.checked=!!S.later[l.line]; all.addEventListener('change',()=>{ S.later[l.line]=all.checked; }); }   // both ticks keep their state while marks are drawn
+  const send=()=>{ const words=ta.value.trim().slice(0,MAX), kept=S.marks[l.line]||{}, marks={}; pics.forEach(x=>{ const k=own?x.id:x.ref; if((kept[k]||[]).length) marks[k]=kept[k]; });
+    if(!words){ sRefuse(w.need); ta.focus(); return; }
+    const has=Object.keys(marks).length>0, each=every?every.checked:true;
+    if(!each&&!has) return sRefuse(w.one);
+    const more=Object.assign({every:each},has?{marks:marks}:{}); S.mk=null;
+    if(own) sAnswer(l,'own',words,Object.assign({own:pics,permission:'',fix:true},more)); else sAnswer(l,all&&all.checked?b.all.choice:b.choice,words,more); };
+  const go=mk('button',{class:'sbtn primary',id:'sfixsend',type:'button',on:{click:send}},b.label), re=again&&mk('button',{class:'sbtn',id:'smagain',type:'button',on:{click:()=>{ S.mk=null; sAnswer(l,again.choice,ta.value.trim().slice(0,MAX)); }}},again.label);
+  if(!own){ gate.push(go); if(re) gate.push(re); }   // the set's own pictures must have shown, as for every answer on them
+  setTimeout(cv._fit,0);
+  return mk('div',{class:'smark',id:'smark'},
+    mk('div',{class:'smtools',role:'toolbar','aria-label':w.open},tool('smrect','rect',w.rect),tool('smpaint','paint',w.paint),mk('label',{class:'stick'},w.brush,' ',brush),
+      step('smundo',w.undo,!h.u.length,()=>mkStep(l,'u','r')),step('smredo',w.redo,!h.r.length,()=>mkStep(l,'r','u')),step('smclear',w.clear,!list.length,()=>mkSet(l,key,[])),
+      mk('span',{class:'sgrow'}),mk('button',{class:'slink',id:'smclose',type:'button',on:{click:()=>sMark(l,null)}},w.close)),
+    mk('p',{class:'said'},w.hint),
+    (wrap.append(pic,cv),wrap),strip,
+    mk('div',{class:'smrow'},
+      mk('div',{},mk('label',{for:'sfix'},w.ask),ta,
+        mk('ul',{class:'smlist',id:'smlist','aria-label':w.list},list.length?list.map((x,i)=>mk('li',{},(x.r?w.mark_rect:w.mark_paint).replace('{n}',i+1),' ',
+          mk('button',{class:'slink',type:'button',on:{click:()=>mkSet(l,key,list.filter((y,j)=>j!==i))}},w.remove))):mk('li',{},w.none)),
+        every&&mk('label',{class:'stick',for:'severy'},every,b.every.label),all&&mk('label',{class:'stick',for:'sall'},all,b.all.label)),
+      mk('p',{class:'smtold',id:'smtold'},w.told||'')),
+    mk('div',{class:'smdo'},mk('div',{},go,mk('p',{},w.fix_line)),re&&mk('div',{},re,mk('p',{},w.again_line))),
+    mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
 }
 function sThing(l){
   const w=SW(), a=sAns(l), kids=[mk('h2',{class:'sname'},l.name||l.title),mk('p',{class:'skind'},[l.kind,String(l.shots||'').split(' · ')[0].replace(/^./,c=>c.toLowerCase())].filter(Boolean).join(' · '))], side=[], gate=[], m=sMade(l), foot=sFoot(l);
   const seen=(l.pics||[]), gmsg=mk('p',{class:'sgate',id:'sgate',hidden:true}), sideBox=mk('div',{class:'sside'});
   const check=()=>{ if(!gate.length) return; const bad=seen.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=seen.filter(p=>picSeen[p.code]!=='ok').length;   // as on every line with pictures (design/210)
     gate.forEach(b=>{ b.disabled=!!(bad.length||wait); }); gmsg.textContent=bad.length?String(w.gate_bad||'').replace('{pics}',bad.join(', ')):wait?w.gate_wait:''; gmsg.hidden=!gmsg.textContent; };
+  const fixB=w.mark&&(l.buttons||[]).find(b=>b.mark), marking=l.state==='open'&&fixB&&S.mk&&S.mk.line===l.line&&(S.mk.own||(l.case==='judge'&&m.length))?sMarkView(l,fixB,m,gate,()=>check()):null;
+  if(marking){ kids.push(marking,gmsg); setTimeout(check,0); return kids; }
   if(l.case==='judge'&&m.length){
     const mp=sMain(l), sel=m.find(p=>p.code===S.view[l.line])||mp, all=m.concat(foot);
     const cmp=!!S.cmpOn[l.line]&&foot.length>0, mate=foot.find(x=>x.code===S.cmp[l.line])||foot[Math.min(Math.max(m.indexOf(sel),0),foot.length-1)];   // A2: the footage beside the set's picture, never in its place
@@ -1173,6 +1274,7 @@ function sThing(l){
     const viewer=mk('div',{class:'sviewer'},
       mk('div',{class:'sbigrow'+(cmp?' two':''),id:'sbig'},big(sel,cmp&&sel.set_cap),cmp&&big(mate,mate.cmp_cap)),
       mk('p',{class:'sbigcap'},mk('b',{},sel.name||''),sel.view&&' · '+sel.view,m.length>1&&sel===mp&&mk('span',{class:'spill'},w.main),mk('span',{class:'sgrow'}),
+        l.state==='open'&&fixB?mk('button',{class:'slink',id:'smarkopen',type:'button',on:{click:()=>sMark(l,sel.code)}},w.mark.open):null,   // under the picture: it opens large, in place, to be marked
         foot.length?mk('button',{class:'slink',id:'scompare',type:'button','aria-pressed':String(cmp),on:{click:()=>{ S.cmpOn[l.line]=!cmp; sMainDraw(); }}},cmp?w.stop:w.compare):null),
       mk('div',{class:'sthis',id:'sthis'},(sel.faults||[]).length?[mk('b',{},sel.check_head),mk('ul',{},sel.faults.map(x=>mk('li',{},x)))]:sel.check_none?[sel.check_head&&mk('b',{},sel.check_head+' '),sel.check_none]:null,   // A4: what belongs to this picture
         l.pick&&m.length>1&&sel!==mp&&sel.main_label?[' ',mk('button',{class:'slink',id:'smainpick',type:'button',on:{click:()=>sPick(l,sel)}},sel.main_label)]:null),
@@ -1201,6 +1303,7 @@ function sThing(l){
     into.push(gmsg);
     if(l.own&&assets) into.push(mk('p',{class:'sownp'},mk('button',{class:'slink',type:'button','data-act':'own','aria-expanded':String(S.panel==='own'),on:{click:()=>sOpen(S.panel==='own'?null:'own')}},l.own.label)));   // A8
     if(l.refused) into.push(mk('p',{class:'smsg',id:'srefused'},l.refused));   // the server's refusal of the last "done", kept on its set
+    if(l.edit_note) into.push(mk('p',{class:'smsg',id:'seditnote'},l.edit_note));   // a correction that was not made, or Claude's one question about it
     into.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
     if(sDone(l)){ const t=sSays(l), ag=sAgainst(l);
       into.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},ownFigs(a),mk('p',{},mk('b',{},t[0]),t[1],a&&a.choice==='own'&&a.notes&&' Your words: “'+a.notes+'”',ag&&' '+w.against_say),
@@ -1431,13 +1534,13 @@ function sMainDraw(){
   main.replaceChildren(mk('div',{class:'swrap'},...[].concat(body).flat(6).filter(Boolean))); main.scrollTop=top; kOver(); }
 function sDraw(){
   if(S.round!==round.round){ const f=sItems().find(l=>!sDone(l));   // a new round: the first thing that needs an answer
-    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,over:null,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{},chk:{}}); }
+    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,over:null,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{},chk:{},mk:null,marks:{},hist:{},every:{},later:{}}); }
   $('sstep').textContent=round.step||''; $('shelp').textContent=SW().help||''; $('shelp').setAttribute('aria-expanded',String(S.help));
   sRail(); sMainDraw(); sCount(); }
 $('shelp').addEventListener('click',()=>{ S.help=!S.help; sDraw(); });
 document.addEventListener('keydown',e=>{   // A15: the arrow keys and Escape stay; the large picture has its own keys
   if($('sets').hidden||zoomed||e.ctrlKey||e.metaKey||e.altKey||!round) return;
-  if(e.key==='Escape'){ if(S.over) return kSheet(null); if(S.panel) return sOpen(null); if(S.help){ S.help=false; return sDraw(); } return; }
+  if(e.key==='Escape'){ if(S.over) return kSheet(null); if(S.mk){ const l=(round.lines||[]).find(x=>x.line===S.mk.line); return l?sMark(l,null):null; } if(S.panel) return sOpen(null); if(S.help){ S.help=false; return sDraw(); } return; }
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||S.over) return;
   if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ const it=TK()?(round.lines||[]):sItems(); if(!it.length) return; e.preventDefault();   // design/222: in step 7 every shot, the ones answered earlier too
     const i=it.findIndex(x=>x.line===S.cur), n=it[(Math.max(i,0)+(e.key==='ArrowRight'?(i<0?0:1):it.length-1))%it.length]; sGo(n.line); }

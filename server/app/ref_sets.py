@@ -57,6 +57,43 @@ REWRITE_DUE = ("{n} set(s) wait for your rewrite: {things}. For each, write the 
                'rows {{element_id, prompt}}. Send it: `vw visuals round --rewrite out/round-rewrites.json`. The sets are made then, not before.')
 REWRITE_WORDS, REWRITE_NO_WORDS = '{eid} ("{words}")', '{eid} (no words: from the check and your look)'
 REWRITE_MAKING = '{n} set(s) are being made again. Wait: `vw visuals status --wait 900`.'
+# Minor corrections as an edit (SK, 25 Nov 2026): the set's own pictures go back to the image model with the operator's words and Claude's where line.
+# The older way, a new set made from the words, is retired and refused by name (EDIT_NOT_REMAKE). "Make again" stays the fresh set.
+EDIT_FIRST = ('Using the provided image, change only this: {words}\nWhere: {where}.\nKeep everything else in the image exactly the same: the same camera, framing, people, things, '
+              'light and colours. Add no marks, outlines, numbers or text.')
+EDIT_NEXT = ('Picture {n} of {N} of the same set. Make the same correction here, so that {name} looks the same as in the picture{s} you corrected before. Keep everything else in '
+             'this picture exactly the same: the same camera, framing, people, things, light and colours.')
+WHERE_HOW = [
+    "Minor corrections: the image model gets the set's own picture, the operator's words unchanged, and one line of yours that says where: which thing in the picture their "
+    'words are about. A picture the operator marked is given to you with the marks drawn on it (red outline, light tint, numbered); the image model never sees the marks.',
+    '1. Name the thing by what it looks like: its colour, material or shape.',
+    '2. Then say where it is, against a neighbour or the frame.',
+    '3. One sentence. No pixel numbers, no "the red rectangle", no "area 1".',
+    '4. Name only the thing to change. A thing inside the mark that must stay is not named, or the line says it stays.',
+    "5. Where the whole thing changes, the thing's name alone is the line.",
+    "6. The operator's words go in unchanged, above your line: do not repeat or reword them.",
+    "Several marks: one line that names each thing. No mark: write the line from the operator's words and your look.",
+    'When you cannot tell which thing is meant, send `unclear` with one question for the operator in place of `where`: nothing is sent to the image model, and the set goes '
+    'back to the operator with your question.',
+    'Rows: {element_id, where}. A set that waits for "Make again" has no where line: {element_id, prompt}, its request written again.']
+EDIT_DUE = ("{n} set(s) wait for your where line (Minor corrections: the set's own pictures are corrected): {things}. Run `vw visuals round --rewrite`: it lists them, fetches "
+            'their pictures with the marks and says how the line is written. Then send out/round-rewrites.json, rows {{element_id, where}}: '
+            '`vw visuals round --rewrite out/round-rewrites.json`. Nothing is corrected before.')
+EDIT_MAKING = '{n} set(s) are being corrected. Wait: `vw visuals status --wait 900`.'
+EDIT_NOT_REMAKE = ("{eid}: Minor corrections no longer makes a new set from words: the set's own pictures are corrected. Send its where line, rows {{element_id, where}} "
+                   '(`vw visuals round --rewrite` says how).')
+WHERE_EMPTY = '{eid}: give its where line (`where`), or `unclear` with one question for the operator.'
+WHERE_SHAPE = ('{eid}: the where line is one sentence of at most {max} characters that names the thing and its place in plain words: no pixel numbers, '
+               'no "the red rectangle", no "area 1".')
+WHERE_NOT = re.compile(r'\bred\s+(rectangle|outline)\b|\bmarked\s+(rectangle|outline|box|area|place|stroke)\b|\barea\s*\d|\bmark\s*\d|\d\s*(px|pixels?)\b', re.I)   # words about the mark itself; a thing that is red (a red box) is named as it looks
+MARKS_MAX, MARK_POINTS, WHERE_CHARS = 3, 200, 300
+MARKS_BAD = '{eid}: a mark is a rectangle or a painted stroke on one picture of this set, {max} at most on a picture. Mark the picture again.'
+EDIT_ONE = '{eid}: without "the same correction in every picture of this set", mark the picture to correct.'
+EDIT_NO_PICTURE = '{eid}: its set has no picture to correct. Use Make again.'
+EDIT_OWN = "{eid}: only the operator's own picture of this thing can be corrected, and never a person's photo."
+EDIT_UNCLEAR = 'The assistant could not tell which thing you mean: {question} Mark the place on the picture and send Minor corrections again. Nothing was changed.'
+EDIT_FAILED = 'The correction was not made: {why} The set is as it was. This does not count as a make.'
+EDIT_LINE = ("the operator's correction is made", "the operator's correction is made: {words}")   # one more line of the look on a corrected set; it only warns
 MERGE_ASK = 'The round is past step 1: nothing was made. {n} thing(s) are back with the operator as open lines. Run `vw visuals page`.'
 MERGE_NONE = ('The round is past step 1: nothing was made and nothing came back. Only a thing that is new in the plan, or whose entry in the plan changed, comes back by a round '
               'file sent again; a thing the operator said needs no reference keeps that answer until they ask for it by name (`vw visuals round --back <element>`).')   # design/216 (B6): was "left out"
@@ -833,7 +870,8 @@ def set_facts(session, plan, eid, row):
     """What the page and the chat show of one made (or failed) set (design/211 section 3.7): {'pictures': [{'ref', 'n', 'view', 'check':
     check_summary, 'look': look or None, 'notes'}], 'inputs': [{'ref', 'role', 'view'}], 'from': 'footage'|'web'|'words', 'notes', 'sources': [{'url',
     'title'}], 'partial': {'made', 'asked', 'missing'} or None, 'rec': {'do', 'golden', 'reason'} or None, 'makes', 'makes_left',
-    'asked': the operator's words of the last remake or None, 'history': [{'n', 'set', 'added', 'operator'}], 'changed': bool,
+    'asked': the operator's words of the last remake or None, 'edited': that remake was an edit of the set's own pictures, 'edit_note': why
+    a correction asked for was not made or None, 'history': [{'n', 'set', 'added', 'operator'}], 'changed': bool,
     'fail': {'cause', 'model', 'text'} or None, 'model': {'chose', 'aside'} or None, 'footage': [{'ref', 'view'}]}. The pictures are those
     of the set the row holds now, candidate or approved. design/213: `notes` is the set's notes for the record, each said once; a picture's
     own `notes` are those of its turn ('' on a set stored before they were kept per picture); `model` is what the look says the image model
@@ -865,6 +903,7 @@ def set_facts(session, plan, eid, row):
             'rec': {'do': look.get('recommend'), 'golden': look.get('golden'), 'reason': look.get('reason') or ''} if pics and look.get('set') == row.get('set') else None,
             'makes': makes(session, eid, row), 'makes_left': max(0, MAKES_MAX - makes(session, eid, row)),
             'asked': (history[-1].get('operator') or None) if history and pics else None,
+            'edited': bool(history and pics and history[-1].get('edit')), 'edit_note': row.get('edit_note') or None,   # Minor corrections as an edit: the set is a corrected one; why a correction was not made
             'history': [{k: h.get(k) for k in ('n', 'set', 'added', 'operator')} for h in history],
             'changed': bool(pics) and bool(made) and ((made.get('fp') is not None and made['fp'] != fp(plan, session, element)) or V._spec_changed(session, plan, eid, row)),
             'fail': fail}
@@ -954,9 +993,12 @@ def then_of(session):
 
 
 def rewrite_due(session):
-    """REWRITE_DUE with the things that wait and the operator's words of each (design/211 review, N7)."""
+    """REWRITE_DUE with the things that wait and the operator's words of each (design/211 review, N7); EDIT_DUE for the sets that wait for
+    Claude's where line (Minor corrections as an edit)."""
     due = [(eid, r['rewrite_due']) for eid, r in session['round']['elements'].items() if r.get('rewrite_due') and not r.get('ignored')]
-    return REWRITE_DUE.format(n=len(due), things='; '.join((REWRITE_WORDS if d.get('words') else REWRITE_NO_WORDS).format(eid=eid, words=d.get('words')) for eid, d in sorted(due)))
+    named = lambda rows: '; '.join((REWRITE_WORDS if d.get('words') else REWRITE_NO_WORDS).format(eid=eid, words=d.get('words')) for eid, d in sorted(rows))
+    edits, again = [x for x in due if x[1].get('edit')], [x for x in due if not x[1].get('edit')]
+    return ' '.join(text.format(n=len(rows), things=named(rows)) for text, rows in ((EDIT_DUE, edits), (REWRITE_DUE, again)) if rows)
 
 
 def status_of(session):
@@ -1352,32 +1394,221 @@ def round_rewrite(conn, store, user, run, outputs, rows):
     """Claude's rewrite of the requests the operator sent back: rows = [{'element_id', 'prompt'}]. The earlier request goes to the row's
     `history`, the new one is stored, `rewrite_due` is cleared and the set is ordered: the operator's "No" or "Correct it" was the word for
     the spend. Refuses REWRITE_NOT_DUE, REWRITE_EMPTY, REWRITE_SAME: every faulty row is named and nothing is ordered. Returns {'pass',
-    'queued': [eid], 'errors': {eid: message}, 'cost_inr', 'then': REWRITE_MAKING}."""
+    'queued': [eid], 'errors': {eid: message}, 'cost_inr', 'then': REWRITE_MAKING}.
+    Minor corrections as an edit (SK, 25 Nov 2026): a set that waits for an edit takes a row {'element_id', 'where'}: Claude's where line,
+    one plain sentence (WHERE_EMPTY, WHERE_SHAPE); the set's own pictures are then ordered to be corrected (`_edit_order`; one the limit or
+    the three makes hold comes back in `errors` and still waits). A row {'element_id', 'unclear'}: Claude cannot tell which thing is meant:
+    nothing is sent and the set is back with the operator with that one question (`asked`). A row with a `prompt` for such a set is the
+    retired way, refused by name (EDIT_NOT_REMAKE)."""
     session = V.session_of(store, run, outputs)
     rd = session.get('round') or {}
     V.need(V.round_v2(session), 'No reference round waits for a rewrite.')
-    faults, new = [], {}
+    faults, new, edits, unclear = [], {}, {}, {}
     for r in rows or []:
         eid = (r or {}).get('element_id')
         row = (rd.get('elements') or {}).get(eid) or {}
         prompt = ' '.join(str((r or {}).get('prompt') or '').split())
         if not row.get('rewrite_due') or row.get('ignored'):
             faults.append(REWRITE_NOT_DUE.format(eid=eid))
+        elif row['rewrite_due'].get('edit'):   # Minor corrections: a where line, or one question for the operator; a request written again is the retired way
+            where, ask = str((r or {}).get('where') or '').strip(), ' '.join(str((r or {}).get('unclear') or '').split())
+            if prompt and not where and not ask:
+                faults.append(EDIT_NOT_REMAKE.format(eid=eid))
+            elif ask:
+                unclear[eid] = ask[:REASON_CHARS]
+            elif not where:
+                faults.append(WHERE_EMPTY.format(eid=eid))
+            elif '\n' in where or len(where) > WHERE_CHARS or WHERE_NOT.search(where):
+                faults.append(WHERE_SHAPE.format(eid=eid, max=WHERE_CHARS))
+            else:
+                edits[eid] = where
         elif not prompt:
             faults.append(REWRITE_EMPTY.format(eid=eid))
         elif prompt.lower() == str(row.get('prompt') or '').lower():
             faults.append(REWRITE_SAME.format(eid=eid))
         else:
             new[eid] = prompt
-    V.need(not faults and new, '\n'.join(faults) or 'Give the rewritten requests: rows {element_id, prompt}.')
+    V.need(not faults and (new or edits or unclear), '\n'.join(faults) or 'Give the where lines, rows {element_id, where}, or the rewritten requests, rows {element_id, prompt}.')
     for eid, prompt in new.items():
         row = rd['elements'][eid]
         due = row.pop('rewrite_due')
         row.setdefault('history', []).append({'n': int(row.get('round') or 0), 'set': due.get('set'), 'added': row.get('prompt') or '', 'operator': due.get('words') or '', 'at': _now()})
         row.update(prompt=prompt, error=None)
+    for eid, ask in unclear.items():   # nothing is sent: the set is back with the operator, to be judged, with Claude's one question; the words they gave are not kept for a later request
+        row = rd['elements'][eid]
+        due = row.pop('rewrite_due')
+        if (row.get('operator_words') or [''])[-1] == due.get('words'):
+            row['operator_words'].pop()
+        row.update(edit_note=EDIT_UNCLEAR.format(question=ask), verdict=None)
+    corrected, held = [], {}
+    if edits:
+        plan = V.guarded(lambda: V.current_plan(store, session))
+        for eid, where in edits.items():
+            why = _edit_order(conn, store, run, outputs, session, plan, eid, where)
+            if why:
+                held[eid] = why
+            else:
+                corrected.append(eid)
+        if corrected:
+            rd['pass'] = 'making'
     V.save_session(store, run, session)
-    session, queued, errors = _order(conn, store, user, run, outputs, list(new))
-    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'then': ' '.join(x for x in (REWRITE_MAKING.format(n=len(queued)) if queued else '', things_due_words(session)) if x) or REWRITE_MAKING.format(n=0)}
+    queued, errors = [], {}
+    if new:
+        session, queued, errors = _order(conn, store, user, run, outputs, list(new))
+    then = [EDIT_MAKING.format(n=len(corrected)) if corrected else '', REWRITE_MAKING.format(n=len(queued)) if queued or not (corrected or unclear) else '', things_due_words(session),
+            SETS_PAGE if unclear and not (corrected or queued) else '']
+    return {'pass': V._round_pass(session, session['round']), 'queued': corrected + queued, 'errors': {**held, **errors}, **({'asked': list(unclear)} if unclear else {}), 'then': ' '.join(x for x in then if x)}
+
+
+# ---------- Minor corrections as an edit (SK, 25 Nov 2026) ----------
+
+def marks_checked(eid, marks, refs):
+    """The operator's marks of an answer as they are stored: {picture: [mark]}, a mark a rectangle {'r': [x, y, w, h]} or a painted stroke
+    {'p': [x, y, x, y, ...], 's': the brush}, each number a fraction of the picture (the points flat: the page's database takes no list of
+    lists); MARKS_MAX on a picture, each on one of `refs`. Refuses MARKS_BAD."""
+    unit = lambda x: round(min(1.0, max(0.0, float(x))), 4)
+    out = {}
+    try:
+        for ref, ms in (marks or {}).items():
+            if ref not in refs or not isinstance(ms, list) or len(ms) > MARKS_MAX:
+                raise ValueError(ref)
+            clean = [{'r': [unit(x) for x in m['r']]} if 'r' in m else {'p': [unit(x) for x in m['p'][:2 * MARK_POINTS]], 's': unit(m.get('s') or 0.03)} for m in ms]
+            if not all((len(m['r']) == 4 and m['r'][2] > 0 and m['r'][3] > 0) if 'r' in m else (m['p'] and len(m['p']) % 2 == 0) for m in clean):
+                raise ValueError(ref)
+            if clean:
+                out[str(ref)] = clean
+    except (ValueError, TypeError, KeyError, AttributeError):
+        V.need(False, MARKS_BAD.format(eid=eid, max=MARKS_MAX))
+    return out
+
+
+def marked_copy(data, marks):
+    """A picture with the operator's marks drawn on it, for Claude to read (a JPEG; the image model is never sent it): each mark a red
+    outline, lightly tinted, with its number."""
+    from io import BytesIO
+    from PIL import Image, ImageDraw
+    with Image.open(BytesIO(data)) as im:
+        im = im.convert('RGBA')
+    w, h = im.size
+    over = Image.new('RGBA', im.size, (0, 0, 0, 0))
+    d, line = ImageDraw.Draw(over), max(3, w // 300)
+    for n, m in enumerate(marks, 1):
+        if 'r' in m:
+            x, y, mw, mh = m['r']
+            box = [x * w, y * h, min(w - 1, (x + mw) * w), min(h - 1, (y + mh) * h)]
+            d.rectangle(box, fill=(255, 0, 0, 40), outline=(255, 0, 0, 255), width=line)
+            at = (box[0] + 2 * line, box[1] + 2 * line)
+        else:
+            pts, half = [(px * w, py * h) for px, py in zip(m['p'][0::2], m['p'][1::2])], max(line, int(m['s'] * w / 2))
+            if len(pts) > 1:
+                d.line(pts, fill=(255, 0, 0, 90), width=2 * half)
+            for px, py in pts:   # round ends and joints
+                d.ellipse([px - half, py - half, px + half, py + half], fill=(255, 0, 0, 90))
+            at = pts[0]
+        d.text(at, str(n), fill=(255, 0, 0, 255), font_size=max(18, w // 40), stroke_width=max(2, line // 2), stroke_fill=(255, 255, 255, 255))
+    out = BytesIO()
+    Image.alpha_composite(im, over).convert('RGB').save(out, format='JPEG', quality=88)
+    return out.getvalue()
+
+
+def edit_pictures(session, eid, due):
+    """The pictures an edit starts from, in their order: the operator's own pictures the answer named, else the pictures of the set it was given on."""
+    own = (due.get('edit') or {}).get('own')
+    return [session['references'][r] for r in own if r in session['references']] if own else _pictures(session, eid, {'set': due.get('set')}, ('candidate',))
+
+
+def rewrites_due(store, run, outputs):
+    """`GET /api/runs/{run_id}/visuals/round/rewrite`: the sets that wait for Claude before they are corrected or made again: {'sets':
+    [{'element_id', 'name', 'edit', 'words'; an edit: 'every', 'pictures': [{'ref', 'n', 'view', 'key', 'marks': how many}]; a remake:
+    'request': the request as it stands}], 'how': WHERE_HOW, 'then'}. A marked picture's key is a copy with the marks drawn on it
+    (`marked_copy`), stored beside the picture; the pictures are the 1600 px copies, as for the looks."""
+    session = V.session_of(store, run, outputs)
+    if not V.round_v2(session):
+        return {'sets': [], 'how': WHERE_HOW, 'then': None}
+    plan = V.guarded(lambda: V.current_plan(store, session))
+    from .page_flow import sized
+    sets = []
+    for eid, row in session['round']['elements'].items():
+        due = row.get('rewrite_due')
+        if not due or row.get('ignored'):
+            continue
+        head = {'element_id': eid, 'name': (_element(plan, eid) or {}).get('name') or eid, 'edit': bool(due.get('edit')), 'words': due.get('words') or ''}
+        if not due.get('edit'):
+            sets.append({**head, 'request': row.get('prompt') or ''})
+            continue
+        pics = []
+        for n, p in enumerate(edit_pictures(session, eid, due), 1):
+            marks = due['edit']['marks'].get(p['id']) or []
+            try:
+                key = sized(store, p['key'], 'zoom', p.get('sha256'))
+            except Exception:   # a picture that cannot be shrunk is read at its full size
+                key = p['key']
+            if marks:
+                key, small = f"{run['id']}/visuals/references/{p['id']}-marked-{hashlib.sha1(repr(marks).encode('utf-8')).hexdigest()[:8]}.jpg", key
+                store.put(key, marked_copy(store.get(small), marks), 'image/jpeg')
+            pics.append({'ref': p['id'], 'n': n, 'view': p.get('view') or '', 'key': key, 'marks': len(marks)})
+        sets.append({**head, 'every': bool(due['edit'].get('every')), 'pictures': pics})
+    return {'sets': sets, 'how': WHERE_HOW, 'then': then_of(session)}
+
+
+def _edit_order(conn, store, run, outputs, session, plan, eid, where):
+    """One edit ordered, in the session given (the caller saves it): the set's own pictures as the inputs, in the set's order; turn 1 is
+    EDIT_FIRST on the first picture to correct (a marked one first), each later picture EDIT_NEXT, in one conversation (the worker's
+    `_gemini_edit`). Without the tick only the marked pictures are corrected; the others come back as they are. An edit is a make: three at
+    most, and the film's limit holds it. The row then holds the new set; `edit` remembers the set before until the job is back (`edit_back`).
+    Returns None, or why nothing was ordered (the set stays, its answer still waiting for the where line)."""
+    import uuid
+    from .chat_flow import WORDS
+    row = session['round']['elements'][eid]
+    due = row['rewrite_due']
+    edit, element = due['edit'], _element(plan, eid) or {'id': eid, 'kind': 'object'}
+    pics = edit_pictures(session, eid, due)
+    marked = [p for p in pics if edit['marks'].get(p['id'])]
+    todo = marked + [p for p in pics if p not in marked] if edit.get('every') or not marked else marked
+    if not pics:
+        return EDIT_NO_PICTURE.format(eid=eid)
+    if makes(session, eid, row) >= MAKES_MAX:
+        return MAKES_LIMIT.format(eid=eid, max=MAKES_MAX)
+    try:
+        V.check_cap(conn, run, session, V.image_price_inr(run, provider='gemini') * len(todo), 'this correction')
+    except Problem:
+        return LIMIT_PLAIN
+    name, n = element.get('name') or eid, int(row.get('round') or 0) + 1
+    turns = [{'n': pics.index(p) + 1, 'text': EDIT_FIRST.format(words=due['words'], where=where.rstrip('.')) if k == 1 else EDIT_NEXT.format(n=k, N=len(todo), name=name, s='' if k == 2 else 's')}
+             for k, p in enumerate(todo, 1)]
+    body = {'element_id': eid, 'kind': 'sheet', 'subject': name, 'prompt': turns[0]['text'], 'set': True, 'edit': {'turns': turns},
+            'views': [p.get('ask') or '' for p in pics], 'view_names': [p.get('view') or WORDS['own_view'] for p in pics]}
+    out = V._queue_image(conn, store, session, run, outputs, element, body, pics, None, 'edit', f'set-{eid}-r{n}',
+                         str(uuid.uuid5(uuid.NAMESPACE_OID, f"{run['id']}-set-{eid}-{n}-edit-{due['at']}")), None)
+    session['references'][out['reference_id']].update(edit_of=due.get('set'), server_checklist=[
+        *(l for l in pics[0].get('server_checklist') or [] if l.get('check') != EDIT_LINE[0]),
+        {'check': EDIT_LINE[0], 'pass_when': EDIT_LINE[1].format(words=due['words']), 'weight': 'should', 'pictures': sorted(t['n'] for t in turns)}])
+    row.pop('rewrite_due')
+    row.pop('edit_note', None)
+    row.setdefault('history', []).append({'n': n - 1, 'set': due.get('set'), 'added': row.get('prompt') or '', 'operator': due['words'], 'at': _now(), 'edit': True})
+    row['edit'] = {**edit, 'of': due.get('set'), 'set': out['reference_id'], 'words': due['words'], 'at': due['at']}
+    row.update(set=out['reference_id'], round=n, error=None)
+    return None
+
+
+def edit_back(session, ref):
+    """The job of an edit is back (`visual_workers.finalize_image`, `visuals_stage.reconcile`). Corrected: the set before goes to the
+    versions, rejected with the operator's words as a set made again is. Not corrected (no picture, a block, a later picture missing):
+    nothing replaces the set: the row holds the set before again, to be judged, with the reason (EDIT_FAILED); it is no make (`makes`)."""
+    eid = ref.get('element_id')
+    row = ((session.get('round') or {}).get('elements') or {}).get(eid) or {}
+    e = row.get('edit') or {}
+    if e.get('set') != ref.get('id') or e.get('back'):
+        return
+    e['back'] = True
+    if ref.get('status') == 'candidate':
+        for p in V._set_rows(session, eid, e.get('of')):
+            p.update(status='rejected', rejection={'by': e.get('by'), 'at': e.get('at'), 'quote': e.get('quote'), 'notes': e.get('words')})
+        return
+    row['set'] = e.get('of')
+    if (row.get('history') or [{}])[-1].get('edit') and row['history'][-1].get('set') == e.get('of'):
+        row['history'].pop()
+    row['edit_note'] = EDIT_FAILED.format(why=fail_of(ref)['text'])
 
 
 def clean_from(session, eid, frames):
