@@ -21,6 +21,7 @@ from app.stage2 import stage as S
 from test_design127_review_pure import USER, answer_all, items_of, saved, session_store
 from test_review_page import FakeConn, RUN
 from test_vw25_review_page_pure import fit_store
+from test_vw25_short_shots_pure import session as short_session, spare
 
 SERVER = Path(__file__).resolve().parents[1]
 TEMPLATES = SERVER / 'app' / 'templates'
@@ -293,6 +294,26 @@ def test_a_part_match_is_labelled_on_its_card_and_an_exact_match_is_not(browser)
     page.locator('.oth .pc', has_text='C5.MP4').get_by_role('button', name='Use this').click()
     page.wait_for_function("(document.querySelector('.row[data-slide=\"1.2\"] .ans')||{}).textContent==='Other clip: C5.MP4 · Shows part of what the words say. Not shown: the second filler'")
     assert row(page, '1.2').locator('.fit').count() == 0 and not page.errors                # said with the clip now in use, not beside the replaced clip's name
+
+
+def test_a_short_shot_says_so_on_its_card_and_trim_and_other_clips_follow_the_same_second(browser):
+    """VW-25 issue 3b (R3b). The older way, retired: no shot under its clip's hold, so nothing to say."""
+    store = spare(short_session('list_item', min_hold_s=4.0), min_hold_s=5.0)              # shot 1.2: 3 s of a clip with a 4 s hold, marked a list item
+    page = open_page(browser, store)
+    assert row(page, '1.2').locator('.shortshot').inner_text() == 'Short shot, 3.0 s: one item of a list'
+    assert page.evaluate("document.querySelector('.row[data-slide=\"1.2\"] .shortshot').nextElementSibling.textContent") == 'ClipC1.MP4'   # before the clip line
+    assert page.locator('.shortshot').count() == 1                                          # no other shot is cut short
+    assert [b.inner_text() for b in row(page, '1.2').locator('.btns button').all()] == ['Keep', 'Reject', 'Trim', 'Other clips']   # the line changes no answer
+    row(page, '1.2').get_by_role('button', name='Trim').click()
+    page.wait_for_function("((document.querySelector('.form .room')||{}).textContent||'').startsWith('This shot: 3.0 s. It can lose up to 2.0 s ')")   # down to 1.0 s
+    row(page, '1.3').get_by_role('button', name='Other clips').click()                      # a normal shot of the same length: the clip needs its 5 s
+    page.wait_for_selector('.oth .pc')
+    assert 'Cannot be used: it needs 5.0 s on screen to be understood; the shot has 3.0 s' in page.locator('.oth .pc').nth(0).inner_text()
+    row(page, '1.2').get_by_role('button', name='Other clips').click()                      # the short shot: the same clip is offered
+    page.wait_for_selector('.oth .pc button.use')
+    page.locator('.oth .pc', has_text='C5.MP4').get_by_role('button', name='Use this').click()
+    page.wait_for_function("(document.querySelector('.row[data-slide=\"1.2\"] .ans')||{}).textContent==='Other clip: C5.MP4 · Short shot, 3.0 s: one item of a list'")
+    assert row(page, '1.2').locator('.shortshot').count() == 0 and not page.errors          # said with the clip now in use
 
 
 def test_what_is_left_is_named_and_each_name_is_a_link_to_its_row(browser):

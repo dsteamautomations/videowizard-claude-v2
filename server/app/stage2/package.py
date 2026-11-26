@@ -6,6 +6,8 @@ from collections import Counter
 from difflib import SequenceMatcher, get_close_matches
 from fractions import Fraction
 
+from .review import SHORT
+
 SHOT_SIZES = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
 GRID = ['Top_Left', 'Top_Center', 'Top_Right', 'Mid_Left', 'Mid_Center', 'Mid_Right', 'Bottom_Left', 'Bottom_Center', 'Bottom_Right']
 
@@ -379,6 +381,7 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
                                                                               'events': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'hold_last_frame': False, 'crop': 'solver|full|hands_only',
                                                                                           'a2_intervals': [{'in_frame': 0, 'out_frame': 0}], 'marker': {'name': '', 'note': '', 'colour': 'Blue'},
                                                                                           'match': 'direct|b_roll', 'evidence': 'the log fields showing this shot shows the words it sits under',
+                                                                                          'short': 'only on a shot cut under its hold: ' + '|'.join(SHORT),   # VW-25 issue 3b
                                                                                           'note': {'kind': 'reuse|check_by_eye|poor_quality|join|other', 'question': 'what the operator should look at'},
                                                                                           'alternatives': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'crop': 'solver|full|hands_only', 'match': 'direct|b_roll',
                                                                                                             'evidence': 'another clip for the same words, the same length, used nowhere else'}],

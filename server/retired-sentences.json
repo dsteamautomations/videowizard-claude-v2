@@ -207,6 +207,8 @@
     "before any layout card is shown",
     "or several layout drawings of AI video shots",
     "the operator is shown the shot's layout drawing only after it passes",
-    "the operator approves that drawing in the chat before any still"
+    "the operator approves that drawing in the chat before any still",
+    "2 to 3.5 s each is normal",
+    "a blank under 3 s"
   ]
 }

@@ -8,6 +8,8 @@ only before a scene and before an alternative; footage carries a strip with its 
 import textwrap
 import unicodedata
 
+from . import review as RV
+
 NOTE_KINDS = ('reuse', 'check_by_eye', 'poor_quality', 'join', 'other', 'library')   # design/147 L4: a library proposal's why
 WRAP = 58   # characters per line at the card font size
 COLOURS = ('#1D9E75', '#7F77DD', '#D85A30', '#378ADD', '#BA7517', '#D4537E', '#639922', '#5F5E5A')   # one per scene, in turn
@@ -86,6 +88,14 @@ def fit(row, o, beat, n, a, z):
     return {'match': 'exact', 'missing': ''} if any(f.get('match') == 'EXACT' for f in got) else None
 
 
+def short_line(ev, row, short, seconds):
+    """SK, 25 Nov 2026 (VW-25 issue 3b): the card's line for a shot or an alternative that is cut short, "Short shot, 1.4 s: one item of a
+    list", so the operator judges it; None when the shot carries no `short` or the cut meets its piece's own hold and main action."""
+    if not short or 'source_fps' not in row:
+        return None
+    return RV.short_text(ev['source_in_frame'], ev['source_out_frame'], row, short, bool(ev.get('hold_last_frame')), seconds)
+
+
 def slides(doc, pk, fps):
     beats = {b['beat_id']: (i + 1, b) for i, b in enumerate(pk['beats'])}
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
@@ -126,6 +136,7 @@ def slides(doc, pk, fps):
                         'library': row.get('library_from') if ev.get('match') == 'library' else None,   # design/147 L4: a library proposal names its film
                         'note': ev.get('note') if isinstance(ev.get('note'), dict) else None, 'flags': warnings(row),
                         'fit': fit(row, o, b, i, at - k, at) if ev.get('match') == 'direct' else None,   # VW-25 issue 3a: B-roll and library keep their own labels
+                        'short': short_line(ev, row, ev.get('short'), k / fps),
                         'marker_reasons': {k: v for k, v in (ev.get('marker_reasons') or {}).items() if str(v or '').strip()} or None,   # design/142 R4: shown to the operator
                         'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it, Other clips puts another clip here',
                         'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said) + has_lines(row)})
@@ -135,6 +146,7 @@ def slides(doc, pk, fps):
                 out.append({**common, 'no': f'{label}A{m}', 'type': 'alternative', 'title': aname, 'of': label, 'alt_index': m - 1, 'clip': clip_name(arow, cards), 'sub_clip_id': alt.get('sub_clip_id'),
                             'library': arow.get('library_from') if alt.get('match') == 'library' else None, 'flags': warnings(arow),
                             'fit': fit(arow, o, b, i, at - k, at) if alt.get('match') == 'direct' else None,
+                            'short': short_line(alt, arow, ev.get('short'), k / fps),   # an alternative takes its shot's `short`
                             'b_roll': alt.get('match') == 'b_roll', 'hint': f'another clip for Shot {i}; open when Shot {i} is rejected; keep at most one',
                             'lines': [aname, clip_name(arow, cards), f'Time: {_seconds(k, fps)}', f'Words: the same as Shot {i}'] + has_lines(arow)})
     return out

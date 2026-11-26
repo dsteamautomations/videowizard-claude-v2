@@ -3,6 +3,7 @@ Returns {'refusals': [...], 'flags': [...]}: a refusal rejects the proposal; a f
 import re
 from fractions import Fraction
 
+from . import review as RV
 from .package import SHOT_SIZES, GRID
 from .slides import NOTE_KINDS
 
@@ -27,9 +28,11 @@ def _eye_ok(a, b):
     return abs(ia // 3 - ib // 3) <= 1 and abs(ia % 3 - ib % 3) <= 1   # adjacent cells count as a match
 
 
-def _piece(tag, ev, row, policy, refusals, flags=None):
+def _piece(tag, ev, row, policy, refusals, flags=None, short=None):
     """The checks every footage piece passes, a shot or an alternative: eligible, client-safe, speaker policy, match and evidence, inside its
-    window (G1), its action peak (G2), its hold (G3). Returns False when its frames are unusable (the caller stops there)."""
+    window (G1), its action peak (G2), its hold (G3). Returns False when its frames are unusable (the caller stops there), else how its
+    length was judged (review.judge). SK, 25 Nov 2026 (VW-25 issue 3b): G2 and G3 read the one rule in review.limits; `short` is the shot's
+    reason for a short shot (an alternative takes its shot's). Older way retired: the rule written out here."""
     if not row['eligibility'].startswith('ELIGIBLE'):   # design/195 (SK, 14 Nov 2026): a flag or a "not safe" mark warns the operator on the shot; it no longer refuses the piece
         refusals.append(f'{tag}: G10 sub-clip is not eligible ({row["eligibility"]})')
     if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
@@ -42,16 +45,18 @@ def _piece(tag, ev, row, policy, refusals, flags=None):
     if not (isinstance(a, int) and isinstance(z, int) and row['in_frame'] <= a < z <= row['out_frame']):
         refusals.append(f"{tag}: G1 source frames {a}-{z} must lie inside the usable window {row['in_frame']}-{row['out_frame']}")
         return False
-    peak = row.get('action_peak')
-    move = next((m for m in row.get('camera_moves') or [] if peak and peak['in_frame'] < m['start_frame'] <= peak['out_frame'] and z >= m['start_frame']), None)
-    if peak and a <= peak['in_frame'] and peak['out_frame'] > z and move:   # design/142 R4: the action is complete where the reported camera move starts
-        if flags is not None:
-            flags.append(f"{tag}: G2 move: ends at {z}, before the reported {move['kind']} at {move['start_frame']}; the action is complete")
-    elif peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
+    how = RV.judge(a, z, row, short, bool(ev.get('hold_last_frame')), ev.get('match'))
+    peak, action, move = row.get('action_peak'), how['action'], how['move']
+    if how['why']:   # what the server can see against a short shot: a wide shot, a camera move, B-roll as the reason of a direct match
+        refusals.append(f"{tag}: short {how['short']}: {how['why']}")
+    if action and not (a <= action[0] and action[1] <= z):
         refusals.append(f"{tag}: G2 must_include_action_peak {peak['in_frame']}-{peak['out_frame']} dropped")
-    if (z - a) / Fraction(row['source_fps']) < row['min_hold_s'] and not ev.get('hold_last_frame'):
-        refusals.append(f"{tag}: G3 shorter than min_comprehension_hold_s {row['min_hold_s']}")
-    return True
+    elif move and z < peak['out_frame'] and flags is not None:   # design/142 R4: the action is complete where the reported camera move starts
+        flags.append(f"{tag}: G2 move: ends at {z}, before the reported {move['kind']} at {move['start_frame']}; the action is complete")
+    if z - a < how['least']:
+        refusals.append(f"{tag}: G3 a short shot is at least {RV.SHORT_S:.1f} s ({how['least']} source frames); it has {z - a}" if how['short'] else
+                        f"{tag}: G3 shorter than min_comprehension_hold_s {row['min_hold_s']}")
+    return how
 
 
 def related_as_direct(row, step_id, ev):
@@ -112,6 +117,7 @@ def validate_options(doc, package, policy):
     uses = {}    # clip_id -> [(option_number, beat_id, event_index, has_reuse_note, source in, source out)] in film order (design/21 rule 7)
     alts = []    # design/127: (option_number, event_index, alternative number, clip_id)
     direct, b_rolls = {}, []   # design/127: B-roll comes after the exact matches
+    film = {}    # VW-25 issue 3b: beat_id -> one entry per event in play order: None for an AI stretch, else (carries `short`, the tags of its pieces that need a run)
     for o in opts:
         n, bid, events = o.get('option_number'), o.get('beat_id'), o.get('events') or []
         beat = beats.get(bid)
@@ -137,6 +143,9 @@ def validate_options(doc, package, policy):
                     refusals.append(f'{tag}: intent is required (what the AI video or animation must show)')
                 if ev.get('alternatives'):
                     refusals.append(f'{tag}: an AI shot has no clip to replace: alternatives go on a footage shot')
+                if ev.get('short'):
+                    refusals.append(f'{tag}: short is for a footage shot: a blank has no hold')
+                film.setdefault(bid, []).append(None)
                 ev['_timeline_frames'], ev['_fps_ratio'] = k, '1'
                 total += k
                 cursor += k
@@ -157,8 +166,17 @@ def validate_options(doc, package, policy):
                 b_rolls.append((n, i, row['clip_id']))
             else:
                 direct.setdefault(row['clip_id'], n)
-            if not _piece(tag, ev, row, policy, refusals, flags):
+            short = ev.get('short') or None   # VW-25 issue 3b: the reason this shot may be shorter than its piece's hold
+            if short and not (isinstance(short, str) and short in RV.SHORT):
+                refusals.append(f"{tag}: short must be one of {', '.join(RV.SHORT)}, or left out")
+                short = None
+            alone = []
+            film.setdefault(bid, []).append((bool(short), alone))
+            how = _piece(tag, ev, row, policy, refusals, flags, short)
+            if not how:
                 continue
+            if how['alone']:
+                alone.append(tag)
             a, z = ev['source_in_frame'], ev['source_out_frame']
             src_fps = Fraction(row['source_fps'])
             hold_s = row['min_hold_s'] + (1.0 if row['effective_shot_size'] in ('WS', 'EWS') else 0.0) - (0.5 if row['effective_shot_size'] in ('CU', 'ECU') else 0.0)
@@ -193,7 +211,10 @@ def validate_options(doc, package, policy):
                     refusals.append(f'{atag}: unknown sub-clip')
                     continue
                 alts.append((n, i, m, arow['clip_id']))
-                if _piece(atag, alt, arow, policy, refusals, flags) and _tl_frames(alt, arow, tl_fps)[0] != n_tl:
+                how = _piece(atag, alt, arow, policy, refusals, flags, short)   # an alternative takes its shot's `short`: it stands in the same place
+                if how and how['alone']:
+                    alone.append(atag)
+                if how and _tl_frames(alt, arow, tl_fps)[0] != n_tl:
                     refusals.append(f"{atag}: an alternative fills its shot's time exactly: {n_tl} frames (it has {_tl_frames(alt, arow, tl_fps)[0]})")
             total += n_tl
             if prev:
@@ -271,6 +292,19 @@ def validate_options(doc, package, policy):
                 if seen.count(sid) != 1:
                     refusals.append(f"OPTION #{n}: N17 step {sid} ({own_steps[sid]['text'][:60]}) {'is not shown' if not seen.count(sid) else 'is named twice'}: "
                                     'name the one event that shows it, or a blank for visuals')
+        # SK, 25 Nov 2026 (VW-25 issue 2): a sentence that names several things. A plain count, a flag only: three or more commas, and fewer shots
+        # and blanks under the sentence in time than things named (commas + 1). Counted by time: the step map names one event per sentence.
+        if all('_timeline_frames' in e for e in events):
+            spans, at = [], beat['timeline_start_frame']
+            for e in events:
+                spans.append((at, at + e['_timeline_frames']))
+                at += e['_timeline_frames']
+            for sid, s in own_steps.items():
+                things = str(s.get('text') or '').count(',') + 1
+                under = sum(1 for a, z in spans if a < s['end_frame'] and s['start_frame'] < z)
+                if things >= 4 and under < things:
+                    flags.append(f"OPTION #{n}: N18 list: step {sid} ({s['text'][:60]}) names about {things} things and has {under} shots and blanks under it: "
+                                 'check that each thing named has its picture, its blank or its note')
         for kept in o.get('carries_over') or []:   # design/91 N14: the state the step before left is still visible
             for k, e in enumerate(events, 1):
                 lm = (rows.get(e.get('sub_clip_id')) or {}).get('landmarks') or []
@@ -288,6 +322,19 @@ def validate_options(doc, package, policy):
             earlier = [u for u in us[:j] if not (u[1] == bid and u[0] != n) and not (u[0] == n and isinstance(a, int) and isinstance(u[5], int) and u[5] <= a)]
             if earlier and not is_reuse:
                 refusals.append(f'OPTION #{n} shot {i + 1}: Q4 clip {cid} is already used (option #{earlier[0][0]}); a second use, even of another part, needs a note of kind reuse or another clip')
+    # VW-25 issue 3b (D1c): a short shot under 1.5 s stands only in a run of three or more shots in a row that each carry `short`. The run is
+    # counted in film order, across scenes; an AI stretch and a scene with no option end it. Checked here, on the proposal, and nowhere later:
+    # the operator's answers may break a run.
+    order = [x for b in package['beats'] for x in (film.get(b['beat_id']) or [None])] + [None]
+    run = []
+    for x in order:
+        if x and x[0]:
+            run.append(x)
+            continue
+        if len(run) < RV.RUN:
+            refusals.extend(f"{t}: short: a shot under {float(RV.ALONE_S)} s stands only in a run of {RV.RUN} or more shots in a row that each carry `short`; this run has {len(run)}"
+                            for r in run for t in r[1])
+        run = []
     seen_alt = set()
     for n, i, m, cid in alts:   # design/127: an alternative's clip is used nowhere else in the cut
         if cid in uses or cid in seen_alt:
