@@ -48,4 +48,5 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert 'A1' in rows['368'] and 'Retired' in rows['368'] and 'Kept' in rows['368']   # the layout drawing card retired (26 Nov)
     assert 'issue 13' in rows['369'] and 'issue 12' in rows['370'] and 'guess' in rows['370']   # the reference sets (26 Nov)
     assert 'issue 3b' in rows['371'] and 'short' in rows['372'] and 'N18' in rows['373']   # short shots and lists (26 Nov)
-    assert '4e part 1' in rows['374'] and '4e part 2' in rows['375'] and '376' not in rows   # the specs on one card (26 Nov)
+    assert '4e part 1' in rows['374'] and '4e part 2' in rows['375']   # the specs on one card (26 Nov)
+    assert 'each cut short' in rows['376'] and 'Kept' in rows['376'] and '377' not in rows   # three short shots of one size (26 Nov)
