@@ -47,4 +47,5 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert all(str(n) in rows for n in range(359, 368)) and 'issue 9' in rows['359'] and 'issue 14' in rows['362'] and 'Withdrawn' in rows['367']   # the release of 25 Nov (server 0.129.0)
     assert 'A1' in rows['368'] and 'Retired' in rows['368'] and 'Kept' in rows['368']   # the layout drawing card retired (26 Nov)
     assert 'issue 13' in rows['369'] and 'issue 12' in rows['370'] and 'guess' in rows['370']   # the reference sets (26 Nov)
-    assert 'issue 3b' in rows['371'] and 'short' in rows['372'] and 'N18' in rows['373'] and '374' not in rows   # short shots and lists (26 Nov)
+    assert 'issue 3b' in rows['371'] and 'short' in rows['372'] and 'N18' in rows['373']   # short shots and lists (26 Nov)
+    assert '4e part 1' in rows['374'] and '4e part 2' in rows['375'] and '376' not in rows   # the specs on one card (26 Nov)

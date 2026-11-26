@@ -339,13 +339,16 @@ SPEC_DONE = 'Every size, material and graphic spec is approved. '
 SPEC_NEXT = SPEC_DONE + 'Go on with `vw visuals next`: it gives the next decision.'
 SPEC_BACK = ('No line waits for the operator now: correct the sizes, materials and graphic specs that are back with you (their words are on each) in out/visual-plan.json, '
              'propose the plan again, then `vw visuals page`.')
+SPEC_HELD = 'Not ready for your answer yet. The assistant completes it first: '   # 4e part 2: on the line of a spec whose approval would be refused, before the refusal's words
 
 
 def _spec_lines(ctx):
     """design/209 (SK, 16 Nov 2026): the lines of the step after the plan: once no plan line is open or back with the assistant, every material's
     facts and every drawing's parts and sizes, the materials first. An open line is the chat's own waiting item (the same id, the same buttons)
     with the plain parts of `chat_flow._spec_views`; an approved one is `recorded` and keeps its parts, to be read back; one sent back is
-    `with_assistant` with the operator's words. Empty while the plan is open, or when the film has no such spec."""
+    `with_assistant` with the operator's words. Empty while the plan is open, or when the film has no such spec.
+    4e part 2 (SK, 26 Nov 2026): a spec whose approval the server would refuse now is `with_assistant` too, with no buttons and the reason as
+    its `text`; until then it was shown to answer and its Yes was refused (retired)."""
     if any(CF._plan_items(ctx)):
         return []
     views = CF._spec_views(ctx)
@@ -354,7 +357,7 @@ def _spec_lines(ctx):
     for v in views:
         head = {'key': v['key'], 'title': v['title']}
         if v['state'] == 'with_assistant':
-            lines.append({**head, 'state': 'with_assistant', 'note': v['note']})
+            lines.append({**head, 'state': 'with_assistant', **({'note': '', 'text': SPEC_HELD + v['held']} if v.get('held') else {'note': v['note']})})
         elif v['state'] == 'recorded':
             lines.append({**head, 'state': 'recorded', 'spec': v['spec']})
         elif v['item'] in items:
@@ -384,10 +387,12 @@ def _spec_page(ctx, base, lines):
     lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if line['key'] in refused and line['state'] == 'open' else {})} for n, line in enumerate(lines, 1)]
     count = lambda state: len([l for l in lines if l['state'] == state])
     left = count('open')
-    return {**base, 'step': SPEC_STEP, 'open': bool(left), 'lines': lines,
+    back = CF.specs_held_words(ctx['session'], ctx['plan'])   # 4e part 2: the assistant's sentence for the specs that are not offered yet
+    return {**base, 'step': SPEC_STEP, 'open': bool(left), 'lines': lines, **({'then': back} if back else {}),
             'summary': f"{' and '.join(kinds)}: {left} to answer, {count('recorded')} recorded, {count('with_assistant')} with the assistant" + (f', {held} more after these' if held else '') + '.',
             'note': f'This list is long: {held} more appear here after you answer these and say done in the chat.' if held else
-                    'Answer each line, then say done in the chat.' if left else 'The assistant is correcting the lines you sent back; they will appear here.' if count('with_assistant')
+                    'Answer each line, then say done in the chat.' if left else 'The assistant is completing the lines that are with the assistant; they will appear here to answer.' if back
+                    else 'The assistant is correcting the lines you sent back; they will appear here.' if count('with_assistant')
                     else SPEC_DONE + 'Nothing more to answer here.'}
 
 
@@ -1100,8 +1105,9 @@ def _spec_answer(ctx, key, choice, words, item_id, items=None):
     """One answer to a drawing's or a material's line (or, with `items`, to a reference drawing's), through the run function of the chat's own
     item: Yes approves it, Correct it sends it back with the operator's words. None when the line is no longer open with that content (stale)."""
     item = next((i for i in (items if items is not None else [i for i in CF._waiting_items(ctx) if i['kind'] == 'spec']) if i['id'] == item_id), None)
-    if not item:
-        return None
+    if not item:   # 4e part 2: the plan changed between the page and the answer and the approval would be refused now: a Yes is refused by name, as before
+        fault = next((v['held'] for v in CF._spec_views(ctx) if v['item'] == item_id and v.get('held')), None) if items is None and choice == 'yes' else None
+        return V.fail(fault) if fault else None
     button = next((b for b in item['buttons'] if b['choice'] == choice), None)
     V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in item['buttons']) + '.')
     V.need(not button.get('needs_words') or words, 'Say what should change in this line, in your own words.')
@@ -1343,6 +1349,8 @@ def page_record(conn, store, user, run, outputs, answers):
         from . import ref_sets
     leads = {'plan': PLAN_DONE, 'spec': SPEC_DONE, 'draw': DRAW_DONE}   # the step this "done" finished
     after = lambda lead, end: _after(CF._ctx(conn, store, user, run, outputs), now, lead, end)   # design/210 review: one "what next" for the three steps before the references
+    spec_ctx = CF._ctx(conn, store, user, run, outputs) if at_spec else None
+    held = CF.specs_held_words(spec_ctx['session'], spec_ctx['plan']) if spec_ctx and spec_ctx['plan'] else ''   # 4e part 2: the specs not offered yet, named with what is missing
     then = ('Nothing was answered on the page. ' if not answers else '') + (f'The references are not recorded yet: {stopped} ' if stopped else '') + (
         SPEC_REFUSED + ' ' if at_spec and refused else DRAW_REFUSED + ' ' if at_draw and refused else ROUND_REFUSED + ' ' if (at_refs or at_sets) and [r for r in refused if r['key'] != 'references'] else '') + (
         leads[was] + REFS_HERE if at_refs and was in leads and not session.get('chat_round') else   # the round is in this answer: never a second `vw visuals page` for it
@@ -1357,13 +1365,15 @@ def page_record(conn, store, user, run, outputs, answers):
         ROUND_NEXT if (was_round or kept or any(k.startswith(('ref:', 'set:')) for k in recorded)) and rd.get('kept') and rd.get('pass') == 'complete' else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec or at_draw) and left else
         DRAW_BACK if at_draw else after(DRAW_DONE, DRAW_NEXT) if was_draw else
-        SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else after(SPEC_DONE, SPEC_NEXT) if at_spec else
+        SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' and not l.get('text') for l in now['lines']) else '' if held else after(SPEC_DONE, SPEC_NEXT) if at_spec else
         PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else after(PLAN_DONE, PLAN_NEXT) if at_plan else
         'The treatment is recorded: write the plan to it.' if session.get('treatment') and not draft else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if left else
         V.DIRECTION_ACCEPTED if alone_accepted else
         'Write the Direction alone, send it (`vw visuals treatment --file out/visual-treatment.json`, no `gaps` in it), then `vw visuals page`.' if not draft else
         'No line waits for the operator now: revise the lines that are back with you (their words are on each), send the draft again, then `vw visuals page`.')
+    if held:
+        then = (then.strip() + ' ' if then.strip() else '') + held
     if was == 'pictures' or now['step'] == P.W['step'] or any(k.startswith('pic:') for k in recorded + stale + [r['key'] for r in refused]):   # design/217: step 6's own "what next"
         here = CF._ctx(conn, store, user, run, outputs)
         if here['plan'] and V.round_v2(here['session']) and P.asked(here['session'], here['plan']):   # C3: Claude is asked from now
