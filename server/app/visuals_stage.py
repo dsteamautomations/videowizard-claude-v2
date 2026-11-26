@@ -3288,6 +3288,7 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
     rd = session.get('round') or {}
     rd_pass = _round_pass(session, rd) if rd.get('kept') else None
     items = []
+    held_specs = specs_held(plan, session)   # 4e part 2 (SK, 26 Nov 2026): a spec whose approval would be refused is not offered; it is with the assistant
 
     def add(at, label, step, group, item, kind):
         if not any(i['label'] == label for _, i in items):
@@ -3333,7 +3334,7 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
             if chain and len(chain) == len(sh.get('states') or []) and any(r['status'] == 'candidate' for r in chain) and all(ready(r) for r in chain if r['status'] == 'candidate'):   # design/217: each step offered with its look
                 add(sh['start_frame'], f"Graphics · {sid}{title(sh)} · {len(chain)} states", 'pictures', sid, chain[-1]['id'], 'graphics to approve')
         spec = sh.get('drawing_spec')
-        if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec) and not correction_pending(session, sid, spec):
+        if spec and sid not in held_specs and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec) and not correction_pending(session, sid, spec):
             add(sh['start_frame'], f'Drawing spec to approve · {sid}{title(sh)}', 'takes' if on_takes(sh) else 'pictures', sid, 'spec', 'drawing spec to approve')   # on its own shot's card, on the tab that shows it
     up = session.get('motion_parts') or {}
     if up.get('picture_key') and not up.get('rejected') and not parts_ready(session):   # design/221 row 1: one card in the chat, before any drawn shot's items
@@ -3353,7 +3354,7 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
         add(shots[ids[0]]['start_frame'], 'Still end-frames · ' + ', '.join(ids) if len(ids) > 1 else f'Still end-frame · {sid}{title(shots[sid])}', 'takes', ids[0], ','.join(ids),
             'still end-frame to approve')
     for e in plan.get('elements') or []:   # design/111 F10: approved once, on the References step, on the material's own card
-        if e.get('material_spec') and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), e['material_spec']):
+        if e.get('material_spec') and material_key(e['id']) not in held_specs and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), e['material_spec']):
             add(-1, f"Material spec to approve · {e['id']}", 'references', e['id'], 'specs', 'material spec to approve')
     for item, q in (session.get('questions') or {}).items():   # design/110 rule 0: an open question comes first
         r = session['references'].get(item)
@@ -5113,9 +5114,44 @@ def _research_fault(label, spec, **kw):
     return ''
 
 
-def approve_spec(store, user, run, outputs, shot_id, quote):
+def spec_fault(plan, shot=None, element=None):
+    """4e part 2 (SK, 26 Nov 2026): the refusal the approval of this spec would give now, in its own words, or ''. The one check, run before a
+    spec is offered to the operator (the chat and the page) and when it is approved."""
+    if element:
+        return _research_fault(f"material spec of {element['id']}", element['material_spec'], material=True)
+    return _research_fault(f"shot {shot['id']}", shot['drawing_spec'], real_thing=draws_real_thing(plan, shot) and not known_on_things(plan, shot))
+
+
+def specs_held(plan, session):
+    """4e part 2: the specs whose approval would be refused now, as {key: the refusal's words}, the materials first, then the drawings in the
+    film's order. They are never offered to the operator: they are with the assistant until a new plan version carries what is missing. A spec
+    approved as it stands is not checked again (an approval of before the change stands), nor is one back with the assistant after a correction.
+    Until 26 Nov 2026 such a spec was offered, and refused when the operator said Yes ("warned at the check, refused at the approval"; retired)."""
+    out = {}
+    for e in plan.get('elements') or []:
+        spec = e.get('material_spec')
+        if spec and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), spec):
+            out[material_key(e['id'])] = spec_fault(plan, element=e)
+    for _, sh in _accepted_shots(plan, session):
+        spec = sh.get('drawing_spec')
+        if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec) and not correction_pending(session, sh['id'], spec):
+            out[sh['id']] = spec_fault(plan, shot=sh)
+    return {k: fault for k, fault in out.items() if fault}
+
+
+def not_this_due(plan, session):
+    """4e part 1: the next-step sentence for the approved materials whose "not this" list is not made (a card of specs records every answer in
+    one call and makes no list inside it; a model call that failed leaves one unmade too). The server repeats it until each list is there. ''
+    when none is missing."""
+    ids = [e['id'] for e in plan.get('elements') or [] if e.get('material_spec') and material_approved(session, e) and not (session.get('not_this') or {}).get(e['id'])]
+    return (f"The \"not this\" list of {len(ids)} approved material{'' if len(ids) == 1 else 's'} is not made yet ({', '.join(ids)}): before anything else, run `vw visuals not-this --element <id>` once for each, "
+            'one call at a time. If a call fails, the approval stands: go on, and run it again later.') if ids else ''
+
+
+def approve_spec(store, user, run, outputs, shot_id, quote, lists=True):
     """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval.
-    design/106 D4: no words needed; the operator never types sizes, and a correction goes to the assistant instead."""
+    design/106 D4: no words needed; the operator never types sizes, and a correction goes to the assistant instead.
+    4e part 1: `lists=False` (a card of specs) leaves the material's "not this" list to be made after the answers are recorded (`not_this_due`)."""
     session = session_of(store, run, outputs)
     if shot_id.startswith('element:'):   # design/111 F10: a material spec, approved once on the References step
         plan = guarded(lambda: current_plan(store, session))
@@ -5123,8 +5159,10 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
         need(element and element.get('material_spec'), f'{shot_id[len("element:"):]} has no material spec.')
         spec = element['material_spec']
         need(not correction_pending(session, shot_id, spec), f'The correction of {element["id"]}\'s material spec waits for the assistant to revise it; approve the revised one.')
-        researched(f'material spec of {element["id"]}', spec, material=True)
-        if not (session.get('not_this') or {}).get(element['id']):   # design/111 F12: the list is the spec's second half, built with it
+        fault = spec_fault(plan, element=element)
+        if fault:
+            fail(fault)
+        if lists and not (session.get('not_this') or {}).get(element['id']):   # design/111 F12: the list is the spec's second half, built with it
             try:
                 not_this(store, user, run, outputs, element['id'])
                 session = session_of(store, run, outputs)
@@ -5138,7 +5176,9 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
     need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; approve the revised one.')   # review 27 Oct
-    researched(f'shot {shot_id}', spec, real_thing=draws_real_thing(plan, shot) and not known_on_things(plan, shot))
+    fault = spec_fault(plan, shot=shot)
+    if fault:
+        fail(fault)
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     (session.get('spec_corrections') or {}).pop(shot_id, None)
     save_session(store, run, session)
@@ -5201,7 +5241,7 @@ def approve_specs(store, user, run, outputs, quote=''):
     for e in plan.get('elements') or []:   # design/134 6: each material's not-this list, built as the single approval builds it, before anything is approved
         spec = e.get('material_spec')
         if spec and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), spec) and not (session.get('not_this') or {}).get(e['id']):
-            fault = _research_fault(f"material spec of {e['id']}", spec, material=True)
+            fault = spec_fault(plan, element=e)
             if fault:
                 faults[fault] = True
                 continue
@@ -5218,7 +5258,7 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, sh['id'], spec):   # review 27 Oct: the assistant's turn, not approved over
             waiting_.append(sh['id'])
         elif spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            fault = _research_fault(f"shot {sh['id']}", spec, real_thing=draws_real_thing(plan, sh) and not known_on_things(plan, sh))   # design/124 C2: refused before anything is saved
+            fault = spec_fault(plan, shot=sh)   # design/124 C2: refused before anything is saved
             if fault:
                 faults[fault] = True
                 continue
@@ -5231,7 +5271,7 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, k, spec):
             waiting_.append(k)
         elif spec and not material_approved(session, e):
-            fault = _research_fault(f"material spec of {e['id']}", spec, material=True)
+            fault = spec_fault(plan, element=e)
             if fault:
                 faults[fault] = True
                 continue

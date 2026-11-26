@@ -339,7 +339,8 @@ def test_the_instructions_send_the_drawings_and_materials_to_the_page_and_the_ch
     import d216_wording_v3 as D216   # design/216: a later script that adds a sentence after one of this script's
     import d218_wording_v3 as D218   # design/218: a later script that adds a sentence before one of this script's
     import fixset5_wording as FIX5   # fix set, 20 Nov 2026: a later script that adds sentences after design/216's (the link only from `--shown`)
-    was = D215.before(D216.before(D218.before(FIX5.before(st))))
+    import specs_card_wording as SPECS   # 4e, 26 Nov 2026: a later script that changes a sentence of this one (in the chat, two or more specs come on one card)
+    was = D215.before(D216.before(D218.before(FIX5.before(SPECS.before(st)))))
     parts = copy.deepcopy(was['parts'])
     assert W.apply(was['prompt'], parts) == was['prompt'] and parts == was['parts'], 'applying twice changes nothing'
     src = Path(V.__file__).read_text(encoding='utf-8')   # the tool's own lines point to the page first
@@ -363,10 +364,17 @@ def test_a_yes_that_relied_on_a_size_corrected_in_the_same_visit_is_not_recorded
 
 
 def test_a_yes_the_server_refuses_tells_the_assistant_to_fix_the_drawing_not_to_send_the_link_again():
-    """The critic's check: an unknown size with nothing tried is refused at approval. The operator cannot act on that; the assistant is told to."""
+    """The critic's check: an unknown size with nothing tried is refused at approval. The operator cannot act on that; the assistant is told to.
+    4e part 2 (SK, 26 Nov 2026): such a line is no longer shown to answer (until then it was, and its Yes was refused); it is with the
+    assistant, with the reason. A Yes from a page of before is still refused by name."""
     spec = drawing([dim('box', 'wall thickness')])
     spec['dimensions'][0]['tried'] = ''
     store, conn = start(plan_with([spec]))
-    r = record(store, conn, [ans(page(store, conn)['lines'][0], 'yes')])
-    assert [x['key'] for x in r['refused']] == ['G1-S1'] and r['recorded'] == []
+    p = page(store, conn)
+    line = p['lines'][0]
+    assert line['state'] == 'with_assistant' and 'buttons' not in line and 'record the sources tried' in line['text'] and p['open'] is False
+    assert 'not shown to the operator yet' in p['then'] and 'record the sources tried' in p['then'] and chat(store, conn) == []
+    item = C._spec_views(C._ctx(conn, store, H.USER, H.RUN, {}))[0]['item']
+    r = record(store, conn, [{'line': 'l01', 'key': 'G1-S1', 'item': item, 'choice': 'yes', 'notes': ''}])
+    assert [x['key'] for x in r['refused']] == ['G1-S1'] and r['recorded'] == [] and 'record the sources tried' in r['refused'][0]['message']
     assert r['then'].startswith(P.SPEC_REFUSED) and 'yours to fix' in P.SPEC_REFUSED and 'propose again' in P.SPEC_REFUSED

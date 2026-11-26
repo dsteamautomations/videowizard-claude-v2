@@ -444,11 +444,13 @@ def spec_research_needs(label, spec, real_thing=False):
 
 
 def _research_warning(label, spec, **where):
-    """design/124 C2: in the plan a spec's sizes may still wait for their research (after the picture search): warned, refused at spec approval."""
+    """design/124 C2: in the plan a spec's sizes may still wait for their research (after the picture search): warned. 4e part 2 (SK, 26 Nov
+    2026): such a spec is not offered to the operator until this is done (`visuals_stage.specs_held`); until then the warning said "refused
+    when the spec is approved" (warned at the check, refused at the approval: retired)."""
     try:
         _plain(lambda: spec_research_needs(label, spec))
     except ValueError as e:
-        return [{**where, 'kind': 'spec_unresearched', 'message': f'{e} (refused when the spec is approved; the research comes after the picture search)'}]
+        return [{**where, 'kind': 'spec_unresearched', 'message': f'{e} (the spec is shown to the operator once this is done; the research comes after the picture search)'}]
     return []
 
 

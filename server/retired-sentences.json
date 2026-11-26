@@ -207,6 +207,10 @@
     "before any layout card is shown",
     "or several layout drawings of AI video shots",
     "the operator is shown the shot's layout drawing only after it passes",
-    "the operator approves that drawing in the chat before any still"
+    "the operator approves that drawing in the chat before any still",
+    "The card is the way back for the treatment and the plan,",
+    "for the treatment's lines and for the plan's gaps",
+    "and refused when the spec is approved",
+    "one visit, then `vw visuals page --record`); in the chat, one at a time"
   ]
 }

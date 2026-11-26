@@ -275,7 +275,7 @@ def test_a_materials_spec_belongs_to_no_shot_and_is_unchanged():
 
 
 def test_the_pages_open_spec_line_carries_the_rows_and_the_name():
-    store, conn = spec_film([drawing(depicts_note=None)], change=lambda plan: plan['gaps'][0]['scenes'][0]['shots'][0].update(depicts='the box and its lid'))
+    store, conn = spec_film([drawing()], change=lambda plan: plan['gaps'][0]['scenes'][0]['shots'][0].update(depicts='the box and its lid'))
     line = page(store, conn)['lines'][0]
     assert line['title'] == 'Shot G1-S1 (G1-S1)' and line['state'] == 'open'
     assert line['rows'] == [['', 'In the film at 0:00.0 to 0:04.0 (4.0 s) · Gap G1, Title 1'], ['The words under it', 'words'], ['Shows', 'the box and its lid']]
