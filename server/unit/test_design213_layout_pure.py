@@ -46,7 +46,7 @@ def test_the_four_groups_in_order_and_the_layout_of_step_2(monkeypatch):
     film = Film(monkeypatch, '2')
     p = film.page()
     assert G == ['To judge', 'Could not be made', 'Waiting to be made', 'Settled']
-    assert p['layout'] == {'kind': 'sets', 'made': 'Nothing is made until you say done in the chat.', 'help': [p['note'], W['help_set'], W['help_rest']], 'groups': G, 'pick': W['pick'], 'words': P.page_words()}
+    assert p['layout'] == {'kind': 'sets', 'made': 'Nothing is made until you say done in the chat.', 'help': [p['note'], W['help_set'], W['help_rest']], 'groups': G, 'pick': W['pick'], 'words': {**P.page_words(), 'own': P.OWN_PAGE}}   # VW-25 issues 10 and 11: what the own-picture box says
     assert [(l['key'], l.get('group'), l.get('case')) for l in p['lines']] == [
         ('sets:rest', None, None), ('set:T_LAY', G[0], 'judge'), ('set:MASON', G[0], 'judge'), ('set:STREET', G[0], 'judge'),   # the set Claude would make again first
         ('set:BRICK', G[2], 'wait'), ('set:TILE', G[2], 'wait'), ('set:TROWEL', G[3], 'settled')]

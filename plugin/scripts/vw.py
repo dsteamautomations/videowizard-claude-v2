@@ -2041,7 +2041,11 @@ def page_own(folder, base, answers):
     there is handed to the server through the same calls as `vw visuals likeness` (a person, with the operator's words of permission) and
     `vw visuals own`, and its answer then carries `own_ref`, the picture's id on the server. A picture not fetched yet makes its answer wait
     in pending.json for the next `--record`, once; whatever cannot be handed over (no id, never fetched, a wrong type, too large, a refusal
-    of the server) travels as `own_error`, so the server says it on that line. Returns (the answers to send, the ids still to fetch)."""
+    of the server) travels as `own_error`, so the server says it on that line. Returns (the answers to send, the ids still to fetch).
+    VW-25 issue 10 (25 Nov 2026): `own` is a list of up to three pictures of one thing; each is fetched and handed over, and the answer
+    carries `own_refs`, their ids on the server in the order given. One that cannot be handed over is named in `own_error`; the others
+    are handed over all the same, so they stay with the server. The older page's one picture (`own`: one object) is a list of one;
+    the older answer field `own_ref` is retired here (the server still reads it from an older tool)."""
     own_dir = folder / 'own'
     waited = load_json(own_dir / 'pending.json', [])
     new = {a['key'] for a in answers}
@@ -2053,26 +2057,24 @@ def page_own(folder, base, answers):
         if a.get('choice') != 'own':
             out.append(a)
             continue
-        ident = str((own or {}).get('id') or '') if isinstance(own, dict) else ''
-        error = ''
-        if not re.fullmatch(r'[0-9a-f]{32}', ident):   # an id names a file here
-            error = 'the page gave no picture with this answer'
-        else:
-            files = sorted(own_dir.glob(ident + '.*'))
-            if not files and not again:
-                wait.append({**a, 'own': own, 'permission': words})
-                fetch.append(ident)
-                continue
+        pics = [p for p in (own if isinstance(own, list) else [own]) if isinstance(p, dict) and re.fullmatch(r'[0-9a-f]{32}', str(p.get('id') or ''))]   # an id names a file here
+        found = {p['id']: sorted(own_dir.glob(p['id'] + '.*')) for p in pics}
+        if not again and not all(found.values()):   # the whole answer waits once for the pictures not fetched yet
+            wait.append({**a, 'own': own, 'permission': words})
+            fetch += [i for i, files in found.items() if not files and i not in fetch]
+            continue
+        eid, refs, errors, asked = str(a.get('key') or '').split(':', 1)[-1], [], [], not words
+        for p in pics:
+            files, name, error = found[p['id']], str(p.get('name') or '')[:80], ''
             if not files:
                 error = 'the picture could not be fetched from the page'
             elif files[0].suffix.lower() not in OWN_TYPES:
                 error = 'the file is not a PNG, JPEG or WebP picture'
             elif files[0].stat().st_size > OWN_PICTURE_MAX:
                 error = 'the picture is larger than 15 MB: choose a smaller file'
-            else:   # ponytail: handed over before the line is recorded; a crash between the two leaves one more approved picture of the thing, as a second `vw visuals own` would
-                eid = str(a.get('key') or '').split(':', 1)[-1]
-                calls = ([('/likeness', {'element_id': eid, 'quote': words, 'stand_in': False})] if words else []) + [
-                    ('/own', {'element_id': eid, 'content_base64': base64.b64encode(files[0].read_bytes()).decode('ascii'), 'url': '', 'name': str((own or {}).get('name') or '')[:80]})]
+            else:   # ponytail: handed over before the line is recorded; a crash between the two leaves the pictures approved for the thing, as `vw visuals own` would; given again they are taken once
+                calls = ([] if asked else [('/likeness', {'element_id': eid, 'quote': words, 'stand_in': False})]) + [
+                    ('/own', {'element_id': eid, 'content_base64': base64.b64encode(files[0].read_bytes()).decode('ascii'), 'url': '', 'name': name})]
                 for path, body in calls:
                     payload, code = request('POST', base + path, json={'request_id': str(uuid.uuid4()), **body})
                     if code == 401:
@@ -2080,10 +2082,17 @@ def page_own(folder, base, answers):
                     if code:
                         error = str((payload or {}).get('message') or 'the server did not take the picture')[:500]
                         break
+                    asked = True   # a person's permission is recorded once, before the first picture
                     if path == '/own':
-                        a['own_ref'] = str(payload.get('id') or '')
-        if error:
-            a['own_error'] = error
+                        refs.append(str(payload.get('id') or ''))
+            if error:
+                errors.append(f'{name}: {error}' if len(pics) > 1 and name else error)   # one of several is named
+        if not pics:
+            errors.append('the page gave no picture with this answer')
+        if refs:
+            a['own_refs'] = refs
+        if errors:
+            a['own_error'] = '; '.join(errors)[:600]   # the server's limit of the field
         out.append(a)
     if wait:
         own_dir.mkdir(parents=True, exist_ok=True)
@@ -2221,7 +2230,7 @@ VISUALS_FLAGS = {
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record', 'uploaded', 'pictures_again'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back', 'rest', 'rewrite', 'looks', 'things'},   # design/177: the page's step-2 actions; design/211 part B: the second go, the rewrite, the looks at the sets
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
-    'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
+    'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name', 'words'},   # design/177; VW-25 issue 11: --words
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote', 'again'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
     'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
@@ -2751,7 +2760,7 @@ def cmd_visuals(a):
                 d = d.get('data') if isinstance(d, dict) and isinstance(d.get('data'), dict) else d
                 if isinstance(d, dict) and d.get('key') and d.get('choice'):
                     answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000],
-                                    **({'own': d['own']} if isinstance(d.get('own'), dict) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {}),
+                                    **({'own': d['own']} if isinstance(d.get('own'), (dict, list)) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {}),
                                     **({'pics': {str(k)[:80]: str(v)[:8] for k, v in list(d['pics'].items())[:8]}} if isinstance(d.get('pics'), dict) and d['pics'] else {})})   # design/211: a picture answered on its own
             answers, own_fetch = page_own(folder, base, answers)   # design/210 part 2: the operator's own pictures reach the server before their lines are recorded
             out = write(base + '/page/record', {'answers': answers}, wait=PAGE_WAIT)
@@ -3044,7 +3053,10 @@ def cmd_visuals(a):
             if path.stat().st_size > OWN_PICTURE_MAX:
                 emit({'action': 'refused', 'message': 'The picture is larger than 15 MB: choose a smaller file.'}, 2)
             content = __import__('base64').b64encode(path.read_bytes()).decode()
-        out = write(base + '/own', {'element_id': a.element, 'content_base64': content, 'url': url, 'name': a.name or ''})
+        words = ' '.join(str(getattr(a, 'words', None) or '').split())   # VW-25 issue 11: what the operator said about the picture, in their words: the server uses it as the page's comment box is used
+        if len(words) > 300:
+            emit({'action': 'refused', 'message': f'The words with the picture are {len(words)} characters long: 300 characters at most. Shorten them with the operator; nothing was sent.'}, 2)
+        out = write(base + '/own', {'element_id': a.element, 'content_base64': content, 'url': url, 'name': a.name or '', **({'words': words} if words else {})})
         emit(out, 0, (out.get('next') or f'Your picture is saved and approved for {a.element}.')
              + f" It is picture {out.get('id')}: to start every shot of {a.element} from it, `vw visuals round --answer {a.element} --verdict yes --golden {out.get('id')}` at step 2.")
     if a.what == 'approve' and getattr(a, 'again', False):   # design/177: a rejected picture approved after all, until a later step used it
