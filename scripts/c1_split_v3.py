@@ -205,6 +205,8 @@ if __name__ == '__main__':
         prompt = vw25(prompt, parts)
         from a1_wording import apply as a1   # A1, 25 Nov 2026: the layout drawing card is retired: after the check passes, the still is ordered; a group only for still end-frames
         prompt = a1(prompt, parts)
+        from shortshots_wording import check as shortshots   # short shots and list items (VW-25 issues 3b and 2), 25 Nov 2026: the options and the master, not the visuals; v3.json holds its sentences
+        shortshots(d)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

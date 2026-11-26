@@ -768,6 +768,7 @@ def _slide_rows(sl, decisions, fps):
         needs, why = needs_answer(s, sl, decisions)
         rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'library', 'note', 'of', 'ai_only', 'intent', 'marker_reasons', 'flags')},
                      'fit': (d.get('swap') or {}).get('fit') if d and d.get('action') == 'SWAP' else s.get('fit'),   # VW-25 issue 3a: the mark of the piece now in use
+                     'short': (d.get('swap') or {}).get('short') if d and d.get('action') == 'SWAP' else s.get('short'),   # VW-25 issue 3b: "Short shot, 1.4 s: one item of a list", of the piece now in use
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'edit_text', 'swap', 'by', 'at')} if d else None)})
     return rows
@@ -831,6 +832,16 @@ def _swap_row(sl, lab):
     return s
 
 
+def _placed_as(row, beat_id):
+    """How a piece the operator puts on a shot is placed: a clip of the client's library, a direct match of the scene, else B-roll."""
+    return 'library' if row.get('library') else 'direct' if P.rank_kind(row, beat_id) in ('exact', 'partly') else 'b_roll'
+
+
+def _short_of(doc, s):
+    """VW-25 issue 3b: the `short` of the shot a row stands for (None for an AI shot): a piece put on the shot under Other clips takes it."""
+    return _shot_event(doc, s).get('short') if s['type'] == 'shot' else None
+
+
 def others(store, run, slide_no):
     """SK, 23 Nov 2026 (VW-25): "Other clips" of one row, a footage shot or the AI shot of an all-AI scene ("Find footage"): the scene's allowed
     pieces in the server's one order (package.ranked: the assistant's files, the ledger and this list read it), each with whether it can be
@@ -846,12 +857,13 @@ def others(store, run, slide_no):
     decisions = session.get('decisions') or {}
     used, fps, clips = _in_cut(sl, decisions, lab), timeline(run)['fps'], session['package'].get('clips') or {}
     chosen = ((decisions.get(lab) or {}).get('swap') or {}).get('sub_clip_id')
+    short = _short_of(doc, s)
     pieces = []
     for x in P.ranked(pk['sub_clips'], next(b for b in pk['beats'] if b['beat_id'] == bid), used):
         if x['sub_clip_id'] == s.get('sub_clip_id'):   # the row's own piece: Keep brings it back
             continue
         row = rows[x['sub_clip_id']]
-        fit = RV.fit_piece(row, s['frames'], fps, partial=s['type'] == 'ai')
+        fit = RV.fit_piece(row, s['frames'], fps, partial=s['type'] == 'ai', short=short, match=_placed_as(row, bid))
         a, z = (row['in_frame'], row['out_frame']) if isinstance(fit, str) else fit[:2]
         k, src = clip_key(run, clips.get(row['clip_id']) or {'name': row.get('clip_name')}), Fraction(str(row['source_fps']))
         in_cut = x['sub_clip_id'] in used
@@ -872,7 +884,8 @@ def trim_room(store, run, slide_no):
     if not s or s['type'] != 'shot':
         fail(f'A trim is for a footage shot; #{lab} is not one.')
     ev = _shot_event(doc, s)
-    return {'slide': lab, 'text': RV.room_text(ev['source_in_frame'], ev['source_out_frame'], _row(store, session, ev['sub_clip_id'])[1])}
+    return {'slide': lab, 'text': RV.room_text(ev['source_in_frame'], ev['source_out_frame'], _row(store, session, ev['sub_clip_id'])[1],
+                                               ev.get('short'), bool(ev.get('hold_last_frame')), ev.get('match'))}
 
 
 def _swap(run, session, pk, doc, sl, s, sub_clip_id):
@@ -887,15 +900,16 @@ def _swap(run, session, pk, doc, sl, s, sub_clip_id):
         fail(f'{sub_clip_id} is already in the cut.')
     if not str(row.get('eligibility')).startswith('ELIGIBLE'):
         fail(f"{sub_clip_id} is not allowed in the film ({row.get('eligibility')}).")
-    fit = RV.fit_piece(row, s['frames'], timeline(run)['fps'], partial=s['type'] == 'ai')
+    o = next(o for o in doc['options'] if o['option_number'] == s['option_number'])
+    match, short, fps = _placed_as(row, o['beat_id']), _short_of(doc, s), timeline(run)['fps']
+    fit = RV.fit_piece(row, s['frames'], fps, partial=s['type'] == 'ai', short=short, match=match)
     if isinstance(fit, str):
         fail(f"{sub_clip_id} cannot be used on {s['title']}: {fit}.")
-    o = next(o for o in doc['options'] if o['option_number'] == s['option_number'])
-    match = 'library' if row.get('library') else 'direct' if P.rank_kind(row, o['beat_id']) in ('exact', 'partly') else 'b_roll'
+    line = RV.short_text(fit[0], fit[1], row, short, False, fit[2] / fps)   # VW-25 issue 3b: the card's line follows the piece now on the shot
     # SK, 25 Nov 2026 (VW-25 issue 3a): the review page's part-match label follows the piece now on the shot (slides.fit, as for a proposed shot)
     mark = SL.fit(row, o, next(b for b in pk['beats'] if b['beat_id'] == o['beat_id']), s['event_index'] + 1, s['at_frame'], s['at_frame'] + fit[2]) if match == 'direct' else None
     return {'sub_clip_id': sub_clip_id, 'source_in_frame': fit[0], 'source_out_frame': fit[1], 'timeline_frames': fit[2], 'crop': 'solver' if row['eligibility'] == 'ELIGIBLE_WITH_CROP' else 'full',
-            'match': match, 'clip': row.get('clip_name'), **({'fit': mark} if mark else {})}
+            'match': match, 'clip': row.get('clip_name'), **({'fit': mark} if mark else {}), **({'short': line} if line else {})}
 
 
 def slide_cues(plan, fps):
@@ -1071,17 +1085,24 @@ def add_rule(store, user, run, text, quote=''):
 
 
 def _trim(ev, edit, row, tl_fps, title):
-    """design/127: TRIM on one footage shot: its in and out moved by source frames, inside its usable window, its action peak and its hold."""
+    """design/127: TRIM on one footage shot: its in and out moved by source frames, inside its usable window, its action peak and its hold.
+    SK, 25 Nov 2026 (VW-25 issue 3b): the limits are the one rule in review.limits, so a shot marked `short` may go down to 1.0 s, and a
+    normal shot has the two exceptions of the proposal's check (a still frame held at the end, a cut that ends where a reported camera move
+    starts). Older way retired: the rule written out here, without those two exceptions."""
     e = RV.parse_edit(edit)
-    room = '. ' + RV.room_text(ev['source_in_frame'], ev['source_out_frame'], row)   # SK, 23 Nov 2026: a refused trim says what the shot can lose and gain
+    short, held, match = ev.get('short'), bool(ev.get('hold_last_frame')), ev.get('match')
+    room = '. ' + RV.room_text(ev['source_in_frame'], ev['source_out_frame'], row, short, held, match)   # SK, 23 Nov 2026: a refused trim says what the shot can lose and gain
     a, z = ev['source_in_frame'] + e['in'], ev['source_out_frame'] + e['out']
     if not (row['in_frame'] <= a < z <= row['out_frame']):
         fail(f"the trim leaves {title} outside its usable window {row['in_frame']}-{row['out_frame']}" + room)
-    peak = row.get('action_peak')
-    if peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
+    how = RV.judge(a, z, row, short, held, match)
+    peak, action = row.get('action_peak'), how['action']
+    if how['why']:
+        fail(f"the trim cannot be made on {title}: {how['why']}" + room)
+    if action and not (a <= action[0] and action[1] <= z):
         fail(f"the trim drops the action peak {peak['in_frame']}-{peak['out_frame']} of {title}" + room)
-    if (z - a) / Fraction(row['source_fps']) < row['min_hold_s']:
-        fail(f"the trim makes {title} shorter than its hold {row['min_hold_s']} s" + room)
+    if z - a < how['least']:
+        fail((f"the trim makes {title} shorter than {RV.SHORT_S:.1f} s, the least for a short shot" if how['short'] else f"the trim makes {title} shorter than its hold {row['min_hold_s']} s") + room)
     ev['source_in_frame'], ev['source_out_frame'] = a, z
     ev['timeline_frames'] = int(round((z - a) * Fraction(str(tl_fps)) / Fraction(row['source_fps'])))
     ev['edited'] = edit

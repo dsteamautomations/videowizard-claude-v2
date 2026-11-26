@@ -47,6 +47,7 @@
 .rv .lb{font-weight:700;color:var(--fg);margin-right:6px}
 .rv .part+.part{border-top:1px solid var(--line);margin-top:5px;padding-top:2px}
 .rv .fit{font-size:12.5px;margin-top:3px}
+.rv .shortshot{font-size:12.5px;margin-top:3px}
 .rv .btns{display:flex;flex-direction:column;gap:6px}
 .rv .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px;white-space:nowrap}
 .rv .btns button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
@@ -149,8 +150,11 @@ function row(s,can){
   const c=cue(s.slide), a=s.answer, swapped=a&&a.action==='SWAP';
   const off=!s.needs_answer&&s.why;
   const fit=s.fit&&s.fit.match==='partly'?'Shows part of what the words say.'+(s.fit.missing?' Not shown: '+s.fit.missing:''):'';
+  // VW-25 issue 3b: a shot cut shorter than its clip's hold says so, with its length and the reason ("Short shot, 1.4 s: one item of a list": the
+  // server's `short`), so the operator judges it; after Other clips the line is that of the clip now in use, and goes with the answer.
+  const short=s.short?'<div class="shortshot">'+esc(s.short)+'</div>':'';
   const parts=[
-    (fit&&!swapped?'<div class="fit">'+esc(fit)+'</div>':'')+(s.clip?'<div class="ds">'+lb('Clip')+esc(s.clip)+'</div>':''),
+    (swapped?'':short)+(fit&&!swapped?'<div class="fit">'+esc(fit)+'</div>':'')+(s.clip?'<div class="ds">'+lb('Clip')+esc(s.clip)+'</div>':''),
     (s.words?'<div class="words">'+lb('Words')+'“'+esc(s.words)+'”</div>':'')+(s.type==='alternative'?'<div class="ds">the same words as '+esc(s.of)+'</div>':'')
       +(s.type==='ai'&&s.intent?'<div class="ds">'+lb('For AI')+esc(s.intent)+'</div>':''),
     (s.flags&&s.flags.length?'<div class="q">'+lb('Has')+esc(s.flags.join('; '))+'</div>':'')+(s.note&&s.note.question?'<div class="q">'+lb('Question')+esc(s.note.question)+'</div>':'')
@@ -163,7 +167,7 @@ function row(s,can){
   else{
     const on=v=>a&&(a.action===v||(v==='OTHERS'&&(a.action==='SWAP'||(s.type==='ai'&&a.action==='REJECT'))));
     if(can){btns='<div class="btns">'+(CHOICES[s.type]||[]).map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(on(v)?'on':'')+'">'+l+'</button>').join('')+'</div>';}
-    if(a){under='<div class="ans"><b>'+esc(said(s,a))+'</b>'+(a.note?' · '+esc(a.note):'')+(fit&&swapped?' · '+esc(fit):'')+'</div>';}   // a swapped shot: the label goes with the clip now in use
+    if(a){under='<div class="ans"><b>'+esc(said(s,a))+'</b>'+(a.note?' · '+esc(a.note):'')+(fit&&swapped?' · '+esc(fit):'')+(s.short&&swapped?' · '+esc(s.short):'')+'</div>';}   // a swapped shot: the labels go with the clip now in use
     if(!can){under+='<div class="why">'+(data.accepted?(data.master_built?'no answer':'waiting'):'after the film')+'</div>';}
   }
   return '<div data-slide="'+esc(s.slide)+'" class="row'+(s.type==='alternative'?' alt':'')+(off?' off':'')+(current===s.slide?' cur':'')+'">'+info+btns+under+(open&&open.slide===s.slide?form(open):'')+'</div>';

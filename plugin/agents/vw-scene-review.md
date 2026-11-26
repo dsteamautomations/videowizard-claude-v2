@@ -25,6 +25,8 @@ Rules your fix must keep, or the server refuses it:
 - A note's kind is one of reuse, check_by_eye, poor_quality, join, other, with the question for the operator.
 - Timing, in this order when they clash: keep the whole action peak (a shot may end before a camera move the log reports inside the peak, once the action is complete); then start the shot 6 to 12 frames before the word it shows; then land the action on its action word. A shot names `illustrates_word_id` and `action_word_id`, or says why one cannot be met in `marker_reasons`.
 - A blank names the clips considered with why each did not fit (`considered`: wrong action, wrong object, already used, claim or number, too short, unusable crop, contradicts the words, or other with words), or `none_fit`. A shot with alternatives says `preferred_because`. Where a clip's labels name a carried-over thing another way, say why in `carries_over_seen`.
+- A shot that carries `short` (list_item, thing, kinds, repeated_action, recap, b_roll) may be shorter than its piece's hold, down to 1 s: keep the field on a shot you keep, and give it to a shot you cut under its hold only for one of those reasons, never on a wide shot or into a camera move; a shot under 1.5 s stands only in a run of three or more short shots.
+- When a sentence names several things, each thing named has its own shot, or a blank, or a note for the operator saying it is not shown.
 
 Write out/second-look/<scene>.json:
 - no change: `{"why": "one line: why the scene stands"}`
