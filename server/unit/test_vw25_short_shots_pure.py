@@ -224,6 +224,23 @@ def test_a_shot_under_one_and_a_half_seconds_stands_only_in_a_run_of_three_short
     assert refused(proposal(shots(30, (60, None), 30)), pack([120], ROWS)) == [f'OPTION #1 shot 1 (p0:S): {alone}1', f'OPTION #1 shot 3 (p2:S): {alone}1']
 
 
+def test_three_shots_cut_short_in_a_row_may_be_of_one_size():
+    """SK, 26 Nov 2026 ("Yes, exempt"): G5 refuses three shots of one size in a row; the things of a list are close-ups of one size, so the
+    refusal is lifted when each of the three is cut short (its cut relies on `short`). The warning on each pair stays, a normal shot among the
+    three brings the refusal back, and two parts of one clip side by side are refused as before."""
+    three = 'G5 three shots of the same size in a row'
+    close = [row_(i, effective_shot_size='CU') for i in range(9)]
+    out = V.validate_options(proposal(shots(30, 30, 30)), pack([90], close), POLICY)
+    assert out['refusals'] == [] and sum('G5 adjacent shots of the same size (CU)' in f for f in out['flags']) == 2   # the run stands; each pair is still warned
+    assert refused(proposal(shots(30, 30, 30, 30, 30)), pack([150], close)) == []                                       # a longer run too
+    assert refused(proposal(shots(50, 60, 75, short=None)), pack([185], close)) == [f'OPTION #1 shot 3 (p2:S): {three}']   # normal shots: refused as before
+    assert refused(proposal(shots(40, 40, (50, None))), pack([130], close)) == [f'OPTION #1 shot 3 (p2:S): {three}']       # a normal shot ends it (1.6 s: no run needed)
+    assert refused(proposal(shots(40, 50, 40)), pack([130], close)) == [f'OPTION #1 shot 3 (p2:S): {three}']               # `short` on a shot at its hold is not a cut-short shot
+    same = [row_(0, effective_shot_size='CU'), {**row_(1, effective_shot_size='CU'), 'clip_id': 'p0'}, row_(2, effective_shot_size='CU')]
+    two = refused(proposal(shots(30, 30, 30)), pack([90], same))
+    assert any('G5 two parts of clip p0 side by side at the same size (CU)' in x for x in two) and not any(three in x for x in two)   # the jump cut is still refused
+
+
 def test_the_run_is_counted_in_film_order_across_scenes_and_an_ai_stretch_ends_it():
     alone = 'this run has '
     pk = pack([60, 60], ROWS)
