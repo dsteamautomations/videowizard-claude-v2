@@ -8,7 +8,8 @@
 .rv .line strong{color:var(--fg)}
 .rv .st{font-size:16px;font-weight:600;color:var(--fg);margin-top:2px}
 .rv .st.err{color:var(--err)}
-.rv .st a{font-weight:400;font-size:12.5px;color:var(--muted);margin-left:12px;cursor:pointer;text-decoration:underline}
+.rv .st #more{font-weight:400;font-size:12.5px;color:var(--muted);margin-left:12px;cursor:pointer;text-decoration:underline}
+.rv a.go{color:inherit;text-decoration:underline;cursor:pointer}
 .rv .det{margin-top:4px}
 .rv .det[hidden]{display:none}
 .rv .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:14px;align-items:start}
@@ -39,14 +40,22 @@
 .rv .words{font-size:13px;margin-top:3px}
 .rv .q{font-size:12.5px;margin-top:3px}
 .rv .broll{display:inline-block;background:#8b0000;color:#fff;font-weight:700;font-size:2.3em;line-height:1.1;padding:1px 10px;border-radius:8px;margin:2px 8px 4px 0;vertical-align:middle}
-.rv .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.rv .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px}
+/* SK, 25 Nov 2026 (VW-25 issue 1): the card's text has the full width but for a column of buttons, one under the other; the saved answer and its note
+   are a line of their own under both, wrapping. Older way retired: the answer beside the buttons (a long note widened that column and squeezed the text).
+   In a narrow window (the rule after these) the buttons are a row under the text. */
+.rv .info{min-width:0;overflow-wrap:anywhere}
+.rv .lb{font-weight:700;color:var(--fg);margin-right:6px}
+.rv .part+.part{border-top:1px solid var(--line);margin-top:5px;padding-top:2px}
+.rv .fit{font-size:12.5px;margin-top:3px}
+.rv .btns{display:flex;flex-direction:column;gap:6px}
+.rv .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px;white-space:nowrap}
 .rv .btns button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
-.rv .ans{font-size:12px;color:var(--muted);margin-top:5px;text-align:right}
+.rv .ans,.rv .why{grid-column:1/-1;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .rv .ans b{color:var(--ok)}
+@media (max-width:980px){.rv .row{grid-template-columns:minmax(0,1fr)}.rv .btns{flex-direction:row;flex-wrap:wrap}}
 .rv .form{grid-column:1/-1;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .rv .form input{min-width:0;padding:6px 9px;font-size:13px;border-radius:8px}
-.rv .form input.w{width:200px}.rv .form input.f{width:64px}
+.rv .form input.w{width:min(100%,310px)}.rv .form input.f{width:64px}
 .rv .form label{font-size:12px;color:var(--muted)}
 .rv .err{color:var(--err)}.rv .ok{color:var(--ok)}
 .rv .foot{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:6}
@@ -130,29 +139,34 @@ function fmt(s){s=Math.max(0,Math.round(Number(s)||0));return Math.floor(s/60)+'
 function stage(){return data&&data.run?data.run.stage:null;}
 function decidable(){return !data.master_built&&((stage()==='master'&&data.accepted)||(stage()==='options'&&!!data.film));}   // design/98 D1: the first answer approves the options
 function cue(slide){const c=data&&data.cues?data.cues[slide]:null;return Array.isArray(c)?c:null;}
+const lb=t=>'<b class="lb">'+t+'</b>';
 function row(s,can){
-  const c=cue(s.slide);
+  // SK, 25 Nov 2026 (VW-25 issue 1): a card is its text (the clip, the words, the notes for the operator: a bold label each, a thin line between the
+  // three; a part with no text is left out), the buttons beside it, and under both one line: the saved answer with its note, or why nothing is asked.
+  // Older way retired: the answer beside the buttons.
+  // VW-25 issue 3a: a shot that shows only part of what its sentence says is labelled, with what it does not show (the server's `fit`, by the
+  // sentence the shot sits under); an exact match, B-roll and a library clip are as before. Older way retired: no label for a part match.
+  const c=cue(s.slide), a=s.answer, swapped=a&&a.action==='SWAP';
   const off=!s.needs_answer&&s.why;
-  let info='<div><div class="t">'+(s.b_roll?'<span class="broll">B-roll</span>':'')+(s.library?'<span class="broll">library · from '+esc(s.library)+'</span>':'')+esc(s.title)+(s.type==='ai'?' · made with AI':'')+'</div>';
-  if(s.clip){info+='<div class="ds">'+esc(s.clip)+'</div>';}
-  if(s.words){info+='<div class="words">“'+esc(s.words)+'”</div>';}
-  if(s.type==='alternative'){info+='<div class="ds">the same words as '+esc(s.of)+'</div>';}
-  if(s.type==='ai'&&s.intent){info+='<div class="ds">For AI: '+esc(s.intent)+'</div>';}
-  if(s.flags&&s.flags.length){info+='<div class="q">'+esc('Has: '+s.flags.join('; '))+'</div>';}
-  if(s.note&&s.note.question){info+='<div class="q">Question: '+esc(s.note.question)+'</div>';}
-  if(s.marker_reasons){info+='<div class="q">Timing: '+esc(Object.values(s.marker_reasons).join('; '))+'</div>';}
-  info+='<div class="ds">'+esc(s.hint||'')+' · '+fmt(s.seconds)+(c?' · at '+fmt(c[0]):'')+'</div></div>';
-  let ans='';
-  if(!s.answerable){ans='<span class="ds">nothing to answer</span>';}
-  else if(off){ans='<span class="ds">'+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action)+' (not used)</div>':'');}
+  const fit=s.fit&&s.fit.match==='partly'?'Shows part of what the words say.'+(s.fit.missing?' Not shown: '+s.fit.missing:''):'';
+  const parts=[
+    (fit&&!swapped?'<div class="fit">'+esc(fit)+'</div>':'')+(s.clip?'<div class="ds">'+lb('Clip')+esc(s.clip)+'</div>':''),
+    (s.words?'<div class="words">'+lb('Words')+'“'+esc(s.words)+'”</div>':'')+(s.type==='alternative'?'<div class="ds">the same words as '+esc(s.of)+'</div>':'')
+      +(s.type==='ai'&&s.intent?'<div class="ds">'+lb('For AI')+esc(s.intent)+'</div>':''),
+    (s.flags&&s.flags.length?'<div class="q">'+lb('Has')+esc(s.flags.join('; '))+'</div>':'')+(s.note&&s.note.question?'<div class="q">'+lb('Question')+esc(s.note.question)+'</div>':'')
+      +(s.marker_reasons?'<div class="q">'+lb('Timing')+esc(Object.values(s.marker_reasons).join('; '))+'</div>':'')];
+  const info='<div class="info"><div class="t">'+(s.b_roll?'<span class="broll">B-roll</span>':'')+(s.library?'<span class="broll">library · from '+esc(s.library)+'</span>':'')+esc(s.title)+(s.type==='ai'?' · made with AI':'')+'</div>'
+    +parts.filter(Boolean).map(p=>'<div class="part">'+p+'</div>').join('')+'<div class="ds">'+esc(s.hint||'')+' · '+fmt(s.seconds)+(c?' · at '+fmt(c[0]):'')+'</div></div>';
+  let btns='', under='';
+  if(!s.answerable){under='<div class="why">nothing to answer</div>';}
+  else if(off){under='<div class="why">'+esc(s.why)+'</div>'+(a?'<div class="ans">'+esc(a.action)+' (not used)</div>':'');}
   else{
-    const a=s.answer;
     const on=v=>a&&(a.action===v||(v==='OTHERS'&&(a.action==='SWAP'||(s.type==='ai'&&a.action==='REJECT'))));
-    if(can){ans='<div class="btns">'+(CHOICES[s.type]||[]).map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(on(v)?'on':'')+'">'+l+'</button>').join('')+'</div>';}
-    if(a){ans+='<div class="ans"><b>'+esc(said(s,a))+'</b>'+(a.note?' · '+esc(a.note):'')+'</div>';}
-    if(!can){ans+='<span class="ds">'+(data.accepted?(data.master_built?'no answer':'waiting'):'after the film')+'</span>';}
+    if(can){btns='<div class="btns">'+(CHOICES[s.type]||[]).map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(on(v)?'on':'')+'">'+l+'</button>').join('')+'</div>';}
+    if(a){under='<div class="ans"><b>'+esc(said(s,a))+'</b>'+(a.note?' · '+esc(a.note):'')+(fit&&swapped?' · '+esc(fit):'')+'</div>';}   // a swapped shot: the label goes with the clip now in use
+    if(!can){under+='<div class="why">'+(data.accepted?(data.master_built?'no answer':'waiting'):'after the film')+'</div>';}
   }
-  return '<div data-slide="'+esc(s.slide)+'" class="row'+(s.type==='alternative'?' alt':'')+(off?' off':'')+(current===s.slide?' cur':'')+'">'+info+'<div>'+ans+'</div>'+(open&&open.slide===s.slide?form(open):'')+'</div>';
+  return '<div data-slide="'+esc(s.slide)+'" class="row'+(s.type==='alternative'?' alt':'')+(off?' off':'')+(current===s.slide?' cur':'')+'">'+info+btns+under+(open&&open.slide===s.slide?form(open):'')+'</div>';
 }
 function draw(){
   const d=data; const film=$('film'), no=$('nofilm');
@@ -161,24 +175,33 @@ function draw(){
     film.hidden=true;no.hidden=false;no.textContent=$('line').textContent;$('slides').innerHTML='';$('action').innerHTML='';return;
   }
   // SK, 15 Nov 2026: one line the reviewer must read, large; the record of the version, the approval and the second look sits behind Details
-  let st; const bal=d.master_built?[]:(d.balance||[]);   // SK, 23 Nov 2026: the scenes a trim left short or long; "all answered" waits for them
-  if(!d.accepted&&stage()==='options'){st=d.film?'Answer each shot. Your first answer approves these options.':'The review film is not ready yet.';}
+  let st, red=''; const bal=d.master_built?[]:(d.balance||[]);   // SK, 23 Nov 2026: the scenes a trim left short or long; "all answered" waits for them
+  // SK, 25 Nov 2026 (VW-25 issue 4): the rows still to answer are named by their titles, each a link to its row (three, then how many more); a scene
+  // that does not add up is a link to the scene, on its own red line under the count. `st` is HTML from here on: every value in it is escaped.
+  // Older ways retired: the bare "1 left"; the red line in place of the count; "N scenes do not add up" without their names; "waiting: 2.1" under Details.
+  const name=lab=>{const s=d.slides.find(x=>x.slide===lab);return s?s.title:'#'+lab;};
+  const go=(lab,text)=>'<a class="go" href="#" data-go="'+esc(lab)+'">'+esc(text)+'</a>';
+  const names=(labs,most)=>labs.slice(0,most).map(l=>go(l,name(l))).join(', ')+(labs.length>most?' and '+(labs.length-most)+' more':'');
+  const wait=d.waiting||[];
+  const left=wait.length+' left: '+names(wait,3);
+  if(!d.accepted&&stage()==='options'){st=d.film?'Answer each shot. Your first answer approves these options.'+(wait.length?' '+left:''):'The review film is not ready yet.';}
   else if(!d.accepted){st='This version is not the recorded one. The assistant proposes or records in chat.';}
   else if(d.master_built){st='Answers closed. The master film is built.';}
-  else if(bal.length){st=(bal.length===1?bal[0].text:bal.length+' scenes do not add up after a trim.')+' Fix it under the scene before the master film.';}
-  else if(d.of&&d.answered>=d.of){st='All '+d.of+' answered. The assistant builds the master film next.';}
-  else{st=d.answered+' of '+d.of+' answered. '+(d.of-d.answered)+' left.';}
+  else if(d.of&&d.answered>=d.of&&!bal.length){st='All '+d.of+' answered. The assistant builds the master film next.';}
+  else{st=esc(d.answered)+' of '+esc(d.of)+' answered.'+(wait.length?' '+left:'');}
+  if(d.accepted&&bal.length){red='<div class="st err">'+bal.slice(0,3).map(b=>go(String(b.scene),b.text)).join(' ')+(bal.length>3?' and '+(bal.length-3)+' more scenes.':'')+' Fix it under the scene before the master film.</div>';}
   let det='<div>Version '+esc(d.version)+(d.accepted&&d.approved_by&&d.approved_by.slide?' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')':'')   // design/98 D6
-    +(d.accepted&&!d.master_built&&d.waiting&&d.waiting.length?' · waiting: '+esc(d.waiting.join(', ')):'')+'</div>';
+    +(d.accepted&&!d.master_built&&wait.length?' · waiting: '+names(wait,wait.length):'')+'</div>';
   const sl=d.second_look;   // design/129 P4: whether the second look ran on this version, and what it changed
   det+='<div>'+(sl?'Second look: ran '+esc(String(sl.at||'').slice(0,16).replace('T',' '))+' (the assistant checked its own cut before showing it) · '+esc(sl.scenes)+' scenes · '+esc(sl.changed.length)+' changed'+(sl.changed.length?' ('+esc(sl.changed.join(', '))+')':'')+
     ' · '+esc(Object.keys(sl.unchanged||{}).length)+' unchanged'+(sl.no_fix_file.length?' · no fix file for '+esc(sl.no_fix_file.join(', ')):'')+(sl.edited_after?' · <span class="err">the cut was changed after the second look</span>':'')+
     sl.fixes.map(f=>'<div>Changed by the second look, nothing to approve: '+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')
     :'Second look: not recorded for this version')+'</div>';
-  let line=(bal.length&&d.accepted?'<div class="st err">':'<div class="st">')+esc(st)+'<a id="more" role="button" tabindex="0" aria-expanded="'+(detOpen?'true':'false')+'">'+(detOpen?'Hide details':'Details')+'</a></div>';
+  let line='<div class="st">'+st+'<a id="more" role="button" tabindex="0" aria-expanded="'+(detOpen?'true':'false')+'">'+(detOpen?'Hide details':'Details')+'</a></div>'+red;
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+='<div class="st err">A defect is open on this run. Nothing can be recorded until it is fixed.</div>';}
   line+='<div class="det"'+(detOpen?'':' hidden')+'>'+det+'</div>';
   $('line').innerHTML=line;fit();
+  $('line').querySelectorAll('a.go').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();goTo(a.dataset.go);}));
   const more=$('more'),flip=()=>{detOpen=!detOpen;draw();};more.addEventListener('click',flip);more.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();}});
   clearTimeout(timer);
   if(d.film){
@@ -219,7 +242,8 @@ function draw(){
     on('button.ask',()=>send({action:'decide',slide:open.slide,decision:'REJECT'}));
     f.querySelectorAll('video').forEach(v=>v.addEventListener('play',()=>$('film').pause()));   // a preview plays alone
     const first=f.querySelector('input');if(first)first.focus();}}
-  const help='Watch the film and answer each shot. Keep: use it. Reject: not this one; an AI stretch takes its place (a reason is optional). Trim: use it with its start or end moved. '
+  // SK, 25 Nov 2026 (VW-25 issue 5): the page says what a note on a Reject does before the operator writes one. Older words retired: "a reason is optional", and "Why? (optional)" in the box
+  const help='Watch the film and answer each shot. Keep: use it. Reject: not this one; an AI stretch takes its place. A note says what the picture should show there. It does not bring another clip: for that use Other clips, and Trim for a shorter cut. Trim: use it with its start or end moved. '
     +'Other clips: put a different clip on this shot. B-roll is marked in dark red: it is fine to reject. An alternative (dashed) is another clip for the same words: it opens when you reject its shot. Keep AI / Find footage: for a scene made only with AI.';
   if(!d.accepted&&stage()==='options'){$('action').innerHTML='<span>'+esc(help)+' Your first answer approves these options.</span>';}   // design/98 D1
   else if(d.accepted&&bal.length){$('action').innerHTML='<span class="err">'+esc(bal.map(b=>b.text).join(' '))+' The master film cannot be built until each scene adds up: use the buttons under the scene.</span>';}
@@ -228,7 +252,7 @@ function draw(){
   else{$('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';}
 }
 function form(o){
-  if(o.action==='REJECT'){return '<div class="form" id="f-'+esc(o.slide)+'"><input class="w" placeholder="Why? (optional)"><button class="go">Save</button><button class="no">Close</button></div>';}   // design/98 R1
+  if(o.action==='REJECT'){return '<div class="form" id="f-'+esc(o.slide)+'"><input class="w" placeholder="What should the picture show instead? (optional)"><button class="go">Save</button><button class="no">Close</button></div>';}   // design/98 R1
   if(o.action==='OTHERS'){return others(o);}
   // SK, 23 Nov 2026 (VW-25): a trim is typed in seconds, with what the shot can lose and gain; the server checks it when it is recorded. Older way retired on the page: source frames
   return '<div class="form" id="f-'+esc(o.slide)+'"><label>Start later by</label><input class="f" type="number" step="0.1" value="0"><label>s</label><label>End earlier by</label><input class="f" type="number" step="0.1" value="0"><label>s</label>'
@@ -277,6 +301,11 @@ async function send(body){
 }
 function unwait(){waitingFor=null;$('wait').hidden=true;}
 function seek(slide){const c=cue(slide);if(!c||!filmKey)return;const f=$('film');unwait();f.currentTime=c[0];passed.delete(slide);f.play().catch(()=>{});}
+function goTo(slide){   // VW-25 issue 4: a name on the top line: its row (or its scene) in the middle of the window, a row outlined, and the film moved to it when there is one
+  const el=$('slides').querySelector('.row[data-slide="'+CSS.escape(slide)+'"],.head[data-slide="'+CSS.escape(slide)+'"]');if(!el)return;
+  if(el.classList.contains('row')){current=slide;$('slides').querySelectorAll('.row').forEach(x=>x.classList.toggle('cur',x===el));}
+  el.scrollIntoView({block:'center'});seek(slide);
+}
 function resume(){unwait();const f=$('film');if(f.paused&&filmKey){f.play().catch(()=>{});}}
 $('goon').addEventListener('click',()=>{if(waitingFor){passed.add(waitingFor);}resume();});
 // SK, 23 Nov 2026 (VW-25): Play pressed on the film itself, or a click on a row, while the film waited for an answer left the wait set, and the film then

@@ -65,6 +65,27 @@ def has_lines(row):
     return wrap('Has: ' + '; '.join(w)) if w else []
 
 
+def fit(row, o, beat, n, a, z):
+    """SK, 25 Nov 2026 (VW-25 issue 3a): how a piece placed as a direct match fits the sentence its shot sits under, by the clip study's own mark:
+    {'match': 'partly' or 'exact', 'missing': what the piece does not show}. The sentences are the ones the option's step map gives event `n`
+    (counted from 1); a shot the map does not name is judged against the sentence that holds most of its timeline frames [a, z), the earlier one
+    on a tie. None when nothing can be said: no step map, a film logged by paragraph (no marks per sentence), a piece marked only RELATED (the
+    options check already refuses that as a direct match). The page labels 'partly' only. Older way retired: a part match looked like an exact one."""
+    smap, marks = o.get('steps'), row.get('sentence_fits')
+    if not isinstance(smap, list) or not marks:
+        return None
+    own = {s.get('step_id') for s in smap if isinstance(s, dict) and s.get('event') == n}
+    if not own:
+        under = lambda s: min(z, s['end_frame']) - max(a, s['start_frame'])
+        most = max(beat.get('steps') or [], key=under, default=None)
+        own = {most['step_id']} if most and under(most) > 0 else set()
+    got = [f for f in marks if f.get('step_id') in own]
+    part = [str(f.get('missing') or '').strip() for f in got if f.get('match') == 'PARTLY']
+    if part:
+        return {'match': 'partly', 'missing': '; '.join(m for m in part if m)}
+    return {'match': 'exact', 'missing': ''} if any(f.get('match') == 'EXACT' for f in got) else None
+
+
 def slides(doc, pk, fps):
     beats = {b['beat_id']: (i + 1, b) for i, b in enumerate(pk['beats'])}
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
@@ -104,6 +125,7 @@ def slides(doc, pk, fps):
             out.append({**common, 'no': label, 'type': 'shot', 'title': name, 'clip': what, 'b_roll': b_roll, 'sub_clip_id': ev.get('sub_clip_id'),
                         'library': row.get('library_from') if ev.get('match') == 'library' else None,   # design/147 L4: a library proposal names its film
                         'note': ev.get('note') if isinstance(ev.get('note'), dict) else None, 'flags': warnings(row),
+                        'fit': fit(row, o, b, i, at - k, at) if ev.get('match') == 'direct' else None,   # VW-25 issue 3a: B-roll and library keep their own labels
                         'marker_reasons': {k: v for k, v in (ev.get('marker_reasons') or {}).items() if str(v or '').strip()} or None,   # design/142 R4: shown to the operator
                         'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it, Other clips puts another clip here',
                         'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said) + has_lines(row)})
@@ -112,6 +134,7 @@ def slides(doc, pk, fps):
                 aname = f'{name} · Alternative {m}'
                 out.append({**common, 'no': f'{label}A{m}', 'type': 'alternative', 'title': aname, 'of': label, 'alt_index': m - 1, 'clip': clip_name(arow, cards), 'sub_clip_id': alt.get('sub_clip_id'),
                             'library': arow.get('library_from') if alt.get('match') == 'library' else None, 'flags': warnings(arow),
+                            'fit': fit(arow, o, b, i, at - k, at) if alt.get('match') == 'direct' else None,
                             'b_roll': alt.get('match') == 'b_roll', 'hint': f'another clip for Shot {i}; open when Shot {i} is rejected; keep at most one',
                             'lines': [aname, clip_name(arow, cards), f'Time: {_seconds(k, fps)}', f'Words: the same as Shot {i}'] + has_lines(arow)})
     return out

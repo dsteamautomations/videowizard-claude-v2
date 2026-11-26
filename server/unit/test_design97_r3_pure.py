@@ -97,4 +97,5 @@ def test_the_page_carries_each_release_3_piece(needle):
 
 
 def test_the_review_page_explains_its_buttons():
-    assert ('Keep: use it. Reject: not this one; an AI stretch takes its place (a reason is optional). Trim: use it with its start or end moved. ') in REVIEW   # design/98 R1; design/127
+    assert ('Keep: use it. Reject: not this one; an AI stretch takes its place. A note says what the picture should show there. It does not bring another clip: '
+            'for that use Other clips, and Trim for a shorter cut. Trim: use it with its start or end moved. ') in REVIEW   # design/98 R1; design/127; 25 Nov 2026 (VW-25 issue 5): "(a reason is optional)" retired
