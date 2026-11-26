@@ -49,7 +49,7 @@ def mixed(state='making'):
     film.back()
     film.set_looks()
     l = film.lines()
-    film.record(ans(l['set:T_LAY'], 'correct', 'Show the hand pressing the brick down.'), ans(l['sets:rest'], 'rest'))
+    film.record(ans(l['set:T_LAY'], 'no', 'Show the hand pressing the brick down.'), ans(l['sets:rest'], 'rest'))
     back(film, *(('BRICK',) if state == 'making' else ('BRICK', 'TILE')))
     assert film.state() == state
     return film
@@ -237,7 +237,7 @@ def test_a_correction_of_one_set_leaves_the_approvals_standing_and_only_that_set
     assert sorted(out['recorded']) == ['set:MASON', 'set:STREET'] and out['refused'] == []
     at, n = approved(film, 'MASON'), len(film.ordered())
     assert at and film.row('STREET')['rewrite_due']['words'] == 'The street is wider.' and len(film.ordered()) == n   # nothing is ordered before the rewrite
-    film.rewrite([{'element_id': 'STREET', 'prompt': 'A wider street, as the operator says.'}])
+    film.rewrite([{'element_id': 'STREET', 'where': 'the sandy street, between the two rows of houses'}])   # Minor corrections: Claude's where line; the set's own pictures are corrected
     assert film.ordered()[n:] == ['STREET'] and approved(film, 'MASON') == at and film.row('MASON')['verdict'] == 'yes'
 
 
@@ -268,7 +268,7 @@ def test_the_same_answer_sent_twice_is_recorded_once_and_the_second_is_answered_
     assert approved(film, 'MASON') == at and film.row('STREET')['operator_words'] == words == ['The street is wider.']
     assert sorted(logged(film)[-2:]) == [VS.SET_RECORDED.format(name='The mason'), VS.SET_RECORDED.format(name='The street')]   # what each was answered, in the log
     assert out['tell'] in logged(film)[-2:] and out['then'].startswith(out['tell'])  # and the assistant is told so, in the answer of the send
-    film.rewrite([{'element_id': 'STREET', 'prompt': 'A wider street, as the operator says.'}])
+    film.rewrite([{'element_id': 'STREET', 'where': 'the sandy street, between the two rows of houses'}])   # Minor corrections: Claude's where line; the set's own pictures are corrected
     out = film.record(ans(l['set:STREET'], 'correct', 'The street is wider.'))      # and once more after the set was ordered again: its answer was recorded, it is not "for the pictures before"
     assert out['recorded'] == ['set:STREET'] and out['refused'] == [] and film.row('STREET')['operator_words'] == words
     out = sets(film, {'MASON': yes(film, 'MASON')})                                  # the same through the function both front ends call

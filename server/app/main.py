@@ -439,6 +439,8 @@ class RoundAnswer(Write):   # design/177: one answer of step 2, stored (the page
     golden: str | None = None
     words: str = ''
     all: bool = False   # design/215: the correction applies to every picture of the thing
+    marks: dict[str, list[dict[str, Any]]] | None = None   # Minor corrections as an edit: the operator's marks per picture (ref_sets.marks_checked)
+    every: bool | None = None   # the tick "the same correction in every picture of this set"; None is ticked
 
 
 class RoundAside(Write):   # design/177: a set never made, set aside at step 2, or brought back
@@ -1579,6 +1581,9 @@ class PageAnswer(Strict):   # design/204: one answer the operator gave on the ar
     choice: str = Field(min_length=1, max_length=120)
     notes: str = Field(default='', max_length=2000)
     own_ref: str = Field(default='', max_length=80)      # design/210: the operator's own picture given on the page, once the tool has handed it to `visuals/own`
+    marks: dict[str, list[dict[str, Any]]] | None = None   # Minor corrections as an edit: the operator's marks per picture, checked by the server (ref_sets.marks_checked)
+    every: bool | None = None   # the tick "the same correction in every picture of this set"
+    fix: bool = False           # the operator's own pictures sent with marks: corrected like a picture of the set
     own_refs: list[str] = Field(default_factory=list, max_length=8)   # VW-25 issue 10: up to three own pictures of one thing; a fourth is refused by its sentence on the line (page_flow._round_answer), so the list takes more
     own_error: str = Field(default='', max_length=600)   # or why the tool could not hand it over
     pics: dict[str, str] = Field(default_factory=dict, max_length=8)   # design/211: a picture answered on its own: {footage picture id: 'not'} or {trial frame id: 'use'}
@@ -1983,7 +1988,7 @@ def visuals_round_sets(run_id: UUID, body: RoundSets, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round/answer')
 def visuals_round_answer(run_id: UUID, body: RoundAnswer, user=User, conn=DB):   # design/177: `vw visuals round --answer`
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words, all=body.all))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words, all=body.all, marks=body.marks, every=body.every))
 
 
 class RoundMake(Write):   # design/211: `vw visuals round --make E --quote "<their words>"`: in a v2 round making a set needs the operator's words
@@ -2073,6 +2078,13 @@ def visuals_round_things_asked(run_id: UUID, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/round/things')
 def visuals_round_things(run_id: UUID, body: RoundThings, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_things(conn, storage(), user, run, outputs, body.rows))
+
+
+@app.get('/api/runs/{run_id}/visuals/round/rewrite')
+def visuals_round_rewrites_due(run_id: UUID, user=User, conn=DB):
+    """The sets that wait for Claude's where line or rewrite. It stores the marked copies of their pictures, so it takes the run's lock."""
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: ref_sets.rewrites_due(storage(), run, outputs)))
 
 
 @app.post('/api/runs/{run_id}/visuals/round/rewrite')

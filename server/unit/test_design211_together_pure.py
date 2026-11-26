@@ -326,7 +326,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     assert lines['set:MASON']['check']['state'] == 'pass' and lines['set:MASON']['rec']['label'] == 'Use this set' and [b['choice'] for b in lines['set:MASON']['buttons']] == ['yes', 'correct', 'no']
 
     # one visit: "Minor corrections", "Make again", a picture chosen, and "make the other sets". Nothing is made again before Claude's rewrite; the others are ordered
-    out = film.record(ans(lay, 'correct', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], approve(lines['set:STREET'])), ans(lines['sets:rest'], 'rest'))
+    out = film.record(ans(lay, 'no', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], approve(lines['set:STREET'])), ans(lines['sets:rest'], 'rest'))
     assert out['recorded'] == ['set:T_LAY', 'set:MASON', 'set:STREET', 'sets:rest'] and out['stale'] == [] and out['refused'] == []
     assert film.ordered()[3:] == ['TROWEL', 'BRICK'] and film.state() == 'making' and says(out, 'vw visuals status') == RS.SAID_REST.format(n='2 sets are', m=3) + ' ' + RS.ALL_MAKING.format(k=2)
     s = film.session()
@@ -384,7 +384,7 @@ def test_the_other_sets_left_out_and_a_set_made_three_times_left_out_complete_th
         film.back()
         film.set_looks()
         if n == 2:
-            film.record(ans(film.lines()['set:T_LAY'], 'correct', f'Not yet, {n}.'))
+            film.record(ans(film.lines()['set:T_LAY'], 'no', f'Not yet, {n}.'))
     lay = film.lines()['set:T_LAY']
     out = film.record(ans(lay, 'aside', 'None of them is right.'))
     assert out['refused'] == [] and film.row('T_LAY')['ignored'] and film.row('T_LAY')['aside']['words'] == 'None of them is right.' and 'T_LAY' not in film.session()['golden']
@@ -440,7 +440,7 @@ def test_the_main_path_in_the_chat_one_question_at_a_time():
         out = film.decide(item['id'], choice, 'my word for it', 'Show the hand pressing the brick down.' if choice == 'correct' else '')
     assert answered == ['set:MASON', 'set:STREET', 'set:T_LAY', 'rest'] and film.ordered()[3:] == ['BRICK', 'TILE'] and film.state() == 'making'
     assert RS.ALL_MAKING.format(k=2, x='71') in says(out, 'vw visuals status')                 # the second go ordered in the chat says the server's sentence
-    film.rewrite([{'element_id': 'T_LAY', 'prompt': 'The right hand presses the wet brick into the mortar bed.'}])
+    film.rewrite([{'element_id': 'T_LAY', 'where': 'the right hand on the brick, at the centre of the frame'}])   # Minor corrections in the chat: words alone; Claude's where line, the set's own pictures corrected
     film.back()
     film.set_looks()
     out = film.next()

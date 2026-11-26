@@ -12,7 +12,7 @@ from app.errors import Problem
 SRC = (Path(__file__).resolve().parents[1] / 'app' / 'main.py').read_text(encoding='utf-8')
 
 ROUTES = [   # (path under /api/runs/{run_id}/visuals, the route's function, the server function it calls with)
-    ('/round/answer', 'visuals_round_answer', 'set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words, all=body.all)'),
+    ('/round/answer', 'visuals_round_answer', 'set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words, all=body.all, marks=body.marks, every=body.every)'),
     ('/round/make', 'visuals_round_make', 'set_make(conn, storage(), user, run, outputs, body.element_id, quote=body.quote)'),   # design/211: with the operator's words
     ('/round/aside', 'visuals_round_aside', 'set_aside(storage(), user, run, outputs, body.element_id, body.words, body.back)'),
     ('/references/{ref_id}/reapprove', 'visuals_reapprove', 'reapprove_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote, conn)'),

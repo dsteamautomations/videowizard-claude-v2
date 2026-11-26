@@ -688,7 +688,8 @@ def _sets_lines_v2(ctx):
                          'head': words['settled_footage' if row.get('from_footage') and shown else 'settled'], **({'pics': pics} if pics else {}),
                          'details': [['The reference pictures', [x['label'] for x in pics]]] if pics else []})
         else:
-            said = ('making', '') if rows('generating') else ('rewriting', 'tag_rewriting') if row.get('rewrite_due') else ('looking', 'tag_looking') if rows('candidate') else ('waiting', 'tag_waiting')
+            said = (('making', '') if rows('generating') else ('correcting', 'tag_correcting') if (row.get('rewrite_due') or {}).get('edit') else ('rewriting', 'tag_rewriting') if row.get('rewrite_due')
+                    else ('looking', 'tag_looking') if rows('candidate') else ('waiting', 'tag_waiting'))
             mine = rest.get(f'set:{eid}') or {}   # design/213: one of the sets that wait for the operator's word: what the list of them says of it
             wait.append({**head, 'state': 'making', 'group': CF.STEP2_GROUPS[2], 'case': 'wait', 'note': words[said[0]], 'head': words['wait_head'] if mine else words[said[0]],
                          'tag': words[said[1]] if said[1] else words['tag_making'], **({'wait_note': mine['note'], **({'out': True} if mine['out'] else {})} if mine else {})})
@@ -905,7 +906,10 @@ def _round_answer(ctx, a, choice, words):
     again has a new id). The operator's own pictures reached the server before this call (`own_refs`); a picture that did not is refused on
     its line (`own_error` is the tool's reason).
     VW-25 issue 10: up to three own pictures of a thing, one photo of a person; the first is the picture that pictures of the thing start from.
-    Issue 11: the words written with them are used (`visuals_stage.own_words`). Retired: one picture per line, and the words dropped at step 2."""
+    Issue 11: the words written with them are used (`visuals_stage.own_words`). Retired: one picture per line, and the words dropped at step 2.
+    Minor corrections as an edit (SK, 25 Nov 2026): the answer's `marks` (per picture) and `every` (the tick) go with "Minor corrections" to the
+    chat item's own function, and so to `visuals_stage.set_answer`; own pictures sent with marks (`fix`) are corrected in place of the set's.
+    "Make again" with a comment stays "Make again". Retired: a "No" with words turned into "Correct it"."""
     session = ctx['session']
     item = next((i for i in CF._round_items(ctx, every=True) if i['id'] == a.get('item')), None)
     if not item:
@@ -942,6 +946,10 @@ def _round_answer(ctx, a, choice, words):
             out = item['_run']('approve', label, words, own=mine[0])
         elif person:   # the sheet made before the photo is out of date: it is made again from the photo, as `vw visuals round --make` does
             out = V.set_make(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], eid, **({'quote': label, 'words': words} if v2 else {}))   # design/211: paid, so the operator's word travels with it
+        elif item['id'].startswith('set:') and v2 and a.get('fix'):   # the operator's own picture, marked: corrected like a picture of the set; it comes back as the set to judge
+            V.need(words, CF.MARK_WORDS['need'])
+            label = CF.WORDS['fix']
+            out = item['_run']('correct', label, words, marks=a.get('marks'), every=a.get('every'), own=mine)
         elif item['id'].startswith('set:'):
             if v2 and V.own_words(session, ctx['user'], ctx['plan'], eid, words, False):   # the picture is the reference itself: the words are the thing's correction
                 V.save_session(ctx['store'], ctx['run'], session)
@@ -954,8 +962,9 @@ def _round_answer(ctx, a, choice, words):
         V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in buttons) + '.')
         V.need(not button['needs_words'] or words, CF.WORDS['fix_words'] if item.get('_v2') and step1 else 'Say what should change in this line, in your own words.')
         label = button['label']
-        again = choice == 'no' and words and item['id'].startswith('set:')   # design/210 review: a paid remake asked for with words is made with them, as "Correct it" is; the log keeps the button pressed
-        out = item['_run']('correct' if again else choice, label, words) or {}
+        again = choice == 'no' and words and item['id'].startswith('set:') and not item.get('_v2')   # design/210 review, an older round only: a paid remake asked for with words is made with them, as "Correct it" is
+        edit = {'marks': a.get('marks'), 'every': a.get('every')} if item.get('_v2') and item['id'].startswith('set:') and choice in ('correct', 'correct_all') else {}
+        out = item['_run']('correct' if again else choice, label, words, **edit) or {}
     hold = (out.get('held') or {}).get(eid)   # the limit holds a set made again: the answer is kept and its line says why
     V.need(not hold, f'{hold[:1].upper()}{hold[1:]}.' if hold else '')
     return label + (f': {words}' if words else ''), out, step1 or (item['id'].startswith('set:') and 'pass' not in out)

@@ -38,7 +38,10 @@ def visuals():
     spec = importlib.util.spec_from_file_location('d215_wording_v3', ROOT / 'scripts' / 'd215_wording_v3.py')   # design/215: a later script still: the references fix set
     d215 = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(d215)
-    return review.before(later.before(d213.before(d214.before(d215.before(next(s for s in d['stages'] if s['name'] == 'visuals'))))))   # the text as it was before them
+    spec = importlib.util.spec_from_file_location('minor_edit_wording', ROOT / 'scripts' / 'minor_edit_wording.py')   # Minor corrections as an edit, 25 Nov 2026: a later script still; it changes the sentences on step 2
+    minor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(minor)
+    return review.before(later.before(d213.before(d214.before(d215.before(minor.before(next(s for s in d['stages'] if s['name'] == 'visuals')))))))   # the text as it was before them
 
 
 def test_each_anchor_of_script_c_is_found_once_or_is_already_applied():

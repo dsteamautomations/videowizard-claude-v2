@@ -176,7 +176,7 @@ def test_a_set_is_judged_through_the_same_server_functions_as_before(monkeypatch
     out = film.record(ans(l['set:MASON'], 'yes'), ans(l['set:STREET'], 'use:s-street-1-2'), ans(l['set:T_LAY'], 'no', 'Show the hand pressing the brick down.'))
     sent = [v for v, _q in film.called('round_sets')]
     assert sent[0] == {'MASON': {'verdict': 'yes', 'golden': None, 'words': ''}} and sent[1]['STREET'] == {'verdict': 'yes', 'golden': 's-street-1-2', 'words': ''}
-    assert sent[2]['T_LAY'] == {'verdict': 'correct', 'golden': None, 'words': 'Show the hand pressing the brick down.'}   # a "No" with words is made again with them, as before
+    assert sent[2]['T_LAY'] == {'verdict': 'no', 'golden': None, 'words': 'Show the hand pressing the brick down.'}   # a "No" with words stays "Make again", the words its comment (until 25 Nov 2026 it was sent as "correct")
     assert out['refused'] == [] and sorted(out['recorded']) == ['set:MASON', 'set:STREET', 'set:T_LAY']
 
 

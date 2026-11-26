@@ -207,6 +207,8 @@ if __name__ == '__main__':
         prompt = a1(prompt, parts)
         from specs_card_wording import apply as specs_card   # 4e, 26 Nov 2026: two or more specs on one card in the chat; a spec that is not ready stays with the assistant until it is shown
         prompt = specs_card(prompt, parts)
+        from minor_edit_wording import apply as minor_edit   # Minor corrections as an edit, 25 Nov 2026: step 2 of the references: the set's own pictures corrected (a where line), "Make again" the new set with the comment
+        prompt = minor_edit(prompt, parts)
         from shortshots_wording import check as shortshots   # short shots and list items (VW-25 issues 3b and 2), 25 Nov 2026: the options and the master, not the visuals; v3.json holds its sentences
         shortshots(d)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly

@@ -591,7 +591,7 @@ WORDS = {
     'leave_failed': 'Go on without a reference',   # step 2: a set that could not be made, or was made the most times
     'fix_all': 'Correct every picture of it',      # design/215 (change 5): the chat's own button for the page's tick
     'all_tick': 'This applies to every picture of this thing',
-    'say_fix_all': 'Make it again with your words: "{words}". They are kept for every later picture of this thing. Claude rewrites the request first; the new set comes back to you.',
+    'say_fix_all': 'These pictures are corrected with your words: "{words}". The words are kept for every later picture of this thing. The corrected set comes back to you.',
     'corrections': "The operator's corrections: {words}",
     # design/215 (change 3): what the picture model searched, each state in its own words
     'web_yes': 'The picture model searched the web: {n}.',
@@ -602,7 +602,7 @@ WORDS = {
     'web_unknown': 'Searched: not known.',
     'fix1': 'Make a set with words',            # step 1 (W1): it makes a new set with the operator's words; it corrects no picture
     'go_set': 'Make a set with these words',       # the button of the words box
-    'go_fix': 'Make it again with these words',
+    'go_fix': 'Correct with these words',
     'set_hint': 'Picture not good? Make a set instead.',   # beside "Make a set", only where a footage picture exists and may be used as it is
     # design/220 (SK, 19 Nov 2026): the check decides whether the others follow; before: 'Up to {m} sets are made first, to check the method; after you judge them, any others are made in one go.'
     'goes': ' Up to {m} sets are made and checked first; when the check passes them all, the others are made at once, and when it does not, you see that set first and the others wait for your word. '
@@ -610,6 +610,15 @@ WORDS = {
     # design/212: the buttons of step 1, short and plain; which of them a thing gets follows its case
     'approve': 'Approve',
     'fix': 'Minor corrections',
+    # Minor corrections as an edit (SK, 25 Nov 2026): the set's own pictures are corrected; "Make again" is the fresh set, with the operator's comment
+    'fix_tell_edit': 'Ask the operator what should change, in their own words, and say this with the question:',
+    'every_tick': 'The same correction in every picture of this set',
+    'edited': 'Corrected as you asked: "{words}"',
+    'own_view': 'your own picture',
+    'again_hint': 'A comment for the new set (optional)',
+    'again_tell': 'A comment the operator gives for the new set goes with the answer as its notes (`--notes`), in their own words.',
+    'correcting': 'The assistant is preparing your correction of these pictures.',
+    'tag_correcting': 'Being corrected',
     'add_words': 'Add words for the picture',
     'upload': 'Upload my own',
     'tag_use': 'Use footage',
@@ -720,7 +729,7 @@ WORDS = {
     'tag_waiting': 'Waiting',
     # design/213 (17 Nov 2026): the sets screen in the new layout; the chat says the same words and offers the same answers
     'again_set': 'Make again',
-    'again_ask': 'Make this set again? Claude rewrites the request from what the checks found.',
+    'again_ask': 'Make this set again? Claude rewrites the request from what the checks found and from your comment.',
     'approve_pic': 'Approve {letter}',
     'pick': 'Choose the picture that is the reference first.',
     'rule_person': 'For a person, picture A is the reference and the face goes with it',
@@ -730,8 +739,8 @@ WORDS = {
     'say_yes': 'Approve: this set is right. Picture A is the reference and the face goes with it.',
     'say_use': 'Approve: picture {letter} is the reference; pictures of this thing start from it.',
     'say_use_one': 'Approve: this picture is the reference; pictures of this thing start from it.',
-    'say_fix': 'Make it again with your words: "{words}". Claude rewrites the request first; the new set comes back to you.',
-    'say_again': 'Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.',
+    'say_fix': 'These pictures are corrected with your words: "{words}". The rest of each picture is kept. The corrected set comes back to you.',
+    'say_again': 'Make it again. Claude rewrites the request from what the checks found and from your comment. The new set comes back to you.',
     'say_remake': 'Make it again from the changed plan. The new set comes back to you.',
     'say_leave': '{label}. {shots} will be made with no reference of it.',
     'say_leave_none': '{label}. No made shot loses it.',
@@ -837,10 +846,24 @@ WORDS = {
     'g_wait': 'Not ready yet',
     'g_done': 'Recorded',
 }
+# what the correction does well and poorly: said beside the words box on the page and with the question in the chat (the one text of both)
+EDIT_TOLD = ('Minor corrections changes this picture and keeps the rest.\nIt does well: taking a thing out of the picture; changing the condition of a thing (newer, cleaner, less worn).\n'
+             'It does poorly: changing how a thing is built or shaped (its parts, how many there are, how they join). For that, ask another way, for example take the thing out, '
+             'or use Make again and describe it as it should be.\nSmall things around the place may shift.')   # one constant: the page shows it beside the words box, the chat says it with the question
+MARK_WORDS = {   # the marking control of the sets screen (the page): every word of it, sent once with the screen's words (`SETS_PAGE['mark']`)
+    'open': 'Mark the place', 'close': 'Close the marking', 'hint': 'Draw on the picture where the correction goes, then write what should change.',
+    'rect': 'Rectangle', 'paint': 'Paint', 'brush': 'Brush size', 'undo': 'Undo', 'redo': 'Redo', 'clear': 'Clear marks',
+    'most': 'Three marks at most on a picture. Take one away first.', 'list': 'Marks on this picture', 'none': 'No mark on this picture.',
+    'mark_rect': '{n}: a rectangle', 'mark_paint': '{n}: painted', 'remove': 'Remove', 'ask': 'What should change?', 'need': 'Say what to correct.',
+    'one': 'Mark the picture to correct, or tick "The same correction in every picture of this set".',
+    'fix_line': 'Corrects these pictures and keeps the rest of each.', 'again_line': 'Makes a new set from the description. Your words go with it.',
+    'own': 'Correct this picture', 'count': '{n} marked', 'told': EDIT_TOLD,
+}
 # design/216: the words of the sets screen itself (its list, its bottom bar, its end card), sent with the layout (`page_flow.page_words`); the page holds none
 SETS_PAGE = {
+    'mark': MARK_WORDS,
     'todo': 'Needs your answer', 'settled': 'Settled earlier, nothing to do', 'busy': 'Being made or looked at, nothing to answer yet', 'suggested': 'Suggested', 'against': 'Against advice', 'against_say': "This goes against Claude's advice.",
-    'done': {'approve': 'Approved', 'fix': 'Made again, your words', 'again': 'Made again', 'remake': 'Made again', 'own': 'Your picture', 'make': 'Will be made',
+    'done': {'approve': 'Approved', 'fix': 'Corrected, your words', 'again': 'Made again', 'remake': 'Made again', 'own': 'Your picture', 'make': 'Will be made',
              'set': 'Will be made', 'leave': 'No reference', 'rest': 'Will be made', 'rest_out': 'Some not made', 'photo': 'Another photo', 'standin': 'A stand-in'},
     'more': 'more', 'main': 'Main picture', 'compare': 'Compare with your footage', 'stop': 'Stop comparing', 'footage_head': 'Your footage: click one to see it beside the set',
     'answer': 'Your answer: ', 'kept': 'Kept from before: ', 'undo': 'Undo', 'cancel': 'Cancel', 'details': 'Details', 'fix_ask': 'What should change?', 'fix_need': WORDS['fix_words'],
@@ -1310,8 +1333,13 @@ def _round_v2(ctx, every, step):
                 chat += [_button(WORDS['approve_pic'].format(letter=letter[p['ref']]), 'use:' + p['ref']) for p in shown]
                 page.append({'label': WORDS['approve_all'].format(n=n_pics), 'choice': 'use', 'needs_words': False, 'act': 'approve', 'say': ''})
             if again:   # made the most times: no remake is offered (ref_sets.MAKES_LIMIT would hold it)
-                add(WORDS['fix'], 'correct', 'fix', WORDS['say_fix'], words=True, tell=WORDS['fix_tell'], go=WORDS['go_fix'], all={'label': WORDS['all_tick'], 'choice': 'correct_all', 'say': WORDS['say_fix_all']})
-                add(WORDS['again_set'] if one else WORDS['again_all'].format(n=n_pics), 'no', 'again', WORDS['say_again'], ask=WORDS['again_ask'])
+                # Minor corrections as an edit (SK, 25 Nov 2026): the page's marking control (`mark`; its words are the screen's, `SETS_PAGE['mark']`, with what it
+                # does well and poorly; `every`: the tick, on unless the operator takes it off; none on a set of one picture); the chat says the same with the
+                # question and gives the words alone
+                told = WORDS['fix_tell_edit'] + ' ' + EDIT_TOLD
+                add(WORDS['fix'], 'correct', 'fix', WORDS['say_fix'], words=True, tell=told, go=WORDS['go_fix'], all={'label': WORDS['all_tick'], 'choice': 'correct_all', 'say': WORDS['say_fix_all']},
+                    mark=True, **({} if one else {'every': {'label': WORDS['every_tick'], 'on': True}}))
+                add(WORDS['again_set'] if one else WORDS['again_all'].format(n=n_pics), 'no', 'again', WORDS['say_again'], tell=WORDS['again_tell'], ask=WORDS['again_ask'], comment=WORDS['again_hint'])
             if sf.get('changed'):
                 add(WORDS['remake'], 'remake', 'remake', WORDS['say_remake'])
             if not again and not person:   # made the most times: a thing may be left out (V.set_aside takes it then); a person shown in a made picture is never left out
@@ -1321,7 +1349,7 @@ def _round_v2(ctx, every, step):
             want = {'use': 'use:' + str(gold) if gold else chat[0]['choice'], 'remake': 'no'}.get(do)
             chat.sort(key=lambda b: b['choice'] != want)
             if again:   # design/215 (change 5): the page's tick "applies to every picture of this thing" as the chat's own answer, after the others
-                chat.append(_button(WORDS['fix_all'], 'correct_all', words=True, tell=WORDS['fix_tell']))
+                chat.append(_button(WORDS['fix_all'], 'correct_all', words=True, tell=told))
             page.sort(key=lambda b: b['act'] != {'use': 'approve', 'remake': 'again'}.get(do))
             if do in ('use', 'remake') and page[0]['act'] == {'use': 'approve', 'remake': 'again'}[do]:
                 page[0]['sug'] = True
@@ -1341,7 +1369,7 @@ def _round_v2(ctx, every, step):
             low = lambda x: x[:1].lower() + x[1:]
             for p, st in zip(shown, states):
                 view = p.get('view') or 'no view named'
-                pics.append({'_key': _ref_key(run, p['ref']), '_mark': _mark(refs, p['ref']), 'label': view if one else WORDS['picture'].format(letter=letter[p['ref']], view=view),
+                pics.append({'_key': _ref_key(run, p['ref']), '_mark': _mark(refs, p['ref']), 'ref': p['ref'], 'label': view if one else WORDS['picture'].format(letter=letter[p['ref']], view=view),   # `ref`: the picture's own id, by which the page names a mark on it
                              'letter': '' if one else letter[p['ref']], 'view': view, 'note': str((p.get('look') or {}).get('seen') or ''),
                              **({'weak': True} if (p.get('look') or {}).get('verdict') == 'weak' else {}), **({'flag': True} if p['ref'] in flagged else {}),
                              # design/216 (A4): what belongs to this picture, under it: its own faults, or that it has none, or that Claude could not check it (never "no fault" then)
@@ -1358,7 +1386,8 @@ def _round_v2(ctx, every, step):
             added = str(row.get('prompt') or '') if any(i.get('role') == 'footage' for i in beside) else ''
             remade = V.SET_REMADE.format(name=names[eid]) if V._answer_of(row)[1] else ''   # VW-25 issue 13: an answer stored on the pictures before: said on the set's own line, page and chat, until it is answered
             line = {**head(eid, f, STEP2_GROUPS[0], 'judge', WORDS['tag_rec_' + do] if do else ''),
-                    'text': '\n'.join(x for x in (remade, about(eid, f), most, WORDS['set_changed'] if sf.get('changed') else '') if x), **({'refused': remade} if remade else {}),
+                    'text': '\n'.join(x for x in (remade, sf.get('edit_note'), about(eid, f), most, WORDS['set_changed'] if sf.get('changed') else '') if x), **({'refused': remade} if remade else {}),
+                    **({'edit_note': sf['edit_note']} if sf.get('edit_note') else {}),   # a correction that was not made, or Claude's one question about it: said on the set's line until it is answered
                     **({'rec': rec_of(WORDS['rec_use_one' if one and do == 'use' else 'rec_' + do], do, str(proposed.get('reason') or ''))} if do else {}),
                     # design/216: the answer column speaks of the whole set (A3); approving against a "make again" asks once (A6)
                     'answer_head': WORDS['answer_one'] if one else WORDS['answer_all'].format(letters=_and([letter[p['ref']] for p in shown])),
@@ -1373,10 +1402,10 @@ def _round_v2(ctx, every, step):
                     **({'made_n': WORDS['made_twice'] if n_made == 2 else WORDS['made_n'].format(n=n_made)} if n_made > 1 else {}),
                     **({'most': most} if most else {}), **({'changed': WORDS['set_changed']} if sf.get('changed') else {}),
                     **({'partial': WORDS['partial'].format(made=part.get('made'), asked=part.get('asked'), missing=', '.join(part.get('missing') or []) or 'not named')} if part else {}),
-                    **({'earlier': earlier} if earlier else {}), **({'asked': WORDS['asked'].format(words=sf['asked'])} if sf.get('asked') else {}),
+                    **({'earlier': earlier} if earlier else {}), **({'asked': WORDS['edited' if sf.get('edited') else 'asked'].format(words=sf['asked'])} if sf.get('asked') else {}),
                     **({'loss': loss, 'cost': _cost(f, where)} if any(b['act'] == 'leave' for b in page) else {}), 'buttons': page}
 
-            def run_(choice, quote, words, eid=eid):
+            def run_(choice, quote, words, eid=eid, marks=None, every=None, own=None):
                 if choice == 'remake':
                     return {**make(eid, quote), 'tell': 'The set is being made again. ' + NOTHING}
                 if choice == 'aside':
@@ -1384,7 +1413,11 @@ def _round_v2(ctx, every, step):
                 golden = choice[4:] if choice.startswith('use:') else None
                 every_pic = choice == 'correct_all'
                 choice = 'correct' if every_pic else choice
-                V.set_answer(store, user, run, outputs, eid, 'yes' if golden else choice, golden, words if choice == 'correct' else '', all=every_pic)
+                # "Make again" keeps the operator's comment: the request is written again with it (the page's comment box, the chat's notes; in the chat the words
+                # fall back on the operator's word for the click, which is no comment). The marks, the tick and their own pictures go with "Minor corrections"
+                # (the page; the chat gives words alone)
+                comment = choice == 'correct' or (choice == 'no' and words != quote)
+                V.set_answer(store, user, run, outputs, eid, 'yes' if golden else choice, golden, words if comment else '', all=every_pic, marks=marks, every=every, own=own)
                 return _record_set(conn, store, user, run, outputs, quote, eid)
             sets.append(_v2_item(f"set:{eid}:{row.get('set')}", 'reference set', '', names[eid], WORDS['ask_person_set' if person else 'ask_one_set' if one else 'ask_thing_set'], run_, chat[:4], line, more=chat[4:],
                                  _key=f'set:{eid}', _eid=eid, _person=person, _rows=sorted(live, key=lambda r: int(r.get('set_n') or 1))[:len(LETTERS)], _kept=V._answered(session, kinds, eid, row),
@@ -2146,13 +2179,13 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
         'Shoot': 'Make the take now (paid)', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
         'Leave it out': 'This thing gets no reference', 'No reference needed': 'No reference of it; its shots are made without one',
         'Go on without a reference': 'No set of it; its shots are made without a reference',
-        'Correct every picture of it': 'The set is made again with your words, and they go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
+        'Correct every picture of it': 'Its pictures are corrected with your words, and the words go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
         'Make it': 'Make the set now (paid)', 'Yes, use it': 'Use the footage picture', 'Yes, make one': 'Have a set made (paid)',
         'Take the effect away': 'Make the drawing again without the added effect',
         'Select it anyway': 'Use it in the film as it is', 'Reject it': 'It is rebuilt from the start', 'One more round': 'The helpers try once more (allowed once)',
         'Use it as the reference': 'Take the footage picture; nothing is made', 'Make a clean set from it': 'A set is made from the footage picture', 'Have a set made': 'A set of three pictures is made',
         'No set needed': 'Its words carry it; nothing is made', 'Ask me each one': 'I ask you every thing in turn',
-        'Make a set': 'A set is made of it; it comes back to you to judge', 'Minor corrections': 'The set is made again with your words', 'Leave out': 'This thing gets no reference',
+        'Make a set': 'A set is made of it; it comes back to you to judge', 'Minor corrections': 'Its pictures are corrected with your words; the rest of each is kept', 'Leave out': 'This thing gets no reference',
         'Add words for the picture': 'A set is made with your words',
         'Use this layout as it is': 'The shot goes on with this layout, against its check', 'Try once more': 'The layout is rebuilt and checked again, three more times at most',
         'Change the shot': 'I will ask you what the shot becomes'}

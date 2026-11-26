@@ -191,6 +191,40 @@ def _gemini_set(req, parents, tries):
     return out
 
 
+def _gemini_edit(req, parents, tries):
+    """Minor corrections as an edit (SK, 25 Nov 2026): the set's own pictures corrected in one conversation, one picture per turn. Each turn
+    of `req['edit']['turns']` sends its picture (`n`, its place among the parents) and the words the server wrote for it; the model's own
+    corrected pictures stay in the conversation. A picture with no turn comes back as it is. A turn that brings no picture ends the whole
+    edit, with no picture kept (a set is never left half corrected); a limit or an outage on any turn answers as that turn did, so the job
+    is queued again."""
+    turns, contents, made = req['edit']['turns'], [], {}
+    usage_in, usage_out, idx = 0, 0, None
+    for k, t in enumerate(turns, 1):
+        contents.append({'role': 'user', 'parts': _parent_parts([parents[t['n'] - 1]]) + [{'text': t['text']}]})
+        r, idx = _gemini_post(req['model'], {'contents': contents, 'generationConfig': _gemini_config(req)}, tries)
+        if r.status_code >= 400 and (k == 1 or r.status_code == 429 or r.status_code >= 500):
+            return _error(r, idx)
+        body = r.json() if r.status_code < 400 else {}
+        cand = (body.get('candidates') or [{}])[0]
+        parts = [p for p in ((cand.get('content') or {}).get('parts') or []) if isinstance(p, dict) and (p.get('inlineData') or p.get('text'))]
+        got = [p['inlineData'] for p in parts if p.get('inlineData')]
+        if not got:
+            words = (' '.join(str(p.get('text') or '') for p in parts).strip() or (body.get('promptFeedback') or {}).get('blockReason')
+                     or (f'HTTP {r.status_code}' if r.status_code >= 400 else 'no image in the answer'))
+            out = _Answer(400, {'error': {'type': 'no_image', 'message': words if k == 1 else f'picture {k} of {len(turns)} did not come back: {words}'}}, words)
+            out.key_index = idx
+            return out
+        usage = body.get('usageMetadata') or {}
+        usage_in += usage.get('promptTokenCount') or 0
+        usage_out += usage.get('candidatesTokenCount') or 0
+        made[t['n']] = got[0]['data']
+        contents.append({'role': 'model', 'parts': parts})
+    out = _Answer(200, {'data': [{'b64_json': made.get(n) or base64.b64encode(png).decode('ascii')} for n, (_, png) in enumerate(parents, 1)],
+                        'usage': {'input_tokens': usage_in, 'output_tokens': usage_out}, 'notes': '', 'sources': []})
+    out.key_index = idx
+    return out
+
+
 def _gemini_image(req, parents):
     """design/120: one picture from Gemini's image model through the key pool (the same cooling as _openai): the prompt and the pictures as parts, the
     aspect and the tier in imageConfig; the first image part comes back as OpenAI's shape so the rest of process_image is shared."""
@@ -198,6 +232,8 @@ def _gemini_image(req, parents):
     tries = keys.each('gemini', settings())
     if not tries:
         raise Problem(503, 'IMAGE_CONFIGURATION', 'Configure VW2_GEMINI_API_KEY on the server.')
+    if req.get('edit'):   # Minor corrections as an edit: the set's own pictures, corrected one per turn
+        return _gemini_edit(req, parents, tries)
     if req.get('set') and req.get('views'):   # design/151 section 13: a set is one conversation, one picture per turn
         return _gemini_set(req, parents, tries)
     payload = {'contents': [{'role': 'user', 'parts': _parent_parts(parents) + [{'text': req['prompt']}]}], 'generationConfig': _gemini_config(req), **_gemini_tools(req)}
@@ -318,6 +354,8 @@ def process_image(job):
         if req.get('provider') == 'gemini':   # design/120: priced flat per picture plus its inputs
             cost = {'provider': 'gemini', 'model': req['model'], 'tier': str((req.get('size') or {}).get('tier') if isinstance(req.get('size'), dict) else '') or settings().GEMINI_IMAGE_SIZE,
                     'inputs': len(req.get('parents') or []), 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens'), **({'pictures': 1 + len(extra)} if req.get('set') else {})}
+            if req.get('edit'):   # an edit is paid by the pictures it corrected: one that came back as it was cost nothing
+                cost.update(inputs=len(req['edit']['turns']), pictures=len(req['edit']['turns']))
         else:
             cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
         return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
@@ -439,6 +477,9 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
     ref, board = ref_of(session, job['request']['reference']['id'])
     due = False
     if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
+        if ref.get('edit_of'):   # Minor corrections as an edit: the set before goes to the versions, or stays when nothing came
+            from . import ref_sets
+            ref_sets.edit_back(session, ref)
         made = [ref]
         for n, x in enumerate((result or {}).get('extra') or [], 2):   # design/151: the set's other pictures are sibling candidates (set, set_n)
             sid = f"{ref['id']}-{n}"

@@ -342,7 +342,8 @@ def code_checks(ref, result, parents):
     else:
         out.append({'check': 'size', 'pass_when': f'the picture is {want}', 'weight': 'must', 'pass': (got == want) if want and got else None, 'seen': got or ''})
     if parents:
-        ok = lambda p: p.get('status') == 'approved' or p.get('id') == ref.get('fix_of') or (ref.get('kind') == 'state' and p.get('status') == 'candidate')   # design/124 decision 9: never a candidate start
+        ok = lambda p: (p.get('status') == 'approved' or p.get('id') == ref.get('fix_of') or (ref.get('kind') == 'state' and p.get('status') == 'candidate')   # design/124 decision 9: never a candidate start
+                        or bool(ref.get('edit_of')))   # Minor corrections as an edit: a corrected set is made from the pictures it corrects
         out.append({'check': 'parent', 'pass_when': 'made from approved parents (a fix from the picture it fixes, a state from the previous state)', 'weight': 'must',
                     'pass': all(ok(p) for p in parents), 'seen': ', '.join(p.get('id', '')[:8] for p in parents)})
     return out

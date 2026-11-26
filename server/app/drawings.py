@@ -111,7 +111,7 @@ def set_drawing(conn, store, user, run, outputs, element_id, description):
     VS.save_session(store, run, session)
     slot = ((session.get('round') or {}).get('elements') or {}).get(element_id) or {}
     late = ('Its footage picture was already taken as its reference, so no set will be made with these drawings on this round: say so to the operator. ' if slot.get('from_footage') else
-            'Its set was already made without these drawings: once they are approved, the operator answers that set No or Correct it on step 2 and it is made again with them. ' if slot.get('set') else '')
+            'Its set was already made without these drawings: once they are approved, the operator answers that set No (Make again) on step 2 and it is made again with them. ' if slot.get('set') else '')
     return {'element_id': element_id, 'sha256': sha, 'status': 'proposed', **({'late': late.strip()} if late else {}), 'views': [{'id': v['id'], 'name': v['name'], 'kind': v['kind']} for v in views],
             'assumed': rows[element_id]['assumed'],
             'next': late + f"The drawings are made (free). The operator looks at them and approves or corrects them on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown; "
