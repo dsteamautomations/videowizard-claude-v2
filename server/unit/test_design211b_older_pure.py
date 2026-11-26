@@ -122,11 +122,11 @@ CASES = {
     'complete: nothing is made': ('complete', lambda st, c: VS.set_make(c, st, USER, RUN, [], 'STREET')),
     'complete: the round file sent again': ('complete', lambda st, c: VS.round_start(st, USER, RUN, [], [{'element_id': 'FAN', 'prompt': 'The dial on its plate.'}], conn=c)),
 }
-BEFORE = {   # the fingerprint of each case on main at d255486
+BEFORE = {   # the fingerprint of each case on main at d255486; VW-25 issue 13 (25 Nov 2026): the two refusals of `round_sets` are new, the older two sentences are retired
     'step1: the round file sent again makes an older round again': 'ff3fe20c30ccbeb9',
     'step1: done orders every set at once': '77453abfe0f0a228',
     'step1: an answer to a set is refused': 'e50ed188e547e36d',
-    'making: the sets are not judged yet': '9488f049203ee40d',
+    'making: the sets are not judged yet': 'ae0b6a528db9fe3d',   # "The street: its set is being made. An answer is taken when it is back."; before: "1 set is still being made: ..."
     'making: a set being made is left alone': '06962716ae8841f9',
     'step2: yes on the set, the rest not made': 'eac679458d076c75',
     'step2: correct it makes the set again with the correction': 'edef9f85a2021766',
@@ -136,7 +136,7 @@ BEFORE = {   # the fingerprint of each case on main at d255486
     'step2: the round file sent again never replaces a set': '58abcb79400a80d2',
     'step2: a set not made is made now': 'd3073c3857737bbc',
     'step2: the sets queued by hand': '017c11d5cdee9084',
-    'complete: nothing is judged': '08a9be5e0ca5be12',
+    'complete: nothing is judged': 'a9b6468d870adf9b',   # "The reference round is not at step 2: there is no set to answer now."; before: "No reference round is waiting for its sets."
     'complete: nothing is made': 'fb8c61bbc0c4afcf',
     'complete: the round file sent again': '30eb422088d962f9',
 }

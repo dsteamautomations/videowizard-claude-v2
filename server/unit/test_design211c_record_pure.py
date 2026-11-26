@@ -193,8 +193,10 @@ def test_an_answer_to_a_set_made_again_since_is_stale_and_an_unknown_choice_is_r
     film = Film(monkeypatch, '2')
     l = film.lines()
     out = film.record({**ans(l['set:MASON'], 'yes'), 'item': 'set:MASON:s-mason-0'}, ans(l['set:STREET'], 'clean'), ans(l['sets:rest'], 'accept_all'))
-    assert out['stale'] == ['set:MASON'] and film.called('round_sets') == [] and film.called('round_rest') == []
-    assert [r['key'] for r in out['refused']] == ['set:STREET', 'sets:rest'] and all(r['message'].startswith('Not an answer to this line: ') for r in out['refused'])
+    # VW-25 issue 13: an answer for the pictures before is refused by name, with the reason (the older way, a silent "stale", is retired for a set's answer)
+    assert out['stale'] == [] and film.called('round_sets') == [] and film.called('round_rest') == []
+    assert [r['key'] for r in out['refused']] == ['set:MASON', 'set:STREET', 'sets:rest'] and 'made again after this answer was given' in out['refused'][0]['message']
+    assert all(r['message'].startswith('Not an answer to this line: ') for r in out['refused'][1:])
     assert {x['key']: x for x in out['page']['lines']}['set:STREET']['refused'].startswith("Not an answer to this line: 'clean'. Its answers are: Approve A")
 
 
@@ -279,7 +281,7 @@ def test_a_refusal_of_the_second_go_or_of_a_remake_is_kept_on_its_line_and_the_r
     def refuse(conn, store, user, run, outputs, quote):
         raise ValueError(cap)
 
-    def sets(store, user, run, outputs, verdicts, quote, conn=None, partial=False):
+    def sets(store, user, run, outputs, verdicts, quote, conn=None, partial=False, each=False):
         if 'T_LAY' in verdicts:
             raise ValueError(limit)
         return film.round_sets(store, user, run, outputs, verdicts, quote, conn, partial)

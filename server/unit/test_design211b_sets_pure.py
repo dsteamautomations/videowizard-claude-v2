@@ -129,7 +129,7 @@ def test_a_persons_pictures_one_and_three_are_fixed_and_the_plan_drives_picture_
 @pytest.mark.parametrize('eid', KINDS)
 def test_the_request_places_the_plans_description_and_requirements_word_for_word(eid):
     r, e = request(eid), el(eid)
-    assert e['description'] in r['prompt'] and e['requirements'] in r['prompt'] and e['name'] in r['prompt']
+    assert e['description'] in r['prompt'] and e['requirements'] in r['prompt'] and (e['name'] in r['prompt']) == (e['kind'] != 'person')   # VW-25 issue 12: a person's request holds no name
     assert r['parts']['description'] == e['description'] and r['parts']['requirements'] == e['requirements'] and r['parts']['kind'] == e['kind'] and r['parts']['subject'] == e['name']
     assert [v['name'] for v in r['views']] == RS.view_names(e) == r['parts']['views'] and len(r['views']) == 3
     assert set(r) == {'prompt', 'views', 'inputs', 'search', 'lines', 'parts'}
@@ -261,7 +261,7 @@ def test_the_approved_drawings_follow_the_footage_pictures_with_their_facts_and_
 def test_a_person_is_made_from_the_description_alone_and_from_their_photo_only_with_the_permission():
     r = request('MASON')
     assert r['inputs'] == [] and r['search'] is False and r['parts']['source'] == 'words' and RS.FROM_WEB not in r['prompt'] and 'Google' not in r['prompt']
-    assert r['prompt'].startswith('Reference set of The mason, a person in this film.') and 'Garments: a white shirt, a checked lungi.' in r['prompt']   # design/211 review: no code name
+    assert r['prompt'].startswith(RS.PERSON_OPENING + '\n') and 'Garments: a white shirt, a checked lungi.' in r['prompt']   # design/211 review: no code name; VW-25 issue 12: no name (the older opening line is retired)
     assert RS.PERSON_SET.format(a='a full-length front view, standing at ease', b='right hand and forearm, the same person', c='a close view of the face') in r['prompt']
     s = ready()
     s['references']['own-1'] = {'id': 'own-1', 'kind': 'supplied', 'element_id': 'MASON', 'status': 'approved', 'created_at': F.NOW}

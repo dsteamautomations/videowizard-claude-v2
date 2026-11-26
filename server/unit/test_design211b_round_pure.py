@@ -529,14 +529,16 @@ def test_no_set_is_answered_before_its_look_is_recorded():
     post(store, conn)
     done(store, conn)
     back(store)
-    assert refused(lambda: judge(store, conn, {'STREET': {'verdict': 'no'}})) == RS.SET_NO_LOOK.format(eid='STREET')
-    assert refused(lambda: judge(store, conn, {})) == RS.SET_NO_LOOK.format(eid='MASON')
+    # VW-25 issue 13: each set by its own state. The page and the chat get the wait by name; the chat tool's whole send is refused with it
+    assert judge(store, conn, {'STREET': {'verdict': 'no'}})['waiting'] == {'STREET': VS.SET_WAITS['looking'].format(name='The street')}
+    assert refused(lambda: judge(store, conn, {'STREET': {'verdict': 'no'}}, partial=False)) == VS.SET_WAITS['looking'].format(name='The street')
+    assert judge(store, conn, {})['approved'] == [] and saved(store)['references'][saved(store)['round']['elements']['STREET']['set']]['status'] == 'candidate'
     assert refused(lambda: VS.set_answer(store, USER, RUN, [], 'STREET', 'yes', None, '')) == RS.SET_NO_LOOK.format(eid='STREET')
     look(store, only=['STREET'])
     assert VS.set_answer(store, USER, RUN, [], 'STREET', 'no', None, '')['stored'] is True       # its own look is recorded: its answer can be stored
     assert refused(lambda: VS.set_answer(store, USER, RUN, [], 'MASON', 'yes', None, '')) == RS.SET_NO_LOOK.format(eid='MASON')
-    assert refused(lambda: judge(store, conn, {'STREET': {'verdict': 'no'}})) == 'No reference round is waiting for its sets.'   # the round is still with Claude
-    assert saved(store)['references'][saved(store)['round']['elements']['STREET']['set']]['status'] == 'candidate'
+    out = judge(store, conn, {'STREET': {'verdict': 'no'}})   # its look is recorded: its answer is recorded though the round is still with Claude for the others (the older way, the round's refusal, is retired)
+    assert out['rewrite'] == ['STREET'] and out['pass'] == 'looking' and saved(store)['references'][saved(store)['round']['elements']['STREET']['set']]['status'] == 'rejected'
 
 
 def test_the_first_sets_are_judged_from_the_chat_tool_while_the_others_wait():

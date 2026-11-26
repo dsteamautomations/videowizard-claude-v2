@@ -477,8 +477,7 @@ REFS_GO = 'The references come next: run `vw visuals page`. The operator answers
 REFS_HERE = ('The references come next, and their round is in this answer: send its pictures and write it to the page (steps 2 and 3 of `how`), then give the operator '
              'the link. They answer every person, object and place there, in one visit.')
 REFS_KEPT = 'Kept, not recorded yet: the sets are made when every thing is answered. Choose again to change it.'
-SETS_KEPT = 'Kept, not recorded yet: it is recorded when the sets still being made are back. Choose again to change it.'
-SETS_HELD = 'Kept, not recorded yet: the reason is on this line. Choose again to change it.'
+SETS_HELD = 'Kept, not recorded yet: the reason is on this line. Choose again to change it.'   # VW-25 issue 13: the one note of a kept set answer; "kept until the other sets are back" is retired
 SETS_WAIT = 'The sets are being made. Wait for them (`vw visuals status --wait 900`), then run `vw visuals page`: the operator judges the sets there, in one visit.'
 SETS_STAND = ('No set waits for the operator now, and none is being made: the answers kept wait, and the reason is on each line. Tell the operator; when it is settled, '
               'run `vw visuals page`.')
@@ -626,7 +625,7 @@ def _v2_line(ctx, item, paid):
     elif kept:
         choice = ('use:' + kept['golden']) if kept.get('golden') else kept['verdict']
         out.update(kept=next((b['label'] for b in buttons if b['choice'] == choice), 'Use my own picture' if kept.get('golden') else choice),
-                   kept_note=SETS_KEPT if V._round_pass(ctx['session'], ctx['session']['round']) == 'making' else SETS_HELD)
+                   kept_note=SETS_HELD)
     return out
 
 
@@ -726,7 +725,7 @@ def _sets_lines(ctx):
                                    + ('' if person else ' Choose the one every shot starts from: under the picture, or with a button below.')),
                           'pics': [{**pic(CF._ref_key(run, r['id']), CF.LETTERS[n], r.get('sha256')), **({} if person else {'choice': 'use:' + r['id']})} for n, r in enumerate(item['_rows'])],
                           'buttons': buttons, 'comment': True, 'own': _own_line(ctx, item, paid),
-                          **({'kept': said, 'kept_note': SETS_KEPT if V._round_pass(session, rd) == 'making' else SETS_HELD} if a else {})})
+                          **({'kept': said, 'kept_note': SETS_HELD} if a else {})})
         elif item:   # its set was not made, or the picture service refused a person's photo
             cause = item.get('_cause')
             lines.append({**head, 'state': 'open', 'item': item['id'], 'ask': _ask(item), 'buttons': _round_buttons(item, paid), 'comment': True, 'own': _own_line(ctx, item, paid),
@@ -882,7 +881,9 @@ def _round_answer(ctx, a, choice, words):
         row = ((session.get('round') or {}).get('elements') or {}).get(eid) or {}
         if choice == 'own' and mine and row.get('own') and V.golden_of(session, eid) == mine:   # its set was not made: the server's own-picture path already took the picture as its reference
             return 'Use my own picture' + (f': {words}' if words else ''), {}, False
-        return None
+        gone = V.set_gone(session, ctx['plan'], a.get('item'))   # VW-25 issue 13: the same answer sent twice is recorded once; an answer of the pictures before is refused by name
+        V.need(not gone or gone[0], gone[1] if gone else '')
+        return (gone[1], {'tell': gone[1]}, False) if gone else None
     eid, person, step1 = item['_eid'], item['_person'], item['id'].startswith('round1:')
     _budget, paid = _money(ctx)
     marks = {str(k): str(v) for k, v in a['pics'].items()} if item.get('_v2') and step1 and eid and isinstance(a.get('pics'), dict) else {}
@@ -1146,7 +1147,7 @@ def _page(conn, store, user, run, outputs):
     (accepted; `reopen` while the treatment is still a draft) or `with_assistant` (sent back, with the operator's words). A new `round` each call."""
     ended = False
     try:
-        ended = (CF.flush_sets(conn, store, user, run, outputs, 'Answered on the page') or {}).get('pass') == 'complete'   # design/210: an answer kept on a set while others were being made is recorded once they are back, as `vw visuals next` does; a round with nothing left to judge ends here
+        ended = (CF.flush_sets(conn, store, user, run, outputs, 'Answered on the page') or {}).get('pass') == 'complete'   # design/210: an answer kept on a set and not recorded yet is recorded here, as `vw visuals next` does; a round with nothing left to judge ends here
     except (ValueError, Problem):
         pass   # said on its line when the operator next answers
     ctx = CF._ctx(conn, store, user, run, outputs)

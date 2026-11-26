@@ -4024,7 +4024,42 @@ def _queue_sets(conn, store, user, run, outputs, eids):
     return queued, errors
 
 
-def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=False):
+# VW-25 issue 13 (25 Nov 2026): each set is judged by its own state. The round's state (`ref_sets.state`) only says whose turn it is and closes the round.
+NOT_AT_SETS = 'The reference round is not at step 2: there is no set to answer now.'
+SET_WAITS = {'making': '{name}: its set is being made. An answer is taken when it is back.',
+             'looking': '{name}: the assistant is looking at its set. An answer is taken after that.',
+             'rewrite': '{name}: its answer is recorded. Its set is made again from those words; the new set is answered when it is back.'}
+SET_REMADE = '{name}: its set was made again after this answer was given. The answer was for the earlier pictures, so it is not recorded. Look at the new set and answer it.'
+SET_RECORDED = '{name}: its answer is recorded already.'
+
+
+def _set_wait(session, eid, row):
+    """What one set waits for before the operator's answer on it is recorded: 'making' (it is being made), 'rewrite' (its answer is recorded and its
+    request is written again), 'looking' (it is made and the assistant's look is not recorded). None: it is ready, or it was never made."""
+    if _set_rows(session, eid, row.get('set'), ('generating',)):
+        return 'making'
+    if not round_v2(session):
+        return None
+    from . import ref_sets
+    return 'rewrite' if row.get('rewrite_due') else 'looking' if _set_rows(session, eid, row.get('set')) and not ref_sets.looked(session, eid, row) else None
+
+
+def set_gone(session, plan, item_id):
+    """An answer to a set's card that is not open any more (`set:<thing>:<set>`), for the page and the chat alike: (True, SET_RECORDED) when the answer
+    of that set is recorded already (the same answer sent twice); (False, SET_REMADE) when the thing's set was made again since, so the answer is of
+    the pictures before; None for any other card."""
+    kind, _, rest = str(item_id or '').partition(':')
+    eid, _, sid = rest.rpartition(':')
+    row = ((session.get('round') or {}).get('elements') or {}).get(eid) or {}
+    if kind != 'set' or not row.get('set'):
+        return None
+    name = next((e.get('name') for e in (plan or {}).get('elements') or [] if e['id'] == eid), None) or eid
+    if sid in [h.get('set') for h in row.get('history') or []] + [(row.get('rewrite_due') or {}).get('set')] or (sid == row['set'] and _set_rows(session, eid, sid, ('approved',))):
+        return True, SET_RECORDED.format(name=name)
+    return (False, SET_REMADE.format(name=name)) if sid != row['set'] else None
+
+
+def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=False, each=False):
     """design/151: the one-shot verdicts on the sets: Yes (the set approved; a thing's golden picture is the ticked one, Q2; a person's is picture 1),
     No or Correct it (the set rejected with the words; made again, the correction in the prompt, never from a rejected picture). Complete when every
     element is approved or ignored; 'making' while any set is made again.
@@ -4033,51 +4068,69 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     those are recorded, every other set is left as it is (a stored answer too) and the round stays on step 2 for them.
     Follow-up, 11 Nov 2026: at the spend cap a Yes is still recorded (it costs nothing); a No or Correct it whose remake the cap does not allow is
     held: its set and its whole answer stay as they are, stored, and wait (returned in `held` with the reason). A round where nothing is left to
-    judge (every other set approved, the rest set aside) completes."""
+    judge (every other set approved, the rest set aside) completes.
+    VW-25 issue 13 (25 Nov 2026): a set that is ready is answered at any time. One that is not (`_set_wait`) is left as it is, a stored answer too, and
+    an answer sent for it comes back in `waiting` with what it waits for; the round stays open for it. `already`: the sets whose answer was recorded
+    before. `each` (the page and the chat, `chat_flow.flush_sets`): an answer with a fault of its own comes back in `refused` and the other answers are
+    still recorded; without it one fault refuses the send, as before. An answer stored on the pictures before (the set was made again since) is never
+    recorded (`_answer_of`); the set's own line says so until it is answered (SET_REMADE). Retired: the refusal of the whole send while one set is
+    being made, has no look, or the round is with the assistant."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
-    making = [eid for eid, r in ((rd or {}).get('elements') or {}).items() if r.get('set') and not r.get('ignored') and _set_rows(session, eid, r.get('set'), ('generating',))] if rd and rd.get('kept') and rd.get('pass') == 'making' else []
-    if making:   # F3, E12: Done waits for the sets still being made, and says which
-        names = {e['id']: e.get('name') or e['id'] for e in guarded(lambda: current_plan(store, session))['elements']}
-        need(False, f"{len(making)} set{' is' if len(making) == 1 else 's are'} still being made: {', '.join(names.get(e, e) for e in making)}. Done is offered when {'it is' if len(making) == 1 else 'they are'} back.")
     v2 = round_v2(session)
-    if v2:   # design/211: no set is answered before its look is recorded
+    if v2:
         from . import ref_sets
-        unlooked = [eid for eid, r in rd['elements'].items() if (not verdicts or eid in verdicts) and r.get('set') and not r.get('ignored') and _set_rows(session, eid, r['set']) and not ref_sets.looked(session, eid, r)]
-        need(not unlooked, ref_sets.SET_NO_LOOK.format(eid=(unlooked or [''])[0]))
-    need(rd and rd.get('kept') and _round_pass(session, rd) in (2, 'rewrite' if v2 else 2), 'No reference round is waiting for its sets.')
+    need(rd and rd.get('kept') and _round_pass(session, rd) in ((2, 'making', 'looking', 'rewrite') if v2 else (2, 'making')), NOT_AT_SETS)
     quote = said(quote, 'Sets done', user)
     verdicts = dict(verdicts or {})
     plan = guarded(lambda: current_plan(store, session))
     kinds = {e['id']: e['kind'] for e in plan['elements']}
+    name = lambda eid: next((e.get('name') for e in plan['elements'] if e['id'] == eid), None) or eid
     # hotfix 2, 11 Nov 2026 (VW-19): a set approved in an earlier pass is settled; it needs no verdict again (its pictures are approved, no longer candidates)
     settled = {eid for eid, r in rd['elements'].items() if r.get('verdict') == 'yes' and _set_rows(session, eid, r.get('set'), ('approved',))}
     active = [eid for eid, r in rd['elements'].items() if not r.get('ignored') and not r.get('from_footage') and eid not in settled]   # a footage element was done at step 1
     if v2:   # design/211: a thing whose set waits for the second go, or that is back with the operator after a second send, is no set to judge
         open_ = ref_sets.rest_of(rd) + [eid for eid, r in rd['elements'].items() if r.get('reopened')]
         active = [eid for eid in active if eid not in open_]
+    refused = {}
+    waits = {eid: w for eid in active for w in [_set_wait(session, eid, rd['elements'][eid])] if w}
+    waiting = {eid: SET_WAITS[w].format(name=name(eid)) for eid, w in waits.items() if (verdicts.get(eid) or {}).get('verdict')}
+    already = [eid for eid in verdicts if eid in settled]
+    active = [eid for eid in active if eid not in waits]
+    need(partial or not waiting, next(iter(waiting.values()), ''))   # the chat tool, which sends its sets as one whole: a set that is not ready is refused by name, with what it waits for
     for eid in active if not partial else []:
         if not (verdicts.get(eid) or {}).get('verdict') and _answered(session, kinds, eid, rd['elements'][eid]):
             verdicts[eid] = _answered(session, kinds, eid, rd['elements'][eid])
     unanswered = [eid for eid in active if not (verdicts.get(eid) or {}).get('verdict')] if partial else []
     active = [eid for eid in active if eid not in unanswered]
-    need(active or not unanswered, 'No set has an answer yet: there is nothing to record.')
+    need(active or not unanswered or waiting or already, 'No set has an answer yet: there is nothing to record.')
     budget = _set_budget(run, session, visuals_spend(conn, run)) if conn is not None else None
     room = int((budget[1] - budget[0] + 1e-9) // budget[2]) if budget and budget[2] > 0 else None   # how many sets the cap still allows
-    for eid in active:
+    for eid in list(active):
         r, v = rd['elements'][eid], verdicts.get(eid) or {}
-        need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
-        rows = _set_rows(session, eid, r.get('set'))
-        if v['verdict'] == 'yes':
-            need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no or correct it to make it again.")
-            need(not (kinds.get(eid) == 'person' and (r.get('made') or {}).get('photo') and not likeness_of(session, eid)),   # design/207 (D1): for the page and the chat alike
-                 f"{eid}: this set was made from the person's photo and the permission is no longer recorded: it cannot be approved. Make it again (`vw visuals round --make {eid}`); it is then made from the description.")
-            if kinds.get(eid) != 'person':
-                need(v.get('golden'), f'{eid}: tick the golden picture of its set, the one every shot of {eid} starts from.')
-            if v.get('golden') and (kinds.get(eid) != 'person' or (session['references'].get(v['golden']) or {}).get('kind') == 'supplied'):   # U19: or the operator's own picture of this element
-                need(_golden_ok(session, kinds.get(eid), eid, v['golden'], rows), f"{eid}: the starting picture chosen is not a picture of its set now (the set was made again since): choose it again.")   # R19: no picture id in a message
-        if v['verdict'] == 'correct':
-            need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
+        try:
+            need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
+            rows = _set_rows(session, eid, r.get('set'))
+            if v['verdict'] == 'yes':
+                need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no or correct it to make it again.")
+                need(not (kinds.get(eid) == 'person' and (r.get('made') or {}).get('photo') and not likeness_of(session, eid)),   # design/207 (D1): for the page and the chat alike
+                     f"{eid}: this set was made from the person's photo and the permission is no longer recorded: it cannot be approved. Make it again (`vw visuals round --make {eid}`); it is then made from the description.")
+                if kinds.get(eid) != 'person':
+                    need(v.get('golden'), f'{eid}: tick the golden picture of its set, the one every shot of {eid} starts from.')
+                if v.get('golden') and (kinds.get(eid) != 'person' or (session['references'].get(v['golden']) or {}).get('kind') == 'supplied'):   # U19: or the operator's own picture of this element
+                    need(_golden_ok(session, kinds.get(eid), eid, v['golden'], rows), f"{eid}: the starting picture chosen is not a picture of its set now (the set was made again since): choose it again.")   # R19: no picture id in a message
+            if v['verdict'] == 'correct':
+                need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
+            if v2 and v['verdict'] != 'yes' and v.get('all') and str(v.get('words') or '').strip():   # design/215 (change 5): checked once, here, before anything is recorded: later requests carry these words without reading them again
+                try:
+                    library.check_prompt(' '.join(str(v['words']).split()), placed=False)
+                except ValueError as exc:
+                    need(False, f'{eid}: these words cannot be kept for every picture: {exc}')
+        except (ValueError, Problem) as exc:   # VW-25 issue 13: on the page and in the chat one faulty answer never stops the others; it is refused by its own name
+            if not each:
+                raise
+            refused[eid] = str(getattr(exc, 'message', '') or exc)
+            active.remove(eid)
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
     again, held, against = [], {}, []
     for eid in active:
@@ -4108,11 +4161,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             _feedback_image(session, run, user, x, 'reject', quote, words)
         if v2:   # design/211: nothing is ordered here: Claude rewrites the request from these words first (ref_sets.round_rewrite); the earlier request is kept
             r.setdefault('operator_words', []).extend([words] if words else [])
-            if words and v.get('all'):   # design/215 (change 5): kept for the thing, in the same save as the answer: every later request of it carries them
-                try:   # checked once, here: later requests carry these words without reading them again
-                    library.check_prompt(words, placed=False)
-                except ValueError as exc:
-                    need(False, f'{eid}: these words cannot be kept for every picture: {exc}')
+            if words and v.get('all'):   # design/215 (change 5): kept for the thing, in the same save as the answer: every later request of it carries them (checked above)
                 ref_sets.correction_kept(session, user, eid, words, r.get('set'))
             r['rewrite_due'] = {'words': words, 'set': r.get('set'), 'at': stamp['at']}
         elif words:
@@ -4138,9 +4187,11 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     left = unanswered + [eid for eid in again if eid not in queued] + list(held)   # still on step 2: the sets with no answer yet, a set that could not be made again (the page offers Make it now), a remake the cap holds
     if v2:
         left += ref_sets.rest_of(rd) + [eid for eid, r in rd['elements'].items() if r.get('reopened') or r.get('held') or r.get('things_due')]   # design/216: a held place is not judged yet; design/211: the round stays open while sets wait for the second go, or a thing is back with the operator
-    rd['pass'] = 'making' if queued else (2 if left else 'complete')
+    left += list(waits) + list(refused)   # VW-25 issue 13: the round closes only when no set is being made, unlooked or waiting for its rewrite, and every set has its answer
+    rd['pass'] = 'making' if queued or 'making' in waits.values() else (2 if left else 'complete')
     save_session(store, run, session)
     return {'pass': _round_pass(session, rd) if v2 else rd['pass'], 'queued': queued, 'errors': errors, 'approved': [eid for eid in active if verdicts[eid]['verdict'] == 'yes'], 'held': held, **({'unanswered': unanswered} if partial else {}),
+            **{k: x for k, x in (('waiting', waiting), ('refused', refused), ('already', already)) if x},
             **({'rewrite': [eid for eid in again], 'then': ref_sets.then_of(session) or (_round_complete_words() if _round_pass(session, rd) == 'complete' else None)} if v2 else {})}
 
 
@@ -4174,7 +4225,7 @@ def _round_row(session, element_id, where, answering=False):
     """The row of one element in a kept round that is at `where`; refused in plain words otherwise."""
     rd = session.get('round')
     step = _round_pass(session, rd) if rd and rd.get('kept') else None
-    need(step in where, 'The reference round is not at step 2: there is no set to answer now.' if answering or where == (2,) else 'The reference round is not at the step where its sets are made: there is nothing to make now.')
+    need(step in where, NOT_AT_SETS if answering or where == (2,) else 'The reference round is not at the step where its sets are made: there is nothing to make now.')
     row = rd['elements'].get(element_id)
     need(row, f'{element_id} is not in the reference round.')
     need(not row.get('ignored'), f'{element_id} was set to Ignore at step 1: it has no set.')
@@ -4191,6 +4242,7 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
     need(verdict in (None, 'yes', 'no', 'correct'), f'{element_id}: the answer is Yes, No or Correct it.')
     rows = _set_rows(session, element_id, row.get('set'))
     need(rows or not _set_rows(session, element_id, row.get('set'), ('generating',)), f'{element_id}: its set is being made: there is nothing to answer yet.')
+    need(rows or not row.get('rewrite_due'), SET_WAITS['rewrite'].format(name=element_id))   # VW-25 issue 13: what it waits for, by name
     need(rows, f'{element_id}: its set is approved already; it needs no answer.' if _set_rows(session, element_id, row.get('set'), ('approved',)) else f'{element_id}: its set was not made: there is nothing to answer yet.')
     if v2:   # design/211: no answer before the look; after three makes "No" and "Correct it" are held
         from . import ref_sets
@@ -4343,7 +4395,7 @@ def set_make(conn, store, user, run, outputs, element_id, quote=None):
         session['references'][rid].update(status='rejected', rejection=stamp)
         if (session.get('golden') or {}).get(element_id) == rid:
             session['golden'].pop(element_id)
-    session['round']['elements'][element_id].pop('answer', None)   # it was for the set before
+    # VW-25 issue 13: an answer stored for the set before stays stored: it is never recorded (`_answer_of`), and the new set's line says so until the operator answers it (SET_REMADE)
     session['round']['pass'] = 'making'
     save_session(store, run, session)
     return {'element_id': element_id, 'queued': True, 'pass': 'making', 'next': f'{element_id}: its set is being made; it comes back on step 2.',

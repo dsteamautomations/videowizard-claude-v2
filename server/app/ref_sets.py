@@ -154,11 +154,11 @@ ONE_THING_FOOTAGE = ("One rule above all: show one real thing, as one real photo
                      'subject. Do not combine them into a single picture, and do not add details of another variant to it. Everything in the picture must belong to one consistent '
                      'real thing; if two details could not both be true of it at the same time, one of them does not belong. Mention the other variants you saw only in your notes, not in the picture.')
 SET_LINE = ("This is a set of three pictures of the same one subject, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each "
-            'picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers '
-            'or captions inside any picture. Say what each picture adds.')
+            'picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders. '
+            'Say what each picture adds.')   # VW-25 issue 12: "no captions" is said once, in FINISH
 # design/213: a place of a round posted from now on (`round['place_one']`) is one picture
-ONE_LINE = ('This is one picture of the subject. Deliver it as one output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside it.')
-FINISH = ('Natural colours, no filters, no stylisation, no illustration. The camera near enough that the subject is readable, the surroundings soft. No text, lettering, logo '
+ONE_LINE = ('This is one picture of the subject. Deliver it as one output image at full size, never as a collage, grid or split frame, with no borders.')
+FINISH = ('Natural colours, no filters, no stylisation, no illustration. The camera near enough that the subject is readable, the surroundings soft. No text, caption, lettering, logo '
           'or mark except what the description names; no watermark and no mark of a picture library; nothing in the picture that its sources do not justify.')
 # the order of authority, said once in a request and used again in its check (design/211 review, C3 and S11): the earlier wins
 AUTHORITY = 'Where two of these disagree, the earlier one wins: {order}.'
@@ -211,6 +211,14 @@ SAME_WHEN = ("it shows the same thing as picture A of the set, sent as a referen
 PERSON_SET = ('Make a set of three separate pictures of this one person, one per turn: 1, {a}; 2, {b}; 3, {c}. Deliver each as one separate output image at full size, never a collage, '
               'grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; no text, numbers or captions inside any picture '
               'except lettering the description names.')
+# VW-25 issue 12 (25 Nov 2026): two sets of VW-25 came back with the person's name printed in them. The request forbade text and the check caught both.
+# That the name, handed over as a title line ("Reference set of {name}, a person in this film."), is what the model printed is a guess, not proven:
+# no paid comparison was made. On that guess the title lines are retired. A person's request holds no name, unless nothing else describes the person.
+# For every other kind the name opens the description sentence: the plan's description leans on it as its noun ("A pointed steel blade" is a trowel
+# only with its name). The check's "no text" line stays as the safety net.
+PERSON_OPENING = 'A reference set of one person in this film: three separate pictures of the same person on plain ground.'
+NOT_PERSON = 'This person is not another person of the film, described so: {description}.'
+CAPTION_AGAIN = 'A picture of the last set had a caption or a mark added to it; none is wanted.'   # the remake after the look failed a set on its "no text" line
 KIND_WORDS = {'person': 'a person', 'object': 'an object', 'material': 'a material', 'place': 'a place', 'technique': 'a way of working', 'process': 'a way of working'}
 MAY_SHOW = {'object': ('What may be shown: the thing itself. No person and no face in any picture. In a picture whose view shows it in use, the hand that holds it and the material it '
                        'works on may be shown where the description names them.'),
@@ -356,10 +364,11 @@ def corrections_of(session, plan, eid):
     return [w for w in (_one(c.get('words')) for c in ((session or {}).get('thing_corrections') or {}).get(eid) or []) if w]
 
 
-def corrections_line(session, plan, eid, skip=''):
-    """The sentence a request of the thing carries: '' with none. `skip`: words the request already says in their own place."""
+def corrections_line(session, plan, eid, skip='', name=''):
+    """The sentence a request of the thing carries: '' with none. `skip`: words the request already says in their own place. `name`: how the
+    sentence names the thing, where its own name is not wanted (VW-25 issue 12: a person's set)."""
     words = [w for w in corrections_of(session, plan, eid) if w != skip]
-    name = (_element(plan, eid) or {}).get('name') or eid
+    name = name or (_element(plan, eid) or {}).get('name') or eid
     if len(words) < 2:
         return CORRECTIONS_ONE.format(name=name, words=words[0]) if words else ''
     return CORRECTIONS_MANY.format(name=name, words='; '.join(f"({n}) {w.rstrip('.')}" for n, w in enumerate(words, 1)))
@@ -643,7 +652,10 @@ def set_request(plan, run, session, element, row):
     'subject', 'description', 'requirements', 'sizes', 'material', 'signs', 'place', 'look', 'category', 'added', 'operator', 'views',
     'inputs', 'source': 'footage'|'web'|'words'}}. The server places the plan's words; `added` is the row's `prompt`; `operator` the latest of
     its `operator_words`. `source` is 'words' for a person made from the description alone (no picture, no search). `row['drawn_how']`, when
-    given, is the paragraph that tells how to read the drawings sent (visuals_stage.generate_image reads it from the stored drawing set)."""
+    given, is the paragraph that tells how to read the drawings sent (visuals_stage.generate_image reads it from the stored drawing set).
+    VW-25 issue 12 (25 Nov 2026): no line hands the thing's name over as a title (PERSON_OPENING and the note above it); another person is told
+    apart by their description, never by name; a remake after the look failed the last set (`row['set']`) for a caption says so in one line.
+    The older opening lines ("Reference set of {name}, a person in this film.", "The subject: {name}, ...") are retired."""
     row = row or {}
     eid, kind = element['id'], element.get('kind')
     facts = thing_facts(plan, session, element)
@@ -653,7 +665,7 @@ def set_request(plan, run, session, element, row):
     sheets = [i for i in inputs if i['role'] == 'drawing']
     added = ' '.join(str(row.get('prompt') or '').split())
     operator = ' '.join(str((row.get('operator_words') or [''])[-1] or '').split())
-    carried = corrections_line(session, plan, eid, skip=operator)   # design/215: the thing's corrections, above everything else
+    carried = corrections_line(session, plan, eid, skip=operator, name='this person' if kind == 'person' else '')   # design/215: the thing's corrections, above everything else
     kept = [w for w in corrections_of(session, plan, eid) if w != operator]
     place = _place(element, facts)
     try:
@@ -670,18 +682,20 @@ def set_request(plan, run, session, element, row):
     drawn = _drawn_facts(session, eid) if sheets else []
     words = lambda label, text: [f'{label}: {_plain_words(element, text)}'] if str(text).strip() else []
     order = _authority(operator or kept, added, footage, sheets, kind != 'person')
+    again = [CAPTION_AGAIN] if row.get('set') and any(f['check'] == 'no text' for r in (session.get('references') or {}).values() if r.get('kind') == 'sheet'
+                                                      and r.get('element_id') == eid and r.get('set') == row['set'] for f in check_summary(session, r)['failed']) else []
     told = (words('Sizes', '; '.join(sizes) + '.') if sizes else []) + ([material] if material else []) + (words('Signs of use', '; '.join(signs) + '.') if signs else []) \
         + ([ADDED_LINE.format(words=added)] if added else []) + ([carried] if carried else []) + ([OPERATOR_LINE.format(words=operator)] if operator else []) \
         + ([AUTHORITY.format(order='; '.join(f'({n}) {x}' for n, x in enumerate(order, 1)))] if order else [])
     if kind == 'person':
         others = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] != eid]
         outfits = [o for o in dict.fromkeys(str((sc.get('outfit') or {}).get(eid) or '').strip() for gap in plan.get('gaps') or [] for sc in all_scenes(gap)) if o]
-        text = [f'Reference set of {name}, a person in this film.',   # design/215: one word, "set"
-                *words('Who they are', facts['requirements']), *words('Fixed look', facts['description']),
+        text = [PERSON_OPENING,   # design/215: one word, "set"
+                *words('Who they are', facts['requirements'] if (facts['requirements'] + facts['description']).strip() else name), *words('Fixed look', facts['description']),
                 *(['Garments: ' + '; '.join(outfits) + '.'] if outfits else []), LOOK_PERSON.format(look=look), *told,
-                *[f"This person is not {o.get('name') or o['id']} ({str(o.get('description') or '').strip().rstrip('.')})." for o in others],
+                *[NOT_PERSON.format(description=d) for d in (str(o.get('description') or '').strip().rstrip('.') for o in others) if d],
                 *([LIKENESS_FOOTAGE_LINE.format(images="Image 1 is the film's own picture" if len(inputs) == 1 else f"Images 1 to {len(inputs)} are the film's own pictures",
-                                                them='it' if len(inputs) == 1 else 'them')] if footage else [V.LIKENESS_PHOTO_LINE] if inputs else []), PERSON_SET.format(a=views[0]['ask'], b=views[1]['ask'], c=views[2]['ask'])]
+                                                them='it' if len(inputs) == 1 else 'them')] if footage else [V.LIKENESS_PHOTO_LINE] if inputs else []), PERSON_SET.format(a=views[0]['ask'], b=views[1]['ask'], c=views[2]['ask']), *again]
         prompt, source = '\n'.join(text), 'footage' if inputs else 'words'
     else:
         pictures = [(FRAME_WEAK_LINE if i['ref'] in weak else FRAME_DRAWN_LINE if sheets else FRAME_LINE).format(k=k, name=name, view=i['view'] or 'as filmed') for k, i in enumerate(footage, 1)]
@@ -697,13 +711,14 @@ def set_request(plan, run, session, element, row):
             inputs = inputs + [{'ref': ref, 'role': 'thing', 'view': t.get('name') or t['id']} for t, ref in ins]
         setting = (f"Setting: the place itself, as described, in its own light and time{': ' + facts['scene']['place'] if (facts['scene'] or {}).get('place') else ''}." if kind == 'place' else
                    f"Setting: {place or NO_PLACE}{', as a soft hint at the edges' if kind in ('object', 'material') else ''}; the light of that place and time.")
-        subject = [f'The subject: {name}, {KIND_WORDS.get(kind, "a thing")} in this film.',
-                   *words("Its description, from the film's plan", facts['description']), *words('What it must meet', facts['requirements']), *told]
+        described = _plain_words(element, facts['description']).strip()
+        subject = [f'The subject: {KIND_WORDS.get(kind, "a thing")} in this film.',
+                   f"Its description, from the film's plan: {name}" + (f'. {described}' if described else ''), *words('What it must meet', facts['requirements']), *told]
         text = [(OPENING if doc else OPENING_ANY) + ' ' + (FROM_FOOTAGE if footage else FROM_WEB) + '\n' + (ONE_THING_FOOTAGE if footage else ONE_THING),
                 (SET_LINE + ' The three views: ' + '; '.join(f"{n}, {v['name']}" for n, v in enumerate(views, 1)) + '.') if len(views) > 1 else f"{ONE_LINE} The view: {views[0]['name']}.",
                 '\n'.join(subject), *pictures,
                 (MAY_SHOW_ANY if not doc and kind == 'object' else MAY_SHOW.get(kind, MAY_SHOW['object'])) + '\n' + setting + ' ' + LOOK_LINE.format(look=look) + '\n' + (FINISH if doc else FINISH_ANY),
-                NOTES_FOOTAGE if footage else NOTES]
+                *again, NOTES_FOOTAGE if footage else NOTES]
         prompt, source = '\n\n'.join(text), 'footage' if footage else 'web'
     prompt = re.sub(r'(?<!\.)\.\.(?!\.)', '.', prompt).replace('.;', ';')   # a sentence of the plan that ends in a full stop gets no second one
     lines = _lines(element, facts, inputs, added, '; '.join(w.rstrip('.') for w in kept + [operator] if w), len(views), doc)

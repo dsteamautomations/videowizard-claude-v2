@@ -253,7 +253,7 @@ def test_a_spec_corrected_after_its_set_was_made_is_said_and_the_set_is_made_aga
     made = VS.set_make(conn, store, USER, NEW, [], 'BRICK')
     s = saved(store)
     assert made['queued'] is True and all(s['references'][i]['status'] == 'rejected' for i in first) and len(sheets(s, 'BRICK', 'generating')) == 1
-    assert 'answer' not in s['round']['elements']['BRICK']   # it was for the old set
+    assert VS._answer_of(s['round']['elements']['BRICK']) == (None, True)   # it was for the old set: never recorded; VW-25 issue 13: it stays stored, so the new set's line can say so
 
 
 # ---------- R21, E17: a supplied file says who supplied it, with which words, and how long it is ----------
