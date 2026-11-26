@@ -497,6 +497,17 @@ OWN_PERMISSION = "A real person's photo is used only with their permission. Writ
 OWN_MISSING = 'Your own picture did not reach VideoWizard. Add it again on this line, or give it to the assistant in the chat.'
 KIND_WORDS = {'person': 'a person', 'place': 'a place', 'object': 'an object', 'material': 'a material', 'process': 'a process', 'technique': 'a technique'}
 OWN_FILE = 'a PNG, JPEG or WebP file up to 15 MB'
+# VW-25 issues 10 and 11 (25 Nov 2026): what "Use my own picture" says before the upload, and its words box. The limits are the server's
+# (visuals_stage.OWN_MAX, OWN_WORDS_MAX). OWN_PAGE is sent once with the layout of the two references screens (a line carries only its own `max`
+# and what is true of that thing), so that 60 things stay one document.
+OWN_FOOTAGE = 'This thing has footage pictures: its set is still made from them. Your own pictures are stored and approved, and pictures of this thing start from the first one.'
+OWN_GIVEN = 'Given already: {names} ({n} of {max}).'
+OWN_PAGE = {'count': 'Up to three pictures of this thing, one by one or several at once.', 'count_one': 'One photo of this person: to give another, remove this one first.',
+            'most': V.OWN_MOST, 'one': V.OWN_ONE, 'again': 'Try again', 'remove': 'Remove', 'failed': 'The picture could not be added: {name}. The other pictures stay.',
+            'twice': '{name} is here already: it is taken once.',
+            'label': 'Your words about the picture (optional)', 'hint': 'What the picture does not say by itself. Your words go with it: into the request of the set made from it, or kept as a correction of this thing.',
+            'max': V.OWN_WORDS_MAX, 'chars': '{n} of {max} characters', 'only': 'Words alone are not an answer here: add the picture too, or choose another answer.',
+            'keep': 'Save my words', 'unsaved': 'Your words are not saved yet: press “Save my words”.'}
 
 
 def _start():
@@ -548,8 +559,22 @@ def _own_line(ctx, item, paid):
             f'When none of these is right, add your own picture, {OWN_FILE}: every shot of this thing then starts from it.' if item['id'].startswith('set:') else
             f'Add your own picture, {OWN_FILE}: it becomes the reference of this thing, and no set is made.')
     label = (CF.WORDS['upload'] if step1 else CF.WORDS['own_instead']) if item.get('_v2') else 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else '')   # design/212: no cost at the references of a v2 round; design/216 (A8): a link under the set's buttons
-    return {'label': label, 'person': person, 'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text,
-            **({'say': CF.WORDS['say_own_person' if person else 'say_own']} if item.get('_v2') and not step1 else {})}
+    out = {'label': label, 'person': person, 'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text,
+           **({'say': CF.WORDS['say_own_person' if person else 'say_own']} if item.get('_v2') and not step1 else {})}
+    if not item.get('_v2'):   # a round of before design/211 keeps its line as it was
+        return out
+    # VW-25 issue 10: how many, what the server already has of this thing, and that a set made from footage pictures stays made from them; issue 11: the words box
+    refs = session['references']
+    given = [] if person else [str(refs[r].get('name') or r) for r in sorted(V._own_pictures(session, eid), key=lambda r: str(refs[r].get('created_at') or ''))]
+    footage = not person and not step1 and any(r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('element_id') == eid for r in refs.values())
+    out['text'] = ' '.join(x for x in (text, OWN_FOOTAGE if footage else '', OWN_GIVEN.format(names=', '.join(given), n=len(given), max=V.OWN_MAX) if given else '') if x)
+    return {**out, 'max': 1 if person else V.OWN_MAX}
+
+
+def _own_refs(a):
+    """VW-25 issue 10: the own pictures an answer names, each once, in the order given. The older tool sends one `own_ref`: a list of one (kept until
+    no page of the older plugin is open: the plugin minimum is raised with this release)."""
+    return list(dict.fromkeys(str(r) for r in (a.get('own_refs') or [a.get('own_ref')]) if r))
 
 
 def _thing(plan, eid, words=KIND_WORDS):
@@ -792,7 +817,7 @@ def _round_page(ctx, base, step):
                         f'This list is long: {held} more things appear here after you answer these and say done in the chat. Nothing is made until after the last one.' if held else
                         'Look at each thing and answer it, then say done in the chat. Nothing is made until you say done.' if left else
                         'Every thing is answered. Say done in the chat.',
-                'layout': {'kind': 'things', 'made': CF.WORDS['made_note'], 'help': CF.WORDS['help'], 'words': page_words(), **({'stopped': stopped} if stopped else {})}}
+                'layout': {'kind': 'things', 'made': CF.WORDS['made_note'], 'help': CF.WORDS['help'], 'words': {**page_words(), 'own': OWN_PAGE}, **({'stopped': stopped} if stopped else {})}}
     if v2:   # design/211: step 2; while Claude looks at the sets, or writes a request again, the page says so
         from . import ref_sets
         state = V._round_pass(session, session['round'])
@@ -805,7 +830,7 @@ def _round_page(ctx, base, step):
                 'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}.",   # design/212: no cost is named
                 'note': note, **({'then': then} if then else {}),
                 # design/213 (17 Nov 2026): the sets in the new layout: one set at a time beside the list, in the server's four groups
-                'layout': {'kind': 'sets', 'made': CF.WORDS['made_note'], 'help': [note, CF.WORDS['help_set'], CF.WORDS['help_rest']], 'groups': CF.STEP2_GROUPS, 'pick': CF.WORDS['pick'], 'words': page_words()}}
+                'layout': {'kind': 'sets', 'made': CF.WORDS['made_note'], 'help': [note, CF.WORDS['help_set'], CF.WORDS['help_rest']], 'groups': CF.STEP2_GROUPS, 'pick': CF.WORDS['pick'], 'words': {**page_words(), 'own': OWN_PAGE}}}
     if step == 'refs':
         stopped = refused.get('references')
         return {**base, 'step': REFS_STEP, 'open': bool(left), 'lines': lines,
@@ -872,14 +897,18 @@ def _round_close(ctx):
 def _round_answer(ctx, a, choice, words):
     """One answer to a line of the reference round, through the run function of the chat's own item. Returns (what the operator said, the
     function's answer, whether the answer is only kept so far), or None when the line is no longer open with that content (stale: a set made
-    again has a new id). The operator's own picture reached the server before this call (`own_ref`); a picture that did not is refused on
-    its line (`own_error` is the tool's reason)."""
+    again has a new id). The operator's own pictures reached the server before this call (`own_refs`); a picture that did not is refused on
+    its line (`own_error` is the tool's reason).
+    VW-25 issue 10: up to three own pictures of a thing, one photo of a person; the first is the picture that pictures of the thing start from.
+    Issue 11: the words written with them are used (`visuals_stage.own_words`). Retired: one picture per line, and the words dropped at step 2."""
     session = ctx['session']
     item = next((i for i in CF._round_items(ctx, every=True) if i['id'] == a.get('item')), None)
     if not item:
-        eid, mine = str(a.get('key') or '').split(':', 1)[-1], str(a.get('own_ref') or '')
+        eid, mine = str(a.get('key') or '').split(':', 1)[-1], _own_refs(a)
         row = ((session.get('round') or {}).get('elements') or {}).get(eid) or {}
-        if choice == 'own' and mine and row.get('own') and V.golden_of(session, eid) == mine:   # its set was not made: the server's own-picture path already took the picture as its reference
+        if choice == 'own' and row.get('own') and V.golden_of(session, eid) in mine:   # its set was not made: the server's own-picture path already took the picture as its reference
+            if V.round_v2(session) and V.own_words(session, ctx['user'], ctx['plan'], eid, V.own_words_checked(words), False):   # issue 11: the picture is the reference itself
+                V.save_session(ctx['store'], ctx['run'], session)
             return 'Use my own picture' + (f': {words}' if words else ''), {}, False
         gone = V.set_gone(session, ctx['plan'], a.get('item'))   # VW-25 issue 13: the same answer sent twice is recorded once; an answer of the pictures before is refused by name
         V.need(not gone or gone[0], gone[1] if gone else '')
@@ -897,16 +926,21 @@ def _round_answer(ctx, a, choice, words):
         return said + (f': {words}' if words else ''), out, 'marked' not in out
     if choice == 'own':
         V.need(not (person and not V.likeness_of(session, eid)), OWN_PERMISSION)
-        V.need(not a.get('own_error'), f"Your own picture was not used: {' '.join(str(a.get('own_error')).split())}")
-        mine = str(a.get('own_ref') or '')
-        V.need(V._own_golden(session, eid, mine), OWN_MISSING)
+        V.need(not a.get('own_error'), f"Your own picture was not used: {V._plain(' '.join(str(a.get('own_error')).split()))}")   # the tool's reason, without a command of the tool
+        mine = _own_refs(a)
+        V.need(mine and all(V._own_golden(session, eid, r) for r in mine), OWN_MISSING)
+        V.need(len(mine) <= (1 if person else V.OWN_MAX), V.OWN_ONE if person else V.OWN_MOST)
+        v2 = bool(item.get('_v2'))
+        words = V.own_words_checked(words) if v2 else words
         label = _own_line(ctx, item, paid)['label']
-        if step1:
-            out = item['_run']('approve', label, words, own=mine)
+        if step1:   # kept until "done"; the words go with the answer (chat_flow.round_close)
+            out = item['_run']('approve', label, words, own=mine[0])
         elif person:   # the sheet made before the photo is out of date: it is made again from the photo, as `vw visuals round --make` does
-            out = V.set_make(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], eid, **({'quote': label} if item.get('_v2') else {}))   # design/211: paid, so the operator's word travels with it
+            out = V.set_make(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], eid, **({'quote': label, 'words': words} if v2 else {}))   # design/211: paid, so the operator's word travels with it
         elif item['id'].startswith('set:'):
-            out = item['_run']('use:' + mine, label, '')
+            if v2 and V.own_words(session, ctx['user'], ctx['plan'], eid, words, False):   # the picture is the reference itself: the words are the thing's correction
+                V.save_session(ctx['store'], ctx['run'], session)
+            out = item['_run']('use:' + mine[0], label, '')
         else:
             out = {}
     else:

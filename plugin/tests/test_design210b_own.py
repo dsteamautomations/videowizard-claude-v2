@@ -79,7 +79,7 @@ def test_a_fetched_picture_goes_to_the_server_as_vw_visuals_own_does_and_then_it
     assert rc == 0 and names == ['page/record', 'own', 'page/record'] and sent(calls, 0) == []
     body = calls[1][1]
     assert body['element_id'] == 'E1' and base64.b64decode(body['content_base64']) == b'\xff\xd8pic' and body['name'] == 'my kiln.jpg' and body['url'] == '' and body['request_id']
-    assert sent(calls) == [{'line': 'l01', 'key': 'ref:E1', 'item': 'round1:E1', 'choice': 'own', 'notes': 'the side with the door', 'own_ref': 'own-1'}]
+    assert sent(calls) == [{'line': 'l01', 'key': 'ref:E1', 'item': 'round1:E1', 'choice': 'own', 'notes': 'the side with the door', 'own_refs': ['own-1']}]   # VW-25 issue 10: a list (until 25 Nov 2026: 'own_ref': 'own-1')
     assert 'own_fetch' not in out and not (folder / 'pending.json').exists()
     rc, out, err = record(capsys)   # nothing is sent twice
     assert [c[0] for c in calls][3:] == ['page/record'] and sent(calls) == []
@@ -92,7 +92,7 @@ def test_a_picture_already_in_the_folder_is_handed_over_at_the_first_done(harnes
     folder.mkdir(parents=True)
     (folder / f'{ID}.png').write_bytes(b'png')
     rc, out, err = record(capsys)
-    assert [c[0] for c in calls] == ['own', 'page/record'] and calls[0][1]['element_id'] == 'E2' and sent(calls)[0]['own_ref'] == 'own-1' and 'own_fetch' not in out
+    assert [c[0] for c in calls] == ['own', 'page/record'] and calls[0][1]['element_id'] == 'E2' and sent(calls)[0]['own_refs'] == ['own-1'] and 'own_fetch' not in out
 
 
 def test_a_persons_permission_is_recorded_first_with_the_operators_words(harness, monkeypatch, capsys):
@@ -104,7 +104,7 @@ def test_a_persons_permission_is_recorded_first_with_the_operators_words(harness
     record(capsys)
     assert [c[0] for c in calls] == ['likeness', 'own', 'page/record']
     assert calls[0][1]['element_id'] == 'P1' and calls[0][1]['quote'] == 'She said yes on the phone.' and calls[0][1]['stand_in'] is False
-    assert sent(calls)[0]['own_ref'] == 'own-1' and 'permission' not in sent(calls)[0] and 'own' not in sent(calls)[0]
+    assert sent(calls)[0]['own_refs'] == ['own-1'] and 'permission' not in sent(calls)[0] and 'own' not in sent(calls)[0]
 
 
 def test_a_refusal_of_the_server_is_said_on_the_line_and_the_other_answers_are_still_recorded(harness, monkeypatch, capsys):
@@ -116,7 +116,7 @@ def test_a_refusal_of_the_server_is_said_on_the_line_and_the_other_answers_are_s
     record(capsys)
     got = sent(calls)
     assert [c[0] for c in calls] == ['own', 'page/record'] and [a['key'] for a in got] == ['ref:P1', 'ref:E2']   # no words of permission on the page: none is recorded for them
-    assert got[0]['own_error'] == 'That file is not a picture this page can read: use a PNG, JPEG or WebP image.' and 'own_ref' not in got[0] and 'own_error' not in got[1]
+    assert got[0]['own_error'] == 'That file is not a picture this page can read: use a PNG, JPEG or WebP image.' and 'own_refs' not in got[0] and 'own_error' not in got[1]
 
 
 def test_a_file_of_a_wrong_type_or_too_large_never_leaves_the_machine(harness, monkeypatch, capsys):

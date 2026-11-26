@@ -91,6 +91,23 @@
     "rest_before_why": "A fault in the first sets would repeat in all of these.",
     "rest_more": "More, if you want it",
     "rest_names": "Which sets these are"
+   },
+   "own": {
+    "count": "Up to three pictures of this thing, one by one or several at once.",
+    "count_one": "One photo of this person: to give another, remove this one first.",
+    "most": "Three pictures at most. Remove one first.",
+    "one": "One photo of a person at most. Remove one first.",
+    "again": "Try again",
+    "remove": "Remove",
+    "failed": "The picture could not be added: {name}. The other pictures stay.",
+    "twice": "{name} is here already: it is taken once.",
+    "label": "Your words about the picture (optional)",
+    "hint": "What the picture does not say by itself. Your words go with it: into the request of the set made from it, or kept as a correction of this thing.",
+    "max": 300,
+    "chars": "{n} of {max} characters",
+    "only": "Words alone are not an answer here: add the picture too, or choose another answer.",
+    "keep": "Save my words",
+    "unsaved": "Your words are not saved yet: press “Save my words”."
    }
   }
  },
@@ -369,7 +386,8 @@
     "person": true,
     "permitted": false,
     "text": "Add this person's own photo, a PNG, JPEG or WebP file up to 15 MB: their set is made from it. A real person's photo is used only with their permission: write first, in your own words, that you have it.",
-    "say": "My own photo: the set is made from it."
+    "say": "My own photo: the set is made from it.",
+    "max": 1
    }
   },
   {
@@ -560,8 +578,9 @@
     "label": "Use my own picture instead",
     "person": false,
     "permitted": true,
-    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it. This thing has footage pictures: its set is still made from them. Your own pictures are stored and approved, and pictures of this thing start from the first one.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    }
   },
   {
@@ -669,7 +688,8 @@
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    }
   },
   {
@@ -825,7 +845,8 @@
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    }
   },
   {
@@ -966,7 +987,8 @@
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    }
   },
   {
@@ -1105,7 +1127,8 @@
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    },
    "refused": "These cannot be made now: the film has reached the limit its owner set. Ask the owner to raise it."
   },
@@ -1253,7 +1276,8 @@
     "person": false,
     "permitted": true,
     "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    },
    "kept": "Approve B",
    "kept_note": "Kept, not recorded yet: the reason is on this line. Choose again to change it."
@@ -1375,7 +1399,8 @@
     "person": false,
     "permitted": true,
     "text": "Add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference of this thing, and no set is made.",
-    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it.",
+    "max": 3
    }
   },
   {

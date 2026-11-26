@@ -452,6 +452,7 @@ class OwnPicture(Write):   # design/177: the operator's own picture of an elemen
     content_base64: str = ''
     url: str = ''
     name: str = ''
+    words: str = Field(default='', max_length=300)   # VW-25 issue 11: the operator's comment given with the picture (visuals_stage.OWN_WORDS_MAX)
 
 
 class GeneratorBody(Write):
@@ -1578,6 +1579,7 @@ class PageAnswer(Strict):   # design/204: one answer the operator gave on the ar
     choice: str = Field(min_length=1, max_length=120)
     notes: str = Field(default='', max_length=2000)
     own_ref: str = Field(default='', max_length=80)      # design/210: the operator's own picture given on the page, once the tool has handed it to `visuals/own`
+    own_refs: list[str] = Field(default_factory=list, max_length=8)   # VW-25 issue 10: up to three own pictures of one thing; a fourth is refused by its sentence on the line (page_flow._round_answer), so the list takes more
     own_error: str = Field(default='', max_length=600)   # or why the tool could not hand it over
     pics: dict[str, str] = Field(default_factory=dict, max_length=8)   # design/211: a picture answered on its own: {footage picture id: 'not'} or {trial frame id: 'use'}
 
@@ -2082,7 +2084,7 @@ def visuals_round_rewrite(run_id: UUID, body: RoundRewrite, user=User, conn=DB):
 def visuals_own(run_id: UUID, body: OwnPicture, user=User, conn=DB):   # design/177: `vw visuals own`
     import base64 as b64
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.supply_own(conn, storage(), user, run, outputs, body.element_id,
-                         content=b64.b64decode(body.content_base64) if body.content_base64 else None, url=body.url, name=body.name), 201)
+                         content=b64.b64decode(body.content_base64) if body.content_base64 else None, url=body.url, name=body.name, words=body.words), 201)
 
 
 @app.post('/api/runs/{run_id}/visuals/round/picks')

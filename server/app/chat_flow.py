@@ -438,6 +438,7 @@ def round_close(conn, store, user, run, outputs, quote):
     for e, mine in owns.items():
         if s['round']['elements'][e].get('from_footage'):
             s.setdefault('golden', {})[e] = mine   # the picture the operator gave on this line, not an older one of theirs
+            V.own_words(s, user, plan, e, held[e].get('words'), False)   # VW-25 issue 11: no set is made, so their words with it are the thing's correction (checked when the answer was given)
     V.save_session(store, run, s)
     if out.get('then'):   # design/211: a v2 round says what comes next in the server's own sentence
         return {**out, 'tell': str(out['then'])}
@@ -1180,7 +1181,7 @@ def _round_v2(ctx, every, step):
                 off = unused(marked)
                 V.need(not (verdict == 'clean' or does.get(verdict) == 'footage') or len(off) < len(frames) or not frames, tick.get(choice) or WORDS['tick_use'])
                 s = V.session_of(store, run, outputs)
-                s['chat_round'] = {**(s.get('chat_round') or {}), eid: {'verdict': verdict, 'quote': quote, 'frames': stamps[eid], 'words': words if does.get(verdict) == 'set' else '',
+                s['chat_round'] = {**(s.get('chat_round') or {}), eid: {'verdict': verdict, 'quote': quote, 'frames': stamps[eid], 'words': words if does.get(verdict) == 'set' or own else '',   # VW-25 issue 11: also with the operator's own picture where no set is made
                                                                        'pics': {**{k: v for k, v in marked.items() if v != 'on'}, **{r: 'off' for r in off if marked.get(r) != 'not'}},
                                                                        **({'own': own} if own else {})}}
                 V.save_session(store, run, s)

@@ -3108,6 +3108,13 @@ def round_undo(store, user, run, outputs, quote):
 
 
 OWN_PICTURE_MAX = 15 * 1024 * 1024
+# VW-25 issues 10 and 11 (SK, 25 Nov 2026: "three and one"): up to three own pictures of one thing (the set's request takes three, ref_sets.inputs_of),
+# one photo of a real person; the comment written with them is at most 300 characters. The sentences are the page's and the chat's alike.
+OWN_MAX, OWN_WORDS_MAX = 3, 300
+OWN_MOST = 'Three pictures at most. Remove one first.'
+OWN_ONE = 'One photo of a person at most. Remove one first.'
+OWN_WORDS_REFUSED = 'Your words with the picture cannot be kept: {why} Write them again without it.'
+OWN_WORDS_LONG = 'Your words with the picture are {n} characters long: {max} characters at most. Write them shorter.'
 LIKENESS_REFUSED = 'Give another photo of this person, or make them a stand-in, made from the description.'   # design/207 (D1): when the picture service refuses the photo
 
 
@@ -3236,8 +3243,48 @@ def _golden_ok(session, kind, element_id, golden, rows):
     return any(x['id'] == golden for x in rows) or _own_golden(session, element_id, golden)
 
 
-def supply_own(conn, store, user, run, outputs, element_id, content=None, url='', name=''):
-    """design/110 rule 0 (Revathi's addition): the operator's own picture from the page, a file or an https link, stored as an approved reference of the element."""
+def own_words_checked(words):
+    """VW-25 issue 11: the comment the operator wrote with their own picture, as one line; refused in plain words when it says what no picture's
+    request may say (the check of a correction kept for every picture, design/215), before anything is stored."""
+    words = ' '.join(str(words or '').split())
+    need(len(words) <= OWN_WORDS_MAX, OWN_WORDS_LONG.format(n=len(words), max=OWN_WORDS_MAX))   # the page stops there and the tool refuses before; an answer sent another way is refused here
+    if words:
+        from . import library
+        try:
+            library.check_prompt(words, placed=False)
+        except ValueError as exc:
+            need(False, OWN_WORDS_REFUSED.format(why=exc))
+    return words
+
+
+def own_words(session, user, plan, element_id, words, to_set):
+    """VW-25 issue 11: the operator's comment with their own picture is kept with the thing, in one place for the page and the chat. `to_set`: a set
+    is made from the picture (a person, a thing with approved drawings): the words are the operator's words of its request (`operator_words`), said
+    by every make from now on, also after a make that failed. Otherwise the picture is the reference itself: the words are the thing's correction
+    (`thing_corrections`, design/215), which every later picture of the thing carries; the later one is the one in force. The same words given again
+    are kept once. True when they were kept now. The caller checked them (`own_words_checked`) and saves the session."""
+    words = ' '.join(str(words or '').split())
+    row = ((session.get('round') or {}).get('elements') or {}).get(element_id)
+    if not words:
+        return False
+    if to_set and row is not None:
+        if (row.get('operator_words') or [''])[-1] == words:
+            return False
+        row.setdefault('operator_words', []).append(words)
+        return True
+    from . import ref_sets
+    if (ref_sets.corrections_of(session, plan, element_id) or [''])[-1] == words:
+        return False
+    ref_sets.correction_kept(session, user, element_id, words, (row or {}).get('set'))
+    return True
+
+
+def supply_own(conn, store, user, run, outputs, element_id, content=None, url='', name='', words=''):
+    """design/110 rule 0 (Revathi's addition): the operator's own picture from the page, a file or an https link, stored as an approved reference of the element.
+    VW-25 issues 10 and 11 (25 Nov 2026), for the page and the chat alike: a thing takes up to three own pictures (OWN_MAX); another one is refused
+    (OWN_MOST) until one is removed; the same picture given again is taken once, by its content. A person keeps one photo: a later one takes the
+    place of the earlier, as before. `words`: the operator's comment with the picture (`own_words`), with a line in the run's log.
+    The older way is retired: any number of own pictures of a thing, the same file stored again each time it was given, and no words."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     element = next((e for e in plan['elements'] if e['id'] == element_id), None)
@@ -3250,11 +3297,31 @@ def supply_own(conn, store, user, run, outputs, element_id, content=None, url=''
         content = fetch_image(url)
     need(len(content) <= OWN_PICTURE_MAX, 'The picture is larger than 15 MB: choose a smaller file.')
     try:
-        image_bytes(content)   # ponytail: decoded once here to refuse in plain words and again in add_reference; one decode if uploads ever get slow
+        png = image_bytes(content)[0]   # ponytail: decoded once here to refuse in plain words and again in add_reference; one decode if uploads ever get slow
     except ValueError:
         raise
     except Exception:   # not an image at all (Pillow's own errors)
         need(False, 'That file is not a picture this page can read: use a PNG, JPEG or WebP image.')
+    words, person = own_words_checked(words), element.get('kind') == 'person'
+    to_set = person or (session.get('drawings') or {}).get(element_id, {}).get('status') == 'approved'   # as `_from_footage` decides: a set is made from the picture
+    mark, mine = hashlib.sha256(png).hexdigest(), [session['references'][x] for x in _own_pictures(session, element_id)]
+    same = next((x for x in mine if x.get('sha256') == mark and (not person or x['id'] == likeness_photo(session, element_id))), None)   # a person: only the photo in use; an earlier one given again is the newest again
+    need(same or person or len(mine) < OWN_MAX,
+         OWN_MOST[:-1] + f" (`vw visuals reject --ref <one of: {', '.join(x['id'] for x in mine)}> --quote \"<the operator's words>\"`).")
+
+    def keep(session):
+        """The words kept with the thing, in the session about to be saved; their line in the run's log."""
+        own = (((session.get('round') or {}).get('elements') or {}).get(element_id) or {}).get('from_footage')   # the picture is the reference itself: no set is made
+        if own_words(session, user, plan, element_id, words, to_set and not own) and conn is not None:
+            from . import runlog
+            runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'thing {element_id}', 'rule': "VW-25 issue 11 (the operator's words with their own picture)",
+                                'entry': f"the operator's words with their own picture of {element.get('name') or element_id}", 'by_kind': 'operator', 'by_name': user.get('name') or '',
+                                'quote': words, 'request_id': None})
+    how = '' if words else f' When the operator said something about the picture, give their words with it: `vw visuals own --element {element_id} --file <file> --words "<their words>"` (the same picture is taken once).'
+    if same:   # nothing is stored again; words given with it are kept
+        keep(session)
+        save_session(store, run, session)
+        return {**same, 'duplicate': True, 'next': f'This picture was given already for {element_id}: it is taken once.' + how}
     body = {'request_id': str(uuid.uuid4()), 'element_id': element_id, 'name': str(name or '').strip() or f'own-{element_id}', 'kind': 'supplied', 'subject': element['name']}
     row = add_reference(conn, store, user, run, outputs, body, content)
     session = session_of(store, run, outputs)
@@ -3269,11 +3336,13 @@ def supply_own(conn, store, user, run, outputs, element_id, content=None, url=''
         slot.update(from_footage=True, own=True, verdict='approve', error=None)
         slot.pop('answer', None)
         session.setdefault('golden', {})[element_id] = row['id']
+    keep(session)
     save_session(store, run, session)
     if element.get('kind') == 'person' and slot and _set_rows(session, element_id, slot.get('set'), ('generating', 'candidate', 'approved')):   # design/207 (D1): the sheet is made from the newest photo
-        return {**r, 'next': f"Your photo is saved for {element_id}. The sheet made before it is out of date: make its sheet again from this photo (`vw visuals round --make {element_id}`)."}
+        return {**r, 'next': f"Your photo is saved for {element_id}. The sheet made before it is out of date: make its sheet again from this photo (`vw visuals round --make {element_id}`)." + how}
     return {**r, 'next': f"Your picture is saved and approved for {element_id}" + ('; its sheet is marked "sources changed": the assistant makes a new one.' if any(
-        x.get('kind') == 'sheet' and x.get('sources_changed') and x.get('element_id') == element_id for x in session['references'].values()) else '.')}
+        x.get('kind') == 'sheet' and x.get('sources_changed') and x.get('element_id') == element_id for x in session['references'].values()) else '.')
+        + ('' if person else f' It is picture {len(mine) + 1} of {OWN_MAX} of this thing.') + how}
 
 
 def waiting(session, plan, code, take_rows, budget=None, gate=True):
@@ -4358,17 +4427,21 @@ def _spec_changed(session, plan, element_id, row):
     return False
 
 
-def set_make(conn, store, user, run, outputs, element_id, quote=None):
+def set_make(conn, store, user, run, outputs, element_id, quote=None, words=''):
     """R17: one set that was not made (refused before the call, or it did not come back) is made now; also a set whose spec changed after it was made
     (E14). Refused in plain words while its cause stands; a set already being made is left alone.
     design/211, a v2 round: `quote` is the operator's words; the chat tool gives them (an empty one is refused: making a set is paid), the page and
-    the chat question give None: there the operator's click or answer is the word. A set whose plan changed since is made again too; three makes at most."""
+    the chat question give None: there the operator's click or answer is the word. A set whose plan changed since is made again too; three makes at most.
+    VW-25 issue 11: `words`, the operator's comment with their own picture: stored with the thing before anything is checked or ordered, so a make
+    that is refused or fails keeps them and the next make says them (`own_words`). The older way, the words dropped here, is retired."""
     session = session_of(store, run, outputs)
     v2 = round_v2(session)
     if v2:
         from . import ref_sets
         need(quote is None or str(quote).strip(), ref_sets.MAKE_NO_QUOTE.format(eid=element_id))
     row = _round_row(session, element_id, (2, 'making', 'complete', 'looking', 'rewrite') if v2 else (2, 'making', 'complete'))
+    if v2 and own_words(session, user, None, element_id, words, True):
+        save_session(store, run, session)
     if _set_rows(session, element_id, row.get('set'), ('generating',)):
         return {'element_id': element_id, 'queued': False, 'next': f'{element_id}: its set is already being made.'}
     plan = guarded(lambda: current_plan(store, session))

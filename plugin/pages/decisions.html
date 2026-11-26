@@ -128,6 +128,10 @@ input[type=file]{max-width:100%;font:inherit;font-size:.9rem;color:var(--fg)}
 input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .acts .group{flex:1 1 100%}
 .ownpic{display:block;max-width:156px;max-height:110px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line)}
+/* VW-25 issue 10: the operator's own pictures of one thing, each small with its name; in the box each has its Remove */
+.ownlist{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.ownlist li,.ownfig{margin:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start;max-width:160px;font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.ownrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 /* design/211: the reference round, rebuilt. A heading that folds the lines of one group; Claude's proposal above the buttons; under a picture what
    Claude saw, a "weak" tag and its own answer; a picture marked "not this picture" is dimmed; a picture shown only to compare with has a dashed edge. */
 .ghead{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font-family:var(--display);font-size:1rem;padding:10px 14px;background:var(--surface)}
@@ -621,27 +625,81 @@ function pictures(line,onChange){   // a line with pictures: the row, the facts 
   if(line.assumed) wrap.appendChild(el('p','changed','Assumed, with no source (say if any is wrong): '+line.assumed));
   return wrap;
 }
-function ownBox(line){   // design/210 part 2: "Use my own picture". The file goes to the page's own file store; the answer then names it, and the assistant carries it to VideoWizard on "done"
-  const o=line.own, wrap=el('div','group'), msg=el('span','said','');
-  wrap.appendChild(el('h4',null,o.label)); wrap.appendChild(el('p','said',o.text));
+// VW-25 issues 10 and 11 (25 Nov 2026): "Use my own picture" takes up to three pictures of one thing (one photo of a real person) and the operator's
+// words about them. The answer's `own` is a list, in the order added: [{id,url,name,type,size,mark}]; `notes` are the words, one comment for the line.
+// Every change is saved at once, so a reload keeps the pictures; with none left the line is unanswered again. An answer written before this (`own`: one
+// object) is read as a list of one. The older way is retired: one file per line (`file.files[0]`, `own: {…}`). What the box says comes with the round
+// (`layout.words.own`); OWN_SAYS serves a round that an older server wrote.
+const OWN_SAYS={count:'Up to three pictures of this thing, one by one or several at once.',count_one:'One photo of this person: to give another, remove this one first.',
+  most:'Three pictures at most. Remove one first.',one:'One photo of a person at most. Remove one first.',again:'Try again',remove:'Remove',
+  failed:'The picture could not be added: {name}. The other pictures stay.',twice:'{name} is here already: it is taken once.',label:'Your words about the picture (optional)',hint:'',
+  max:300,chars:'{n} of {max} characters',only:'Words alone are not an answer here: add the picture too, or choose another answer.',keep:'Save my words',
+  unsaved:'Your words are not saved yet: press “Save my words”.'};
+const ownSt={};   // by line: what the box says about the files just given ({text, file} with a file to try again), and whether files are being added
+const ownW=()=>Object.assign({},OWN_SAYS,W().own);
+const ownOf=a=>!a||a.choice!=='own'?[]:[].concat(a.own||[]).filter(p=>p&&typeof p.url==='string');
+const ownFigs=a=>ownOf(a).map(p=>mk('figure',{class:'ownfig'},mk('img',{class:'ownpic',alt:'Your own picture'+(p.name?': '+p.name:''),src:p.url}),p.name&&mk('figcaption',{},p.name)));
+const ownSaid=line=>{ const a=answers[line.line]; return ownOf(a).length?String(a.notes||''):''; };
+const ownWords=line=>line.comment?comment(line):String(drafts['c:'+line.line]!=null?drafts['c:'+line.line]:ownSaid(line)).trim().slice(0,ownW().max);
+async function ownMark(f){   // the same file is taken once, by its content; where the browser cannot hash it, by its name and size (the server compares the content again)
+  try{ const h=await crypto.subtle.digest('SHA-256',await f.arrayBuffer()); return Array.prototype.map.call(new Uint8Array(h),b=>('0'+b.toString(16)).slice(-2)).join(''); }
+  catch(e){ return 'n:'+f.name+':'+f.size; } }
+function ownSave(line,list,permission){
+  const a=answers[line.line]||{};
+  if(!list.length) return (!$('things').hidden?tUndo:!$('sets').hidden?sUndo:undo)(line);
+  write(line,'own',ownWords(line),{own:list,permission:permission||(a.choice==='own'&&a.permission)||''});
+}
+async function ownAdd(line,files,permission){   // one by one or several at once: each is refused or added by its own name, and the others stay
+  const o=line.own, w=ownW(), st=ownSt[line.line], max=o.max||(o.person?1:3);
+  let list=ownOf(answers[line.line]).slice();
+  st.busy=true; draw(true);
+  for(const f of files){
+    const name=String(f.name||'picture').slice(0,80);
+    if(OWN_TYPES.indexOf(f.type)<0){ st.msgs.push({text:name+' is not a PNG, JPEG or WebP picture: choose another.'}); continue; }
+    if(f.size>OWN_MAX){ st.msgs.push({text:name+': This picture is larger than 15 MB: choose a smaller one.'}); continue; }
+    const mark=await ownMark(f);
+    if(list.some(p=>p.mark===mark)){ st.msgs.push({text:w.twice.replace('{name}',name)}); continue; }
+    if(list.length>=max){ st.msgs.push({text:max===1?w.one:w.most}); break; }
+    try{ const r=await assets.upload(f); if(!r||!r.id||!r.url) throw new Error('no file');
+      list=list.concat([{id:r.id,url:r.url,name:name,type:r.contentType||f.type,size:r.sizeBytes||f.size,mark:mark}]); ownSave(line,list,permission); }
+    catch(e){ st.msgs.push({text:w.failed.replace('{name}',name),file:f}); }   // The picture could not be added: named, with "Try again"
+  }
+  st.busy=false; draw(true);
+}
+function ownBox(line){   // design/210 part 2: "Use my own picture". The files go to the page's own file store; the answer then names them, and the assistant carries them to VideoWizard on "done"
+  const o=line.own, w=ownW(), wrap=el('div','group'), st=ownSt[line.line]||(ownSt[line.line]={msgs:[],busy:false});
+  const max=o.max||(o.person?1:3), list=ownOf(answers[line.line]);
+  wrap.appendChild(el('h4',null,o.label)); wrap.appendChild(el('p','said',[o.text,max===1?w.count_one:w.count].filter(Boolean).join(' ')));
   let perm=null;
   if(o.person&&!o.permitted){   // a real person's photo: the operator's own words that they have the permission, before the photo is taken
-    perm=el('input'); perm.type='text'; perm.maxLength=300; perm.placeholder="Your words: that you have this person's permission"; perm.setAttribute('aria-label',"Your words that you have this person's permission");
+    perm=el('input'); perm.type='text'; perm.maxLength=300; perm.id='ownp-'+line.line; perm.placeholder="Your words: that you have this person's permission"; perm.setAttribute('aria-label',"Your words that you have this person's permission");
     perm.value=drafts['p:'+line.line]||''; perm.addEventListener('input',()=>{drafts['p:'+line.line]=perm.value;}); wrap.appendChild(perm); }
-  const file=el('input'); file.type='file'; file.accept=OWN_TYPES.join(','); file.setAttribute('aria-label',o.label);   // image/png,image/jpeg,image/webp
+  const words=()=>perm?perm.value.trim():'';
+  if(list.length) wrap.appendChild(mk('ul',{class:'ownlist'},list.map((p,i)=>mk('li',{},mk('img',{class:'ownpic',alt:'',src:p.url}),mk('span',{},p.name||'Picture '+(i+1)),   // each one small, with its name; removable before "done"
+    mk('button',{type:'button',disabled:st.busy,'aria-label':w.remove+' '+(p.name||'picture '+(i+1)),on:{click:()=>{ st.msgs=[]; ownSave(line,list.filter((x,j)=>j!==i)); }}},w.remove)))));
+  const file=el('input'); file.type='file'; file.accept=OWN_TYPES.join(','); file.multiple=max>1; file.disabled=st.busy; file.setAttribute('aria-label',o.label);   // image/png,image/jpeg,image/webp
   file.addEventListener('change',()=>{
-    const f=file.files&&file.files[0], words=perm?perm.value.trim():''; if(!f) return;
-    const no=m=>{ msg.textContent=m; file.value=''; file.disabled=false; };
-    if(OWN_TYPES.indexOf(f.type)<0) return no('This file is not a PNG, JPEG or WebP picture: choose another.');
-    if(f.size>OWN_MAX) return no('This picture is larger than 15 MB: choose a smaller one.');
-    if(perm&&!words){ perm.focus(); return no("Write first that you have this person's permission, then add the photo."); }
-    msg.textContent='Adding your picture…'; file.disabled=true;
-    assets.upload(f).then(r=>{
-      if(!r||!r.id||!r.url) return no('The picture could not be added. Try again, or give it to the assistant in the chat.');
-      write(line,'own',comment(line),{own:{id:r.id,url:r.url,name:String(f.name||'').slice(0,80),type:r.contentType||f.type,size:r.sizeBytes||f.size},permission:words});
-    },e=>no('The picture could not be added ('+((e&&(e.code||e.message))||'error')+'). Try again, or give it to the assistant in the chat.'));
+    const fs=Array.prototype.slice.call(file.files||[]); if(!fs.length) return;
+    st.msgs=[];
+    if(perm&&!words()){ st.msgs=[{text:"Write first that you have this person's permission, then add the photo."}]; draw(true); const p=$('ownp-'+line.line); if(p) p.focus(); return; }
+    ownAdd(line,fs,words());
   });
-  wrap.appendChild(file); wrap.appendChild(msg);
+  wrap.appendChild(file);
+  if(st.busy) wrap.appendChild(el('span','said','Adding your picture…'));
+  st.msgs.forEach(m=>wrap.appendChild(mk('p',{class:'said',role:'status'},m.text,m.file&&[' ',mk('button',{type:'button',disabled:st.busy,
+    on:{click:()=>{ st.msgs=st.msgs.filter(x=>x!==m); ownAdd(line,[m.file],words()); }}},w.again)])));
+  if(!line.comment){   // issue 11: the operator's words about the picture, at most 300 characters, with the count (the older layout has its comment box above)
+    const ta=el('textarea'), cnt=el('span','count'), hint=el('span','said'), cut=()=>ta.value.trim().slice(0,w.max);
+    const show=()=>{ cnt.textContent=w.chars.replace('{n}',ta.value.length).replace('{max}',w.max); hint.textContent=ownOf(answers[line.line]).length&&cut()!==ownSaid(line).trim()?w.unsaved:''; };
+    ta.maxLength=w.max; ta.setAttribute('maxlength',String(w.max)); ta.id='ownw-'+line.line; ta.style.minHeight='48px'; ta.placeholder=w.hint; ta.setAttribute('aria-label',w.label);
+    ta.value=drafts['c:'+line.line]!=null?drafts['c:'+line.line]:ownSaid(line);
+    ta.addEventListener('input',()=>{ if(ta.value.length>w.max) ta.value=ta.value.slice(0,w.max); drafts['c:'+line.line]=ta.value; show(); });
+    const keep=mk('button',{type:'button',id:'ownk-'+line.line,disabled:st.busy,on:{click:()=>{ const have=ownOf(answers[line.line]);
+      st.msgs=have.length?[]:[{text:w.only}];   // words alone are not an "own" answer: the box asks for the picture, or another answer
+      if(have.length) ownSave(line,have); else draw(true); }}},w.keep);
+    show();
+    wrap.appendChild(mk('label',{for:ta.id},w.label)); wrap.appendChild(ta); wrap.appendChild(mk('div',{class:'ownrow'},keep,cnt,hint));
+  }
   return wrap;
 }
 const KINDS={Person:'People',Place:'Places',Object:'Things',Material:'Materials',Animal:'Animals',Process:'Processes',Technique:'Techniques'};
@@ -725,10 +783,11 @@ function block(line,n){
     cancel.addEventListener('click',()=>{delete editing[line.line]; draw(true);});
     row.appendChild(save); row.appendChild(cancel); row.appendChild(count); wrap.appendChild(ta); wrap.appendChild(row); acts.appendChild(wrap);
   } else if(a){
-    if(a.own&&typeof a.own.url==='string'){ const im=el('img','ownpic'); im.alt='Your own picture'; im.src=a.own.url; acts.appendChild(im); }   // design/210 part 2: shown at once, until "done"
+    ownFigs(a).forEach(x=>acts.appendChild(x));   // design/210 part 2: shown at once, until "done"; VW-25 issue 10: every one of them
     if(a.notes) acts.appendChild(el('span','said','Your words: “'+a.notes+'”'));
-    const un=el('button',null,a.choice==='own'?'Remove my picture':'Undo my answer'); un.addEventListener('click',()=>undo(line)); acts.appendChild(un);
+    const un=el('button',null,a.choice==='own'?(ownOf(a).length>1?'Remove my pictures':'Remove my picture'):'Undo my answer'); un.addEventListener('click',()=>undo(line)); acts.appendChild(un);
     acts.appendChild(el('span','said','Saved on this page. It is recorded in VideoWizard when you say done in the chat.'));
+    if(a.choice==='own'&&line.own&&assets) acts.appendChild(ownBox(line));   // VW-25 issue 10: another picture, or one removed
     if(gate.length){ acts.appendChild(gmsg); check(); }
   } else if(line.state==='open'){
     if(line.kept) acts.appendChild(el('span','said',line.kept_note||'Kept, not recorded yet.'));
@@ -873,7 +932,7 @@ function tSays(l){   // the answer as it stands, said back
   const n=tKept(l).length, pic=n+' ticked picture'+(n===1?'':'s'), from=n?'from the '+pic:'from the description; the footage pictures are not used';
   const s={use:has?'Approve: the '+pic+(n===1?' is':' are')+' the reference.':'Approve.',set:(has?'Make a set '+from+'.':'Make a set.')+(a.notes?' Your words: '+q(a.notes):''),
     fix:has?(W().fix||'')+': '+q(a.notes)+' A set is made '+from+', with these words.':'Make a set, with your words: '+q(a.notes),
-    own:'My own picture'+(a.own&&a.own.name?': '+a.own.name:'')+'.'+(a.permission?' Permission: '+q(a.permission):''),ignore:(W().leave||'')+'.'}[a.choice]||String(a.choice);
+    own:(ownOf(a).length>1?'My own pictures':'My own picture')+(ownOf(a).some(p=>p.name)?': '+ownOf(a).map(p=>p.name).filter(Boolean).join(', '):'')+'.'+(a.notes?' Your words: '+q(a.notes):'')+(a.permission?' Permission: '+q(a.permission):''),ignore:(W().leave||'')+'.'}[a.choice]||String(a.choice);
   return ['Your answer: ',s];
 }
 function tLarge(p,btn){   // on a wide screen the row's pictures are wider than the small picture: the large one from the file store takes its place
@@ -1016,7 +1075,7 @@ function tMain(list){
     mk('p',{class:'tmsg',id:'tmsg',role:'status',hidden:!T.msg},T.msg));
   if(T.panel) kids.push(mk('div',{class:'tpanel',id:'tpanel'},tPanel(l)));
   if(tDone(l)){ const a=tOwn(l), s=tSays(l);
-    kids.push(mk('div',{class:'tanswer',id:'tanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'Your own picture',src:a.own.url}),mk('p',{},mk('b',{},s[0]),s[1]),
+    kids.push(mk('div',{class:'tanswer',id:'tanswer'},ownFigs(a),mk('p',{},mk('b',{},s[0]),s[1]),
       a&&mk('button',{class:'tbtn',id:'tundo',type:'button',on:{click:()=>tUndo(l)}},'Undo'))); }
   const det=mk('div',{class:'tdetails',id:'tdetails',hidden:true},mk('dl',{},[
     mk('dt',{},'Description'),mk('dd',{},l.desc),
@@ -1144,7 +1203,7 @@ function sThing(l){
     if(l.refused) into.push(mk('p',{class:'smsg',id:'srefused'},l.refused));   // the server's refusal of the last "done", kept on its set
     into.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
     if(sDone(l)){ const t=sSays(l), ag=sAgainst(l);
-      into.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'',src:a.own.url}),mk('p',{},mk('b',{},t[0]),t[1],ag&&' '+w.against_say),
+      into.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},ownFigs(a),mk('p',{},mk('b',{},t[0]),t[1],a&&a.choice==='own'&&a.notes&&' Your words: “'+a.notes+'”',ag&&' '+w.against_say),
         a&&mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo))); }
   }
   (l.case==='judge'&&m.length?side:kids).push(sDetails(l));

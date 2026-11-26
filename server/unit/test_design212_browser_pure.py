@@ -198,7 +198,7 @@ def test_step_1_in_its_new_layout(monkeypatch, browser, size, scheme):
     assert 'add your own' in pg.locator('#tpanel').text_content()                                                                              # 38
     pg.locator('#tpanel input[type=file]').set_input_files({'name': 'mine.png', 'mimeType': 'image/png', 'buffer': picture()})
     a = saved(pg, 'l06', 'own')
-    assert a['own']['name'] == 'mine.png' and a['permission'] == '' and pg.locator('#tanswer img.ownpic').count() == 1                          # 39
+    assert a['own'][0]['name'] == 'mine.png' and a['permission'] == '' and pg.locator('#tanswer img.ownpic').count() == 1                          # 39
     # case 2, only a "closest found" picture: Approve needs its tick
     thing(pg, 'Wall fan regulator')
     assert bar(pg) == ['No reference needed Suggested', 'Approve', 'Make a set', 'Upload my own']                                                         # 40
