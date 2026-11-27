@@ -194,8 +194,8 @@ def intake_record(ws, procedure, prior, title=None, client=''):
         if not original.is_file() or hashlib.sha256(original.read_bytes()).hexdigest() != src['sha256']:
             raise Refused(f"The source file {src['file']} changed or is missing since prepare; run `vw stage intake prepare` again.")
     titles = data.get('titles')
-    if not isinstance(titles, list) or not titles or not all(isinstance(t, str) and t.strip() for t in titles):  # design/34 1.4
-        raise Refused('out/intake.json: `titles` must list at least one non-empty title (recommended first).')
+    if not isinstance(titles, list) or not all(isinstance(t, str) and t.strip() for t in titles):  # design/34 1.4; an empty list is allowed (27 Nov 2026): the instruction asks for none when the document is unclear
+        raise Refused('out/intake.json: `titles` must be a list of non-empty titles (recommended first; empty when the document is too unclear to name).')
     titles = [t.strip() for t in titles]
     chosen = (title or '').strip()
     if not chosen:  # design/34 1.2: the operator chooses; the tool never picks for them

@@ -63,3 +63,19 @@ def test_the_shape_is_fixed_once_the_first_cut_is_recorded():
     with pytest.raises(Problem) as e:   # a film with footage: the analysis fixes it first, as before
         film.record(Conn(jobs=True), user, {'id': 'r2', 'status': 'open', 'film': {}}, 'shape', 'horizontal', 'x', 'horizontal', 25)
     assert e.value.code == 'FILM_LOCKED' and 'analysis' in e.value.message
+
+
+def test_the_same_answer_again_is_not_a_change_and_is_never_refused():
+    """Sweep of 27 Nov 2026, intake finding 3: the intake record passes the category every time; once the visuals stage had started the same
+    category again was refused ("cannot change now"), so the intake of such a film could not be recorded again."""
+    user = {'id': 'u1'}
+    run = {'id': 'r3', 'status': 'open', 'film': {'category': {'value': 'documentary-explainer', 'quote': 'first words', 'by': 'Asha', 'at': 't0'},
+                                                 'shape': {'value': 'vertical', 'video': 'vertical', 'fps': 25, 'quote': 'q', 'by': 'Asha', 'at': 't0'}}}
+    assert film.record(Conn(jobs=True), user, run, 'category', 'documentary-explainer', 'the same as before') == run['film']   # nothing written: the first words stand
+    assert film.record(Conn(jobs=True, first_cut=True), user, run, 'shape', 'vertical', 'same', 'vertical', 25) == run['film']
+    with pytest.raises(Problem) as e:   # another value is still a change
+        film.record(Conn(jobs=True), user, run, 'category', 'advertisement-product', 'changed my mind')
+    assert e.value.code == 'FILM_LOCKED'
+    with pytest.raises(Problem) as e:   # one part of the shape changed
+        film.record(Conn(jobs=True), user, run, 'shape', 'vertical', 'x', 'vertical', 30)
+    assert e.value.code == 'FILM_LOCKED'

@@ -122,7 +122,10 @@ def test_titles_non_empty_strings_only_never_a_traceback(ws):
     intake_prepare(ws, PROC, prior)
     proposal(ws, titles=['T'])
     assert intake_record(ws, PROC, prior, title='T', client='VK')['summary']['titles'] == ['T']
-    for bad in ([42], [None], ['ok', ''], [], 'not a list', ['  ']):
+    proposal(ws, titles=[])   # sweep of 27 Nov 2026, intake finding 2: the instruction allows no title for an unclear document; the operator's own title is then recorded
+    s = intake_record(ws, PROC, prior, title='Their own title', client='VK')['summary']
+    assert s['titles'] == [] and s['title'] == 'Their own title' and s['title_source'] == 'typed'
+    for bad in ([42], [None], ['ok', ''], 'not a list', ['  '], None):
         proposal(ws, titles=bad)
         with pytest.raises(Refused) as exc:
             intake_record(ws, PROC, prior, title='x', client='VK')

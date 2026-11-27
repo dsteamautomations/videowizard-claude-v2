@@ -349,6 +349,8 @@ def record(conn, user, run, key, value, quote, video=None, fps=None, scripts=Non
     if not quote:
         raise Problem(422, 'FILM_CHOICE', 'Pass the operator\'s own words with --quote.')
     doc = check(key, value, video, fps, scripts)
+    if all(_value(run, key).get(k) == v for k, v in doc.items()):   # 27 Nov 2026 (sweep, intake 3): the same answer again is not a change: nothing is written, nothing refused
+        return choices(run)
     stage = LOCKS[key]
     if stage and conn.execute('select 1 from vw2_jobs where run_id=%s and stage=%s limit 1', (run['id'], stage)).fetchone():
         why = {'analysis': 'the analysis has started and judged the crops against the shape recorded; to change it, run the analysis again (`vw analysis --again`) after recording',

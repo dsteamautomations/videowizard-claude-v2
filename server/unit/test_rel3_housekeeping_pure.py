@@ -56,4 +56,4 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert ('_font_card' in rows['396'] and 'style_words' in rows['397'] and 'cue_rows' in rows['398'] and 'revise_specs' in rows['399'] and 'cue_warnings' in rows['400']
             and 'palette_line' in rows['401'] and 'PARTS_AGAIN' in rows['402']
             and 'go_on' in rows['403'] and 'start_retry_due' in rows['404'] and 'order_due' in rows['405'] and 'with_places' in rows['406'] and 'stuck_of' in rows['407']
-            and 'footage_due' in rows['408'] and '409' not in rows)   # release 1 of 27 Nov 2026, phase 3   # what a correction can change (27 Nov)
+            and 'footage_due' in rows['408'] and 'intake_record' in rows['409'] and '410' not in rows)   # release 1 of 27 Nov 2026, phase 3   # what a correction can change (27 Nov)
