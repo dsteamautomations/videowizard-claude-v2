@@ -9,7 +9,7 @@ import pytest
 import handoff as H
 import vw
 from test_download import Storage, Stream, body, setup   # noqa: F401 (the fixture)
-from test_handoff import cli, edit, args, run   # noqa: F401 (the fixture)
+from test_handoff import cli, edit, args, listed, run   # noqa: F401 (the fixture)
 
 
 class Flaky(Storage):
@@ -53,8 +53,7 @@ def test_the_cross_check_passes_after_the_timeline_got_this_computers_paths(tmp_
 def test_confirm_passes_after_download_on_the_same_folder(cli, monkeypatch, capsys):
     m, sent, tmp_path = cli
     d, manifest = edit(tmp_path)
-    (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True, exist_ok=True)
-    (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: listed(tmp_path, manifest))   # hand-over stoppers, 23 Nov: the server names the current package list
     H.write_timeline_for(d, manifest)   # what `vw delivery download` leaves behind
     code, out, err = run(args(what='confirm', quote='Yes, the start, middle and end match the film.'), capsys)
     assert code == 0 and [s[0] for s in sent] == ['resolve/reserve', 'resolve/mark', 'resolve/mark'], out
@@ -93,9 +92,10 @@ def test_a_second_download_is_not_refused_for_the_space_the_first_one_took(cli, 
     have = H.present_bytes(d)
     monkeypatch.setattr(vw.handoff, 'find_resolve', lambda: {'found': True, 'version': '21.1', 'edition': 'free'})
     monkeypatch.setattr(vw.handoff, 'free_bytes', lambda ws: 5)
-    monkeypatch.setattr(vw, 'call', lambda *a, **k: {'bundle': {'manifest': {'key': 'k-man'}, 'bytes': have}})
-    (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True, exist_ok=True)
-    (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+    st = listed(tmp_path, manifest)   # hand-over stoppers, 23 Nov: the list here is the server's current one, so nothing is fetched
+    st['bundle']['bytes'] = have
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: st)
+    monkeypatch.setattr(vw, '_download', lambda m, key, rel, expect=None: str(tmp_path / 'runs' / 'VW-9' / rel))
     monkeypatch.setattr(vw, 'download_bundle', lambda m, man, into=None, **kw: {})
     code, out, err = run(args(what='download'), capsys)
     assert code == 0 and out['check']['ok'], out   # the folder already holds the bundle: nothing more is needed
