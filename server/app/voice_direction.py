@@ -216,8 +216,15 @@ def validate_passages(passages, text):
     if len(passages) > PASSAGES_MAX:
         problems.append(f'at most three test passages; {len(passages)} given')
     words = words_of(text)
+    short = len(words) < PASSAGE_MIN   # 27 Nov 2026 (sweep, voice 1): a script under 50 words is its own test passage; it could get none, so no direction and no tryout
+    if short and len(passages) > 1:
+        return [f'the script has {len(words)} words, under {PASSAGE_MIN}: one test passage, the whole script ({len(passages)} given)']
     for i, p in enumerate(passages[:PASSAGES_MAX], 1):
         where = f'test passage {i}'
+        if short and isinstance(p, dict) and type(p.get('first_word')) is int and type(p.get('last_word')) is int:
+            if (p['first_word'], p['last_word']) != (1, len(words)):
+                problems.append(f'{where}: the script has {len(words)} words, under {PASSAGE_MIN}, so the whole script is the test passage: first_word 1, last_word {len(words)}')
+            continue
         if not isinstance(p, dict) or not isinstance(p.get('first_word'), int) or not isinstance(p.get('last_word'), int):
             problems.append(f'{where}: first_word and last_word are word numbers')
             continue

@@ -126,3 +126,38 @@ def test_sub_request_ids_are_valid_uuids_and_stable():
     base = str(uuid.uuid4())
     a, b = V.sub_request_id(base, 0), V.sub_request_id(base, 1)
     assert uuid.UUID(a) and uuid.UUID(b) and a != b and a == V.sub_request_id(base, 0) and a != base
+
+
+# ---------- sweep of 27 Nov 2026, voice finding 1: a script under 50 words could get no test passage, so no direction and no tryout ----------
+
+def short_script(n):
+    return ' '.join(f'word{i}.' for i in range(1, n + 1))
+
+
+def test_a_script_under_50_words_is_its_own_test_passage():
+    assert VD.validate_passages([{'first_word': 1, 'last_word': 49, 'why': 'the whole script'}], short_script(49)) == []
+    assert VD.validate_passages([{'first_word': 1, 'last_word': 1, 'why': ''}], short_script(1)) == []
+
+
+def test_a_script_of_50_words_keeps_the_rule_of_50_to_100_words():
+    assert VD.validate_passages([{'first_word': 1, 'last_word': 50, 'why': ''}], short_script(50)) == []
+    assert '50 to 100 words' in VD.validate_passages([{'first_word': 1, 'last_word': 49, 'why': ''}], short_script(50))[0]
+
+
+def test_a_part_of_a_short_script_is_refused_with_the_words_to_use():
+    for a, b in ((1, 35), (2, 36), (5, 20)):
+        assert VD.validate_passages([{'first_word': a, 'last_word': b, 'why': ''}], short_script(36)) == [
+            'test passage 1: the script has 36 words, under 50, so the whole script is the test passage: first_word 1, last_word 36']
+
+
+def test_a_short_script_has_one_test_passage_only():
+    whole = {'first_word': 1, 'last_word': 36, 'why': ''}
+    assert VD.validate_passages([whole] * 3, short_script(36)) == ['the script has 36 words, under 50: one test passage, the whole script (3 given)']
+
+
+def test_the_direction_instruction_says_what_a_short_script_does():
+    import json
+    from pathlib import Path
+    voice = next(s for s in json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'voice')
+    assert 'A script under 50 words is its own test passage: word 1 to its last word.' in voice['direction_prompt']
+    assert 'ONE recommended test passage of 50 to 100 words (the whole script when it has under 50 words)' in ' '.join(voice['steps'])
