@@ -1012,7 +1012,7 @@ def _plan_step(ctx):
         six = P.expected(ctx['session'], ctx['plan'], rows)   # design/221 row 18: the page only when everything is made
         lines = _pictures_lines(ctx) if P.complete(six) else None
         seven = T.expected(ctx['session'], ctx['plan'], rows)   # design/222: step 7, AI video, once step 6 has nothing left to answer; a film with no AI video has none
-        if seven and lines is not None and not lines:
+        if seven and (lines == [] or (lines is None and P.settled(six))):   # phase 4 part D: nor when what is left of step 6 is stuck, with nothing to answer
             return 'takes', ((_takes_lines(ctx) if T.complete(seven) else None), seven)
         return 'pictures', (lines, six)
     return ('refs', []) if at == 1 else ('sets', []) if at in (2, 'making', 'looking', 'rewrite') else ('spec', specs) if specs else ('plan', [])
@@ -1084,7 +1084,7 @@ def _takes_page(ctx, base, lines, seven):
     """design/222: the round of step 7. While a take is being made or checked (lines None) nothing is put on the page: the answer is the line of
     counts. A round over the document's size loses the details and the passed lines of its last lines first; a line is never cut."""
     if lines is None:
-        count = T.status_line(seven)
+        count = ' '.join(x for x in (T.status_line(seven), P.stuck_due(seven)) if x)   # phase 4 part D: each stuck shot is said, also while the page is closed
         start = T.starts(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run'])) if ctx.get('plan') else ''   # release 1, D1: what can start now, together in one message
         return {**base, 'step': T.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': T.W['page_later'],
                 'then': ' '.join(x for x in (count, start, T.W['page_later']) if x), 'how': TAKES_CLOSED}
@@ -1097,7 +1097,7 @@ def _takes_page(ctx, base, lines, seven):
         l['takes'] = [{**t, 'details': []} for t in l['takes']]
     n = len([l for l in lines if l['state'] == 'open'])
     return _counted(ctx['session'], {**base, 'step': T.W['step'], 'open': bool(n), 'lines': lines, 'say': T.say(lines, rows), 'summary': T.W['summary'].format(n=n),
-                                     'note': T.W['note'] if n else T.W['nothing'], 'layout': {'kind': 'takes', 'help': T.W['help'], 'coming': rows, 'words': {**page_words(), 'takes': T.PAGE}}},
+                                     'note': T.W['note'] if n else T.W['nothing'], 'layout': {'kind': 'takes', 'help': T.W['help'], 'coming': rows, **({'waiting': P.waiting_rows(ctx['session'], ctx.get('plan'), seven)} if any(i.get('stuck') for i in seven) else {}), 'words': {**page_words(), 'takes': T.PAGE}}},
                     seven, T.W['count'], (T.STATE['failed'],))   # a take answered earlier is a line of its own (`takes.recorded`)
 
 
@@ -1106,7 +1106,7 @@ def _pictures_page(ctx, base, lines, six):
     last lines first; a line is never cut. design/221 row 18: while something of step 6 is being made (lines None) nothing is put on the page:
     the answer is the line of counts."""
     if lines is None:
-        count = P.status_line(six)
+        count = ' '.join(x for x in (P.status_line(six), P.stuck_due(six)) if x)   # phase 4 part D
         return {**base, 'step': P.W['step'], 'open': False, 'closed': True, 'lines': [], 'say': count, 'summary': '', 'note': P.W['page_later'],
                 'then': ' '.join(x for x in (count, P.drawn_due(six), P.starts(six), P.W['page_later']) if x), 'how': PICTURES_CLOSED}   # design/221: a failed or stale render is said; fix set A1.4
     rows = P.coming(six)
@@ -1121,7 +1121,7 @@ def _pictures_page(ctx, base, lines, six):
     done = [{'name': i['name'], 'kind_words': P.W[P.KIND_WORDS[i['kind']]], 'state': 'answered', 'note': P.W['answered_note']} for i in things if i['state'] == P.STATE['answered']]
     return _counted(ctx['session'], {**base, 'step': P.W['step'], 'open': bool(n), 'lines': lines, 'say': P.say(lines, rows),
                                      'summary': P.W['summary'].format(n=n, c=len(rows)) if rows else f'{n} to answer.', 'note': P.W['note'] if n else P.W['nothing'],
-                                     'layout': {'kind': 'pictures', 'help': P.W['help'], 'coming': rows, **({'recorded': done} if done else {}),   # fix set (f): answered earlier, shown apart as recorded
+                                     'layout': {'kind': 'pictures', 'help': P.W['help'], 'coming': rows, **({'waiting': P.waiting_rows(ctx['session'], ctx.get('plan'), six)} if any(i.get('stuck') for i in six) else {}), **({'recorded': done} if done else {}),   # fix set (f): answered earlier, shown apart as recorded
                                                 'words': {**page_words(), 'pictures': P.PAGE}}},
                     things, P.W['count'], (P.STATE['answered'], P.STATE['failed']))
 

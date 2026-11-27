@@ -3608,7 +3608,7 @@ def waiting(session, plan, code, take_rows, budget=None, gate=True):
         from . import takes   # design/222: step 7 is shown at the end, on the page: a ready AI video take is not asked one by one (gate False: an answer given on the page that opened)
         video = lambda i: i['kind'] == 'take to select' and route_of(shots.get(i['group']) or {'visual_type': ''}) == 'video'
         by_id = {str(j['id']): j for j in take_rows}
-        if not takes.complete(takes.expected(session, plan, take_rows, now)) or not pictures.complete(pictures.expected(session, plan, take_rows, now)):   # the critic's S1: nor while step 6 is still being made
+        if not takes.complete(takes.expected(session, plan, take_rows, now)) or not pictures.settled(pictures.expected(session, plan, take_rows, now)):   # the critic's S1: nor while step 6 is still being made
             items = [(a, i) for a, i in items if not video(i)]
         else:   # the second critic's points 1, 9: the page is open: each take only with its check (a remake too), and none of a shot with an open question
             items = [(a, i) for a, i in items if not video(i) or takes.answerable(session, plan, take_rows, i['group'], by_id[i['item']], now)]   # design/223: the newest video of a shot that waits for an answer (a video the operator spoke of earlier stays on its line)
@@ -8751,7 +8751,7 @@ def status(conn, store, run, outputs, repair=True):
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
     step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()), pictures.stills_wait(six), pictures.supplied_due(six),
-                                 takes.starts(session, plan, take_rows) if seven else '') if x)   # release 1, D1: what of step 7 can start now, together
+                                 takes.starts(session, plan, take_rows) if seven else '', pictures.stuck_due(six), pictures.stuck_due(seven)) if x)   # release 1, D1: what of step 7 can start now, together
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3

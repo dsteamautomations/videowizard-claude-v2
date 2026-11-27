@@ -2073,7 +2073,7 @@ def _guide_items(ctx):
                 out = guide.approve_still(conn, store, user, run, outputs, sid, still['id'], still['sha256'], quote, shoot=choice == 'approve')
                 sent = choice == 'approve' and sid in guide.order_due(conn, store, user, run, outputs)   # the words and the video are there already: ordered at once
                 return {**out, 'tell': 'The picture is approved and its take is being made. ' + NOTHING if sent else out['next']}
-            items.append(_item(P.marked(f"still:{sid}:{still['id']}", P.look_view(still))[0] if V.round_v2(session) else f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the picture that starts the shot',   # the critic's point 2
+            items.append(_item(P.marked(f"still:{sid}:{still['id']}", P.look_view(still))[0] if V.round_v2(session) else f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',   # the critic's point 2
                                f'{title}: this picture starts the shot. Is it what the shot should show?', run_,
                                [_button(f'Approve and shoot (about ₹{price:.0f})', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the picture.')],
                                more=[_button('Approve the picture, the take later', 'later')], show=[{'key': still['key'], 'name': f'{sid}-still.png'}],
@@ -2518,11 +2518,11 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if looks:
             out['then'] = looks + (' ' + out['then'] if out.get('then') else '')
         rows = V.take_jobs(conn, run)
-        more = ' '.join(x for x in (T.starts(session, plan, rows), T.C.due(session, plan, rows), T.held_due(session, plan), T.render_due(session, plan)) if x)   # design/223: the corrections that wait for their route   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
+        more = ' '.join(x for x in (T.starts(session, plan, rows), T.C.due(session, plan, rows), T.held_due(session, plan), T.render_due(session, plan), P.stuck_due(T.expected(session, plan, rows))) if x)   # design/223: the corrections that wait for their route   # the takes that wait for Claude's check; release 1, D1: what can start now, together; a take ordered on the page; a shot left with no take
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)
-        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.stills_wait(six), P.supplied_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
+        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.stills_wait(six), P.supplied_due(six), P.stuck_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
         from . import core

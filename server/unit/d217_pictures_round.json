@@ -26,7 +26,7 @@
   "words": {
    "pictures": {
     "todo": "Needs your answer",
-    "coming": "Could not be made",
+    "coming": "Could not be made", "waiting": "Not being made now",
     "recorded": "Answered earlier",
     "nothing": "Nothing waits for you now.",
     "against": "Against the check",

@@ -158,7 +158,7 @@ W = {
     'comp_all_na':'Claude answered every line of its list "does not apply": it is not checked.',
 }
 PAGE = {   # layout.words.pictures: the page's chrome
-    'todo': 'Needs your answer', 'coming': 'Could not be made', 'recorded': 'Answered earlier', 'nothing': W['nothing'], 'against': 'Against the check',
+    'todo': 'Needs your answer', 'coming': 'Could not be made', 'waiting': 'Not being made now', 'recorded': 'Answered earlier', 'nothing': W['nothing'], 'against': 'Against the check',
     'done': {'answer': 'Answered', 'approve': 'Approved', 'again': 'Made again', 'fix': 'Made again, your words', 'select': 'Selected', 'reject': 'Rebuilt, your words', 'plain': 'Made again, no effect'},
     'undo': 'Undo', 'cancel': 'Cancel', 'details': 'Details', 'more': 'See all {n}', 'fewer': 'Show fewer', 'compare': 'Compare with the earlier try', 'stop': 'Stop comparing',
     'frames': 'Show its frames', 'video': 'Show the video', 'video_bad': 'The video could not be shown here; these are its frames.',
@@ -1384,7 +1384,13 @@ def expected(session, plan, take_rows, now=None):
             wait = V.parts_wait(plan, session) if wait is None else wait
             if wait and not turn[0].startswith('check'):   # F11: the shared parts are not the approved ones: no builder is named, and the line says what is waited for
                 turn, due = ('', ''), ' '.join(x for x in (due, wait if turn[0] else '') if x)
-        out.append({'kind': kind, 'id': sid, 'name': V.coded(names, sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
+        stuck = None
+        if STATE[state] not in COMPLETE:   # phase 4 part D (SK's second decision): the 30 minutes hold for step 6 too
+            made = [r for r in refs if V.made_for(session, r) == sid]
+            busy = any(r.get('status') == 'generating' for r in made) or any(j.get('unit') == sid and j.get('status') in JOB_OPEN for j in take_rows or [])
+            stuck = stuck_of(session, sid, STUCK['supplied' if kind == 'still' and sh.get('supplied') and state == 'none' else 'refs' if held and state == 'none' else state], made,
+                             [j for j in take_rows or [] if j.get('unit') == sid], busy, now)
+        out.append({'kind': kind, 'id': sid, 'name': V.coded(names, sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}), **({'stuck': stuck} if stuck else {}),
                     **({'supplied': sh['supplied']} if kind == 'still' and sh.get('supplied') else {}),   # release 3 (N4): it waits for the operator's own picture
                     **({'waits_for': [e.get('name') or e['id'] for e in held]} if held else {}),   # phase 2 part C: the things whose approved reference it waits for
                     **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
@@ -1396,13 +1402,83 @@ def expected(session, plan, take_rows, now=None):
     for eid, rs in by.items():
         state = _component_state(rs)
         if state:
-            out.append({'kind': 'component', 'id': eid, 'name': str(names.get(eid) or eid), 'state': STATE[state]})
+            stuck = None if STATE[state] in COMPLETE else stuck_of(session, eid, STUCK[state], rs, [], any(r.get('status') == 'generating' for r in rs), now)
+            out.append({'kind': 'component', 'id': eid, 'name': str(names.get(eid) or eid), 'state': STATE[state], **({'stuck': stuck} if stuck else {})})
     return out
 
 
+# ---------- release 1 of 27 Nov 2026, phase 4 part D (SK): a thing that is stuck does not keep the page closed ----------
+
+STUCK_MINUTES = 30   # one number (SK, 27 Nov 2026), for the page of step 7 and, by his second decision, the page of step 6
+JOB_OPEN = ('queued', 'running', 'submitted', 'storage_pending', 'submission_unknown')
+STUCK = {   # what a stuck thing waits for, one sentence for each state that is not complete
+    'none': 'Nothing has been ordered for it since {since}. Ask the assistant why.',
+    'making': 'Nothing is being made for it since {since}. Ask the assistant why.',
+    'checking': "It waits for Claude's check since {since}. Ask the assistant why.",
+    'redo': 'It is to be made again; nothing has happened since {since}. Ask the assistant why.',
+    'held': 'It waits for your decision in the chat since {since}.',
+    'stale': 'It must be rendered again; nothing has happened since {since}. Ask the assistant why.',
+    'supplied': 'It waits for your own picture since {since}.',
+    'refs': 'It waits for the approved references of what it shows since {since}.',
+}
+STUCK_LEAD = f'Not moving for {STUCK_MINUTES} minutes or more: '
+
+
+def _marks(o):
+    """Every time recorded in a record: the values of `at` and of the keys that end in `_at`, at any depth."""
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if (k == 'at' or str(k).endswith('_at')) and isinstance(v, (str, datetime)):
+                try:
+                    d = v if isinstance(v, datetime) else datetime.fromisoformat(v)
+                except ValueError:
+                    continue
+                yield d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+            else:
+                yield from _marks(v)
+    elif isinstance(o, (list, tuple)):
+        for x in o:
+            yield from _marks(x)
+
+
+def stuck_of(session, ident, sentence, refs, rows, busy, now=None):
+    """Part D, rule 1: the one test of "stuck", for a shot of step 7 and a thing of step 6: nothing is queued or running for it (`busy`, said by
+    the caller) and nothing has happened for it for STUCK_MINUTES. None, or {'since', 'waits'}: since when, and what it waits for in one
+    sentence. "Since when" is the newest time recorded on the thing: in its own records of the session (any record filed under its id), on its
+    pictures (`refs`) and on its jobs (`rows`); a thing with no time at all counts from the plan's last version or acceptance.
+    Why: on VW-25 eleven paid takes waited about 25 hours for one shot. Retired: one unfinished thing keeping the page closed with no time limit."""
+    if busy:
+        return None
+    own = [v[ident] for v in session.values() if isinstance(v, dict) and ident in v]
+    at = max(_marks([own, list(refs), [dict(j) for j in rows]]), default=None) or max(_marks([session.get('versions'), session.get('accepted')]), default=None)
+    now = now or _now()
+    if at is None or now - at < timedelta(minutes=STUCK_MINUTES):
+        return None
+    since = at.strftime('%H:%M UTC') if at.date() == now.date() else f"{at.day} {at.strftime('%b, %H:%M UTC')}"
+    return {'since': at.isoformat(), 'waits': sentence.format(since=since)}
+
+
+def settled(items):
+    """Nothing of the step is still moving: every thing is complete or stuck."""
+    return all(i['state'] in COMPLETE or i.get('stuck') for i in items)
+
+
 def complete(items):
-    """The page of step 6 opens: every thing is made and checked, answered, or could not be made (a held drawing waits for its card)."""
-    return all(i['state'] in COMPLETE for i in items)
+    """The page of step 6 opens: every thing is made and checked, answered, or could not be made (a held drawing waits for its card).
+    Part D: a stuck thing does not keep it closed; with a stuck thing the page opens only when something waits for an answer on it."""
+    return settled(items) and (not any(i.get('stuck') for i in items) or any(i['state'] == STATE['done'] for i in items))
+
+
+def stuck_due(items):
+    """Part D, rule 4: the sentence of each stuck thing, the same in the status line, the next-step line and on the page. '' when none."""
+    rows = [f"{i['name']}: {i['stuck']['waits']}" for i in items if i.get('stuck')]
+    return STUCK_LEAD + ' '.join(rows) if rows else ''
+
+
+def waiting_rows(session, plan, items):
+    """layout.waiting: the stuck things, listed apart on the page: the name, the voiceover, what it waits for and since when."""
+    shots = {sh['id'] for _, sh in V._accepted_shots(plan, session)} if plan else set()
+    return [{'name': i['name'], 'kind_words': heading_text(session, plan, [i['id']]) if i['id'] in shots else '', 'state': 'stuck', 'note': i['stuck']['waits']} for i in items if i.get('stuck')]
 
 
 def status_line(items):

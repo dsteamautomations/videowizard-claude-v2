@@ -781,6 +781,7 @@ def apply_result(session, job, status, result, error):
     g = (session.get('guides') or {}).get(req.get('shot_id'))
     if not g or g.get('sha256') != req.get('sha256'):
         return None
+    g['moved_at'] = now()   # phase 4 part D: a result that came back is the shot's newest mark (`pictures.stuck_of`)
     ok = status in ('ready', 'retained')
     if req['kind'] == 'guide-frames':
         g['frames'] = {'job_id': str(job['id']), 'status': 'ready' if ok else 'failed', **({'frames': result['frames'], 'strip_key': result['strip_key']} if ok else {'error': error})}

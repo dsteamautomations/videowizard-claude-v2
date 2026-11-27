@@ -88,7 +88,7 @@ W = {
     'answered': 'Take {n} accepted. It is in the film at {at}.',
 }
 PAGE = {   # layout.words.takes: the page's chrome (the page holds no words of its own)
-    'todo': 'Needs your answer', 'answered_head': 'Answered earlier', 'coming': 'Could not be made', 'nothing': W['nothing'], 'state_open': 'needs your answer',
+    'todo': 'Needs your answer', 'answered_head': 'Answered earlier', 'coming': 'Could not be made', 'waiting': 'Not being made now', 'nothing': W['nothing'], 'state_open': 'needs your answer',
     'done': {'select': 'Accepted', 'again': 'Correction ordered'}, 'more': 'See all {n}', 'words_label': 'Voiceover',
     'film': 'See it in the film', 'film_head': 'In the film', 'before': 'Where the shot before ends', 'after': 'Where the shot after begins', 'this_take': 'This take',
     'compare_only': 'Shown to compare. Nothing here needs an answer.', 'compare_from': 'The one before', 'compare_new': 'The new one', 'play_both': W['play_both'],
@@ -294,19 +294,40 @@ def answerable(session, plan, take_rows, shot_id, job, now=None):
     return state in ('done', 'stale') and str(shown['id']) == str(job['id'])
 
 
+# Release 1 of 27 Nov 2026, phase 4 part D: what a stuck shot waits for, one sentence for each state that is not complete (`pictures.STUCK` for the shared ones)
+STUCK = {**P.STUCK, 'none': 'Its scene has not been written; nothing has been started since {since}. Ask the assistant why.',
+         'chat': 'It waits for your answer in the chat since {since}.', 'fix': 'Its correction is not being made; nothing has happened since {since}. Ask the assistant why.',
+         'video': 'It waits for its layout video, which is not being made, since {since}. Ask the assistant why.',
+         'still': 'Its still can be ordered; nothing has been ordered since {since}. Ask the assistant why.', 'cap': 'It waits for the cost limit since {since}.'}
+
+
+def _busy(g, js):
+    """Something is queued or running for the shot: a take, its check frames, its first frame, its layout video or its still (the list of take jobs
+    leaves the last four out: they are read from the shot's own record)."""
+    r = g.get('render') or {}
+    return (any(j['status'] in OPEN for j in js) or (g.get('frames') or {}).get('status') not in (None, 'ready', 'failed') or r.get('status') not in (None, 'ready', 'failed')
+            or bool(r.get('frame1_job_id') and not r.get('frame1_key') and not r.get('frame1_error')) or any(s.get('status') == 'generating' for s in g.get('stills') or []))
+
+
 def expected(session, plan, take_rows, now=None):
-    """Every AI video shot of the accepted plan, in film order, with its state in plain words: [{kind 'take', id, name, state, job?}]."""
+    """Every AI video shot of the accepted plan, in film order, with its state in plain words: [{kind 'take', id, name, state, job?, stuck?}].
+    Part D: `stuck` (`pictures.stuck_of`): not complete, nothing queued or running for it, nothing happened for 30 minutes."""
     out = []
     for g, sh, n, of in video_shots(plan, session):
         state, job, aside = _state(session, plan, sh, take_rows, now)
-        out.append({'kind': 'take', 'id': sh['id'], 'name': name_of(g, sh, n, of), 'state': STATE[state], **({'job': job} if job else {}), **({'aside': True} if aside else {})})
+        js = jobs_of(take_rows, sh['id'])
+        stuck = None if STATE[state] in COMPLETE or aside else P.stuck_of(session, sh['id'], STUCK[state], [], js, _busy((session.get('guides') or {}).get(sh['id']) or {}, js), now)
+        out.append({'kind': 'take', 'id': sh['id'], 'name': name_of(g, sh, n, of), 'state': STATE[state], **({'job': job} if job else {}), **({'aside': True} if aside else {}),
+                    **({'stuck': stuck} if stuck else {})})
     return out
 
 
 def complete(items):
     """The page of step 7 opens: every take is made, answered, or could not be made; a shot the assistant talks to the operator about in the chat, or
-    one that waits for the cost limit, does not close it for the others."""
-    return all(i['state'] in COMPLETE or i.get('aside') for i in items)
+    one that waits for the cost limit, does not close it for the others. Part D: nor does a stuck shot; with a stuck shot the page opens only when
+    a take waits for an answer (every shot stuck: no page; the status says each one)."""
+    return (all(i['state'] in COMPLETE or i.get('aside') or i.get('stuck') for i in items)
+            and (not any(i.get('stuck') for i in items) or any(i['state'] == STATE['done'] for i in items)))
 
 
 def status_line(items):

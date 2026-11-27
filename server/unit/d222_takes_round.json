@@ -782,7 +782,7 @@
    "takes": {
     "todo": "Needs your answer",
     "answered_head": "Answered earlier",
-    "coming": "Could not be made",
+    "coming": "Could not be made", "waiting": "Not being made now",
     "nothing": "Nothing waits for you now.",
     "state_open": "needs your answer",
     "against": "Against the check",

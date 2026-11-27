@@ -388,7 +388,7 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .pqbar{display:grid;gap:8px;max-width:560px;margin:4px 0 6px}
 .pkw{display:block;font-size:12px;color:var(--muted)} #sets .sfold[data-fold="coming"]{gap:8px}
 .pagt{color:var(--chg);font-weight:600}
-.pcoming{list-style:none;margin:0 0 14px;padding:0} .pcoming li{padding:5px 10px 5px 20px;color:var(--muted);font-size:13px;line-height:1.35} .pcoming small{display:block;font-size:12px}
+.pcoming{list-style:none;margin:0 0 14px;padding:0} .pcoming li{padding:5px 10px 5px 20px;color:var(--muted);font-size:13px;line-height:1.35} .pcoming small{display:block;font-size:12px} .pcoming li[data-state="stuck"]{color:var(--chg)}
 .pnone{font-size:12px;color:var(--muted)}
 /* design/222 (SK, 19 Nov 2026): step 7, "AI video", in the same frame, as on the trial SK approved: the take large and playing, the words spoken during
    the shot under its name and marked in time, beside it the check in one line, the buttons and two links; the film order and the details open over the page. */
@@ -1513,7 +1513,8 @@ function sRail(){
       mk('i',{class:'sdot',role:'img',title:say,'aria-label':say},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},[l.kind_words,l.film_at].filter(Boolean).join(' · '))))); })));
   const coming=(PIC()||TK())&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
   const earlier=PIC()&&(round.layout||{}).recorded||[];   // fix set (20 Nov 2026): what was answered earlier, in the chat: shown as recorded, in a folded row of its own
-  [['coming',w.coming,coming],['recorded',w.recorded,earlier]].forEach(([g,title,rows])=>{ if(!rows.length) return; const o=!!S.fold[g];
+  const stuck=(PIC()||TK())&&(round.layout||{}).waiting||[];   // release 1 of 27 Nov 2026, phase 4 part D: what is not moving, listed apart and open from the start
+  [['waiting',w.waiting,stuck],['coming',w.coming,coming],['recorded',w.recorded,earlier]].forEach(([g,title,rows])=>{ if(!rows.length) return; const o=g==='waiting'?S.fold[g]!==false:!!S.fold[g];
     kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':g,on:{click:()=>{ S.fold[g]=!o; sRail(); }}},mk('span',{},title||''),String(rows.length)));
     if(o) kids.push(mk('ul',{class:'pcoming',id:'p'+g},rows.map(c=>mk('li',{'data-state':c.state},c.name,mk('small',{},[c.kind_words,c.note].filter(Boolean).join(' · ')))))); });
   const covered=(sRest()||{}).covers||[];
