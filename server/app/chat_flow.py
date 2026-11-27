@@ -2325,14 +2325,15 @@ def card_answer(conn, store, user, run, outputs, card_id, answers, one=False):
     session['chat_cards_done'] = ((session.get('chat_cards_done') or []) + [card_id])[-30:]   # the card is spent: it is never taken up again
     session.pop('chat_card', None)
     V.save_session(store, run, session)
-    nxt = next_item(conn, store, user, run, outputs, one)
+    nxt = _next_after(conn, store, user, run, outputs, one)
     changed = sorted([n for n, _, choice, _ in todo if choice == 'change'] + [n for n in before if seen[n][0] == 'change'])
     return {'answered_card': card_id, 'recorded': sorted(recorded), 'not_open': not_open, 'held': held, **nxt,
             'then': f'{len(recorded)} answer(s) recorded. '
                     + (f"Not recorded, because the direction changes and every line is written again from it: entries {', '.join(map(str, held))}. " if held else '')
                     + (f"Not recorded, no longer open (recorded before, or changed since the card): entries {', '.join(map(str, not_open))}; any still open are asked again. " if not_open else '')
                     + (f"The operator asked for a change in entries {', '.join(map(str, changed))}: make only those changes, send them again, and they return in their turn. " if changed else '')
-                    + ('What comes next is in this answer: show it now; do not run `vw visuals next` for it.' if nxt.get('item') or nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')}
+                    + (NEXT_REFUSED.format(why=nxt['next_refused']) if nxt.get('next_refused')
+                       else 'What comes next is in this answer: show it now; do not run `vw visuals next` for it.' if nxt.get('item') or nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')}
 
 
 # ---------- release 2, B4 and B4b (SK, 20 Nov 2026): several of one kind, ready together, in one message; still one decision per picture ----------
@@ -2366,6 +2367,8 @@ def _entry(item):
 
 def handed(out):
     """Release 3, E1: what a next call handed out, for its line in the run's log: the item's id and kind, a group's ids, a card's size."""
+    if out.get('next_refused'):   # part A (27 Nov 2026): the answer stayed; what stopped the next card is in the log
+        return f"answer recorded; the next card was refused: {out['next_refused']}"
     if out.get('item'):
         return f"handed out {out['item']['id']} ({out['item'].get('kind') or 'item'})"
     if out.get('group'):
@@ -2486,6 +2489,20 @@ def _next_item(conn, store, user, run, outputs, one=False, many=False):
                    + (STATUS_HOW if count else '') + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
 
 
+NEXT_REFUSED = 'The answer is recorded. The next card could not be fetched: {why} Run `vw visuals next`.'
+
+
+def _next_after(conn, store, user, run, outputs, one=False, many=False):
+    """Release 1 of 27 Nov 2026, part A: the next card after a recorded answer. A refusal raised while it is fetched (a ValueError or a Problem:
+    words written for a person) no longer refuses the request: the answer and what it queued stay, in the database and in storage alike, and the
+    refusal's words go into the reply and the run's log. Anything unexpected still fails the request. Older way retired: the refusal failed the
+    whole request, the queued jobs were rolled back and the saved record still said the answer was given (VW-25, S01-1)."""
+    try:
+        return next_item(conn, store, user, run, outputs, one, many)
+    except (ValueError, V.Problem) as exc:
+        return {'item': None, 'next_refused': str(getattr(exc, 'message', '') or exc)}
+
+
 def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='', one=False, many=False):
     """The operator's answer to the item that was handed out, or to one item of the group that was handed out (release 2, B4: each on its own, in
     any order). Any other item is refused by name; so is the layout drawing's card, retired (A1, SK 25 Nov 2026)."""
@@ -2519,11 +2536,12 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     out = out if isinstance(out, dict) else {}
     done = {k: out[k] for k in ('recorded', 'accepted', 'revise', 'for_the_assistant', 'held', 'pass', 'queued', 'errors') if k in out}
     said = out.get('tell') or (out.get('then') if V.round_v2(session) else None)   # design/211: an answer of a v2 round carries the server's own "what next" (the second go ordered, a set made)
-    nxt = next_item(conn, store, user, run, outputs, one, many)   # SK, 12 Nov 2026: record and fetch in one step, so the operator waits once per answer, not twice
+    nxt = _next_after(conn, store, user, run, outputs, one, many)   # SK, 12 Nov 2026: record and fetch in one step, so the operator waits once per answer, not twice
     return {'answered': item_id, 'choice': choice, **done, **nxt,
             'then': (str(said) + ' ' if said else '')
                     + ('If the operator answered other pictures of the same message, record those first; show only what the last record returns. ' if len(open_ids) > 1 else '')
-                    + ('The next decision is in `item`: show it now; do not run `vw visuals next` for it.' if nxt.get('item')
+                    + (NEXT_REFUSED.format(why=nxt['next_refused']) if nxt.get('next_refused')
+                       else 'The next decision is in `item`: show it now; do not run `vw visuals next` for it.' if nxt.get('item')
                        else 'What comes next is a card (`card`): show it now, as `how` says.' if nxt.get('card')
                        else 'What comes next is several pictures in one message (`group`): show them now, as `how` says.' if nxt.get('group')
                        else 'No decision waits now: give the `working` lines and the last line.')

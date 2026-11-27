@@ -52,4 +52,4 @@ def test_the_owner_rulings_and_the_decisions_not_to_build_are_logged():
     assert 'each cut short' in rows['376'] and 'Kept' in rows['376']   # three short shots of one size (26 Nov)
     assert all('issue 10' in rows[n] for n in ('377', '378', '379')) and 'issue 11' in rows['380']   # own pictures and their words (26 Nov)
     assert 'Minor corrections' in rows['381'] and 'Make again' in rows['382'] and 'Reversed' in rows['383'] and 'Kept' in rows['384']   # minor corrections as an edit (26 Nov)
-    assert 'hint_again' in rows['385'] and 'cannot change the camera' in rows['385'] and '386' not in rows   # what a correction can change (27 Nov)
+    assert 'hint_again' in rows['385'] and 'cannot change the camera' in rows['385'] and '_next_after' in rows['386'] and '387' not in rows   # what a correction can change (27 Nov)
