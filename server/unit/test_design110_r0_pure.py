@@ -67,7 +67,7 @@ def test_a_question_is_asked_once_shown_everywhere_and_answered_by_the_operator(
 
 def test_derived_work_from_an_item_with_an_open_question_is_refused():
     store = start_store()
-    VS.ask(store, USER, RUN, [], 'K1', 'Keep K1 as the parent?', ['yes', 'no'])
+    VS.ask(store, USER, RUN, [], 'K1', 'Keep K1 as the parent?', ['yes', 'no'], keeps='yes')   # release 1 of 27 Nov 2026, part F: the choice that changes nothing
     waits = "K1 waits for the operator's answer: Keep K1 as the parent"
     with pytest.raises(Problem, match=waits):
         g(lambda: revise_start(store, role='start'))   # K1 among the parents
@@ -76,7 +76,7 @@ def test_derived_work_from_an_item_with_an_open_question_is_refused():
     with pytest.raises(Problem, match='The fix round is retired'):   # design/217 (D3): the fix round is retired before any question is read
         g(lambda: VS.request_fix(FakeConn([]), store, USER, RUN, [], 'K1'))
     VS.answer(store, USER, RUN, [], 'K1', 'yes')
-    VS.ask(store, USER, RUN, [], 'VS1', 'Shorten VS1 to 4 s?', ['yes', 'no'])
+    VS.ask(store, USER, RUN, [], 'VS1', 'Shorten VS1 to 4 s?', ['yes', 'no'], keeps='no')
     waits = "VS1 waits for the operator's answer: Shorten VS1"
     with pytest.raises(Problem, match=waits):
         g(lambda: revise_start(store, role='start'))   # made for VS1

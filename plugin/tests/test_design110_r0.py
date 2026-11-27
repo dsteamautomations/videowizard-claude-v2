@@ -16,7 +16,7 @@ def ns(**kw):
 
 def test_the_flags_table_knows_ask_answer_and_undo():
     assert 'ask' in vw.VISUALS_WHAT and 'answer' in vw.VISUALS_WHAT
-    assert vw.VISUALS_FLAGS['ask'] == {'item', 'question', 'choices', 'cost'} and vw.VISUALS_FLAGS['answer'] == {'item', 'answer'} and 'undo' in vw.VISUALS_FLAGS['round']
+    assert vw.VISUALS_FLAGS['ask'] == {'item', 'question', 'choices', 'cost', 'keeps'} and vw.VISUALS_FLAGS['answer'] == {'item', 'answer'} and 'undo' in vw.VISUALS_FLAGS['round']
     assert vw.visuals_flags_refused(ns(what='ask', item='K1', question='Which?', choices='a|b', cost='4')) == ''
     assert '--shot' in vw.visuals_flags_refused(ns(what='ask', item='K1', question='Which?', choices='a|b', shot='VS1'))
     assert '--question' in vw.visuals_flags_refused(ns(what='answer', item='K1', answer='a', question='x'))

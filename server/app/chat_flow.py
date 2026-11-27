@@ -2386,6 +2386,7 @@ def logged(out):
 def next_item(conn, store, user, run, outputs, one=False, many=False):
     """design/217 (C2): the pictures that wait for Claude's check are said first, in `then`: the duty is never silent."""
     out = _next_item(conn, store, user, run, outputs, one, many)
+    session = None
     try:
         session = V.session_of(store, run, outputs)
         plan = V.current_plan(store, session) if session.get('current') and V.round_v2(session) else None
@@ -2413,6 +2414,9 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if show:
             V.save_session(store, run, session)
             out['show'], out['show_how'] = show, SHOW_FIRST
+    due = V.unapplied_line(session or {})   # release 1 of 27 Nov 2026, part F: an answer not applied is said first, every time
+    if due:
+        out['then'] = due + (' ' + out['then'] if out.get('then') else '')
     return out
 
 

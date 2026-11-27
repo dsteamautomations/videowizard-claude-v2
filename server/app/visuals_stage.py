@@ -683,7 +683,7 @@ LOGO = re.compile(r'\b(?:logo|wordmark|brand\s*mark)\b', re.I)   # an element na
 
 def _answered_for(session, item):
     """Release 3, C2: the operator's answer to the question on this item that no plan change has used yet; refused when there is none."""
-    record = next((r for r in reversed(session.get('answered') or []) if r.get('item') == item and r.get('answer') and not r.get('plan_version')), None)
+    record = next((r for r in reversed(session.get('answered') or []) if r.get('item') == item and r.get('answer') and not r.get('plan_version') and not r.get('applied')), None)
     need(record, f"No answered question on {item} waits for its plan change: `--answers` names the item of a question the operator answered (`vw visuals ask`, answered in the chat) "
                  'and is used once. Propose the plan without it; the operator is then asked for the gaps that changed.')
     return record
@@ -765,6 +765,10 @@ def new_version(store, run, session, plan, user, warnings, answers=''):
         prev = current_plan(store, session) if session.get('current') else None   # the plan in force, for what this version changes
     except (Problem, StopIteration, KeyError, TypeError, ValueError):
         prev = None   # it cannot be read: carried and asked as before this release
+    if answer and prev:   # release 1 of 27 Nov 2026, part F: the change named with the answer alters what the question names
+        need(_altered(prev, plan, answer.get('holds') or [answer['item']]),
+             f"This plan does not change {answers}: `--answers {answers}` goes with the plan change the operator's answer asks for "
+             f"(\"{answer['answer']}\" to \"{answer['question']}\"). Change {answers} as the answer says and propose again; nothing was stored.")
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'source_plan_digest': session['source']['plan_digest'], 'document': plan,
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
@@ -776,6 +780,10 @@ def new_version(store, run, session, plan, user, warnings, answers=''):
     kept, quiet, asked = _carry_acceptances(session, plan, version, prev, answer)
     if answer:
         answer['plan_version'] = version   # used once
+    now = set(shot_prints(plan)) | {e['id'] for e in plan.get('elements') or []} | set(session.get('references') or {})
+    for r in unapplied(session):   # part F: an answer about a shot or a thing the plan no longer holds is closed by this change
+        if not any(i in now for i in r.get('holds') or [r['item']]):
+            r['applied'] = f'left the plan in version {version}'
     return {'version': version, 'plan_digest': identity, 'kept_recorded': kept, 'quiet': quiet, 'asked': asked,
             'asked_beyond': sorted(g for g in set(session.get('was_accepted') or {}) - was if g not in asked) if answer else []}
 
@@ -3041,16 +3049,70 @@ def _no_question(session, *items):
         q = qs.get(item) if item else None
         need(not q, f"{item} waits for the operator's answer: {q['question'] if q else ''} It is asked in the chat: `vw visuals next`; "
                     f"nothing is made from {item} until then.")
+    for r in unapplied(session):   # release 1 of 27 Nov 2026, part F: an answer not applied holds what its question names
+        need(not any(i and i in (r.get('holds') or [r['item']]) for i in items), _not_applied(r))
 
 
-def ask(store, user, run, outputs, item, question, choices, cost_inr=None):
-    """The assistant's question at a fork: one sentence, the concrete choices, the paid cost; recorded on the item, shown on its card, in status and in waiting."""
+NOT_APPLIED = ('{item}: the operator answered "{answer}" to "{question}" and the answer is not applied yet. Nothing more is made from {held} until '
+               'it is: propose the plan change the answer asks for with `--answers {item}` (the change must alter {held}). If the operator changed their '
+               'mind, ask again with `vw visuals ask`.')
+
+
+def unapplied(session):
+    """Release 1 of 27 Nov 2026, part F: the operator's answers to the assistant's own questions that nothing closed yet: no plan change named
+    them (`--answers`), the answer was not the choice marked as keeping the item as it is, the question was not asked again and the item is
+    still in the plan. A question the server raised itself (`fork`) acted on its answer when it was given."""
+    return [r for r in session.get('answered') or [] if r.get('answer') and not r.get('fork') and not r.get('plan_version') and not r.get('applied')]
+
+
+def _not_applied(r):
+    return NOT_APPLIED.format(item=r['item'], answer=r['answer'], question=r['question'], held=', '.join(r.get('holds') or [r['item']]))
+
+
+def unapplied_line(session):
+    """The sentence for the next-step line and the status: each answer not applied, with its shot, question and answer. '' when there is none."""
+    return ' '.join(_not_applied(r) for r in unapplied(session))
+
+
+def _holds(store, session, item):
+    """What an answer on this item holds: the item; for a picture, the shot or the thing it is of; for a thing, every shot that shows it."""
+    ref = (session.get('references') or {}).get(item) or {}
+    target = ref.get('shot_id') or ref.get('element_id') or item
+    try:
+        plan = current_plan(store, session) if session.get('current') else {}
+    except (Problem, StopIteration, KeyError, TypeError, ValueError):
+        plan = {}
+    shows = [s['id'] for gap in plan.get('gaps') or [] for sc in all_scenes(gap) for s in sc['shots'] if target in (s.get('element_ids') or [])] if any(e['id'] == target for e in plan.get('elements') or []) else []
+    return list(dict.fromkeys([item, target, *shows]))
+
+
+def _altered(prev, plan, items):
+    """True when the new plan changes one of these shots (its fingerprint: the shot, its scene, the things it shows), one of these things, or
+    the shots that show one of these things."""
+    a, b = shot_prints(prev), shot_prints(plan)
+    things = lambda p: {e['id']: e for e in p.get('elements') or []}
+    shows = lambda p, i: {s['id'] for gap in p.get('gaps') or [] for sc in all_scenes(gap) for s in sc['shots'] if i in (s.get('element_ids') or [])}
+    return any(a.get(i) != b.get(i) or things(prev).get(i) != things(plan).get(i) or shows(prev, i) != shows(plan, i) for i in items)
+
+
+def ask(store, user, run, outputs, item, question, choices, cost_inr=None, keeps=None):
+    """The assistant's question at a fork: one sentence, the concrete choices, the paid cost; recorded on the item, shown on its card, in status and in waiting.
+    keeps (release 1 of 27 Nov 2026, part F): the one choice that leaves the item as it is; every other answer needs a plan change."""
     session = session_of(store, run, outputs)
     need(_item_kind(store, session, item), f'{item} is not a picture, a shot or an element of this run.')
     q = _open(session, item, question, choices, user['id'], cost_inr)
+    keeps = str(keeps or '').strip()
+    need(not keeps or keeps in q['choices'], f"`--keeps` names one of the choices, word for word: the one that leaves {item} as it is ({' | '.join(q['choices'])}).")
+    if keeps:
+        q['keeps'] = keeps
+    for r in unapplied(session):   # asked again: the newest answer counts
+        if r['item'] == item:
+            r['applied'] = 'asked again'
     save_session(store, run, session)
     return {**q, 'next': f"Question recorded on {item}: the server hands it to the operator in the chat, in its turn: `vw visuals next`; "
-                         f"nothing is made from {item} until then."}
+                         f"nothing is made from {item} until then. After the answer "
+                         + (f'"{keeps}" the work goes on; after any other answer ' if keeps else '')
+                         + f"nothing is made from {item} until a plan change proposed with `--answers {item}` applies it."}
 
 
 def answer(store, user, run, outputs, item, words):
@@ -3071,10 +3133,16 @@ def answer(store, user, run, outputs, item, words):
     if q.get('fork') == 'not_yet' and words == q['choices'][1]:   # F3: approved anyway, on the operator's word; the flaw is theirs to carry as a parent too
         session['references'][item].update(not_yet_ok=True, parent_ok=True)
     record = {**q, 'answer': words, 'answered_by': user['id'], 'answered_at': datetime.now(timezone.utc).isoformat()}
+    if not q.get('fork'):   # release 1 of 27 Nov 2026, part F: the assistant's own question; its answer holds the item until it is applied
+        record['holds'] = _holds(store, session, item)
+        if q.get('keeps') and words == q['keeps']:
+            record['applied'] = 'no change needed'
     del session['questions'][item]
     session.setdefault('answered', []).append(record)
     save_session(store, run, session)
-    return {**record, 'next': f'Answered: {words}. Work on {item} goes on from this answer.'}
+    then = (f'Work on {item} goes on: the answer needs no change.' if q.get('fork') or record.get('applied') else
+            f"Apply it now: propose the plan change this answer asks for with `--answers {item}`. Nothing more is made from {', '.join(record['holds'])} until then.")
+    return {**record, 'next': f'Answered: {words}. {then}'}
 
 
 NO_UNDO = ('Done on step 1 cannot be undone on this film: its reference sets are ordered, and paid for, as soon as it is said, and they stay. '
@@ -8538,7 +8606,8 @@ def status(conn, store, run, outputs, repair=True):
              for j in take_rows]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'busy': not repair, **({'pictures_waiting': looks} if looks else {}), **({'step6': step6} if step6 else {}), **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+    due = unapplied_line(session)   # release 1 of 27 Nov 2026, part F
+    return {'state': 'prepared', 'busy': not repair, **({'answers_due': due} if due else {}), **({'pictures_waiting': looks} if looks else {}), **({'step6': step6} if step6 else {}), **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
@@ -8616,6 +8685,7 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     need(gap_id in session['accepted'], f'Gap {gap_id} is not accepted.')
+    _no_question(session, gap_id, *[s['id'] for s in shots_of(plan, session, gap_id)])   # release 1 of 27 Nov 2026, part F: no gap goes into the film on an answer not applied
     files, shots = [], []
     cost = []
     for s in shots_of(plan, session, gap_id):

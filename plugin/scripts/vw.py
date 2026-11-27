@@ -2232,7 +2232,7 @@ VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file', 'answers'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record', 'uploaded', 'pictures_again'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back', 'rest', 'rewrite', 'looks', 'things'},   # design/177: the page's step-2 actions; design/211 part B: the second go, the rewrite, the looks at the sets
-    'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost', 'keeps'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name', 'words'},   # design/177; VW-25 issue 11: --words
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote', 'again'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
@@ -2862,7 +2862,7 @@ def cmd_visuals(a):
         emit(out, 0, ' '.join([*(out.get('refused') or {}).values(), out.get('then') or '']))   # a refused thing is the server's sentence; the others were recorded
     if a.what == 'ask':   # design/110 rule 0: the question is a server state on the item
         choices = [c.strip() for c in str(a.choices or '').split('|') if c.strip()]
-        out = write(base + '/ask', {'item': a.item, 'question': a.question or '', 'choices': choices, 'cost_inr': float(a.cost) if a.cost else None})
+        out = write(base + '/ask', {'item': a.item, 'question': a.question or '', 'choices': choices, 'cost_inr': float(a.cost) if a.cost else None, **({'keeps': a.keeps.strip()} if a.keeps else {})})   # release 1 of 27 Nov 2026, part F
         emit(out, 0, out.get('next') or 'Question recorded.')
     if a.what == 'answer':
         out = write(base + '/answer', {'item': a.item, 'answer': a.answer or ''})
@@ -3228,7 +3228,7 @@ def cmd_visuals(a):
         on_page = 'answered on the page in one visit (`vw visuals page`): the sizes, materials and graphic specs, and the reference sets'
         waiting_line = (f"; {len(wt)} waiting for the operator: " + (f'all {on_page}' if paged == len(wt) else (f'{paged} of them are {on_page}; ' if paged else '')
                         + f"ask {'the others' if paged else 'them'} one at a time with `vw visuals next` (design/188), never from this list")) if wt else ''
-        due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
+        due_line = (f"; {st['answers_due']}" if st.get('answers_due') else '') + (f"; {st['round_due']}" if st.get('round_due') else '')   # release 1 of 27 Nov 2026, part F: an answer not applied, said first   # design/151 hotfix: a kept film's round is next, said before the waiting specs
         six = (f"; step 6 (say this to the operator each time it changes, as it is, and ask nothing with it): {st['step6']}" if st.get('step6') else '')   # design/221 row 18
         early = republish_now(ws)   # fix set (c): said while things are being made, long before the page is wanted
         emit({**_short_status(st, a.shot, a.gap), **early[0]}, 0, early[1] + 'Visuals: ' + line + round_line + due_line + waiting_line + six + '; one line per job above, the whole status in work/visuals/status.json')
@@ -4230,7 +4230,7 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded', '--answers'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--keeps', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded', '--answers'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--rest', action='store_true', help="round: make the other sets, on the operator's word (design/211)"); s.add_argument('--rewrite', nargs='?', const=True, default=None, help='round: alone, list the sets that wait for a where line or a rewrite and fetch their pictures; with a file, send the rows {element_id, where} (Minor corrections) or {element_id, prompt} (Make again)')

@@ -398,6 +398,7 @@ class Ask(Write):   # design/110 rule 0
     question: str = Field(min_length=1, max_length=2000)
     choices: list[str]
     cost_inr: float | None = None
+    keeps: str | None = None   # release 1 of 27 Nov 2026, part F
 
 
 class Answer(Write):   # design/110 rule 0
@@ -2111,7 +2112,7 @@ def visuals_nothing_fits(run_id: UUID, body: NothingFits, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/ask')
 def visuals_ask(run_id: UUID, body: Ask, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.ask(storage(), user, run, outputs, body.item, body.question, body.choices, body.cost_inr))   # design/110 rule 0
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.ask(storage(), user, run, outputs, body.item, body.question, body.choices, body.cost_inr, body.keeps))   # design/110 rule 0
 
 
 @app.post('/api/runs/{run_id}/visuals/answer')

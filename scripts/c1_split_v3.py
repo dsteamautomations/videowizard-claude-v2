@@ -207,6 +207,8 @@ if __name__ == '__main__':
         prompt = a1(prompt, parts)
         from minor_edit_wording import apply as minor_edit   # Minor corrections as an edit, 25 Nov 2026: step 2 of the references: the set's own pictures corrected (a where line), "Make again" the new set with the comment
         prompt = minor_edit(prompt, parts)
+        from rel27nov_wording import apply as rel27nov   # release 1 of 27 Nov 2026: `--keeps` on the command of a question (part F)
+        prompt = rel27nov(prompt, parts)
         from shortshots_wording import check as shortshots   # short shots and list items (VW-25 issues 3b and 2), 25 Nov 2026: the options and the master, not the visuals; v3.json holds its sentences
         shortshots(d)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
