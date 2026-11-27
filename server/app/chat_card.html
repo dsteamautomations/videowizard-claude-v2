@@ -1,4 +1,4 @@
-<h2 class="sr-only">Decision card: answer every entry, then submit all answers once.</h2>
+<h2 class="sr-only">Decision card: answer every entry with Accept or Change this, then submit all answers once.</h2>
 <div style="padding:1rem 0">
 <div id="say" style="background:var(--bg-accent);color:var(--text-accent);border-radius:var(--radius);padding:10px 14px;font-size:14px;line-height:1.6;margin-bottom:10px"></div>
 <p id="sum" style="font-size:13px;color:var(--text-secondary);margin:0 0 12px"></p>
@@ -20,8 +20,6 @@
 <script>
 const D=__DATA__;
 const $=id=>document.getElementById(id),N=D.e.length;
-const L=D.lab||['Accept','Change this','Accepted ✓','Change saved ✓','Say what should change','Type what should change first','Save the change','accepted','change saved'];
-$('note').placeholder=L[4];$('err').textContent=L[5];$('save').textContent=L[6];
 let ans={},cur=0,done=false,store=false,timer=0;
 try{const v=localStorage.getItem(D.id);if(v)ans=JSON.parse(v)||{};localStorage.setItem(D.id,JSON.stringify(ans));store=true}catch(e){ans={}}
 function keep(){if(store)try{localStorage.setItem(D.id,JSON.stringify(ans))}catch(e){}}
@@ -32,7 +30,7 @@ const e=D.e[cur],a=ans[cur];
 $('say').textContent=D.say;$('sum').textContent=D.sum||'';$('sum').style.display=D.sum?'block':'none';
 $('nums').textContent='';
 D.e.forEach((x,i)=>{const v=ans[i],b=el('button',String(i+1),'min-width:34px;padding:4px 0;font-size:13px;'+(v?(v.c==='accept'?'background:var(--bg-success);color:var(--text-success);':'background:var(--bg-warning);color:var(--text-warning);'):'')+(i===cur?'border:2px solid var(--border-accent);':''));
-b.type='button';b.setAttribute('aria-label',x.n+(v?', '+(v.c==='accept'?L[7]:L[8]):', not answered'));b.onclick=()=>{clearTimeout(timer);cur=i;draw()};$('nums').appendChild(b)});
+b.type='button';b.setAttribute('aria-label',x.n+(v?(v.c==='accept'?', accepted':', change saved'):', not answered'));b.onclick=()=>{clearTimeout(timer);cur=i;draw()};$('nums').appendChild(b)});
 $('ttl').textContent=e.n;$('chd').textContent=e.a?'Changed as you asked':e.c?'Changed since you last saw it':'';
 const body=$('body');body.textContent='';
 if(e.ch){body.appendChild(el('p',e.a?'Changed as you asked:':'What changed:','margin:0 0 4px;font-weight:500'));e.ch.forEach(l=>body.appendChild(el('p','\u2022 '+l,'margin:0 0 4px;color:var(--text-secondary)')));body.appendChild(el('p','','margin:0 0 10px'))}
@@ -43,8 +41,8 @@ D.cols.forEach((c,i)=>h.appendChild(el('th',c,'font-weight:500;padding:6px 4px;w
 e.tb.forEach(r=>{const tr=el('tr',null,'border-top:0.5px solid var(--border);vertical-align:top');r.forEach((c,i)=>tr.appendChild(el('td',c,'padding:6px 4px;overflow-wrap:anywhere'+(i===1?';font-weight:500':''))));t.appendChild(tr)});body.appendChild(t)}
 $('tot').textContent=e.tot||'';
 const acc=$('acc'),chg=$('chg'),isA=a&&a.c==='accept',isC=a&&a.c==='change';
-acc.textContent=isA?L[2]:L[0];acc.style.cssText=isA?'background:var(--bg-success);color:var(--text-success);border-color:var(--border-success)':'';acc.setAttribute('aria-pressed',isA?'true':'false');
-chg.textContent=isC?L[3]:L[1];chg.style.cssText=isC?'background:var(--bg-warning);color:var(--text-warning);border-color:var(--border-warning)':'';chg.setAttribute('aria-pressed',isC?'true':'false');
+acc.textContent=isA?'Accepted ✓':'Accept';acc.style.cssText=isA?'background:var(--bg-success);color:var(--text-success);border-color:var(--border-success)':'';acc.setAttribute('aria-pressed',isA?'true':'false');
+chg.textContent=isC?'Change saved ✓':'Change this';chg.style.cssText=isC?'background:var(--bg-warning);color:var(--text-warning);border-color:var(--border-warning)':'';chg.setAttribute('aria-pressed',isC?'true':'false');
 $('box').style.display=isC&&!done?'block':'none';$('note').value=isC?a.n:'';$('err').style.display='none';
 const m=missing();$('left').textContent=done?'Your answers are in the message box below. Press Enter to send them. Nothing is recorded until you do.':(m.length?m.length+' still to answer':'All answered: press Submit all');
 }

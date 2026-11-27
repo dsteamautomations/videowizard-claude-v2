@@ -143,7 +143,7 @@ def test_a_diagram_of_a_real_thing_needs_a_proportion_or_a_known_size():
     assert VS.draws_real_thing(plan, {'graphic_kind': 'diagram', 'element_ids': ['E2']})
     assert not VS.draws_real_thing(plan, {'graphic_kind': 'chart', 'element_ids': ['E2']}) and not VS.draws_real_thing(plan, {'graphic_kind': 'diagram', 'element_ids': ['E1']})
     src = Path(VS.__file__).read_text(encoding='utf-8')
-    assert src.count('real_thing=draws_real_thing(plan, ') == 1 and src.count('fault = spec_fault(plan, shot=') == 2   # both approval paths (one spec, and all specs at once) through the one check (4e part 2: `spec_fault`, also run before a spec is offered)
+    assert src.count('real_thing=draws_real_thing(plan, ') == 2   # both approval paths: one spec, and all specs at once
 
 
 # ---------- row 6: the order ----------

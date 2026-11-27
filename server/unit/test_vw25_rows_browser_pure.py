@@ -28,7 +28,7 @@ def test_a_gap_line_shows_the_words_and_the_time_open_and_accepted_and_the_direc
 
 
 def test_a_drawings_line_shows_where_it_sits_the_words_and_what_it_shows_above_its_parts(browser):
-    store, conn = spec_film([drawing()], change=lambda plan: plan['gaps'][0]['scenes'][0]['shots'][0].update(depicts='the box and its lid'))
+    store, conn = spec_film([drawing(depicts_note=None)], change=lambda plan: plan['gaps'][0]['scenes'][0]['shots'][0].update(depicts='the box and its lid'))
     d = page(store, conn)
     pg = live(browser, d)
     block = pg.evaluate(PAIRS)[0]

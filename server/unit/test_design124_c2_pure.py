@@ -127,7 +127,7 @@ def test_an_unresearched_size_is_warned_in_the_plan_and_refused_at_spec_approval
     unresearched = {**SPEC, 'dimensions': [SPEC['dimensions'][0], UNTRIED], 'illustrative': False}
     out, warns = check(drawn_plan(drawing_spec=unresearched))
     w = [x for x in warns if x['kind'] == 'spec_unresearched']
-    assert w and w[0]['shot_id'] == 'DR1' and 'record the sources tried' in w[0]['message'] and 'the spec is shown to the operator once this is done' in w[0]['message']   # 4e part 2 (until 26 Nov 2026: "refused when the spec is approved")
+    assert w and w[0]['shot_id'] == 'DR1' and 'record the sources tried' in w[0]['message'] and 'refused when the spec is approved' in w[0]['message']
     assert ('DR1', 'spec_unresearched') not in kinds(drawn_plan())   # the shared fixture tried all four
     doc, sess = graphic_session()
     doc['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec'] = unresearched
@@ -158,7 +158,7 @@ def test_an_unresearched_material_spec_is_warned_in_the_plan_and_refused_at_appr
 
 def test_the_text_names_the_drawn_shot_at_plan_time_and_uploads_the_scene_after_the_picture_search():
     assert 'A drawn shot is named at plan time by `visual_type: drawn` alone' in PART['plan']
-    assert 'are warned in the plan (`spec_unresearched`); the server keeps that spec with you' in PART['plan']   # 4e part 2 (until 26 Nov 2026: "and refused when the spec is approved"; scripts/specs_card_wording.py)
+    assert 'are warned in the plan (`spec_unresearched`) and refused when the spec is approved' in PART['plan']
     assert 'uploaded first with' not in PART['later'] and 'its `scene_svg` comes after the picture search' in PART['later']
     assert 'refused while the shot has no uploaded scene or its drawing spec is not approved' in PART['later']
 

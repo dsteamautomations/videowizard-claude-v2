@@ -1561,8 +1561,8 @@ def _spec_parts(spec, view=None):
         return {'other': _leaves(spec)}
 
 
-def _spec_text(parts, cut=6000):
-    """The plain parts of a spec (`_spec_parts`) as the lines the chat shows above its question (`cut=None`: whole, for a card of specs)."""
+def _spec_text(parts):
+    """The plain parts of a spec (`_spec_parts`) as the lines the chat shows above its question."""
     c = parts or {}
     rows = [f"Drawn as: {c['drawn_as']}"] if c.get('drawn_as') else []
     rows += [c['words']] if c.get('words') else []
@@ -1575,7 +1575,7 @@ def _spec_text(parts, cut=6000):
     rows += [f"Already confirmed: {c['confirmed']}"] if c.get('confirmed') else []
     rows += [f"Not known, so no figure is shown: {c['unknown']}"] if c.get('unknown') else []
     rows += [f'- {x}' for x in c.get('other') or []]
-    return '\n'.join(rows)[:cut]
+    return '\n'.join(rows)[:6000]
 
 
 def _drawing_rows(session, plan, gap, sh, accepted, drawings):
@@ -1606,11 +1606,8 @@ def _spec_views(ctx):
     it asks and its plain parts. Each fact is asked once: a known size that is the same part, measure and size as one the operator has approved
     in this film, or as one on an earlier line still to answer, is on the one line `confirmed` and not among the `sizes` to confirm (so a
     material's unit sizes are asked at the material). The same part and measure with another size on another line stays in full on both, with a
-    `differs` remark. A line that is back with the assistant confirms nothing.
-    4e part 2 (SK, 26 Nov 2026): a spec whose approval the server would refuse now (`visuals_stage.specs_held`) is `with_assistant` too, with
-    the refusal's own words as `held`: it is not asked until the plan carries what is missing."""
+    `differs` remark. A line that is back with the assistant confirms nothing."""
     session, plan = ctx['session'], ctx['plan']
-    held = V.specs_held(plan, session)
     names, approved, corrections = _names(plan), session.get('spec_approvals') or {}, session.get('spec_corrections') or {}
     shot_names = V.shot_names(plan, session)   # VW-25 issue 7: a drawing in words, its code last
     accepted = {e.get('gap_id'): e for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
@@ -1621,10 +1618,9 @@ def _spec_views(ctx):
     views = []
     for key, title, name, spec, view, above in rows:
         digest = V.spec_digest(spec)
-        state = 'with_assistant' if V.correction_pending(session, key, spec) or key in held else 'recorded' if (approved.get(key) or {}).get('digest') == digest else 'open'
+        state = 'with_assistant' if V.correction_pending(session, key, spec) else 'recorded' if (approved.get(key) or {}).get('digest') == digest else 'open'
         parts = _spec_parts(spec, view)
         views.append({'key': key, 'title': title, 'name': name, 'rows': above, 'state': state, 'item': f'spec:{key}:{digest[:10]}', 'spec': parts, 'note': (corrections.get(key) or {}).get('words') or '',
-                      **({'held': held[key]} if key in held else {}),
                       'ask': 'Are these facts right?' if view is None else 'Are the parts and the known sizes right?' if parts.get('known') else 'Are the parts right?'})
     sizes = [{(p.strip().lower(), m.strip().lower()): size for p, m, size, _ in v['spec'].get('sizes') or []} for v in views]
     live = [n for n, v in enumerate(views) if v['state'] != 'with_assistant']
@@ -1894,8 +1890,6 @@ def _waiting_items(ctx):
                                text=_rows_text(view['rows']) + _spec_text(view['spec']), name=view['title']))
             if view['name']:   # VW-25 issue 7: the question in the button panel names the drawing (cut at 80 characters)
                 items[-1]['_ask'] = f"{view['name'][:80]}: {ask}"
-            # 4e part 1: its entry on a card of specs: what the one question shows (the rows above, the parts and sizes, the question), the spec whole
-            items[-1]['_card'] = {'n': view['title'], 'c': 0, 't': '\n'.join([f'{k}: {v}' if k else v for k, v in view['rows']] + [_spec_text(view['spec'], None), view['ask']])}
         elif kind == 'take to select':   # design/207 (D2): the reuse question is retired; a reuse that passes the checks is kept without the operator
             job = next((j for j in take_rows if str(j['id']) == str(it)), None)
             if not job:
@@ -1972,15 +1966,6 @@ def _waiting_items(ctx):
             if line:
                 item.update(_line=line, _bare=bare, _against=against)
             items.append(item)
-    # 4e part 1 (SK, 26 Nov 2026): two or more specs that wait are asked first, together (on one card: `_next_item`); what else waits here is
-    # asked after them, in its order. One spec alone keeps its place, as before. A decision that was handed out stays the open one until it is
-    # answered. The page lists its lines in its own order.
-    asked, handed_ = [i for i in items if i['kind'] == 'spec'], (session.get('chat_item') or {}).get('id')
-    if len(asked) >= 2 and not ctx.get('page') and not any(i['id'] == handed_ and i['kind'] != 'spec' for i in items):
-        order = asked + [i for i in items if i['kind'] != 'spec']
-        for i, at in zip(order, [i['position'] for i in items]):
-            i['position'] = at
-        items = order
     return items
 
 
@@ -2110,8 +2095,6 @@ def _candidates(ctx):
         return t_items, (summary if t_items and (none_yet or len(t_items) == 1) else ''), ([f"Treatment: the assistant is revising {', '.join('the direction' if k == 'direction' else 'gap ' + k for k in back)}."] if back else [])
     p_items, revising = _plan_items(ctx)
     note = [f"Plan: the assistant is revising {', '.join(revising)}."] if revising else []
-    n = len(V.specs_held(ctx['plan'], ctx['session'])) if ctx['plan'] else 0   # 4e part 2: specs not offered yet, because their approval would be refused
-    note += [f"{CARD_SPEC['step']}: {n} {'is' if n == 1 else 'are'} with the assistant, to be completed before {'it is' if n == 1 else 'they are'} shown to you."] if n else []
     if p_items:
         return p_items, '', note
     # VW-25 issue 14 (SK, 25 Nov 2026): a layout card that was handed out stays the open one until it is answered: a card of an earlier step
@@ -2232,18 +2215,10 @@ def _public(item, summary, n_waiting, one=False):
 
 # ---------- design/190 (SK, 13 Nov 2026): the treatment's lines, and the plan's gaps, on one card; one submit ----------
 
-# 4e part 1 (SK, 26 Nov 2026): two or more sizes, materials and graphic specs that wait are on one card too. Until then each was one question in
-# the chat; that way is kept for one spec alone and for `vw visuals next --one`.
-CARD_KINDS = ('treatment line', 'plan gap', 'spec')
+CARD_KINDS = ('treatment line', 'plan gap')
 CARD_ALL, CARD_PART = 12, 10   # up to 12 entries on one card; a longer step comes as cards of 10
-CARD_SAY = ('What to do: read each {what} and choose {yes} or {no}. The numbers at the top show where you are: green is {green}, amber has {amber}. '
+CARD_SAY = ('What to do: read each {what} and choose Accept or Change this. The numbers at the top show where you are: green is accepted, amber has a change. '
             'When every number is coloured, press Submit all: your answers appear in the message box below. Press Enter to send them. Nothing is recorded until you send them.')
-CARD_WORDS = {'yes': 'Accept', 'no': 'Change this', 'green': 'accepted', 'amber': 'a change'}
-# a card of specs: its step, its two answers, and the words of its page (chat_card.html reads `lab`; without it, the words of the treatment's card)
-CARD_SPEC = {'step': 'Sizes, materials and graphic specs', 'what': 'entry', 'yes': 'Yes', 'no': 'Correct it', 'green': 'Yes', 'amber': 'a correction',
-             'lab': ['Yes', 'Correct it', 'Yes ✓', 'Correction saved ✓', 'Say what to correct', 'Type what to correct first', 'Save the correction', 'yes', 'correction saved']}
-CARD_SPEC_HOW = (' On this card the two answers are Yes and Correct it: in the answers file "accept" is their Yes and "change" is Correct it, with their words as `notes`. '
-                 'Where the page can be shown, these are approved there instead (`vw visuals page`).')
 
 
 def _lit(value):
@@ -2254,8 +2229,7 @@ def _lit(value):
 
 def _card_code(card_id, items, summary):
     """The card as the chat shows it: the fixed page (chat_card.html) with this card's entries written into it, one row to a line."""
-    plan, spec = items[0]['kind'] == 'plan gap', items[0]['kind'] == 'spec'
-    words = CARD_SPEC if spec else {**CARD_WORDS, 'what': 'gap' if plan else 'line'}
+    plan = items[0]['kind'] == 'plan gap'
     entries = []
     for it in items:
         c = it['_card']
@@ -2263,7 +2237,7 @@ def _card_code(card_id, items, summary):
                 else f"tot:{_lit(c['tot'])},tb:[\n" + ',\n'.join('[' + ','.join(_lit(x) for x in row) + ']' for row in c['tb']) + ']')
         ch = f"ch:[{','.join(_lit(x) for x in c['ch'])}]," if c.get('ch') else ''
         entries.append(f"{{n:{_lit(c['n'])},c:{c['c']},{'a:1,' if c.get('a') else ''}{ch}{body}}}")
-    data = ('{' + f"id:{_lit(card_id)},say:{_lit(CARD_SAY.format(**words))},sum:{_lit(summary or '')},auto:1," + (f"lab:[{','.join(_lit(x) for x in words['lab'])}]," if spec else '')
+    data = ('{' + f"id:{_lit(card_id)},say:{_lit(CARD_SAY.format(what='gap' if plan else 'line'))},sum:{_lit(summary or '')},auto:1,"
             + f"cols:{json.dumps(GAP_COLS)},w:[5,19,13,9,27,27],e:[\n" + ',\n'.join(entries) + ']}')
     data = data.replace('</', '<\\/').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')   # nothing in an entry can end the script or break a line of it
     return Path(__file__).with_name('chat_card.html').read_text(encoding='utf-8').replace('__DATA__', data, 1)
@@ -2279,9 +2253,9 @@ def _card(session, items, summary):
         at = datetime.now(timezone.utc).isoformat()
         card_id = 'card-' + hashlib.sha256(('|'.join(ids) + at).encode()).hexdigest()[:10]
         session['chat_card'], changed = {'id': card_id, 'items': ids, 'at': at}, True
-    kind = items[0]['kind']
-    step, what = ('Plan', 'gaps of the plan') if kind == 'plan gap' else (CARD_SPEC['step'], 'sizes, materials and graphic specs') if kind == 'spec' else ('Treatment', 'lines of the treatment')
-    return {'id': card_id, 'step': step, 'entries': len(items), 'widget_code': _card_code(card_id, items, summary),
+    plan = items[0]['kind'] == 'plan gap'
+    what = 'gaps of the plan' if plan else 'lines of the treatment'
+    return {'id': card_id, 'step': 'Plan' if plan else 'Treatment', 'entries': len(items), 'widget_code': _card_code(card_id, items, summary),
             'say_before': f'Here are {len(items)} {what} on one card. Answer each one, then press Submit all.',
             'answers_file': f'work/chat/{card_id}.answers.json'}, changed
 
@@ -2312,8 +2286,6 @@ def card_answer(conn, store, user, run, outputs, card_id, answers, one=False):
         V.need(n not in seen, f'Entry {n} is answered twice.')
         V.need(choice == 'accept' or words, f'Entry {n}: say what should change (notes).')
         seen[n] = (choice, words)
-    if ids[0].startswith('spec:'):
-        return _spec_card(conn, store, user, run, outputs, card_id, ids, seen, one)
     open_ = {i['id']: i for i in _candidates(_ctx(conn, store, user, run, outputs))[0] if i['kind'] in CARD_KINDS}
     # a card from before 14 Nov 2026 held the direction with the gap lines: its changed direction is still taken once, the old way
     direction_changes = ids[0].startswith('treatment:direction:') and ids[0] in open_ and seen.get(1, ('', ''))[0] == 'change'
@@ -2360,75 +2332,7 @@ def card_answer(conn, store, user, run, outputs, card_id, answers, one=False):
                     + (f"Not recorded, because the direction changes and every line is written again from it: entries {', '.join(map(str, held))}. " if held else '')
                     + (f"Not recorded, no longer open (recorded before, or changed since the card): entries {', '.join(map(str, not_open))}; any still open are asked again. " if not_open else '')
                     + (f"The operator asked for a change in entries {', '.join(map(str, changed))}: make only those changes, send them again, and they return in their turn. " if changed else '')
-                    + ('What comes next is in this answer: show it now; do not run `vw visuals next` for it.' if nxt.get('item') or nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')
-                    + (' ' + nxt['then'] if nxt.get('then') else '')}   # 4e: the server's own next step (specs that are with the assistant, once the plan is accepted)
-
-
-def _spec_card(conn, store, user, run, outputs, card_id, ids, seen, one):
-    """4e part 1 (SK, 26 Nov 2026): the answers of a card of specs, each recorded by the spec's own function (`approve_spec`, `correct_spec`),
-    the corrections first. As on the page (design/209): a Yes that rested on a size shown as "Already confirmed" is not recorded when a
-    correction is recorded on the same card; it is asked again. A refusal names its entry and the other answers are still recorded. An entry
-    an earlier attempt to send this card recorded, with this same answer, counts once. No "not this" list is made in this call, however many
-    materials (`lists=False`): the server names the ones still to make in `then` (`visuals_stage.not_this_due`), until each is there."""
-    unanswered = [n for n in range(1, len(ids) + 1) if n not in seen]
-    V.need(not unanswered, f"Answer every entry of the card first; still to answer: {', '.join(map(str, unanswered))}. Nothing was recorded.")
-    ctx = _ctx(conn, store, user, run, outputs)
-    views = {v['item']: v for v in _spec_views(ctx)} if ctx['plan'] else {}
-    todo, before, not_open = [], [], []
-    for n in sorted(seen):
-        iid, yes = ids[n - 1], seen[n][0] == 'accept'
-        key, digest = iid[len('spec:'):].rsplit(':', 1)
-        v = views.get(iid)
-        if v and (v['state'] == 'open' or (yes and v.get('held'))):   # (held: the plan changed since the card and the approval would be refused now: its Yes is refused by name, below)
-            todo.append((n, v))
-        elif str(((ctx['session'].get('spec_approvals' if yes else 'spec_corrections') or {}).get(key) or {}).get('digest') or '').startswith(digest):
-            before.append(n)
-        else:
-            not_open.append(n)
-    relies = {v['key'] for _, v in todo if v['spec'].get('confirmed')}
-    corrected = any(seen[n][0] == 'change' for n in before)
-    recorded, refused, again = list(before), [], []
-    for n, v in sorted(todo, key=lambda t: seen[t[0]][0] == 'accept'):
-        choice, words = seen[n]
-        try:
-            if choice == 'change':
-                V.correct_spec(store, user, run, outputs, v['key'], words)
-                corrected = True
-            elif corrected and v['key'] in relies:
-                again.append(n)
-                continue
-            else:
-                V.approve_spec(store, user, run, outputs, v['key'], f'Yes on the card ({card_id})', lists=False)
-        except (ValueError, V.Problem) as exc:
-            refused.append({'n': n, 'name': v['title'], 'message': str(getattr(exc, 'message', '') or exc)})
-            continue
-        recorded.append(n)
-    session = V.session_of(store, run, outputs)
-    session['chat_cards_done'] = ((session.get('chat_cards_done') or []) + [card_id])[-30:]   # the card is spent: what was not recorded comes again by itself
-    session.pop('chat_card', None)
-    V.save_session(store, run, session)
-    nxt = next_item(conn, store, user, run, outputs, one)
-    changed, listed = sorted(n for n in recorded if seen[n][0] == 'change'), lambda ns: ', '.join(map(str, ns))
-    return {'answered_card': card_id, 'recorded': sorted(recorded), 'not_open': not_open, 'refused': refused, 'again': again, **nxt,
-            'then': f'{len(recorded)} answer(s) recorded. '
-                    + ''.join(f"Refused: entry {r['n']} ({r['name']}): {r['message']} " for r in refused)
-                    + (f"Not recorded, because the Yes rested on a size that a correction on this card may change: entries {listed(again)}; they are asked again. " if again else '')
-                    + (f"Not recorded, no longer open (recorded before, or changed since the card): entries {listed(not_open)}; any still open are asked again. " if not_open else '')
-                    + (f"The operator asked for a correction in entries {listed(changed)}: make only those corrections in the plan, propose it again, and they return in their turn. " if changed else '')
-                    + ('What comes next is in this answer: show it now; do not run `vw visuals next` for it.' if nxt.get('item') or nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')
-                    + (' ' + nxt['then'] if nxt.get('then') else '')}
-
-
-def specs_held_words(session, plan):
-    """4e part 2 (SK, 26 Nov 2026): the assistant's next-step sentence for the specs that are not offered to the operator, because their approval
-    would be refused: each by its name, with the refusal's own words. '' when there is none."""
-    held = [v for v in _spec_views({'session': session, 'plan': plan}) if v.get('held')]
-    if not held:
-        return ''
-    one = len(held) == 1
-    return (f"{'1 spec is' if one else f'{len(held)} specs are'} not shown to the operator yet, because {'its' if one else 'their'} approval would be refused: "
-            + ' '.join(f"{v['title']}: {v['held']}" for v in held)
-            + ' Complete each in out/visual-plan.json, check and propose the plan again: the spec is shown to the operator once this is done.')
+                    + ('What comes next is in this answer: show it now; do not run `vw visuals next` for it.' if nxt.get('item') or nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')}
 
 
 # ---------- release 2, B4 and B4b (SK, 20 Nov 2026): several of one kind, ready together, in one message; still one decision per picture ----------
@@ -2481,14 +2385,9 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
     out = _next_item(conn, store, user, run, outputs, one, many)
     try:
         session = V.session_of(store, run, outputs)
-        whole = V.current_plan(store, session) if session.get('current') else None
+        plan = V.current_plan(store, session) if session.get('current') and V.round_v2(session) else None
     except (ValueError, V.Problem):
-        whole = None
-    if whole:   # 4e (SK, 26 Nov 2026): the specs that are with the assistant, by name and with what is missing; the "not this" lists still to make
-        specs = ' '.join(x for x in (specs_held_words(session, whole), V.not_this_due(whole, session)) if x)
-        if specs:
-            out['then'] = specs + (' ' + out['then'] if out.get('then') else '')
-    plan = whole if whole and V.round_v2(session) else None
+        plan = None
     if plan:
         if P.stamp(session, plan) | P.asked(session, plan):   # a picture that waited for the model's check at the deploy is given to Claude's check; C3: Claude is asked from now
             V.save_session(store, run, session)
@@ -2548,15 +2447,13 @@ def _next_item(conn, store, user, run, outputs, one=False, many=False):
     items, summary, with_assistant = _candidates(ctx)
     session = V.session_of(store, run, outputs)
     # SK, 14 Nov 2026: the direction is asked first and alone; every gap line is written from it, so none is shown until it is accepted
-    spec = bool(items) and items[0]['kind'] == 'spec'
-    cards = [i for i in items if i['kind'] == 'spec'] if spec else items   # 4e part 1: only the specs are on their card; what else waits is asked after it
-    if items and not one and len(cards) >= 2 and items[0]['kind'] in CARD_KINDS and not items[0]['id'].startswith('treatment:direction:'):
-        on_card = cards if len(cards) <= CARD_ALL else cards[:CARD_PART]
+    if items and not one and len(items) >= 2 and items[0]['kind'] in CARD_KINDS and not items[0]['id'].startswith('treatment:direction:'):
+        on_card = items if len(items) <= CARD_ALL else items[:CARD_PART]
         card, changed = _card(session, on_card, items[0].get('_summary') or '')
         if changed or session.pop('chat_item', None):
             session.pop('chat_item', None)
             V.save_session(store, run, session)
-        return {'item': None, 'card': card, 'waiting_after_this': len(items) - len(on_card), 'needed': True, 'say_last': NEEDED, 'how': CARD_HOW + (CARD_SPEC_HOW if spec else '')}
+        return {'item': None, 'card': card, 'waiting_after_this': len(items) - len(on_card), 'needed': True, 'say_last': NEEDED, 'how': CARD_HOW}
     if items:
         group = _together(items, many and not one)   # release 2, B4 and B4b: several end-frames, or layout drawings, ready together; else the one item, as before
         item, ids, held = items[0], [i['id'] for i in group], session.get('chat_item') or {}
