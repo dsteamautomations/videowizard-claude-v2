@@ -56,10 +56,10 @@ def test_a_drawing_continuing_a_held_drawing_selected_anyway_is_briefed_on_it():
 def test_the_brief_has_a_cues_line_with_each_selector_and_its_word_or_second():
     store = motion_store()
     b = VS.motion_brief(store, NEW, [], 'MO1')['brief']
-    assert 'Cues from the plan (each part has this id and starts to move at its word or second): #label at the word "solid".' in b
+    assert 'Cues from the plan (each part has this id and starts to move at its word or second): #label at the word "solid" (0.84 s).' in b   # release 1 of 27 Nov 2026, phase 3 part F: with the second it resolves to
     edit_plan(store, lambda d: d['gaps'][0]['scenes'][0]['shots'][0]['scene_motion'].update(cues=[{'selector': '#label', 'word': 'solid'}, {'selector': '#arrow', 'at_s': 2.4}]))
     b = VS.motion_brief(store, NEW, [], 'MO1')['brief']
-    assert 'move at its word or second): #label at the word "solid"; #arrow at 2.4 s.' in b
+    assert 'move at its word or second): #label at the word "solid" (0.84 s); #arrow at 2.4 s.' in b
     assert b.index('Cues from the plan') > b.index("Each word's start")
     edit_plan(store, lambda d: d['gaps'][0]['scenes'][0]['shots'][0]['scene_motion'].update(cues=[]))
     assert 'Cues from the plan' not in VS.motion_brief(store, NEW, [], 'MO1')['brief']   # no cue: no line

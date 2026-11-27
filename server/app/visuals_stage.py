@@ -443,6 +443,41 @@ def palette_due(session, plan):
     return answer_warnings(plan, palette_warnings(plan, session.get('added_colours')))
 
 
+CUE_LATE_S = 0.5   # SK, 27 Nov 2026: a part that appears with less than this before its shot ends is too late to be seen
+
+
+def cue_warnings(session, plan):
+    """Release 1 of 27 Nov 2026, phase 3 parts E and F (SK): two warnings on a drawn shot's cues, raised with the plan's other warnings.
+    E (`cue_late`): a cue that leaves under CUE_LATE_S before its shot ends (never a cue at second 0); the assistant moves it itself. Was: the
+    assistant asked the operator. F (`cue_twice`): a cue word or phrase said more than once in its shot, with each second: the cue is keyed
+    to the first (`drawn.cue_times`), so a part meant for a later one names a longer phrase or a second. Was: found by the render's check.
+    A film with no timed narration: no second is known, so nothing is late, and a word said twice is counted in the shot's narration text."""
+    from . import drawn
+    fps = session['source'].get('fps') or 25
+    out = []
+    for gap in plan['gaps']:
+        words = (((session['source'].get('gaps') or {}).get(gap['gap_id']) or {}).get('timing') or {}).get('words')
+        for scene in all_scenes(gap):
+            for sh in scene['shots']:
+                length = (sh['end_frame'] - sh['start_frame']) / float(Fraction(str(fps)))
+                for c in (sh.get('scene_motion') or {}).get('cues') or [] if sh['visual_type'] == 'drawn' else []:
+                    times, toks = drawn.cue_times(c, sh, words, fps), drawn._tokens(c.get('word'))
+                    if times is None:
+                        said = drawn._tokens(sh.get('narration'))
+                        count, at = (sum(said[i:i + len(toks)] == toks for i in range(len(said))) if toks else 0), ''
+                    else:
+                        count, at = (len(times) if c.get('at_s') is None else 1), ', at ' + ' and at '.join(f'{t:g} s' for t in times or [])
+                    if count > 1:
+                        out.append({'kind': 'cue_twice', 'shot_id': sh['id'],
+                                    'message': f"shot {sh['id']}: the word '{c.get('word')}' is said {'twice' if count == 2 else f'{count} times'} in this shot{at}. The cue of {c.get('selector')} "
+                                               'is keyed to the first. If it belongs to a later one, give a longer phrase that is said only there, or a second.'})
+                    if times and times[0] > 0 and length - times[0] < CUE_LATE_S - 1e-9:
+                        out.append({'kind': 'cue_late', 'shot_id': sh['id'],
+                                    'message': f"shot {sh['id']}: {c.get('selector')} appears {length - times[0]:.2f} s before the shot ends, too late to be seen. Move it earlier yourself "
+                                               '(an earlier word, or a second) and tell the operator in one line what you moved. Do not ask them.'})
+    return out
+
+
 # The critic's point 9 (19 Nov 2026): a move is the camera's only in a sentence whose subject is the camera or the view (CAMERA_SUBJECT), or when the
 # words are a camera term whatever the subject (the *_BARE lists): "the lid tilts up" and "a pan on the stove" are the things, not the camera.
 # ponytail: word lists, a warning only; a thing named "frame" or "shot" that moves in its own sentence is flagged too.
@@ -545,7 +580,7 @@ def carried_warnings(session, run, plan, outputs):
     if length and first and pictures / length > limit + 1e-9:   # the treatment's own warning and sentence, worked out again from the plan
         out.append({'kind': 'stills_many', 'gap_id': first,
                     'message': f"Still pictures are {math.ceil(pictures / length * 1000 - 1e-6) / 10:g} % of the film: above {limit * 100:g} %. Make some of them moving shots."})
-    return answer_warnings(plan, out)
+    return answer_warnings(plan, out + cue_warnings(session, plan))   # phase 3 parts E and F
 
 
 VERTICAL_VIDEO = ('{shots}: AI video is not built for a vertical film yet: the video AI makes its takes in the horizontal shape only. '
@@ -691,8 +726,15 @@ def propose(conn, store, user, run, outputs, document, answers='', pictures=None
         runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'gap ' + ', '.join(new['kept_recorded']), 'rule': f'visual plan v{version}',
                             'entry': 'already recorded into the film and its own shots unchanged: the acceptance is kept through a change of the shared part, without asking again',
                             'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
+    for r in new['spec_revised']:   # phase 3 part D: the operator's decision, recorded by the server with their words
+        runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': r['key'], 'rule': f'visual plan v{version}',
+                            'entry': _short_text(r['line'] + ' Recorded as approved by the server with those words: no second approval.', 3800),
+                            'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': r['words'], 'request_id': None})
+    faults = {k: c['fault'] for k, c in (session.get('spec_corrections') or {}).items() if c.get('fault')}
     shared = sorted(session.get('shared_pending') or {})
     return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']],
+            **({'tell': 'Tell the operator once, in one line each, and ask nothing: ' + ' '.join(r['line'] for r in new['spec_revised'])} if new['spec_revised'] else {}),
+            **({'spec_not_recorded': [f"{k}: the revised spec is not recorded as approved: {f} Revise it again." for k, f in faults.items()]} if faults else {}),
             **({'kept_without_asking': said} if said else {}),
             **({'asked_again': [f"gap {g}: a label in words the plan does not hold ({'; '.join(w)}): new wording on screen is the operator's to accept (`vw visuals next`)" for g, w in new['asked'].items()]
                                 + [f"gap {g}: its change is larger than what the question on {answers} names: the operator is asked for it (`vw visuals next`)" for g in new['asked_beyond']]}
@@ -803,13 +845,14 @@ def new_version(store, run, session, plan, user, warnings, answers=''):
     session['current'] = identity
     was = set(session.get('was_accepted') or {})
     kept, quiet, asked = _carry_acceptances(session, plan, version, prev, answer)
+    revised = revise_specs(session, prev, plan, answer, user, version)   # phase 3 part D: before the answer is marked as used
     if answer:
         answer['plan_version'] = version   # used once
     now = set(shot_prints(plan)) | {e['id'] for e in plan.get('elements') or []} | set(session.get('references') or {})
     for r in unapplied(session):   # part F: an answer about a shot or a thing the plan no longer holds is closed by this change
         if not any(i in now for i in r.get('holds') or [r['item']]):
             r['applied'] = f'left the plan in version {version}'
-    return {'version': version, 'plan_digest': identity, 'kept_recorded': kept, 'quiet': quiet, 'asked': asked,
+    return {'version': version, 'plan_digest': identity, 'kept_recorded': kept, 'quiet': quiet, 'asked': asked, 'spec_revised': revised,
             'asked_beyond': sorted(g for g in set(session.get('was_accepted') or {}) - was if g not in asked) if answer else []}
 
 
@@ -5328,7 +5371,7 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
         element = next((e for e in plan['elements'] if e['id'] == shot_id[len('element:'):]), None)
         need(element and element.get('material_spec'), f'{shot_id[len("element:"):]} has no material spec.')
         spec = element['material_spec']
-        need(not correction_pending(session, shot_id, spec), f'The correction of {element["id"]}\'s material spec waits for the assistant to revise it; approve the revised one.')
+        need(not correction_pending(session, shot_id, spec), f'The correction of {element["id"]}\'s material spec waits for the assistant to revise it; the revised one is recorded with the correction\'s words.')
         researched(f'material spec of {element["id"]}', spec, material=True)
         if not (session.get('not_this') or {}).get(element['id']):   # design/111 F12: the list is the spec's second half, built with it
             try:
@@ -5343,7 +5386,7 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     plan, _, _, shot = guarded(lambda: locate(store, session, shot_id))
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
-    need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; approve the revised one.')   # review 27 Oct
+    need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; the revised one is recorded with the correction\'s words.')   # review 27 Oct
     researched(f'shot {shot_id}', spec, real_thing=draws_real_thing(plan, shot) and not known_on_things(plan, shot))
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     (session.get('spec_corrections') or {}).pop(shot_id, None)
@@ -5393,9 +5436,11 @@ def correct_spec(store, user, run, outputs, shot_id, words):
         _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
         need(shot.get('drawing_spec'), f'Shot {shot_id} has no drawing spec.')
         spec = shot['drawing_spec']
-    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': spec_digest(spec)}
+    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': spec_digest(spec),
+                                                           'spec': spec}   # release 1 of 27 Nov 2026, phase 3 part D: the spec as it was, so the line can say which rows changed
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'correction': words, 'next': f'Correction sent: the assistant revises the spec of {shot_id}, then you approve it.'}
+    return {'shot_id': shot_id, 'correction': words,
+            'next': f'Correction sent: the assistant revises the spec of {shot_id}. The revised spec is recorded as approved with your words, and you are told which rows changed.'}
 
 
 def approve_specs(store, user, run, outputs, quote=''):
@@ -5448,6 +5493,52 @@ def approve_specs(store, user, run, outputs, quote=''):
     save_session(store, run, session)
     return {'approved': approved, 'waiting': waiting_, 'next': (f"{len(approved)} drawing spec{'s' if len(approved) != 1 else ''} approved." if approved else 'No drawing spec was waiting.')
             + (f" {', '.join(waiting_)}: a correction waits for the assistant; approve the revised spec." if waiting_ else '')}
+
+
+def spec_rows_changed(old, new):
+    """Phase 3 part D: the names of the rows that differ between two specs: each size by its part and measure, then every other row by its name."""
+    if not isinstance(old, dict):
+        return []
+    sizes = lambda spec: {f"{d.get('part') or ''} {d.get('measure') or ''}".strip(): d for d in spec.get('dimensions') or []}
+    a, b = sizes(old), sizes(new)
+    return ([k for k in dict.fromkeys([*a, *b]) if a.get(k) != b.get(k)]
+            + [k.replace('_', ' ') for k in dict.fromkeys([*old, *new]) if k != 'dimensions' and old.get(k) != new.get(k)])
+
+
+def revise_specs(session, prev, plan, answer, user, version):
+    """Release 1 of 27 Nov 2026, phase 3 part D (SK: no card, one status line). A spec the operator's own word changed is recorded as approved
+    by the plan change that revises it, with that word: the words of their correction that waits on it (`correct_spec`), or their answer to the
+    assistant's question when this plan change applies it (`--answers`) to a spec they had approved. Returns one line for the operator for each
+    (`line`: the words and the rows that changed). A revision that fails the source check (`researched`) stays with the assistant: the correction
+    waits on the revised spec with its `fault`. A spec changed with neither is asked as before. The session is changed, not saved.
+    Retired: "the assistant revises the spec, then you approve it" (a second approval of what the operator had just said)."""
+    specs = {sh['id']: (sh['drawing_spec'], f"shot {sh['id']}", {'real_thing': draws_real_thing(plan, sh) and not known_on_things(plan, sh)}, f"The spec of {sh['id']}", sh['id'])
+             for g in plan['gaps'] for sc in all_scenes(g) for sh in sc['shots'] if sh.get('drawing_spec')}
+    specs.update({material_key(e['id']): (e['material_spec'], f"material spec of {e['id']}", {'material': True}, f"The material spec of {e['id']}", e['id'])
+                  for e in plan.get('elements') or [] if e.get('material_spec')})
+    before = {}
+    for g in (prev or {}).get('gaps') or []:
+        before.update({sh['id']: sh['drawing_spec'] for sc in all_scenes(g) for sh in sc['shots'] if sh.get('drawing_spec')})
+    before.update({material_key(e['id']): e['material_spec'] for e in (prev or {}).get('elements') or [] if e.get('material_spec')})
+    named = set((answer or {}).get('holds') or [answer['item']]) if answer else set()
+    approvals, corrections, told = session.setdefault('spec_approvals', {}), session.setdefault('spec_corrections', {}), []
+    for k, (spec, label, kw, name, item) in specs.items():
+        now, c = spec_digest(spec), corrections.get(k)
+        if c and c.get('digest') and c['digest'] != now:
+            words, old, by = c['words'], c.get('spec'), c.get('by')
+        elif item in named and k in before and spec_digest(before[k]) != now and (approvals.get(k) or {}).get('digest') == spec_digest(before[k]):
+            words, old, by = answer['answer'], before[k], user['id']
+        else:
+            continue
+        fault = _research_fault(label, spec, **kw)
+        if fault:   # stays with the assistant, never asked of the operator as it is
+            corrections[k] = {'words': words, 'by': by, 'at': (c or {}).get('at') or datetime.now(timezone.utc).isoformat(), 'digest': now, 'spec': old, 'fault': fault}
+            continue
+        approvals[k] = {'digest': now, 'quote': words, 'by': by, 'at': datetime.now(timezone.utc).isoformat(), 'revised': version}
+        corrections.pop(k, None)
+        rows = spec_rows_changed(old, spec)
+        told.append({'key': k, 'words': words, 'line': f"{name} was revised as you said ('{words}')." + (f" Changed: {', '.join(rows)}." if rows else '')})
+    return told
 
 
 def correction_pending(session, shot_id, spec):
@@ -8092,6 +8183,8 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     f = float(Fraction(str(fps)))
     words = [w for w in ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words') or [] if shot['start_frame'] <= w['start_frame'] < shot['end_frame']]
     timed = ', '.join(f"{w['text']} {(w['start_frame'] - shot['start_frame']) / f:.2f}" for w in words) or 'none recorded: key cues with at_s'
+    from . import drawn
+    cue_at = lambda c: ''.join(f' ({t:g} s)' for t in (drawn.cue_times(c, shot, words, fps) or [])[:1])   # phase 3 part F: the second the cue resolves to, the one the render's check uses
     spec = shot.get('drawing_spec') or {}
     fonts = _motion_fonts(store, session, run)
     pictures = sorted(brief_pictures(session, shot), key=lambda p: p[0].lower())   # design/221 S3: one order whatever order the session was saved in
@@ -8151,7 +8244,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
               ('Narration', f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\""),
               ('Each word\'s start', f"Each word's start, seconds from the shot's start: {timed}."),
               ('Cues', 'Cues from the plan (each part has this id and starts to move at its word or second): '   # design/221 (the critic's point 2): the builder sees the cues the render checks
-               + '; '.join(f"{c.get('selector')} at " + (f"{float(c['at_s']):g} s" if c.get('at_s') is not None else f"the word \"{c.get('word')}\"") for c in sm.get('cues') or []) + '.'
+               + '; '.join(f"{c.get('selector')} at " + (f"{float(c['at_s']):g} s" if c.get('at_s') is not None else f"the word \"{c.get('word')}\"" + cue_at(c)) for c in sm.get('cues') or []) + '.'
                if sm.get('cues') else ''),
               ('Progression', piece('Progression', shot.get('information_progression'))),
               ('Look at', 'Look at these before you draw (in refs/): ' + '; '.join(f"{els.get(e, {}).get('name') or e}: " + ', '.join(f'refs/{rid}.png ({_shows(r)})' for rid, r in rs)
@@ -8655,7 +8748,7 @@ def status(conn, store, run, outputs, repair=True):
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
             'footage': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/88
             'waiting': waiting(session, plan, run.get('code'), take_rows, _set_budget(run, session, sp)),   # design/97 W4: each with its label and link
-            'spec_corrections': {sid: c.get('words') for sid, c in (session.get('spec_corrections') or {}).items()},   # review 27 Oct: the assistant revises these specs
+            'spec_corrections': {sid: c.get('words') + (f" (the revised spec is not recorded yet: {c['fault']})" if c.get('fault') else '') for sid, c in (session.get('spec_corrections') or {}).items()},   # review 27 Oct: the assistant revises these specs
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0: the open questions, by item
             'material_specs': {e['id']: {'approved': material_approved(session, e), 'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')}
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10

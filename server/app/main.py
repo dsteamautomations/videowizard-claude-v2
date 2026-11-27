@@ -1266,8 +1266,13 @@ def get_font_sample(run_id: UUID, user=User, conn=DB):
 def post_film(run_id: UUID, body: FilmChoice, user=User, conn=DB):
     run = core.load_run(conn, user, run_id, lock=True)
     scripts = (_film_scripts(core.current_outputs(conn, run['id'])) | {'latin'}) if body.key == 'font' else None   # design/179 S6, S8: a font must hold the film's language
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, {'film': film.record(conn, user, run, body.key, body.value, body.quote, body.video, body.fps, scripts)}))
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, _film_said(run, body.key, film.record(conn, user, run, body.key, body.value, body.quote, body.video, body.fps, scripts))))
     return Response(resp, status_code=status)
+
+
+def _film_said(run, key, recorded):
+    """Release 1 of 27 Nov 2026, phase 3 part B: the motion style's answer says the style that leads and that the operator's words go to every drawing."""
+    return {'film': recorded, **({'tell': film.style_line({**run, 'film': recorded})} if key == 'motion' else {})}
 
 
 def _film_scripts(outputs):

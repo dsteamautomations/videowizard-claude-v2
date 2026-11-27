@@ -208,7 +208,8 @@ def _motion_line(run, draft):
         return None
     st, chosen, head = F.styles(), F.motion(run), {'line': 'l00', 'key': 'motion'}
     if chosen:
-        return {**head, 'title': f"How things move in this film: {st.get(chosen, {}).get('title') or chosen}", 'state': 'recorded'}
+        return {**head, 'title': f"How things move in this film: {st.get(chosen, {}).get('title') or chosen}"
+                                 + (f". Your words '{F.style_words(run)}' go to every drawing." if F.style_words(run) else ''), 'state': 'recorded'}   # phase 3 part B
     cat = F.category(run)
     order = F.recommend_styles(cat)
     first, label = st[order[0]], str(cat or 'not recorded').replace('-', ' ')

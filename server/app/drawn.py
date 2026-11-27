@@ -38,29 +38,36 @@ def _tokens(text):
     return re.findall(r"[a-z0-9']+", str(text or '').lower())
 
 
+def cue_times(cue, shot, words, fps):
+    """Release 1 of 27 Nov 2026, phase 3 part F: every second (from the shot's start) at which a cue is said inside its shot: its at_s alone,
+    or each narration word (film frames) whose text carries the cue, else each place where a cue of several words is said as a phrase.
+    None when the cue is a word and the run has no timed narration."""
+    if cue.get('at_s') is not None:
+        return [float(cue['at_s'])]
+    if not words:
+        return None
+    f, a, b = float(Fraction(str(fps))), shot['start_frame'], shot['end_frame']
+    toks = _tokens(cue.get('word'))
+    inside = [w for w in words if a <= w['start_frame'] < b]
+    hits = [w for w in inside if ' '.join(toks) in ' '.join(_tokens(w['text']))] if toks else []
+    if toks and not hits:   # a cue of several words: each word that starts the phrase
+        flat = [(w, t) for w in inside for t in _tokens(w['text'])]
+        hits = [flat[i][0] for i in range(len(flat) - len(toks) + 1) if [t for _, t in flat[i:i + len(toks)]] == toks]
+    return [round((w['start_frame'] - a) / f, 3) for w in hits]
+
+
 def cue_seconds(scene, shot, words, fps):
     """design/113 E1: each action's start in seconds from the shot's start: at_s as given, or the first narration word (film frames) inside the shot
-    whose text carries the cue. A word cue with no timed narration on the run is a named failure: give at_s."""
-    f, a, b = float(Fraction(str(fps))), shot['start_frame'], shot['end_frame']
+    whose text carries the cue (`cue_times`). A word cue with no timed narration on the run is a named failure: give at_s."""
+    a, b = shot['start_frame'], shot['end_frame']
     out = []
     for n, act in enumerate(scene.get('actions') or [], 1):
-        if act.get('at_s') is not None:
-            out.append(float(act['at_s']))
-            continue
-        cue = ' '.join(_tokens(act.get('word')))
-        if not words:
+        times = cue_times(act, shot, words, fps)
+        if times is None:
             raise ValueError(f"action {n} is keyed to the word '{act.get('word')}' but the run has no timed narration: give at_s (seconds from the shot's start)")
-        hit = next((w for w in words if a <= w['start_frame'] < b and cue in ' '.join(_tokens(w['text']))), None)
-        if hit is None:   # a cue of several words: the first word that starts the phrase
-            flat = [(w, t) for w in words if a <= w['start_frame'] < b for t in _tokens(w['text'])]
-            toks = cue.split()
-            for i in range(len(flat) - len(toks) + 1):
-                if [t for _, t in flat[i:i + len(toks)]] == toks:
-                    hit = flat[i][0]
-                    break
-        if hit is None:
+        if not times:
             raise ValueError(f"action {n}: the word '{act.get('word')}' is not spoken inside {shot['id']} ({a}-{b}); the plan check reads the shot's narration, the timing the recorded words: give at_s")
-        out.append(round((hit['start_frame'] - a) / f, 3))
+        out.append(times[0])
     return out
 
 

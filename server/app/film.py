@@ -90,13 +90,29 @@ def motion(run):
     return None if older(run) else _value(run, 'motion').get('value')
 
 
+def style_words(run):
+    """Release 1 of 27 Nov 2026, phase 3 part B (SK): the operator's own words on the motion style: the recorded quote when it says more than
+    the style's name or title (a plain click records the title). Retired: those words stored and read by nothing."""
+    doc = _value(run, 'motion')
+    said, name = str(doc.get('quote') or '').strip(), str(doc.get('value') or '')
+    plain = {'', name.lower(), str((styles().get(name) or {}).get('title') or '').lower()}
+    return '' if older(run) or said.strip(' .').lower() in plain else said
+
+
+def style_line(run):
+    """Phase 3 part B: the line that confirms the motion style: the one style that leads, and the operator's words when they said more."""
+    name, said = motion(run), style_words(run)
+    return (f"Motion style: {(styles().get(name) or {}).get('title') or name}." + (f" Your words '{said}' go to every drawing." if said else '')) if name else ''
+
+
 def style_part(run):
     """S4: the 'Motion style' part of a drawn shot's brief; design/221a F1, F3 and design/221 section 10: its camera flows, its motions, the fixed paragraph last."""
     name = motion(run)
     if name and name in styles():
         s = styles()[name]
         return '\n'.join([f"Motion style ({s['title']}): how things move and appear in this film. It never changes the facts, the labels, the colours, the font or the timing above.",
-                          s['text'], '', f"Camera flows this style allows on a shot that explains: {', '.join(s['camera'])}.",
+                          s['text'], *([f"In the operator's words: '{style_words(run)}'. Follow them inside the rules of the style above."] if style_words(run) else []),   # phase 3 part B
+                          '', f"Camera flows this style allows on a shot that explains: {', '.join(s['camera'])}.",
                           *(['The motions of this film, by name. Use these for these jobs and no others:', *s['motions']] if s['motions'] else []), EVERY_STYLE])
     return f'Motion style (the older fixed style, kept for this film): {OLDER_STYLE}'
 
