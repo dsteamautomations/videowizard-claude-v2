@@ -1432,7 +1432,7 @@ def cmd_stage(a):
     save_json(manifest_path(m['code']), m)
     if a.stage == 'script':   # design/192 (script row 4): the changes, the decisions and the claims, in the run's log
         log_quiet(m, 'step', stages_text.script_log_line(result.get('summary') or {}))
-    warning = (result.get('summary') or {}).get('length_warning')   # design/39 4.3: said out loud, not only stored
+    warning = ' '.join(w for w in ((result.get('summary') or {}).get(k) for k in ('length_warning', 'passage_warning')) if w)   # design/39 4.3: said out loud, not only stored; 27 Nov 2026: a paragraph too long for one beat too
     if a.stage == 'media':   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
         clips = (row.get('summary') or {}).get('clips') or []
         row = {**row, 'files': f"{len(row.get('files') or [])} file references, kept on the server", 'summary': {k: v for k, v in (row.get('summary') or {}).items() if k != 'clips'},

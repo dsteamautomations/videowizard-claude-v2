@@ -164,3 +164,43 @@ def test_prompt_and_steps_are_clean_and_carry_the_new_rules():
     assert 'I am deviating from the usual procedure' in steps and 'rebuilds the text' in steps and 'decision' in steps
     change = PROC['output_shape']['changes'][0]
     assert 'decision' in change and 'operator_wording' in change
+
+
+# ---------- sweep of 27 Nov 2026, script finding 1: a script with no blank lines became one beat, and nothing said so ----------
+
+LINES = '\n'.join(f'Sentence number {i} of the script is spoken here.' for i in range(1, 41)) + '\n'   # 40 lines, no blank line: one paragraph of about 1,900 characters
+
+
+def long_film(ws, text=LINES):
+    (ws / 'out' / 'source.txt').write_text(text, encoding='utf-8')
+    intake = {'summary': {'title': 'T', 'client': 'VK', 'source_digest': digest(text)}}
+    return lambda stage: {'intake': intake, 'brief': prior_of()('brief')}[stage]
+
+
+def test_prepare_says_a_paragraph_that_is_too_long_for_one_beat_and_what_to_do(ws):
+    out = script_prepare(ws, PROC, long_film(ws))
+    assert out['passage_note'].startswith("1 of the script's 1 paragraphs is longer than 1,200 characters (the longest: ")
+    assert 'A beat is one paragraph, and a paragraph ends at a blank line' in out['passage_note'] and 'needs no listed change' in out['passage_note']
+
+
+def test_a_script_of_ordinary_paragraphs_gets_no_note_and_no_warning(src):
+    assert 'passage_note' not in script_prepare(src, PROC, prior_of())
+    proposal(src, SOURCE)
+    assert 'passage_warning' not in record(src)['summary']
+
+
+def test_record_warns_when_the_long_paragraph_is_kept_and_not_when_it_is_split_by_blank_lines(ws):
+    prior = long_film(ws)
+    proposal(ws, LINES)
+    s = script_record(ws, PROC, prior)['summary']
+    assert s['beats'] == 1 and s['passage_warning'].startswith("1 of the script's 1 paragraphs is longer than 1,200 characters")
+    rows = LINES.strip().split('\n')
+    proposal(ws, '\n\n'.join(' '.join(rows[i:i + 4]) for i in range(0, 40, 4)) + '\n')   # the same words, a blank line every four sentences: no change to list
+    s = script_record(ws, PROC, prior)['summary']
+    assert s['beats'] == 10 and s['changes_proposed'] == 0 and 'passage_warning' not in s
+
+
+def test_one_long_paragraph_among_short_ones_is_counted_alone(ws):
+    text = 'A short opening.\n\n' + LINES + '\nA short ending.\n'
+    out = script_prepare(ws, PROC, long_film(ws, text))
+    assert out['passage_note'].startswith("1 of the script's 3 paragraphs is longer than 1,200 characters")
