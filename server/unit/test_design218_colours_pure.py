@@ -69,11 +69,11 @@ def test_bad_input_is_refused_by_name():
 
 def test_every_later_brief_gets_the_plans_palette_and_the_added_colours():
     s, p = {}, plan(drawn('D1'))
-    assert V.palette_line(p, s) == 'Palette (not yet approved): navy #12324A, orange #FF8800, concrete mid grey #8A8A8A.'   # design/221: said approved or not yet
+    assert V.palette_line(p, s, 'D1') == 'Palette (not yet approved): navy #12324A, orange #FF8800, concrete mid grey #8A8A8A.'   # design/221: said approved or not yet
     add(s, p)
-    assert V.palette_line(p, s) == ('Palette (not yet approved): navy #12324A, orange #FF8800, concrete mid grey #8A8A8A. Added for every drawing of this film (the spec wins where they differ): '
+    assert V.palette_line(p, s, 'D1') == ('Palette (not yet approved): navy #12324A, orange #FF8800, concrete mid grey #8A8A8A. Added for this drawing (the spec wins where they differ): '
                                      'walls #5A524C (dark warm grey).')
-    assert 'palette_line(plan, session)' in open(V.__file__, encoding='utf-8').read()   # motion_brief's palette line is this one
+    assert "palette_line(plan, session, shot['id'])" in open(V.__file__, encoding='utf-8').read()   # motion_brief's palette line is this one
 
 
 def test_the_drawn_line_shows_it_under_details_without_asking(monkeypatch):

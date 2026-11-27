@@ -93,8 +93,8 @@ def test_an_unknown_size_says_so_with_no_number():
 def test_the_palette_is_said_approved_only_once_a_gap_was_accepted():
     assert 'Palette (approved): terracotta #B5543A, paper #F4EDE1.' in brief(motion_store())
     doc = {'foundation': {'graphic_style': {'palette': 'terracotta #B5543A'}}, 'gaps': []}
-    assert VS.palette_line(doc, {'accepted': {}}) == 'Palette (not yet approved): terracotta #B5543A.'   # a brief needs an accepted gap, so only the line itself shows it
-    assert VS.palette_line(doc, {'accepted': {}, 'shared_pending': {'G1': {}}}) == 'Palette (approved): terracotta #B5543A.'
+    assert VS.palette_line(doc, {'accepted': {}}, 'MO1') == 'Palette (not yet approved): terracotta #B5543A.'   # a brief needs an accepted gap, so only the line itself shows it
+    assert VS.palette_line(doc, {'accepted': {}, 'shared_pending': {'G1': {}}}, 'MO1') == 'Palette (approved): terracotta #B5543A.'
 
 
 def test_the_letter_size_is_for_labels_in_the_brief_and_the_skill():

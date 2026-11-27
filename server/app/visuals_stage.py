@@ -6851,7 +6851,7 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     shared = (session.get('motion_parts_approved') or {}).get('parts') or []   # design/221 row 1: a project uses the shared parts of its things, never its own copy
     text = ' '.join(motion._texts(files).values())
     own = [p['id'] for p in shared if re.search(r'\bid\s*=\s*["\']' + re.escape(p['id']) + r'["\']', text)]
-    need(not own, PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own)))
+    missing = [PARTS_OWN_ID.format(shot=shot_id, ids=', '.join(own))] if own else []   # release 1 of 27 Nov 2026, phase 3 part H: one refusal names every part (was: one upload for each)
     plan = guarded(lambda: current_plan(store, session))
     prev = continues_from(plan, session, gap, shot)   # the critic's point 7: the still opens on the earlier drawing's approved still; the motion is built on its passed project
     on = opens_on(session, prev) if prev and still else {}
@@ -6865,15 +6865,17 @@ def set_motion(store, user, run, outputs, shot_id, name, content, rules_text='',
     els = {e['id']: e for e in plan.get('elements') or []}
     placed = lambda ids: any(re.search(r'href\s*=\s*["\']#' + re.escape(i) + r'["\']', text) for i in ids)
     for p in shared:   # fix set A1.1: a shape that is no thing of the plan, drawn once: the drawings its part names place it
-        need(p.get('element') or shot_id not in (p.get('shots') or []) or placed([p['id']]), PARTS_USE.format(shot=shot_id, thing=p['title'] or p['id'], id=p['id']))
+        if not (p.get('element') or shot_id not in (p.get('shots') or []) or placed([p['id']])):
+            missing.append(PARTS_USE.format(shot=shot_id, thing=p['title'] or p['id'], id=p['id']))
     mine, fits = view_parts(session, shot), fit_parts(session, shot)
     for e in shot.get('element_ids') or []:   # defect 56 (VW-24, 19 Nov 2026): a thing may have several views among the parts (cut across, from above); a drawing places the view it shows
         views = fits.get(e) or []   # release 2, F5: with a stated view, its parts of that view or of no view; drawn in other views only: nothing of it is demanded
         thing = (els.get(e) or {}).get('name') or e
         if len([p for p in shared if p.get('element') == e]) > 1 and mine.get(e) and not placed(mine[e]):   # fix set B2: the view the shot's spec states, when the thing has a part drawn in it
-            need(False, PARTS_USE_VIEW.format(shot=shot_id, thing=thing, view=shot['drawing_spec']['view'], ids=', '.join(mine[e])))
-        if views and not placed(views):   # no stated view: one of the thing's views is enough (defect 56's fix, kept)
-            need(False, PARTS_USE.format(shot=shot_id, thing=thing, id=views[0]) if len(views) == 1 else PARTS_USE_ONE.format(shot=shot_id, thing=thing, ids=', '.join(views)))
+            missing.append(PARTS_USE_VIEW.format(shot=shot_id, thing=thing, view=shot['drawing_spec']['view'], ids=', '.join(mine[e])))
+        elif views and not placed(views):   # no stated view: one of the thing's views is enough (defect 56's fix, kept)
+            missing.append(PARTS_USE.format(shot=shot_id, thing=thing, id=views[0]) if len(views) == 1 else PARTS_USE_ONE.format(shot=shot_id, thing=thing, ids=', '.join(views)))
+    need(not missing, ' '.join(dict.fromkeys(m.replace(PARTS_AGAIN, '') for m in missing)) + PARTS_AGAIN)   # each part once, the next step once
     from . import pictures   # design/217 (C6): the rules of the brief, held by the server per project, so a fact check answers every one of them
     notes = pictures.notes_in(rules_text)
     need(not notes, NOT_A_RULE.format(lines='; '.join(f'"{n}"' for n in notes[:12])))   # design/221 row 15
@@ -7588,14 +7590,16 @@ def add_note(store, user, run, outputs, body):
     return {'note': row, 'next': f"Recorded for {'every drawing of this film (the shared look)' if row.get('shared') else ', '.join(row['shots'])}: the next briefs of those drawings carry it (`vw motion brief`); the operator sees it under Details, nothing is asked."}
 
 
-def palette_line(plan, session):
-    """design/218: the brief's palette: the plan's, then the colours added since (design/218 A), so every drawing agrees."""
+def palette_line(plan, session, shot_id):
+    """design/218: the brief's palette: the plan's, then the colours added for this drawing (design/218 A).
+    Release 1 of 27 Nov 2026, phase 3 part G (SK, 6.6): only the colours whose record names this drawing. Retired: every added colour in the
+    Palette line of every drawing, so one colour added for one drawing made every finished drawing's rules count as old."""
     base = ((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or 'the approved style picture'
     from .font_sample import drawn_shots
     drawn = {s['id'] for s in drawn_shots(plan)}   # a colour whose drawings all left the plan is not given (existence only)
-    added = '; '.join(f"{r['thing']} {r['colour']} ({r['words']})" for r in (session.get('added_colours') or {}).values() if drawn & set(r['shots']))
+    added = '; '.join(f"{r['thing']} {r['colour']} ({r['words']})" for r in (session.get('added_colours') or {}).values() if shot_id in drawn and shot_id in r['shots'])
     approved = bool(session.get('accepted') or session.get('shared_pending'))   # design/221 row 14: as palette_due counts it: approved once a gap was accepted
-    return f"Palette ({'approved' if approved else 'not yet approved'}): {base.rstrip('.')}." + (f' Added for every drawing of this film (the spec wins where they differ): {added}.' if added else '')
+    return f"Palette ({'approved' if approved else 'not yet approved'}): {base.rstrip('.')}." + (f' Added for this drawing (the spec wins where they differ): {added}.' if added else '')
 
 
 def add_subject_rule(store, user, run, subject, rule, quote):
@@ -8139,7 +8143,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
     bare = [els.get(e, {}).get('name') or e for e, ids in fit_parts(session, shot).items() if not ids]   # release 2, F5: drawn in other views only; the line changes for such a shot alone
     lines += [('Use these parts', PARTS_LINE.format(parts='; '.join(f"{p['id']}: {p['title']}" + (f" (view {p['view']})" if p.get('view') else '') for p in used),
                                                     view=f", {spec['view']} ({', '.join(p['id'] for p in used if p['id'] in mine)})," if mine else '')
-               + (PARTS_NO_VIEW.format(things=', '.join(bare), view=spec.get('view')) if bare else '') if used else '')]
+               + (PARTS_NO_VIEW.format(things=', '.join(bare), view=spec.get('view')) if bare else '') + ' An upload that redraws one of them is refused.' if used else '')]
     lines += [('Text on screen', f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in shown) or 'none'}."),   # design/221 (the critic's A1): the labels are in the plan before the first brief
               ('Corner note', f'Corner note: "{note}" is drawn by the server in the lower right corner of every frame, in the box from 80 % of the width and 90 % of the height to the edges. '
                                              'Do not draw it, and keep that corner free.' if note else ''),
@@ -8156,7 +8160,7 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
               ('Continues from', f"Continues from {prev}: this drawing is built on {prev}'s project: start from a copy of {prev}'s files and from {prev}'s last frame, and open "
                                  f"exactly as {prev} ends (same framing, same size, same parts). Its still end-frame comes first, built from {prev}'s approved still end-frame "
                                  f"(from-{prev}/opens-on.png, with that still's files); the motion is started only after {prev}'s project has passed its fact check." if prev else ''),   # design/221 row 2; the critic's point 7
-              ('Palette', palette_line(plan, session)),   # design/218: the plan's palette and the colours added since, the same for every drawing
+              ('Palette', palette_line(plan, session, shot['id'])),   # design/218: the plan's palette; phase 3 part G: and the colours added for this drawing
               ('Fonts', f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
                + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "
                   '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else '')),
@@ -8169,6 +8173,10 @@ def motion_brief(store, run, outputs, shot_id, session=None, build=False, conn=N
         for source, rules in _subject_rules(store, stem):
             lines += [('', ''), ('Subject rules', '\n'.join([f'Subject rules ({stem}), {source}: every one holds in this drawing.', *(f'- {r}' for r in rules)]))]
     lines = [(k, t) for k, t in lines if t or not k]
+    use = [x for x in lines if x[0] == 'Use these parts']   # phase 3 part H: the rule is said right after what the drawing shows (was: in the middle, after the spec)
+    at = next((i for i, x in enumerate(lines) if x[0] == 'Shows'), None)
+    if use and at is not None:
+        lines = [x for x in lines[:at + 1] if x not in use] + use + [x for x in lines[at + 1:] if x not in use]
     prints = {}
     for k, t in lines:   # design/221 S3: one fingerprint per labelled line, so a later change of the brief can be named
         if k:   # design/221 row 1: the parts line also carries the drawings of its parts, so a part drawn again makes the rules be read again

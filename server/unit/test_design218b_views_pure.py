@@ -103,8 +103,8 @@ def test_notes_and_colours_of_a_shot_no_longer_drawn_in_the_plan_are_skipped():
     now = plan('D1')   # a revision took D2 out
     assert P.drawing_notes(s, 'D2', now) == [] and P.colour_notes(s, 'D2', now) == []
     assert P.drawing_notes(s, 'D2', plan('D2')) == [LINE] and P.colour_notes(s, 'D2', plan('D2'))
-    assert 'walls' not in VS.palette_line(now, s) and 'walls #5A524C' in VS.palette_line(plan('D2'), s)
-    assert '(the spec wins where they differ)' in VS.palette_line(plan('D2'), s)
+    assert 'walls' not in VS.palette_line(now, s, 'D2') and 'walls #5A524C' in VS.palette_line(plan('D2'), s, 'D2')
+    assert '(the spec wins where they differ)' in VS.palette_line(plan('D2'), s, 'D2')
     src = Path(P.__file__).read_text(encoding='utf-8')
     assert 'drawing_notes(session, shot_id, plan)' in src and 'colour_notes(session, shot_id, plan)' in src
 
