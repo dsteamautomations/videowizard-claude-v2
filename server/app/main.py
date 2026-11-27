@@ -1211,7 +1211,7 @@ def post_library_unmark(run_id: UUID, body: LibraryOne, user=User, conn=DB):
 
 
 class FilmChoice(Write):   # design/137, design/139: one choice with the operator's words
-    key: Literal['category', 'shape', 'colours', 'font', 'motion']   # design/179: the motion style
+    key: Literal['category', 'shape', 'colours', 'font', 'motion', 'footage']   # design/179: the motion style; defect 70 (27 Nov 2026): 'footage', the intake's answer, which the tool has sent since 0.109.0 and `film.record` takes: it was refused here (422), so no new film could record its intake
     value: str = Field(min_length=1, max_length=300)
     quote: str = Field(min_length=1, max_length=2000)
     video: str | None = None
