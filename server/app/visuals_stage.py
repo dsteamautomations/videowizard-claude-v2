@@ -6838,10 +6838,10 @@ def film_font_files(run):
 def need_font(run, session=None):
     """design/139 R13: the drawing font is asked once, before the first drawing, with Noto Sans as the reference; a brand font given with
     `vw visuals font --file` answers it too."""
-    need(film.font(run) or (session or {}).get('font'), "Ask the operator the film's font once, in the chat: `vw font` lists the fonts that fit this film's motion style and hold its language, the first is the "
-                                                         'one to recommend. First run `vw font --sample` and show its picture (each offered font drawn on this film\'s labels; "Other" is not in it), '
-                                                         'then ask the question with the fonts and "Other" as before; if it says "The font sample is not available.", say that line and ask as before. '
-                                                         'Record it: `vw font <name> --quote "<their words>"`.')   # design/218
+    need(film.font(run) or (session or {}).get('font'), "This film has no font yet. The font is asked by a card of the server: run `vw visuals next` and show the card as it is "
+                                                         f"(its picture and its buttons, one for each font the server holds for this film). {film.OTHER_FONTS} Do not offer another "
+                                                         'name and do not record one: when the operator names another font, say that line and show the card again.')
+    # release 1 of 27 Nov 2026, phase 3 part A (SK). Retired: the font asked by the assistant as its own question, with "Other" (`vw font`, `vw font --sample` and the font file stay)
 
 
 def _motion_fonts(store, session, run=None):

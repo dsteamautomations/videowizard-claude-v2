@@ -58,7 +58,7 @@ def verdict(sha, run=NEW, store=None):
 def test_no_brief_while_the_font_is_not_chosen_and_the_refusal_says_how_to_ask():
     with pytest.raises((Problem, ValueError)) as e:
         g(lambda: brief(run=run_with(motion='lively')))
-    assert "Ask the operator the film's font once" in str(e.value) and '`vw font --sample`' in str(e.value)
+    assert 'This film has no font yet' in str(e.value) and '`vw visuals next`' in str(e.value)   # release 1 of 27 Nov 2026, phase 3 part A: the font is asked by the server's card; "Other" is retired
 
 
 def test_no_brief_while_the_motion_style_is_not_chosen():
@@ -211,7 +211,8 @@ def test_the_wording_script_is_applied_once_and_says_each_change():
     sys.path.insert(0, str(ROOT / 'scripts'))
     import d221_wording_v3 as W
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
-    stage = FIX2.before(visuals())
+    import rel27nov_wording as R27   # release 1 of 27 Nov 2026, phase 3 part A: the font sentence of this script is replaced (the server's card asks the font)
+    stage = FIX2.before(R27.before(visuals()))
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     before = W.before(stage)

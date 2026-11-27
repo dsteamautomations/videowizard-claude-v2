@@ -27,6 +27,9 @@ PARTS = [   # (the part, the words before, the words now); phase 2 part B: the s
     ('plan', "(two signs of use per shot, or 'clean and unused, as planned')", "('clean and unused, as planned' for a place staged clean)"),
     # phase 2 part C: a still is ordered only after the references of what it shows are approved
     ('later', 'counts the still shots with no picture asked for yet.', 'names the still shots due: a still waits for its references.'),
+    # phase 3 part A: the font is asked by the server's card, with no "Other" (shorter than the sentences it replaces)
+    ('later', 'the font comes first: run `vw font` before any brief (`vw motion brief` is refused until the film\'s motion style and its font are recorded). If no font is recorded, ask it in the chat with its sample: run `vw font --sample` and show its picture (each offered font drawn on the film\'s labels and colours; "Other" is not in it), then ask the question with the fonts `vw font` lists and Other, as before; when it says "The font sample is not available.", say that line and ask as before.',
+     "the font comes first (`vw motion brief` is refused until the film's motion style and its font are recorded). The server asks the font with a card (`vw visuals next`): show it as it is. Other fonts are not available: offer and record no other name."),
     # phase 2 part A has no sentence here: the picture-search paragraph is pinned whole by the design/211 scripts; the server's own words say it (ref_sets.PEOPLE_WAIT, PERMISSION_FIRST)
 ]
 
@@ -41,6 +44,17 @@ def apply(prompt, parts):
         assert old in part['text'] or new in part['text'], 'not applied: %s: not found: %s' % (where, old[:60])
         part['text'] = part['text'].replace(new, old).replace(old, new)
     return prompt
+
+
+def before(stage):
+    """The visuals stage as it read before this script (for the tests of the older wording scripts whose sentences this one replaces)."""
+    st = json.loads(json.dumps(stage))
+    for old, new in reversed(COMMON):
+        st['prompt'] = st['prompt'].replace(new, old)
+    for where, old, new in reversed(PARTS):
+        part = next(p for p in st['parts'] if p['name'] == where)
+        part['text'] = part['text'].replace(new, old)
+    return st
 
 
 def main():

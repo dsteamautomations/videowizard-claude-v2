@@ -4102,13 +4102,13 @@ def cmd_film(a):
     if getattr(a, 'sample', False):   # design/218: the picture of the offered fonts, shown before the font question; never blocks it
         out = call('GET', f"/api/runs/{m['run_id']}/film/font-sample", wait=120)
         if not out.get('base64'):
-            emit({k: v for k, v in out.items() if k != 'reason'}, 0, out.get('message') + (' Say this line to the operator, then ask the font question as before.' if out.get('asked') else ''))
+            emit({k: v for k, v in out.items() if k != 'reason'}, 0, out.get('message') + (" Say this line to the operator. The font is asked by the server's card (`vw visuals next`): show that card. Other fonts are not available." if out.get('asked') else ''))   # release 1 of 27 Nov 2026, phase 3 part A
         import base64 as _b64
         path = workspace(m['code']) / 'work' / 'chat' / 'font-sample.png'
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(_b64.b64decode(out.pop('base64')))
-        emit({**out, 'show_files': [str(path)]}, 0, f"File to show: {path}. Show it to the operator first, then ask the font question as before, the card's fonts as the "
-                                                   f"picture heads them ({', '.join(out.get('on_card') or out.get('fonts') or [])}) and Other, the first to recommend; any font of the picture may be named.")
+        emit({**out, 'show_files': [str(path)]}, 0, f"File to show: {path}. It shows the fonts of this film ({', '.join(out.get('on_card') or out.get('fonts') or [])}). "
+                                                   "The font is asked by the server's card (`vw visuals next`): show that card. Other fonts are not available.")   # release 1 of 27 Nov 2026, phase 3 part A: no question of the assistant's own, no "Other"
     if not a.value:
         emit(call('GET', f"/api/runs/{m['run_id']}/film"))
         return

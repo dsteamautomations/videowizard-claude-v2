@@ -16,7 +16,7 @@ def test_the_font_choice_is_checked():
     assert F.check('font', 'Inter') == {'value': 'Inter'}
     with pytest.raises(Problem) as e:
         F.check('font', 'Comic Sans')
-    assert 'not a font the server holds; offer: Noto Sans, Noto Serif, Anek' in e.value.message   # design/179: the set of fifteen; the recommendation follows the film's style
+    assert 'not a font the server holds. Other fonts are not available.' in e.value.message and 'The fonts: Noto Sans, Noto Serif, Anek' in e.value.message   # design/179: the set of fifteen; the recommendation follows the film's style
 
 
 def test_the_recorded_font_reaches_the_motion_route_beside_noto_sans():
@@ -27,7 +27,7 @@ def test_the_recorded_font_reaches_the_motion_route_beside_noto_sans():
 
 
 def test_a_new_film_asks_the_font_before_drawing():
-    with pytest.raises(ValueError, match='vw font'):
+    with pytest.raises(ValueError, match='vw visuals next'):   # release 1 of 27 Nov 2026, phase 3 part A: the font is asked by the server's card; "Other" is retired
         VS.need_font({'film': {}})
     VS.need_font({'film': None})
     VS.need_font({'film': {'font': {'value': 'Noto Sans'}}})

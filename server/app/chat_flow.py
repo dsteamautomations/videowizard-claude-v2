@@ -1756,7 +1756,43 @@ def _decided(conn, run, user, about, rule, entry, words):
                             'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': words, 'request_id': None})
 
 
+def _font_card(ctx):
+    """Release 1 of 27 Nov 2026, phase 3 part A (SK): the film's font, asked once by a card of the server before the first brief of a drawn
+    graphic: the sample picture (made once and kept), one button for each font the server holds for this film (`film.fonts_for`, the
+    recommended one first) and no choice that takes typed words; the card says that other fonts are not available. None for a film with a font,
+    with no drawn graphic, or from before the film record. Retired: the font as the assistant's own question, with "Other"."""
+    from . import film as F, font_sample, main
+    session, plan, run, store, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['conn']
+    if F.older(run) or F.font(run) or session.get('font') or V.drawn_route(run) != 'motion' or not any(sh['visual_type'] == 'drawn' for _, sh in V._accepted_shots(plan, session)):
+        return None
+    scripts, _, offer = main._font_offer(conn, run, ctx['outputs'])
+    names = [f['name'] for f in offer]
+    if not names:
+        return None
+    key = V.key(run, 'font-sample-' + hashlib.sha256(json.dumps([names, font_sample.drawn_labels(plan)], sort_keys=True).encode()).hexdigest()[:10] + '.png')
+    if not store.exists(key):
+        png = font_sample.sample(offer, scripts, plan, F.colours(run)).get('png')
+        if png:
+            store.put(key, png, 'image/png')
+    shown = store.exists(key)
+
+    def run_(choice, quote, words):
+        name = names[int(choice[1:]) - 1]
+        run['film'] = F.record(conn, ctx['user'], run, 'font', name, name, scripts=set(scripts) | {'latin'})   # the click is the operator's word: the font's name
+        return {'recorded': True, 'tell': f'Font: {name}. Every drawn graphic of this film uses it.'}
+    buttons = [_button(n + (' (recommended)' if i == 0 else ''), f'f{i + 1}') for i, n in enumerate(names)]
+    return _item('font:choose', 'font', 'the font of the drawn graphics', 'Which font do the drawn graphics of this film use?', run_, buttons[:4], more=buttons[4:],
+                 text='\n'.join([f"- {f['name']}: {f['character']}" for f in offer] + ['', F.OTHER_FONTS + ' One font for the whole film; it is asked once.']
+                                + ([] if shown else [font_sample.NOT_AVAILABLE])),
+                 show=[{'key': key, 'name': 'font-sample.png'}] if shown else [])
+
+
 def _waiting_items(ctx):
+    font = _font_card(ctx) if ctx['plan'] else None
+    return ([font] if font else []) + _waiting_cards(ctx)
+
+
+def _waiting_cards(ctx):
     session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
     if not plan:
         return []

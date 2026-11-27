@@ -71,6 +71,9 @@ def styles():
     return out
 
 
+OTHER_FONTS = 'Other fonts are not available.'   # release 1 of 27 Nov 2026, phase 3 part A (SK): said by the font card, by the refusal of a brief and by the refusal of an unknown name
+
+
 @lru_cache(maxsize=1)
 def font_set():
     return json.loads((FONT_DIR / 'fonts.json').read_text(encoding='utf-8'))['fonts']
@@ -317,7 +320,8 @@ def check(key, value, video=None, fps=None, scripts=None):
         return {'value': value}
     if key == 'font':
         if value not in font_set() and value not in FONTS:
-            raise Problem(422, 'FILM_CHOICE', f'{value!r} is not a font the server holds; offer: {", ".join(font_set())}.')
+            raise Problem(422, 'FILM_CHOICE', f'{value!r} is not a font the server holds. {OTHER_FONTS} Do not record it: tell the operator so and show the font card again '
+                                              f'(`vw visuals next`). The fonts: {", ".join(font_set())}.')   # release 1 of 27 Nov 2026, phase 3 part A
         lacks = [s for s in sorted(scripts or ()) if value in font_set() and s not in font_set()[value]['scripts']] or [s for s in sorted(scripts or ()) if value not in font_set() and s != 'latin']
         if lacks:   # S6: never a font for a film whose language it lacks
             have = [n for n in font_set() if _holds(n, scripts)]

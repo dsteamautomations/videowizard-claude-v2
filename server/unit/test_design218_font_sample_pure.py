@@ -128,7 +128,7 @@ def test_the_question_and_the_command_say_to_show_the_sample_first():
     with pytest.raises(ValueError) as e:
         V.need_font({'film': {}}, {})
     said = str(e.value)
-    assert '`vw font --sample`' in said and FS.NOT_AVAILABLE in said and 'Other' in said
+    assert '`vw visuals next`' in said and 'Other fonts are not available.' in said   # release 1 of 27 Nov 2026, phase 3 part A: the font is asked by the server's card; "Other" is retired (the card shows the sample, or says FS.NOT_AVAILABLE)
     vw = (ROOT / 'plugin' / 'scripts' / 'vw.py').read_text(encoding='utf-8')
     assert '/film/font-sample"' in vw and "add_argument('--sample'" in vw and 'font-sample.png' in vw
     main = (ROOT / 'server' / 'app' / 'main.py').read_text(encoding='utf-8')
@@ -140,7 +140,8 @@ def test_the_wording_is_in_once_retired_by_name_and_registered():
     import d218_wording_v3 as W
     import d221_wording_v3 as D221   # design/221: a later script that replaces this one's font sentence (the font first, no brief before it): the text as it was before it
     import fixset2_wording as FIX2   # fix set phase 2: sentences added inside this script's sentences, and one replaced
-    stage = D221.before(FIX2.before(next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals')))
+    import rel27nov_wording as R27   # release 1 of 27 Nov 2026, phase 3 part A: the font is asked by the server's card; the font sentences as they were before it
+    stage = D221.before(FIX2.before(R27.before(next(s for s in _core.for_footage(json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8')), 'own')['stages'] if s['name'] == 'visuals'))))
     part = {p['name']: p['text'] for p in stage['parts']}
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing

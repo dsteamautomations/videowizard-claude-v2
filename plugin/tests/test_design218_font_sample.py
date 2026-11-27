@@ -25,13 +25,13 @@ def test_the_sample_is_saved_and_shown_first(harness, monkeypatch, capsys):
     code, out, err = _film(capsys)
     saved = ws / 'work' / 'chat' / 'font-sample.png'
     assert code == 0 and saved.read_bytes() == png and out['show_files'] == [str(saved)] and 'base64' not in out
-    assert f'File to show: {saved}' in err and 'Anek, Mukta' in err and 'Other' in err
+    assert f'File to show: {saved}' in err and 'Anek, Mukta' in err and 'Other fonts are not available.' in err and '`vw visuals next`' in err   # release 1 of 27 Nov 2026, phase 3 part A: the server's card asks
 
 
 def test_no_sample_says_the_one_line_and_does_not_block(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'available': False, 'asked': True, 'message': 'The font sample is not available.', 'reason': 'x', 'fonts': []})
     code, out, err = _film(capsys)
-    assert code == 0 and 'The font sample is not available.' in err and 'ask the font question as before' in err and 'reason' not in out
+    assert code == 0 and 'The font sample is not available.' in err and 'Other fonts are not available.' in err and 'reason' not in out
 
 
 def test_motion_colour_posts_the_thing_the_colour_and_the_reason(harness, monkeypatch, capsys):
