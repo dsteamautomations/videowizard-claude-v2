@@ -46,6 +46,15 @@ def apply(prompt, parts):
     return prompt
 
 
+COMMAND = ("(the film's font: show the picture of `vw font --sample` first, then ask as before)",   # phase 3 part A: plugin/commands/vw.md, changed in place
+           "(the film's font: the server's card, `vw visuals next`; other fonts are not available)")
+
+
+def now(file, text):
+    """A sentence of an older wording script as the command file holds it now (for that script's test)."""
+    return text.replace(*COMMAND) if file == 'commands/vw.md' else text
+
+
 def before(stage):
     """The visuals stage as it read before this script (for the tests of the older wording scripts whose sentences this one replaces)."""
     st = json.loads(json.dumps(stage))
