@@ -478,6 +478,22 @@ def cue_warnings(session, plan):
     return out
 
 
+def cue_rows(session, plan, shot_id):
+    """Release 1 of 27 Nov 2026, phase 3 part C (SK): the rows under a drawing on its end-picture card: its parts in the order they appear, each
+    with its second (`drawn.cue_times`, the second the render's check uses), the word it is keyed to and the part (its id in plain words); a cue
+    whose second cannot be worked out last, with the reason. [] when the plan sets no cue. Retired: the card with the picture only."""
+    from . import drawn
+    gap, shot = next(((g, sh) for g in plan['gaps'] for sc in all_scenes(g) for sh in sc['shots'] if sh['id'] == shot_id), (None, None))
+    words = (((session['source'].get('gaps') or {}).get((gap or {}).get('gap_id')) or {}).get('timing') or {}).get('words')
+    out = []
+    for c in ((shot or {}).get('scene_motion') or {}).get('cues') or []:
+        times, part = drawn.cue_times(c, shot, words, session['source'].get('fps') or 25), str(c.get('selector') or '').lstrip('#.').replace('-', ' ').replace('_', ' ')
+        on = f', on the word "{c.get("word")}"' if c.get('at_s') is None else ''
+        out.append((times[0], f'{times[0]:g} s{on}: {part}') if times else
+                   (float('inf'), f'no second (this film has no timed narration){on}: {part}' if times is None else f'no second (the word "{c.get("word")}" is not spoken in this shot): {part}'))
+    return [row for _, row in sorted(out, key=lambda r: r[0])]
+
+
 # The critic's point 9 (19 Nov 2026): a move is the camera's only in a sentence whose subject is the camera or the view (CAMERA_SUBJECT), or when the
 # words are a camera term whatever the subject (the *_BARE lists): "the lid tilts up" and "a pan on the stove" are the things, not the camera.
 # ponytail: word lists, a warning only; a thing named "frame" or "shot" that moves in its own sentence is flagged too.
@@ -6857,7 +6873,8 @@ STILL_FIRST = ('{shot}: the still end-frame comes first: build the picture as it
                'Then the animated project.')
 STILL_WAIT = "{shot}: the still end-frame waits for the operator's approval in the chat (`vw visuals next`); the animated project comes after it."
 STILL_REJECTED = ('{shot}: the operator rejected the still end-frame: "{words}". Give these words to a `vw-motion-shot` helper to redo the still, then upload it '
-                  'again with --still.')
+                  'again with --still. When the words are about the moment a part appears and not about the picture, change the cues of {shot} in the plan instead '
+                  '(scene_motion.cues: an earlier or later word, or a second), then upload it again with --still: the card comes back with the new seconds.')   # phase 3 part C: both ways out
 STILL_STALE = ("{shot}: its parts changed since the still end-frame was approved: upload the still again (`vw motion upload --shot {shot} --still`), snapshot "
                "its last frame and send the checker's verdict; the approval stays when the picture is the same.")
 STILL_FRAME = "{shot}: the still's last frame is not taken yet: run `vw motion snapshot --shot {shot} --sha {sha} --at {last:g}`, give it to the checker, then send the verdict."

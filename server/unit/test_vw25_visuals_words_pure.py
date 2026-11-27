@@ -307,7 +307,8 @@ def test_the_card_of_the_drawing_at_the_end_of_the_shot_has_the_name_and_the_two
     out = C._public(card, '', 1)
     assert f'({sid})' in card['question'] and not card['question'].startswith(sid + ':')   # the name in words, the code last
     assert out['ask'].startswith('Is it right?') and '### ' in out['message'] and f'({sid}): this is the drawing as it stands at the end of the shot' in out['message']
-    assert card['text'].splitlines()[0].startswith('- In the film at ') and card['text'].splitlines()[1].startswith('- Voiceover: ') and len(card['text'].splitlines()) == 2
+    assert card['text'].splitlines()[0].startswith('- In the film at ') and card['text'].splitlines()[1].startswith('- Voiceover: ')
+    assert card['text'].splitlines()[2:] == ['', 'The parts appear in this order:', '', '- The plan sets no moment for any part of this drawing.']   # release 1 of 27 Nov 2026, phase 3 part C
 
 
 # ---------- R8: what was accepted for the drawing ----------

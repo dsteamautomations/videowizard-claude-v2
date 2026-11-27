@@ -1882,13 +1882,17 @@ def _waiting_items(ctx):
             ask = (f"{named}: this is the drawing as it stands at the end of the shot, before any motion is added. Is it right?" if len(ids) == 1 else
                    f"{named}: the drawing as it stands at the end of each of these shots, in order, before any motion is added. Are they right?")
             above = ''   # VW-25 issue 7: where each drawing sits in the film and the words under it
+            timed = {sid: V.cue_rows(session, plan, sid) for sid in ids}   # release 1 of 27 Nov 2026, phase 3 part C: the order and the seconds, approved with the picture
             for sid in ids:
                 try:
                     w = P.where(session, plan, sid)
                 except (KeyError, TypeError, ValueError, ZeroDivisionError):
-                    continue
-                if w['where']:
-                    above += (f'{title(sid)}:\n\n' if len(ids) > 1 else '') + _rows_text([['', w['where']], [P.W['words_head'].rstrip(':'), w['words'] or 'none']])
+                    w = {'where': ''}
+                above += ((f'{title(sid)}:\n\n' if len(ids) > 1 else '') + (_rows_text([['', w['where']], [P.W['words_head'].rstrip(':'), w['words'] or 'none']]) if w['where'] else '')
+                          + 'The parts appear in this order:\n\n'   # each drawing's rows under its own name
+                          + ''.join(f'- {r}\n' for r in (timed[sid] + ['The other parts have no set moment.'] if timed[sid] else ['The plan sets no moment for any part of this drawing.'])) + '\n')
+            if any(timed.values()):
+                ask = ask.replace(' Is it right?', ' Is the drawing right, and do the parts appear at the right moments?').replace(' Are they right?', ' Are the drawings right, and do the parts appear at the right moments?')
             last = lambda sid, st: next((c for c in reversed((session.get('motion_checks') or {}).get(sid) or []) if c.get('still') and c.get('sha256') == st.get('sha256')), None)
             bare = [sid for sid, st in zip(ids, sts) if last(sid, st) and not last(sid, st).get('rules')]
             if bare:   # release 2, F10: the still passed with nothing checked (no rule of its list is one a still can show): the card says so
