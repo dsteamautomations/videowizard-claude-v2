@@ -3285,9 +3285,10 @@ def cmd_visuals(a):
             emit(out, 0, f"{len(rows)} stretch(es) proposed for shot {a.shot}. {out.get('next', '')}")
         if not a.shot or not a.clip or a.at is None:
             emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)
+        at = _number(a.at, '--at')   # a bad number is refused first (W11)
         if not str(a.quote or '').strip():
             emit({'action': 'refused', 'message': "Give the operator's own words (--quote)."}, 2)
-        out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': _number(a.at, '--at'), 'quote': a.quote, **_reuse_fields(a)})
+        out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': at, 'quote': a.quote, **_reuse_fields(a)})
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
     if a.what == 'reuse':   # design/207 (D2): retired by name (the older way, design/89 H7: the operator approved a proposed reuse with their words)
         emit({'action': 'refused', 'message': "vw visuals reuse is retired: a reuse no longer needs the operator's approval. Place the shot again with the reason and the reimagined shot "

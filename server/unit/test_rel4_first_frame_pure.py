@@ -124,7 +124,7 @@ def test_the_still_is_ordered_as_soon_as_the_first_frame_is_ready_and_shoot_wait
     # the video is back: the card, and the take is sent with the whole video
     back(store, 'guide-render')
     # release 1 of 27 Nov 2026, phase 4 part B: no Shoot card; this still was approved without the word for the take (the tool): the line says it waits for that word
-    assert R1.state(store) == ['waiting for you in the chat'] and shoot_cards(store, conn) == [] and due(store).endswith('but the operator said not yet. On their word: `vw guide shoot --shot VS1 --quote "…"`.')
+    assert R1.state(store) == ['waiting for you in the chat'] and shoot_cards(store, conn) == [] and due(store).endswith('but its take is not ordered: the operator has not given the word for it. On their word: `vw guide shoot --shot VS1 --quote "…"`.')
     assert nxt(store, conn).startswith('Everything for the take is ready (10 s, about 30 rupees).') and 'guide' in GD.status(conn, store, NEW, [], 'VS1')['files']
     GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Yes, shoot it.')
     snap = json.loads(store.files[conn.queued[-1]['request']['request_key']])

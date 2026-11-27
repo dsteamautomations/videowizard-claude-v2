@@ -48,15 +48,6 @@ def held_cards(store, conn):
     return [i for i in CF._layout_items(ctx) if i['id'].startswith('layout-held:')]   # VW-25 issue 14: their own function
 
 
-def held3(take_film):
-    store, conn = film(take_film)
-    for n in range(3):
-        out = round_(store, conn, n)
-    assert out['next'] == ('Round 3 failed, the third check in a row: the shot is held and the operator is asked in the chat (`vw visuals next`). '
-                           'Send no new scene of it until they answer. Still open: nothing floats')
-    return store, conn
-
-
 def due(store):
     s = saved(store)
     return T.held_due(s, V.current_plan(store, s))
@@ -183,6 +174,10 @@ def test_the_served_text_and_the_skill_say_the_held_layout_and_one_verdict():
     sys.path.insert(0, str(root / 'scripts'))
     import rel2c_wording as R
     st = next(s for s in json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    import rel27nov_wording as W27   # release 1 of 27 Nov, phase 4 part A (row 403): the held layout is retired; the server goes on by itself
+    now = next(p for p in st['parts'] if p['name'] == 'later')['text']
+    assert 'goes on as it is, by the server: nobody is asked about a layout' in now and 'is held: `vw visuals next` asks the operator' not in now
+    st = W27.before(st)
     later = next(p for p in st['parts'] if p['name'] == 'later')['text']
     assert later.count(R.VERDICT + R.HELD) == 1 and 'third check in a row' in R.HELD and 'one verdict for each scene' in R.HELD
     old = R.before(st)

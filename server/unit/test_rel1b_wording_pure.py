@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 def test_the_served_text_says_it_and_the_replaced_words_are_retired():
     import rel1b_wording as W
     import d223_wording   # design/223 retired the take sentences this script wrote (Select, Make another, Reject; the takes' checkers): the text is read as it was before it
-    stage = d223_wording.before(__import__('a1_wording').before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))   # A1 (25 Nov 2026) replaced "no still before their Yes", which this script's sentence follows
+    stage = d223_wording.before(__import__('a1_wording').before(__import__('rel27nov_wording').before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))))   # release 1 of 27 Nov, phase 4: the two batches of cards are one card now; A1 (25 Nov 2026) replaced "no still before their Yes", which this script's sentence follows
     st = json.loads(json.dumps(stage))
     assert W.apply(st['prompt'], st['parts']) == stage['prompt'] and st['parts'] == stage['parts']   # applying twice changes nothing
     later = next(p for p in stage['parts'] if p['name'] == 'later')['text']

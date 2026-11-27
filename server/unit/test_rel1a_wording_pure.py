@@ -23,6 +23,7 @@ def test_the_served_text_and_the_helpers_say_it_and_the_replaced_sentence_is_ret
         assert said in later, said
     for file in sorted({f for f, _, _ in HELPERS}):
         md = (ROOT / 'plugin' / file).read_text(encoding='utf-8').replace('\r\n', '\n')
+        md = md.replace(*reversed(__import__('rel27nov_wording').SKILL_4))   # release 1 of 27 Nov, phase 4 part A: the skill no longer shows the operator the overlay; read as before it
         for f, old, new in HELPERS:
             if f == file:
                 assert md.count(new) == 1 and (new.startswith(old) or old not in md), (file, old[:50])

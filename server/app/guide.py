@@ -438,9 +438,10 @@ def with_places(session, plan, shot, parents):
     reference adds nothing. Why: four stills of VW-25 showed a place other than the references.
     Retired: a still of an AI video shot made with no picture of its place."""
     out, refs = [dict(p) for p in parents], session.get('references') or {}
+    left = (session.get('round') or {}).get('elements') or {}
     ok = lambda r: bool(r) and r.get('status') == 'approved' and r.get('key')
     for e in plan.get('elements') or []:
-        if e.get('kind') != 'place' or e['id'] not in (shot.get('element_ids') or []):
+        if e.get('kind') != 'place' or e['id'] not in (shot.get('element_ids') or []) or (left.get(e['id']) or {}).get('ignored'):   # 6. left without a reference
             continue
         gold = refs.get(VS.golden_of(session, e['id']) or '')
         row = gold if ok(gold) else next((r for r in refs.values() if r.get('element_id') == e['id'] and r.get('kind') in ('sheet', 'frame', 'supplied') and ok(r)), None)
@@ -550,12 +551,12 @@ def _still(g, still_id):
     return s
 
 
-SHOOT_ON_APPROVAL = ("The picture is approved and its take is paid for on this answer: the server orders it as soon as the take's words and the shot's video of "
-                     "positions are both there. Write the take's words now (`vw guide prompt --shot {shot} --file …`), then run `vw visuals next`.")
+SHOOT_ON_APPROVAL = ("The picture is approved and its take is paid for on this answer: the server orders it as soon as the take's words and its layout "
+                     "video are both there. Write the take's words now (`vw guide prompt --shot {shot} --file …`), then run `vw visuals next`.")
 SHOOT_LATER = ("The picture is approved. No take is ordered: the operator said not yet. Write the take's words meanwhile (`vw guide prompt --shot {shot} --file …`); "
                'when the operator says so, order the take with their words: `vw guide shoot --shot {shot} --quote "…"`.')
 SHOOT_REFUSED = '{name} ({shot}): its take was not ordered: {words} When that is settled, order it with the operator\'s words: `vw guide shoot --shot {shot} --quote "…"`.'
-SHOOT_WAITS = '{name} ({shot}): its picture is approved and everything for its take is ready, but the operator said not yet. On their word: `vw guide shoot --shot {shot} --quote "…"`.'
+SHOOT_WAITS = '{name} ({shot}): its picture is approved and everything for its take is ready, but its take is not ordered: the operator has not given the word for it. On their word: `vw guide shoot --shot {shot} --quote "…"`.'
 
 
 def approve_still(conn, store, user, run, outputs, shot_id, still_id, sha256, quote, shoot=False):
@@ -594,6 +595,8 @@ def shoot_state(session, shot_id):
     ('later', ''): the operator approved the picture and said not yet."""
     g = (session.get('guides') or {}).get(shot_id) or {}
     if not g or g.get('takes') or shot_id in (session.get('selections') or {}) or not ready_card(session, shot_id, 0)['ready']:
+        return None
+    if (session.get('questions') or {}).get(shot_id):   # an open question on the shot: nothing is ordered or said yet; the order is tried when it is answered
         return None
     still = next(s for s in g['stills'] if s.get('status') == 'approved' and s.get('guide_sha256') == g['sha256'])
     if not (still.get('approval') or {}).get('shoot'):

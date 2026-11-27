@@ -144,8 +144,9 @@ def test_a_typed_not_yet_approves_the_picture_only_and_the_take_waits_for_the_op
     g = saved(store)['guides']['VS1']
     assert g['stills'][0]['status'] == 'approved' and 'shoot' not in g['stills'][0]['approval'] and out['then'].startswith(G.SHOOT_LATER.format(shot='VS1'))
     assert CF.next_item(conn, store, USER, NEW, []).get('item') is None and videos(conn) == []         # no card, no take
-    assert G.shoot_state(saved(store), 'VS1') == ('later', '') and due(store).endswith('its picture is approved and everything for its take is ready, but the operator said not yet. '
+    assert G.shoot_state(saved(store), 'VS1') == ('later', '') and due(store).endswith('its picture is approved and everything for its take is ready, but its take is not ordered: the operator has not given the word for it. '
                                                                                          'On their word: `vw guide shoot --shot VS1 --quote "…"`.')
+    assert G.shoot_state({**saved(store), 'questions': {'VS1': {'question': 'Which hand?'}}}, 'VS1') is None   # an open question on the shot: nothing ordered, nothing recorded as refused
     G.shoot(conn, store, USER, NEW, [], 'VS1', 'Now make it.')
     assert len(videos(conn)) == 1 and G.shoot_state(saved(store), 'VS1') is None and due(store) == ''
 

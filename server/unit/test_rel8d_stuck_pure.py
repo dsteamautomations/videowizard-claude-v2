@@ -75,7 +75,7 @@ def test_every_shot_stuck_gives_no_page_and_the_status_says_each_one(held):
         s['guides'][sid]['stills'][0].update(check_look=LOOKED, asked_at=ago(45))
     held(s, p)
     got = items(s, p, [])
-    assert all(i.get('stuck') for i in got) and not T.complete(got) and P.stuck_due(got).count('It waits for your answer in the chat since 11:15 UTC.') == 2
+    assert all(i.get('stuck') for i in got) and not T.complete(got) and P.stuck_due(got).count('It waits for your answer in the chat since 11:15 UTC.') == 1 and P.stuck_due(got).count('; ') == 1   # one sentence for both
 
 
 def test_a_stuck_shot_whose_take_arrives_is_a_take_to_answer_and_no_longer_stuck(held):

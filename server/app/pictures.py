@@ -1471,8 +1471,11 @@ def complete(items):
 
 def stuck_due(items):
     """Part D, rule 4: the sentence of each stuck thing, the same in the status line, the next-step line and on the page. '' when none."""
-    rows = [f"{i['name']}: {i['stuck']['waits']}" for i in items if i.get('stuck')]
-    return STUCK_LEAD + ' '.join(rows) if rows else ''
+    same = {}
+    for i in items:
+        if i.get('stuck'):
+            same.setdefault(i['stuck']['waits'], []).append(i['name'])
+    return STUCK_LEAD + ' '.join(f"{'; '.join(names)}: {waits}" for waits, names in same.items()) if same else ''
 
 
 def waiting_rows(session, plan, items):

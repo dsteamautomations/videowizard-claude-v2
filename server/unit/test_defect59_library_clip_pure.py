@@ -47,15 +47,18 @@ def test_an_own_clip_is_placed_as_before_and_carries_no_key():
     assert a['name'] == 'C0012.MP4' and 'key' not in a and 'library_from' not in a
 
 
-@pytest.mark.parametrize('clip', ['nope', 'yard.mp4', 'c7'])   # no such clip; a name is not an id; a clip of the first cut that is not a library clip
-def test_a_clip_neither_this_film_nor_its_library_has_is_refused_as_before(clip):
+@pytest.mark.parametrize('clip', ['nope', 'c7'])   # no such clip; a clip of the first cut that is not a library clip
+def test_a_clip_neither_this_film_nor_its_library_has_is_refused_with_the_films_clips(clip):
+    # release 1 of 27 Nov 2026, phase 4 part E (row 408): the refusal lists the film's clips, and a file name is taken (retired: "Unknown clip C.", a name refused)
     doc, sess = clip_session()
-    assert refused(lambda: VS.fill_clip(first_cut(store_with(sess, doc)), USER, RUN, [MEDIA], 'VS1', clip, 4.0, 'yes')) == f'Unknown clip {clip}.'
+    assert refused(lambda: VS.fill_clip(first_cut(store_with(sess, doc)), USER, RUN, [MEDIA], 'VS1', clip, 4.0, 'yes')) == f"No clip of this film is called '{clip}'. Its clips: yard.mp4 (id L9); C0012.MP4 (id c1); C0013.MP4 (id c2)."
+    store = first_cut(store_with(sess, doc))
+    assert VS.fill_clip(store, USER, RUN, [MEDIA], 'VS1', 'yard.mp4', 4.0, 'yes')['clip_id'] == 'L9'   # the library clip, by its file name
 
 
 def test_a_film_with_no_first_cut_record_refuses_in_plain_words():
     doc, sess = clip_session()
-    assert refused(lambda: VS.fill_clip(store_with(sess, doc), USER, RUN, [MEDIA], 'VS1', 'L9', 4.0, 'yes')) == 'Unknown clip L9.'
+    assert refused(lambda: VS.fill_clip(store_with(sess, doc), USER, RUN, [MEDIA], 'VS1', 'L9', 4.0, 'yes')) == "No clip of this film is called 'L9'. Its clips: C0012.MP4 (id c1); C0013.MP4 (id c2)."
     assert VS.library_clips(store_with(sess, doc), RUN) == {}
 
 

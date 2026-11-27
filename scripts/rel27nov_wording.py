@@ -30,6 +30,18 @@ PARTS = [   # (the part, the words before, the words now); phase 2 part B: the s
     # phase 3 part A: the font is asked by the server's card, with no "Other" (shorter than the sentences it replaces)
     ('later', 'the font comes first: run `vw font` before any brief (`vw motion brief` is refused until the film\'s motion style and its font are recorded). If no font is recorded, ask it in the chat with its sample: run `vw font --sample` and show its picture (each offered font drawn on the film\'s labels and colours; "Other" is not in it), then ask the question with the fonts `vw font` lists and Other, as before; when it says "The font sample is not available.", say that line and ask as before.',
      "the font comes first (`vw motion brief` is refused until the film's motion style and its font are recorded). The server asks the font with a card (`vw visuals next`): show it as it is. Other fonts are not available: offer and record no other name."),
+    # phase 4 part A: no layout card; the server goes on by itself after the third failed check
+    ('later', 'a layout whose third check in a row fails is held: `vw visuals next` asks the operator (use it as it is, try once more, or change the shot), and no new scene of that shot is sent until they answer;',
+     'a layout whose third check in a row fails goes on as it is, by the server: nobody is asked about a layout, and no layout picture or overlay is shown to the operator;'),
+    # phase 4 parts A, B, C and E: the still's card alone with one approving button; the server orders the take; one remake; the place's picture; the footage shot's card
+    ('later', 'The take is paid for only on the operator\'s word: show them the ready-to-shoot card (the guide, the still on its overlay, the words, the cost), then `vw guide shoot --shot S --quote "<their words>"`. '
+              'That card is for the first take of a shot, which is made once, small (360p). No second Shoot card is shown: a take the operator says is wrong is corrected (the takes, below); only a first take that could not '
+              'be made at the provider is offered once more, on their word. The cards before a take come in two batches, in film order: every still\'s card, each with Claude\'s check, then every word to shoot: have every '
+              'still made before any word to shoot is asked.',
+     'The take is paid for only on the operator\'s word: the still\'s card shows the still alone, with the take\'s price on its button "Approve and shoot"; the server then orders the first take itself once its words and '
+     'its layout video exist (`vw visuals next`). A typed "not yet" approves the still only (`--choice later`); its take is then ordered on their word: `vw guide shoot --shot S --quote "<their words>"`. '
+     'The first take is made once, small (360p): a take the operator says is wrong is corrected (the takes, below); only a first take that could not be made at the provider is offered once more, on their word. '
+     'A still whose check failed is made again once, without asking. A still waits for the references of what its shot shows; the server adds the place\'s picture itself.'),
     # phase 2 part A has no sentence here: the picture-search paragraph is pinned whole by the design/211 scripts; the server's own words say it (ref_sets.PEOPLE_WAIT, PERMISSION_FIRST)
 ]
 
@@ -48,11 +60,17 @@ def apply(prompt, parts):
 
 COMMAND = ("(the film's font: show the picture of `vw font --sample` first, then ask as before)",   # phase 3 part A: plugin/commands/vw.md, changed in place
            "(the film's font: the server's card, `vw visuals next`; other fonts are not available)")
+COMMAND_4 = ('`guide look` and the operator\'s `guide approve` on the overlay (or `repair`, `reject`), `guide prompt`, then `guide shoot --shot S --quote "<their words>"` (paid; only on the operator\'s word; never the same request twice;',   # phase 4 parts A and B: plugin/commands/vw.md, changed in place
+             '`guide look`; the still\'s card shows the still alone (`vw visuals next`: "Approve and shoot" with the take\'s price; never show the operator a layout or the overlay; `repair`, `reject`), `guide prompt`, then the server orders the first take itself; `guide shoot --shot S --quote "<their words>"` only after a "not yet" (paid; only on the operator\'s word; never the same request twice;')
+
+
+SKILL_4 = ('After `vw guide look`, show the operator the overlay and say what to look for: every person and thing sits on the red outlines. Claude checks the still first: `vw visuals pictures --looks` lists it (kind `start`) with its lines; its card comes with the check, or after 30 minutes as not checked. Then: approve the exact file;',   # phase 4 part A: plugin/skills/guide/SKILL.md, changed in place
+           'Never show the operator the overlay, the layout or its frames: they are the inputs of the check (`vw guide look` is for you). Claude checks the still first: `vw visuals pictures --looks` lists it (kind `start`) with its lines; a still whose check failed is made again once, without asking; its card then shows the still alone, with the take\'s price on "Approve and shoot" (or after 30 minutes as not checked). Then: approve the exact file;')
 
 
 def now(file, text):
     """A sentence of an older wording script as the command file holds it now (for that script's test)."""
-    return text.replace(*COMMAND) if file == 'commands/vw.md' else text
+    return text.replace(*COMMAND).replace(*COMMAND_4) if file == 'commands/vw.md' else text
 
 
 def before(stage):
