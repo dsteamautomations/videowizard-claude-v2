@@ -73,7 +73,7 @@ W = {
     # release 1, D1 (SK, 20 Nov 2026): what can start now in step 7, as step 6 says it (`pictures.starts`)
     'start_guides': 'the checkers of the guides of {ids} ({n}) (a fresh `vw-guide-check` helper each: its guide is rendered, and its still can be ordered, only after its check passes)', 'start_order': 'the stills of {ids} ({n}), each ordered with `vw guide still --shot S --file still.json`',
     'start_words': "the writers of the take's words of {ids} ({n}) (`vw guide prompt --shot S --file take.txt`)",
-    'video_wait': ' Everything else for its take is ready: its word to shoot is asked when the video is ready; go on with the other shots.',   # release 4
+    'video_wait': ' Everything else for its take is ready: the server orders the take when the video is ready (`vw visuals next`); go on with the other shots.',   # release 4
     'start_scenes': 'the writers of the scene descriptions of {ids} ({n})',
     'start_rebuild': ("the writers of the scene descriptions of {ids} ({n}), each rebuilt after its check or the operator's correction: read `vw guide status --shot S` first, "
                       'it holds what must change'),
@@ -215,6 +215,9 @@ def render_due(session, plan):
         r = e.get('render') or {}
         if not r or sh['id'] in (session.get('selections') or {}) or guide.rebuild(e):
             continue
+        state = guide.shoot_state(session, sh['id'])   # phase 4 part B: never silent
+        if state and state[0] in ('refused', 'later'):
+            out.append((guide.SHOOT_REFUSED if state[0] == 'refused' else guide.SHOOT_WAITS).format(name=name_of(g, sh, n, of), shot=sh['id'], words=state[1]))
         if r.get('status') == 'failed' or (r.get('frame1_error') and not r.get('frame1_key')) or _video_waits(e):
             out.append(f"{name_of(g, sh, n, of)} ({sh['id']}): " + guide.render_line(sh['id'], e) + (W['video_wait'] if r.get('status') != 'failed' and _video_waits(e) else ''))
     return ' '.join(out)
@@ -257,7 +260,7 @@ def _state(session, plan, sh, take_rows, now):
         return ('stale' if _stale(session, plan, ready[-1]) else 'done'), ready[-1], False
     if not g:
         return 'none', None, False
-    if _still_checking(session, g, now):
+    if _still_checking(session, g, now) or any(P.start_retry_due(session, sid, g, st) for st in g.get('stills') or []):   # phase 4 part A rule 6: made again once by itself
         return 'checking', None, False
     from . import guide
     if guide.held(g):

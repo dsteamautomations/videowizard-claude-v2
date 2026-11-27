@@ -236,7 +236,7 @@ def test_the_rounds_are_counted_across_changed_scenes_and_the_shot_is_held_at_th
     changed['people'][2]['at'] = [4.0, 1.4, 0.3]
     scene(store, conn, changed)
     out = GD.verdict(conn, store, OTHER, NEW, [], 'VS1', frames_back(store, conn), False, [{'look': 'a', 'pass': False}])
-    assert out['round'] == 3 and out['next'].startswith('Round 3 failed, the third check in a row: the shot is held') and GD.held(saved(store)['guides']['VS1'])
+    assert out['round'] == 3 and out['next'].startswith('Round 3 failed, the third check in a row: the layout goes on as it is, by the server') and GD.checked(saved(store)['guides']['VS1'])   # release 1 of 27 Nov 2026, phase 4: part A: no card, the server goes on
 
 
 def test_a_result_for_a_scene_that_changed_meanwhile_is_ignored(film):
@@ -331,7 +331,7 @@ def test_a_still_without_its_overlay_cannot_be_approved(film):
     s = saved(store)
     s['guides']['VS1']['stills'][0]['overlay_key'] = None
     VS.save_session(store, NEW, s)
-    assert 'no overlay yet' in refused(lambda: GD.approve_still(conn, store, USER, NEW, [], 'VS1', sid, 'sha-still', 'yes'))
+    assert 'is not ready yet' in refused(lambda: GD.approve_still(conn, store, USER, NEW, [], 'VS1', sid, 'sha-still', 'yes'))
 
 
 def test_a_masked_repair_sends_only_the_still_its_region_and_the_fixed_words(film):
@@ -464,7 +464,7 @@ def test_the_view_of_a_guide_lists_where_it_stands_and_every_picture(film):
     ready(store, conn)
     v = GD.view(saved(store), 'VS1', lambda k: '/f/' + k)
     assert v['frames']['strip_url'] == '/f/strip' and v['render']['guide_url'].endswith('guide.mp4') and v['stills'][0]['overlay_url'] == '/f/ov.jpg'
-    assert v['card'] == {'ready': True, 'missing': [], 'seconds': 10, 'cost_inr': 80.0, 'prompt': v['card']['prompt'], 'look_for': v['card']['look_for']} and 'red outlines' in v['card']['look_for']
+    assert v['card'] == {'ready': True, 'missing': [], 'seconds': 10, 'cost_inr': 80.0, 'prompt': v['card']['prompt'], 'look_for': v['card']['look_for']} and 'red outlines' not in v['card']['look_for']
     assert GD.view(saved(store), 'IM1', lambda k: k) is None
 
 

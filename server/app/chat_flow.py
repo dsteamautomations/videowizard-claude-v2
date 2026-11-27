@@ -2041,7 +2041,7 @@ def _waiting_cards(ctx):
 
 
 def _guide_items(ctx):
-    """An AI video shot: its still on the overlay, then the word to shoot. Both are the operator's."""
+    """An AI video shot: the picture that starts it, with the price of its take; after a failure at the provider, the word to send it again."""
     session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
     if not plan or not session.get('guides'):
         return []
@@ -2057,18 +2057,34 @@ def _guide_items(ctx):
         if still and not P.start_offered(session, still):
             checking = True   # a still is with Claude's look: its card comes first, so the words to shoot wait for it (30 minutes at most: then it is shown as not checked)
             continue   # release 1, A1: step 7's still is checked by Claude's look first; its card comes with the look, or after 30 minutes as not checked
+        if still and P.start_retry_due(session, sid, g, still):
+            checking = True   # phase 4 part A rule 6: its check failed: it is made again once by itself; nothing is shown meanwhile
+            continue
         if still:
+            # Release 1 of 27 Nov 2026, phase 4 parts A and B (SK): the card shows the still alone and asks what the picture shows; its approving
+            # button is also the word for the paid take, with the price on it. A typed "not yet" approves the picture only (`later`): never a rejection.
+            # Retired: the still over the red outlines and the question about them; the separate Shoot card of a first take and its "Not yet".
+            price = round(g['seconds'] * guide.take_price(), 2)
+            warn = [r['message'] for r in g.get('checks') or [] if r.get('before_take')]
+
             def run_(choice, quote, words, sid=sid, still=still):
-                if choice == 'approve':
-                    return guide.approve_still(conn, store, user, run, outputs, sid, still['id'], still['sha256'], quote)
-                return guide.reject_still(conn, store, user, run, outputs, sid, still['id'], words, quote)
-            show = ([{'key': still['overlay_key'], 'name': f'{sid}-still-on-the-guide.png'}] if still.get('overlay_key') else []) + [{'key': still['key'], 'name': f'{sid}-still.png'}]
-            items.append(_item(P.marked(f"still:{sid}:{still['id']}", P.look_view(still))[0] if V.round_v2(session) else f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the still',   # the critic's point 2
-                               f'{title}: this still starts the shot. On the first picture, does every person and thing sit on the red outlines?', run_,
-                               [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show,
-                               # the check's line and its warnings: the operator may approve against them; A1: then what the layout changed from the plan, and its notes
-                               text=chr(10).join(x for x in [P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else ''] + guide.layout_lines(g) if x), name=title,
+                if choice == 'reject':
+                    return guide.reject_still(conn, store, user, run, outputs, sid, still['id'], words, quote)
+                out = guide.approve_still(conn, store, user, run, outputs, sid, still['id'], still['sha256'], quote, shoot=choice == 'approve')
+                sent = choice == 'approve' and sid in guide.order_due(conn, store, user, run, outputs)   # the words and the video are there already: ordered at once
+                return {**out, 'tell': 'The picture is approved and its take is being made. ' + NOTHING if sent else out['next']}
+            items.append(_item(P.marked(f"still:{sid}:{still['id']}", P.look_view(still))[0] if V.round_v2(session) else f"still:{sid}:{still['id']}", 'still', 'Step 7, AI video: the picture that starts the shot',   # the critic's point 2
+                               f'{title}: this picture starts the shot. Is it what the shot should show?', run_,
+                               [_button(f'Approve and shoot (about ₹{price:.0f})', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the picture.')],
+                               more=[_button('Approve the picture, the take later', 'later')], show=[{'key': still['key'], 'name': f'{sid}-still.png'}],
+                               # the check's line and its warnings: the operator may approve against them; the take's length and price; what to know before paying; what the shot changed from the plan
+                               text=chr(10).join(x for x in [P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else '',
+                                                             f"The take is {g['seconds']} s and costs about ₹{price:.0f}. It is made on your approval, as soon as its words are written.",
+                                                             ('Before you pay: ' + ' '.join(warn)) if warn else ''] + guide.layout_lines(g) if x), name=title,
                                head=P.heading_text(session, plan, [sid])))
+            items[-1]['_typed'] = ('A typed answer that says what is wrong with the picture is recorded as `--choice reject` with their words as `--notes`, at once, without a further question. '
+                                   'A typed answer that says not yet, or not to pay yet, is never a rejection: record it as `--choice later` with their words as `--quote` '
+                                   '(the picture is approved and no take is ordered until they say so). ')
             continue
         if not g.get('take_prompt') or sid in session['selections']:
             continue
@@ -2081,19 +2097,18 @@ def _guide_items(ctx):
         last = takes[-1] if takes else None
         again = bool(last and last['status'] in T.GONE and not open_take)
         stamp = stamp + (':again:' + str(last['id']) if again else '')
-        if card['ready'] and not open_take and (g.get('shoot_asked') or {}).get('stamp') != stamp:
+        if again and card['ready'] and not open_take and (g.get('shoot_asked') or {}).get('stamp') != stamp:   # phase 4 part B: no Shoot card for a first take
             def run_(choice, quote, words, sid=sid, stamp=stamp, again=again):
-                out = guide.shoot(conn, store, user, run, outputs, sid, quote, again) if choice == 'shoot' else {'for_the_assistant': words}
+                out = guide.shoot(conn, store, user, run, outputs, sid, quote, True) if choice == 'shoot' else {'for_the_assistant': words}
                 s = V.session_of(store, run, outputs)
                 s['guides'][sid]['shoot_asked'] = {'stamp': stamp, 'answer': 'shoot' if choice == 'shoot' else 'not yet', **({'words': words} if choice != 'shoot' else {})}   # asked once for this state of the shot
                 V.save_session(store, run, s)
                 return {**out, **({'tell': 'The take is being made. ' + NOTHING} if choice == 'shoot' else {})}
-            show = [{'key': k, 'name': n} for k, n in ((card.get('guide_key'), f'{sid}-guide.mp4'), ((card.get('still') or {}).get('overlay_key'), f'{sid}-still-on-the-guide.png')) if k]
+            show = [{'key': card['still']['key'], 'name': f'{sid}-still.png'}]   # phase 4 part A: no layout video, no overlay
             why = str(last.get('error') or '').strip() if again else ''
             words.append(_item(f"shoot:{sid}:{hashlib.sha256(stamp.encode()).hexdigest()[:10]}", 'shoot', 'Step 7, AI video: the take',
-                               (f"{title}: the take could not be made. {why} Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
-                                else f"{title}: make the take now? It is {card['seconds']} s and costs about ₹{card['cost_inr']:g}."), run_,
-                               [_button('Send it again' if again else 'Shoot', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
+                               f"{title}: the take could not be made. {why} Send the same request once more? It costs about ₹{card['cost_inr']:g}.", run_,
+                               [_button('Send it again', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
                                text=str(card.get('look_for') or ''), show=show, name=title, head=P.heading_text(session, plan, [sid])))
     return items + ([] if checking else words)
 
@@ -2257,7 +2272,7 @@ def _paragraphs(text):
 
 SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to change', 'Yes': 'It is right', 'No': 'It is wrong; another is made', 'Correct it': 'I will ask you what to correct',
         'None of these': 'None is right; the set is made again', 'Select': 'Use it in the film', 'Reject': 'I will ask you what is wrong with it', 'Approve': 'It is right; go on',
-        'Shoot': 'Make the take now (paid)', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
+        'Approve and shoot': 'The picture is right; its take is made (paid)', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
         'Leave it out': 'This thing gets no reference', 'No reference needed': 'No reference of it; its shots are made without one',
         'Go on without a reference': 'No set of it; its shots are made without a reference',
         'Correct every picture of it': 'Its pictures are corrected with your words, and the words go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
@@ -2274,7 +2289,7 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
 
 def _says(label):
     label = label.split(' (paid')[0]   # design/211: a paid button carries its price
-    return SAYS.get(label) or ('This one becomes the reference' if label.startswith('Use ') else 'The whole set is right' if label.startswith('Approve all ') else   # design/216
+    return SAYS.get(label) or (SAYS['Approve and shoot'] if label.startswith('Approve and shoot') else 'This one becomes the reference' if label.startswith('Use ') else 'The whole set is right' if label.startswith('Approve all ') else   # design/216
                                SAYS['Make again'] if label.startswith('Make all ') else 'Use this picture as the reference' if label.startswith('Approve ') else
                                'No set of them; their shots are made without a reference' if label.startswith('Do not make ') else
                                'The sets that wait are made now, in one go' if label.startswith('Make the other ') else '')
@@ -2311,7 +2326,7 @@ def _public(item, summary, n_waiting, one=False):
                    + 'Post `message` as your own text, exactly as it is laid out (its heading, its lines, its totals); add nothing to it. '
                    + 'Then ask with the question tool: the question is `ask` and nothing else (never the text of `message` again); each button is an option with its `label` and its '
                    + '`description`, in this order, and no others. The panel adds "Other" by itself: it is the operator\'s box for typing. '
-                   + (f"A typed answer that asks for a change is recorded as `--choice {typed}` with their words as `--notes`, at once, without a further question; " if typed else item['_typed'] if item.get('_typed') else 'A typed answer is recorded with their words as `--quote`; ')
+                   + (item['_typed'] if item.get('_typed') else f"A typed answer that asks for a change is recorded as `--choice {typed}` with their words as `--notes`, at once, without a further question; " if typed else 'A typed answer is recorded with their words as `--quote`; ')
                    + ('' if item.get('_typed') else 'a typed answer that plainly accepts is recorded as the accepting button. ')
                    +
                    f"Record the reply: `vw visuals decide{' --one' if one else ''} --item {item['id']} --choice <the button's choice> --quote \"<their words>\"` (`--notes` for what to change). Say nothing about what you did."}
@@ -2554,6 +2569,8 @@ def _next_item(conn, store, user, run, outputs, one=False, many=False):
         flush_sets(conn, store, user, run, outputs)
     except (ValueError, V.Problem):   # VW-25 issue 13: a refusal written with `need` is a ValueError here; no other card is refused because of a set
         pass   # said again when the operator next answers a set
+    from . import guide
+    guide.order_due(conn, store, user, run, outputs)   # release 1 of 27 Nov 2026, phase 4 part B: a take the operator approved with its picture is ordered when its words and video exist
     ctx = _ctx(conn, store, user, run, outputs)
     items, summary, with_assistant = _candidates(ctx)
     session = V.session_of(store, run, outputs)

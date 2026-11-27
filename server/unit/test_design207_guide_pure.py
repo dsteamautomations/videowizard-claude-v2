@@ -251,9 +251,9 @@ def test_the_ready_to_shoot_card_repeats_the_warnings_that_matter_before_a_paid_
     session = {'guides': {'VS1': {'sha256': 'abc', 'seconds': 5, 'checks': G.checks(spec)}}}
     card = GD.ready_card(session, 'VS1', 8.0)
     assert card['warnings'] == [next(r['message'] for r in G.checks(spec) if r['check'] == 'untried')]
-    assert 'red outlines' in card['look_for'] and card['look_for'].endswith('Before you pay: ' + card['warnings'][0])
+    assert card['look_for'] == 'Before you pay: ' + card['warnings'][0]   # release 1 of 27 Nov 2026, phase 4: no word about the overlay or its outlines
     session['guides']['VS1']['checks'] = G.checks(home_walk())   # a proven kind: the card is as before
     card = GD.ready_card(session, 'VS1', 8.0)
-    assert card['warnings'] == [] and card['look_for'] == 'On the overlay: every person and thing of the still sits on the red outlines of the guide.'
+    assert card['warnings'] == [] and card['look_for'] == ''
     session['guides']['VS1'].pop('checks')   # a guide stored before this change
     assert GD.ready_card(session, 'VS1', 8.0)['warnings'] == []

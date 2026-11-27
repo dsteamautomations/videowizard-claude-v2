@@ -65,9 +65,9 @@ def test_d2_every_stills_card_comes_before_any_word_to_shoot_in_film_order(held,
     for sid in ('S1', 'S3'):
         s['guides'][sid]['stills'][0]['check_look'] = LOOKED
     held(s, p)
-    assert cards(s, p, monkeypatch) == ['still:S1', 'still:S3', 'shoot:S2']
+    assert cards(s, p, monkeypatch) == ['still:S1', 'still:S3']   # release 1 of 27 Nov 2026, phase 4: part B: no Shoot card for a first take
     s['guides']['S1'] = guide()                                                                          # S1's still answered: its word to shoot joins the second batch, in film order
-    assert cards(s, p, monkeypatch) == ['still:S3', 'shoot:S1', 'shoot:S2']
+    assert cards(s, p, monkeypatch) == ['still:S3']
 
 
 def test_d2_a_word_to_shoot_waits_while_a_still_is_being_checked_and_never_longer_than_the_look(held, monkeypatch):
@@ -76,12 +76,12 @@ def test_d2_a_word_to_shoot_waits_while_a_still_is_being_checked_and_never_longe
     held(s, p)
     assert cards(s, p, monkeypatch) == []                                                                # no card yet: the still's card comes first, with its look
     s['guides']['S1']['stills'][0]['check_look'] = LOOKED
-    assert cards(s, p, monkeypatch) == ['still:S1', 'shoot:S2']
+    assert cards(s, p, monkeypatch) == ['still:S1']   # release 1 of 27 Nov 2026, phase 4: part B: no Shoot card for a first take
     s['guides']['S1']['stills'][0].pop('check_look')
     s['guides']['S1']['stills'][0]['asked_at'] = (P._now() - timedelta(minutes=P.PICTURE_LOOK_MINUTES + 1)).isoformat()   # the look never came
     ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': OP, 'outputs': [], 'conn': None}
     first = CF._guide_items(ctx)[0]
-    assert cards(s, p, monkeypatch) == ['still:S1', 'shoot:S2'] and "Not checked: Claude's check did not come within 30 minutes. Judge it by eye." in first['text']   # shown as not checked: never blocks
+    assert cards(s, p, monkeypatch) == ['still:S1'] and "Not checked: Claude's check did not come within 30 minutes. Judge it by eye." in first['text']   # shown as not checked: never blocks
 
 
 def test_d2_a_rejected_still_does_not_hold_the_other_shots_words(held, monkeypatch):
@@ -89,7 +89,7 @@ def test_d2_a_rejected_still_does_not_hold_the_other_shots_words(held, monkeypat
     s['guides'] = {'S1': guide(still='rejected', prompt=False), 'S2': guide(), 'S3': guide()}
     s['guides']['S1']['stills'].append({'id': 'st2', 'status': 'generating', 'guide_sha256': 'g' * 64})   # its new still is being made
     held(s, p)
-    assert cards(s, p, monkeypatch) == ['shoot:S2', 'shoot:S3']
+    assert cards(s, p, monkeypatch) == []   # release 1 of 27 Nov 2026, phase 4: part B: no Shoot card for a first take
 
 
 # ---------- D3: every choice before the first take is paid for ----------
@@ -170,7 +170,7 @@ def test_a_step_7_in_mid_flight_continues_with_nothing_asked_again(held, monkeyp
     held(s, p)
     rows = [job('j1', 'S1', status='running'), job('j2', 'S2')]
     assert states(s, p, rows) == [('S1', 'being made'), ('S2', 'answered'), ('S3', 'waiting for you in the chat')]
-    assert cards(s, p, monkeypatch, rows) == ['shoot:S3']                                                # S1 and S2 are not asked again
+    assert cards(s, p, monkeypatch, rows) == []   # release 1 of 27 Nov 2026, phase 4: part B: no Shoot card for a first take;                                               # S1 and S2 are not asked again
     assert [w for w in V.waiting(s, p, 'VW-99', rows) if w['kind'] == 'take to select'] == []
     assert s['reviews']['j2'][-1]['notes'] == 'The broom is out of the cut.'                             # the typed reason stands as it was recorded
 
@@ -192,7 +192,7 @@ def test_mid_flight_a_candidate_still_a_still_with_a_look_reference_and_a_take_w
     later = P._now() + timedelta(minutes=31)
     assert P.start_offered(s, s['guides']['S1']['stills'][0], later) and s['guides']['S1']['stills'][0]['look'] == 'R9'   # never held past the look's time; the reference untouched
     s['guides']['S1']['stills'][0]['asked_at'] = (P._now() - timedelta(minutes=31)).isoformat()
-    assert cards(s, p, monkeypatch, rows) == ['still:S1', 'shoot:S3']
+    assert cards(s, p, monkeypatch, rows) == ['still:S1']   # release 1 of 27 Nov 2026, phase 4: part B: no Shoot card for a first take
 
 
 # ---------- D4b: the form of `changed_from_plan` (17 scene files refused on the first real run of step 7, VW-24, 20 Nov 2026) ----------

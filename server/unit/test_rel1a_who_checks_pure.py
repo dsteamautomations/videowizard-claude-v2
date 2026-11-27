@@ -148,8 +148,11 @@ def test_step_7s_still_is_listed_for_claudes_look_with_a_list_of_its_own_and_its
     assert P.record_looks(None, USER, RUN, [], [{'ref': 'st1', 'sha10': 'x' * 10, 'lines': bad}], 'helper')['refused']['st1'] == P.PIC_LOOK_GONE.format(name='Mason')
     done = P.record_looks(None, USER, RUN, [], [{'ref': 'st1', 'sha10': 's' * 10, 'lines': bad}], 'helper')
     assert done['recorded'] == ['st1'] and done['left'] == [] and s['guides']['S1']['stills'][0]['check_look']['who'] == 'helper'
+    # release 1 of 27 Nov 2026, phase 4 part A rule 6: the first failure is made again once by itself: no card; the second goes to the operator
+    assert CF._guide_items(ctx) == [] and 'Make it again once now' in done['then'] and [(i['id'], i['state']) for i in T.expected(s, p, [], NOW)] == [('S1', 'being checked by Claude')]
+    s['still_retries'] = {'S1': {'of': 'st0', 'by': 'st1'}}
     item = CF._guide_items(ctx)[0]
-    assert item['kind'] == 'still' and item['text'] == '- 1 warning: on the layout\n- on the layout: The mason stands a step left of his outline.'   # release 1, B3: the short line, the warning in full
+    assert item['kind'] == 'still' and item['text'].startswith('- 1 warning: on the layout\n- on the layout: The mason stands a step left of his outline.\nThe take is ')   # release 1, B3: the short line, the warning in full
     assert [b['choice'] for b in item['buttons']] == ['approve', 'reject'] and not item['buttons'][0].get('needs_words')   # a warning: the operator may approve against it
     assert [(i['id'], i['state']) for i in T.expected(s, p, [], NOW)] == [('S1', 'waiting for you in the chat')] and P.looks_due(None, RUN, [], [])['pictures'] == []
 

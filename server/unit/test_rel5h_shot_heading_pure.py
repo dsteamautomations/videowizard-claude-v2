@@ -73,9 +73,8 @@ def test_the_still_and_the_shoot_card_of_an_ai_video_shot_carry_the_voiceover(ta
     assert f'Voiceover: {SAID}' in card(conn, store, 'still:VS1')['message']
 
 
-def test_the_shoot_card_carries_the_voiceover(take_film):
-    store, conn = ready_to_shoot(take_film)
-    assert f'Voiceover: {SAID}' in card(conn, store, 'shoot:VS1')['message']
+# Retired with release 1 of 27 Nov 2026, phase 4 part B: test_the_shoot_card_carries_the_voiceover
+# (no Shoot card for a first take; the still's card above carries the voiceover and the price: unit/test_rel8ab_still_card_pure.py)
 
 
 def test_the_assistants_own_question_on_a_shot_carries_its_name_and_voiceover(take_film):

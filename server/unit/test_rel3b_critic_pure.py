@@ -18,7 +18,7 @@ from app.errors import Problem
 from test_design151_refs_pure import NEW
 from test_guide_route_pure import refused, still_made, take_film   # noqa: F401 (take_film: the fixture)
 from test_hotfix_guide_lane_pure import Conn as LaneConn
-from test_rel4_first_frame_pure import back, start, to_the_take
+from test_rel4_first_frame_pure import TAKE_WORDS, back, start, to_the_take
 from test_visuals_stage_pure import USER, saved
 import test_rel3_defect_scope_pure as D
 import test_rel3_plan_cards_pure as PC
@@ -64,19 +64,28 @@ def with_a_still(take_film):
     return store, conn
 
 
+def still_to_answer(take_film):
+    """Release 1 of 27 Nov 2026, phase 4 part B: the picture waits for its answer, and the take's words and the layout video are there already:
+    "Approve and shoot" orders the take at once. (Until then these tests answered the separate Shoot card, retired.)"""
+    store, conn = with_a_still(take_film)
+    G.set_prompt(conn, store, USER, NEW, [], 'VS1', TAKE_WORDS)
+    back(store, 'guide-render')
+    return store, conn
+
+
 OTHERS = ({'defect': 7, 'shot': 'VS9'}, {'defect': 8, 'stage': 'voice'})   # another shot's defect, another step's defect
 
 
 # ---------- 1. the chat ----------
 
 def test_the_chat_cannot_shoot_a_held_shot_and_shoots_when_the_defect_is_on_another(take_film, monkeypatch):
-    store, conn = ready_to_shoot(take_film)
-    sid = item(store, conn, 'shoot')
+    store, conn = still_to_answer(take_film)
+    sid = item(store, conn, 'still:VS1')
     defects(monkeypatch, {'defect': 7, 'shot': 'VS1'})
-    e = held(lambda: CF.answer(conn, store, USER, NEW, [], sid, 'shoot', 'Yes, shoot it.'))
+    e = held(lambda: CF.answer(conn, store, USER, NEW, [], sid, 'approve', 'Yes, shoot it.'))
     assert e.extra['holds'] == {'shot': 'VS1'} and 'holds shot VS1 only' in e.message and videos(conn) == []   # nothing paid
     defects(monkeypatch, *OTHERS)
-    CF.answer(conn, store, USER, NEW, [], sid, 'shoot', 'Yes, shoot it.')
+    CF.answer(conn, store, USER, NEW, [], sid, 'approve', 'Yes, shoot it.')
     assert len(videos(conn)) == 1
 
 

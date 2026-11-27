@@ -484,7 +484,15 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         parts = {'the colour key': len(how), 'the layout block': len(block), 'your words': len(words)}
     need(len(effective) <= still['max_prompt'], TOO_LONG_PROMPT.format(n=len(effective), max=still['max_prompt'], shot=shot_id,
                                                                     parts=', '.join(f'{k} {v:,}' for k, v in parts.items()), rest=len(effective) - sum(parts.values())))
-    VS.check_cap(conn, run, session, VS.image_price_inr(run, provider='openai'), 'this still')
+    from . import pictures as P   # release 1 of 27 Nov 2026, phase 4 part A rule 6: this order is the one remake of a start still whose check failed
+    retried = next((s for s in g.get('stills') or [] if P.start_retry_due(session, shot_id, g, s)), None)
+    try:
+        VS.check_cap(conn, run, session, VS.image_price_inr(run, provider='openai'), 'this still')
+    except Problem as e:
+        if retried:   # at the cost limit there is no remake: the first picture goes to the operator with the check's finding
+            session.setdefault('still_retries', {})[shot_id] = {'of': retried['id'], 'gave_up': str(getattr(e, 'message', None) or e)}
+            VS.save_session(store, run, session)
+        raise
     still_id = uuid.uuid4().hex
     request = {'kind': 'guide-still', 'op': 'edit', 'provider': 'openai', 'model': still['model'], 'prompt': effective, 'size': still['size'], 'quality': still['quality'],
                'parents': inputs, 'reference': {'id': still_id}, 'shot_id': shot_id, 'sha256': g['sha256'], **({'region': region} if repair_of else {})}
@@ -492,11 +500,15 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
     g.setdefault('stills', []).append({'id': still_id, 'job_id': job_id, 'status': 'generating', 'guide_sha256': g['sha256'], 'prompt': words, 'effective_prompt': effective,
                                        'inputs': [{'id': i['id'], 'job': j} for i, j in zip(inputs[1 + len(sheets):], jobs_)], **({'look': look} if look and not repair_of else {}), **({'repair_of': repair_of, 'region': region} if repair_of else {}),
                                        'model': still['model'], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
+    if retried:   # counted once for the shot; the first picture stays in the record as the earlier try
+        lines_ = ' '.join(P._failed_lines(retried))
+        session.setdefault('still_retries', {})[shot_id] = {'of': retried['id'], 'by': still_id, 'lines': lines_, 'at': now()}
+        retried.update(status='rejected', rejection={'notes': f"Made again once by itself: Claude's check failed: {lines_}", 'quote': '', 'by': 'server', 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'still repair asked' if repair_of else 'still asked', 'still_id': still_id, 'model': still['model'], 'prompt': effective,
                                                     'inputs': [i['id'] for i in inputs], **({'repair_of': repair_of, 'region': region} if repair_of else {}), 'by': user['id'], 'by_name': user.get('name') or ''})
     return {'shot_id': shot_id, 'still_id': still_id, 'job_id': job_id, 'model': still['model'],
-            'next': f'The still is being made. Then look at the overlay (`vw guide status --shot {shot_id}`) and approve or repair it.'}
+            'next': 'The still is being made. Claude checks it first; then the server puts it to the operator on a card (`vw visuals next`).'}
 
 
 def _still(g, still_id):
@@ -505,8 +517,20 @@ def _still(g, still_id):
     return s
 
 
-def approve_still(conn, store, user, run, outputs, shot_id, still_id, sha256, quote):
-    """The operator approves the exact file, on the overlay. One approved still per guide."""
+SHOOT_ON_APPROVAL = ("The picture is approved and its take is paid for on this answer: the server orders it as soon as the take's words and the shot's video of "
+                     "positions are both there. Write the take's words now (`vw guide prompt --shot {shot} --file …`), then run `vw visuals next`.")
+SHOOT_LATER = ("The picture is approved. No take is ordered: the operator said not yet. Write the take's words meanwhile (`vw guide prompt --shot {shot} --file …`); "
+               'when the operator says so, order the take with their words: `vw guide shoot --shot {shot} --quote "…"`.')
+SHOOT_REFUSED = '{name} ({shot}): its take was not ordered: {words} When that is settled, order it with the operator\'s words: `vw guide shoot --shot {shot} --quote "…"`.'
+SHOOT_WAITS = '{name} ({shot}): its picture is approved and everything for its take is ready, but the operator said not yet. On their word: `vw guide shoot --shot {shot} --quote "…"`.'
+
+
+def approve_still(conn, store, user, run, outputs, shot_id, still_id, sha256, quote, shoot=False):
+    """The operator approves the exact file. One approved still per guide. Release 1 of 27 Nov 2026, phase 4 part B (SK: one approving button):
+    with `shoot` the approval is also the operator's word for the paid first take (the price is on the card they answered): `order_due` orders it
+    when the take's words and the layout video both exist. Without it (a typed "not yet", the page, the tool) the still alone is approved.
+    Part A: nobody approves on the overlay any more; it stays required, as the input of Claude's check.
+    Retired: the separate Shoot card of a first take, and "it is approved on its overlay"."""
     VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
@@ -514,15 +538,59 @@ def approve_still(conn, store, user, run, outputs, shot_id, still_id, sha256, qu
     need(s.get('status') in ('candidate', 'approved') and s.get('key'), 'Approve a finished still.')
     if s.get('sha256') != sha256:
         raise Problem(409, 'REFERENCE_MISMATCH', 'The still changed since it was looked at; look at the current file and approve that.')
-    need(s.get('overlay_key'), 'This still has no overlay yet; it is approved on its overlay.')
+    need(s.get('overlay_key'), 'This still is not ready yet: its check has not got its files. Run `vw guide status` and try again.')
     need(s.get('guide_sha256') == g['sha256'], 'The scene changed since this still was made; make the still again from the current guide.')
     for other in g['stills']:
         if other is not s and other.get('status') == 'approved':
             other['status'] = 'superseded'
-    s.update(status='approved', approval={'by': user['id'], 'by_name': user.get('name') or '', 'at': now(), 'sha256': sha256, 'quote': VS.said(quote, 'Approved', user)})
+    s.update(status='approved', approval={'by': user['id'], 'by_name': user.get('name') or '', 'at': now(), 'sha256': sha256, 'quote': VS.said(quote, 'Approved', user), **({'shoot': True} if shoot else {})})
     VS.save_session(store, run, session)
-    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'still approved', 'still_id': still_id, 'sha256': sha256, 'quote': s['approval']['quote'], 'by': user['id'], 'by_name': user.get('name') or ''})
-    return {'shot_id': shot_id, 'still_id': still_id, 'status': 'approved', 'next': f'Write the take\'s words (`vw guide prompt --shot {shot_id} --file …`), then the operator says Shoot.'}
+    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'still approved', 'still_id': still_id, 'sha256': sha256, 'quote': s['approval']['quote'], 'by': user['id'], 'by_name': user.get('name') or '',
+                                                    **({'take': 'paid for on this answer'} if shoot else {})})
+    return {'shot_id': shot_id, 'still_id': still_id, 'status': 'approved', 'next': (SHOOT_ON_APPROVAL if shoot else SHOOT_LATER).format(shot=shot_id)}
+
+
+def _shoot_stamp(g, still):
+    """The state of a shot a take is ordered for: its approved still, its words and its layout video. An order is tried once for each."""
+    return '|'.join(str(x) for x in (still.get('sha256'), (g.get('take_prompt') or {}).get('at') or (g.get('take_prompt') or {}).get('prompt'), (g.get('render') or {}).get('sha256')))
+
+
+def shoot_state(session, shot_id):
+    """Part B: where a shot's first take stands once everything for it exists: None (not ready, a take was already sent, or a take is selected),
+    else ('order', stamp): to be ordered now on the operator's approval; ('refused', words): the order was refused, in the refusal's words;
+    ('later', ''): the operator approved the picture and said not yet."""
+    g = (session.get('guides') or {}).get(shot_id) or {}
+    if not g or g.get('takes') or shot_id in (session.get('selections') or {}) or not ready_card(session, shot_id, 0)['ready']:
+        return None
+    still = next(s for s in g['stills'] if s.get('status') == 'approved' and s.get('guide_sha256') == g['sha256'])
+    if not (still.get('approval') or {}).get('shoot'):
+        return 'later', ''
+    stamp, tried = _shoot_stamp(g, still), g.get('auto_shoot') or {}
+    return ('refused', tried.get('refused') or '') if tried.get('stamp') == stamp else ('order', stamp)
+
+
+def order_due(conn, store, user, run, outputs):
+    """Part B, rule 2: the first take of every shot whose picture the operator approved with "Approve and shoot", ordered by the server once the
+    take's words and the layout video both exist, whichever came last, with the operator's words on the still as the word for the paid call
+    (`shoot`: its cost limit and every other gate as before). A refusal keeps the approval and is never silent: its words are kept on the shot and
+    said in the next-step line (`takes.render_due`); the order is tried once for each state of the shot. Called where the chat fetches its next
+    step. Returns the shots it ordered."""
+    session, sent = VS.session_of(store, run, outputs), []
+    for shot_id in list(session.get('guides') or {}):
+        state = shoot_state(session, shot_id)
+        if not state or state[0] != 'order':
+            continue
+        still = next(s for s in session['guides'][shot_id]['stills'] if s.get('status') == 'approved' and s.get('guide_sha256') == session['guides'][shot_id]['sha256'])
+        refused = None
+        try:
+            shoot(conn, store, user, run, outputs, shot_id, still['approval']['quote'])
+            sent.append(shot_id)
+        except (Problem, ValueError) as e:
+            refused = str(getattr(e, 'message', None) or e)
+        session = VS.session_of(store, run, outputs)   # `shoot` saved its own
+        session['guides'][shot_id]['auto_shoot'] = {'stamp': state[1], 'at': now(), **({'refused': refused} if refused else {})}
+        VS.save_session(store, run, session)
+    return sent
 
 
 def reject_still(conn, store, user, run, outputs, shot_id, still_id, notes, quote):
@@ -575,7 +643,7 @@ def effective_prompt(g, words):
 
 
 def set_prompt(conn, store, user, run, outputs, shot_id, prompt):
-    """The writer's words for the take, kept until the operator says Shoot. Refused when it carries what the tests showed to fail."""
+    """The writer's words for the take, kept until the take is ordered. Refused when it carries what the tests showed to fail."""
     VS.need_free(conn, store, run, [shot_id])   # the critic's point 1 on release 3: an open defect on this shot, or on the drawing it continues from, holds it on every path
     session = VS.session_of(store, run, outputs)
     g = entry_of(session, shot_id)
@@ -587,7 +655,8 @@ def set_prompt(conn, store, user, run, outputs, shot_id, prompt):
     need('ONE action only' in words, 'Open the action paragraph with "ONE action only:" and give a second on every move, repeating the guide\'s own times.')
     g['take_prompt'] = {'prompt': words, 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
     VS.save_session(store, run, session)
-    return {'shot_id': shot_id, 'words': len(words.split()), 'prompt': effective_prompt(g, words), 'next': 'Show the operator the ready-to-shoot card; the take is paid for only on their word (`vw guide shoot`).'}
+    return {'shot_id': shot_id, 'words': len(words.split()), 'prompt': effective_prompt(g, words),
+            'next': 'Run `vw visuals next`: the server orders the take itself when the operator approved the picture with "Approve and shoot"; no card asks for it.'}
 
 
 def ready_card(session, shot_id, price_per_s):
@@ -601,7 +670,7 @@ def ready_card(session, shot_id, price_per_s):
     return {'shot_id': shot_id, 'ready': not missing, 'missing': missing, 'seconds': g['seconds'], 'cost_inr': round(g['seconds'] * price_per_s, 2),
             'guide_key': (g.get('render') or {}).get('guide_key'), 'strip_key': (g.get('frames') or {}).get('strip_key'), 'still': still,
             'prompt': effective_prompt(g, g['take_prompt']['prompt']) if g.get('take_prompt') else None, 'warnings': warnings,
-            'look_for': 'On the overlay: every person and thing of the still sits on the red outlines of the guide.' + (' Before you pay: ' + ' '.join(warnings) if warnings else '')}
+            'look_for': 'Before you pay: ' + ' '.join(warnings) if warnings else ''}   # phase 4 part A: no word about the overlay or its outlines
 
 
 def take_price():
@@ -750,13 +819,14 @@ def status(conn, store, run, outputs, shot_id):
     elif not r['frame1_url']:   # release 4: the first frame is what the still waits for (until then: the whole render)
         nxt = render_line(shot_id, g)
     elif card['ready']:
-        nxt = f"Ready to shoot: show the operator the card ({card['seconds']} s, about {card['cost_inr']:.0f} rupees). On their word: `vw guide shoot --shot {shot_id} --quote \"…\"`."
+        nxt = (f"Everything for the take is ready ({card['seconds']} s, about {card['cost_inr']:.0f} rupees). The server orders it on the operator's approval of the picture: "   # phase 4 part B
+               f"run `vw visuals next`. When they approved the picture and said not yet, on their word: `vw guide shoot --shot {shot_id} --quote \"…\"`.")
     else:   # release 4: the first frame is ready: the still goes on while the video renders; the two are said apart
         rest = [m for m in card['missing'] if m != 'the rendered guide']
         ordered = any(s.get('guide_sha256') == g['sha256'] and s.get('status') in ('generating', 'candidate', 'approved') for s in g.get('stills') or [])
         nxt = ' '.join(x for x in ((f'First frame ready: the still can be ordered (`vw guide still --shot {shot_id} --file …`).' if not ordered
                                     else 'Still missing before the take: ' + ', '.join(rest) + '.' if rest
-                                    else 'Everything else for the take is ready: the word to shoot is asked when the layout video is ready.'), render_line(shot_id, g)) if x)
+                                    else 'Everything else for the take is ready: the server orders the take when the layout video is ready (`vw visuals next`).'), render_line(shot_id, g)) if x)
     d = g.get('drawing') or {}
     if d.get('status') == 'rejected' and d.get('sha256') == g.get('sha256'):   # a correction of the older way (until 25 Nov 2026): the scene changes first, whatever else is ready
         nxt = CORRECTED.format(shot=shot_id, words=(d.get('verdict') or {}).get('notes'))

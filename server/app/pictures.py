@@ -148,6 +148,9 @@ W = {
     'later_step': 'Made from a step that was corrected.',
     'still_failed': ("{name} ({ref}), a still, did not pass Claude's check: {lines} Make it again once now, without asking the operator, with a request that fixes "
                      "exactly that (`vw visuals image --shot {shot} --element {element} --kind keyframe …`); it is not shown meanwhile. If the next one fails too, it goes to the operator."),
+    'start_failed': ("{name} ({shot}): the picture that starts the shot did not pass Claude's check: {lines} Make it again once now, without asking the operator, "
+                     "with words that fix exactly that (`vw guide still --shot {shot} …`, or a masked repair of the wrong part); it is not shown meanwhile. "
+                     "If the next one fails too, it goes to the operator."),
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
     'comp_unopened': 'Claude could not open it ({why}).',
@@ -432,6 +435,27 @@ def stills_failed(session, plan):
             for r in session['references'].values() if retry_due(session, r, plan)]
 
 
+def start_retry_due(session, shot_id, g, still):
+    """Release 1 of 27 Nov 2026, phase 4 part A, rule 6 (SK: "yes, once"): the picture that starts an AI video shot is made again once by itself
+    when Claude's check failed a line (the line "on the layout" included; an advice line never counts), before the operator sees anything:
+    phase 2's rule for a still picture (`retry_due`), with the same count (`still_retries`, by shot). Never a second time, never when the check
+    could not run, never on top of a still the operator sent back. Retired: such a still went to the operator at once."""
+    look = looked(still)
+    return bool(still.get('status') == 'candidate' and still.get('guide_sha256') == g.get('sha256') and shot_id not in (session.get('still_retries') or {})
+                and look and not look.get('not_checked') and _failed_lines(still)
+                and not any(s.get('status') == 'rejected' and (s.get('rejection') or {}).get('by') != 'server' for s in g.get('stills') or []))
+
+
+def starts_failed(session, plan):
+    """Part A rule 6: each start still whose first picture failed Claude's check, said plainly with what failed: the assistant makes it again once."""
+    if not plan:
+        return []
+    from . import takes
+    return [W['start_failed'].format(name=takes.name_of(gap, sh, n, of), shot=sh['id'], lines=' '.join(_failed_lines(st)))
+            for gap, sh, n, of in takes.video_shots(plan, session) for g in [(session.get('guides') or {}).get(sh['id']) or {}]
+            for st in g.get('stills') or [] if start_retry_due(session, sh['id'], g, st)]
+
+
 def offered(session, ref, plan=None, now=None):
     """C3: a picture Claude checks is offered with its look recorded, or PICTURE_LOOK_MINUTES after Claude was asked (as not checked).
     A picture the model checked before the deploy, and any other picture: as before. Part D: never while it is made again by itself."""
@@ -459,7 +483,9 @@ def stamp(session, plan):
     return changed
 
 
-START_ON_LAYOUT = ('on the layout', "every person and thing sits where the layout puts it: on the overlay sent with it, on the red outlines of the guide's first frame")
+START_ON_LAYOUT = ('on the layout', "every person and thing sits where the layout puts it: on the overlay sent with it, on the red outlines of the guide's first frame. "
+                   "Write what you see in words about the people and things of the picture (who stands where, what is missing): the operator reads it and never sees "
+                   "the outlines, the overlay or the layout")   # release 1 of 27 Nov 2026, phase 4 part A: the still's card shows the still alone
 
 
 START_WHO = ('who and what', 'each person, thing and place in it is the one of the pictures sent as `parent`: the same face, build and clothes, the same object, the same place')   # the critic's point 6
@@ -529,7 +555,7 @@ def waits_words(session, plan):
     Stamps `asked_at` on the pictures it reports (the caller saves the session)."""
     asked(session, plan)
     n = len(due(session, plan)) + len(starts_due(session, plan))   # release 1, A1: with the stills of step 7
-    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + faces_to_ask(session, plan) + components_failed(session, plan) + stills_failed(session, plan))   # release 1, A7: a person of the footage nobody was asked about
+    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + faces_to_ask(session, plan) + components_failed(session, plan) + stills_failed(session, plan) + starts_failed(session, plan))   # release 1, A7: a person of the footage nobody was asked about
 
 
 def _big(store, session, ref_id):
@@ -670,7 +696,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
     left = [r['id'] for r in due(session, plan)] + [x[3]['id'] for x in starts_due(session, plan)]
-    failed = components_failed(session, plan) + stills_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent; phase 2 part D: a failed still too
+    failed = components_failed(session, plan) + stills_failed(session, plan) + starts_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent; phase 2 part D: a failed still too
     return {'recorded': recorded, 'refused': refused, 'left': left, **na_log(na),
             'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE] + failed).strip()}
 

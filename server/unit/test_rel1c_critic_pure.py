@@ -47,12 +47,12 @@ def test_3_a_plan_revision_that_turns_a_shot_with_a_candidate_still_into_another
         s, p = session(), plan(shot('S1', kind, end=100), shot('S2', start=100, end=200), shot('S3', start=200, end=300))
         s['guides'] = {'S1': guide(still='candidate', prompt=False), 'S2': guide(), 'S3': guide()}   # S1's still was made while S1 was an AI video shot: nobody is asked to look at it now
         held(s, p)
-        assert P.starts_due(s, p) == [] and cards(s, p, monkeypatch) == ['shoot:S2', 'shoot:S3'], kind   # no card for S1, and the others' words come
+        assert P.starts_due(s, p) == [] and cards(s, p, monkeypatch) == [], kind   # no card for S1, and the others' words come
     s['guides']['S1'] = guide(still='candidate', prompt=False)
     s['guides']['S1']['stills'][0].pop('sha256')                                                # a still that can never be listed for a look is not waited for either
     p = plan(shot('S1', end=100), shot('S2', start=100, end=200))
     held(s, p)
-    assert cards(s, p, monkeypatch) == ['still:S1', 'shoot:S2'] and states(s, p, [])[0] == ('S1', 'waiting for you in the chat')
+    assert cards(s, p, monkeypatch) == ['still:S1'] and states(s, p, [])[0] == ('S1', 'waiting for you in the chat')
 
 
 # ---------- point 4: the line of what can start now is complete, and never names what the server would refuse ----------
@@ -326,5 +326,7 @@ def test_2_a_step_7_still_shown_not_checked_whose_failing_look_arrives_gets_a_ne
     shown = CF._guide_items(ctx_of(s, p))[0]
     assert 'Not checked' in shown['text']
     s['guides']['S1']['stills'][0]['check_look'] = {'sha256': 's' * 64, 'lines': [{'id': '1', 'check': 'on the layout', 'pass': False, 'seen': 'A step left of the outline.'}]}
+    assert CF._guide_items(ctx_of(s, p)) == []   # release 1 of 27 Nov 2026, phase 4: part A rule 6: a failed check is made again once by itself
+    s['still_retries'] = {'S1': {'of': 'st0', 'by': 'st1'}}   # the remake failed too: it goes to the operator
     again = CF._guide_items(ctx_of(s, p))[0]
     assert again['id'] != shown['id'] and again['id'].startswith('still:S1:st1:') and '1 warning: on the layout' in again['text']   # the chat's answer to the older card finds no such item

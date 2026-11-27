@@ -119,12 +119,13 @@ def test_the_still_is_ordered_as_soon_as_the_first_frame_is_ready_and_shoot_wait
     assert T.status_line(T.expected(s, VS.current_plan(store, s), [])) == 'AI video: 1 waiting for the layout video.'
     assert refused(lambda: GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.')) == RENDERING + NO_TAKE
     assert not any(q['provider'] == 'video' for q in conn.queued)
-    assert nxt(store, conn) == 'Everything else for the take is ready: the word to shoot is asked when the layout video is ready. ' + RENDERING
-    assert due(store).endswith('(VS1): ' + RENDERING + ' Everything else for its take is ready: its word to shoot is asked when the video is ready; go on with the other shots.')
+    assert nxt(store, conn) == 'Everything else for the take is ready: the server orders the take when the layout video is ready (`vw visuals next`). ' + RENDERING
+    assert due(store).endswith('(VS1): ' + RENDERING + ' Everything else for its take is ready: the server orders the take when the video is ready (`vw visuals next`); go on with the other shots.')
     # the video is back: the card, and the take is sent with the whole video
     back(store, 'guide-render')
-    assert R1.state(store) == ['waiting for you in the chat'] and shoot_cards(store, conn) == ['shoot'] and due(store) == ''
-    assert nxt(store, conn).startswith('Ready to shoot') and 'guide' in GD.status(conn, store, NEW, [], 'VS1')['files']
+    # release 1 of 27 Nov 2026, phase 4 part B: no Shoot card; this still was approved without the word for the take (the tool): the line says it waits for that word
+    assert R1.state(store) == ['waiting for you in the chat'] and shoot_cards(store, conn) == [] and due(store).endswith('but the operator said not yet. On their word: `vw guide shoot --shot VS1 --quote "…"`.')
+    assert nxt(store, conn).startswith('Everything for the take is ready (10 s, about 30 rupees).') and 'guide' in GD.status(conn, store, NEW, [], 'VS1')['files']
     GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Yes, shoot it.')
     snap = json.loads(store.files[conn.queued[-1]['request']['request_key']])
     assert snap['guide'] == {'key': base(store) + '/guide.mp4', 'sha256': 'sha-guide', 'seconds': 10, 'scene_sha256': g['sha256']}   # what the take uploads and its checks read
@@ -165,7 +166,7 @@ def test_a_video_that_fails_after_the_still_is_approved_reads_waiting_with_the_e
     g = saved(store)['guides']['VS1']
     assert g['render']['status'] == 'queued' and 'error' not in g['render'] and g['stills'][0]['status'] == 'approved' and g.get('take_prompt')   # nothing else is lost
     back(store, 'guide-render')
-    assert shoot_cards(store, conn) == ['shoot']
+    assert shoot_cards(store, conn) == [] and GD.shoot_state(saved(store), 'VS1') == ('later', '')
 
 
 def test_a_failed_video_before_any_still_keeps_the_still_open(take_film):
