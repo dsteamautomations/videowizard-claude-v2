@@ -38,14 +38,14 @@ def test_every_other_category_reads_the_general_rules(category, monkeypatch):
     assert 'worn, held or at work' in use['ask'] and 'no face' not in use['ask']
     checks = {l['check']: l['pass_when'] for l in r['lines']}
     assert 'no person' not in checks and 'in use' in checks['the thing is the subject']
-    assert 'No text, caption, lettering, logo or mark except what the description names' in p and RS.ONE_THING in p   # what is general stays (VW-25 issue 12: "caption" is said here, once)
+    assert 'No text, lettering, logo or mark except what the description names' in p and RS.ONE_THING in p   # what is general stays
 
 
 def test_a_material_and_a_person_keep_their_rules_in_every_category(monkeypatch):
     brick = request('BRICK', 'advertisement-product', monkeypatch)
     assert RS.MAY_SHOW['material'] in brick['prompt'] and any(l['check'] == 'no person' for l in brick['lines'])
     mason = request('MASON', 'advertisement-product', monkeypatch)
-    assert mason['prompt'].startswith(RS.PERSON_OPENING + '\n') and 'sheet' not in mason['prompt'].split('\n')[0]   # VW-25 issue 12: the older opening line, with the name, is retired
+    assert mason['prompt'].startswith('Reference set of The mason, a person in this film.') and 'sheet' not in mason['prompt'].split('\n')[0]
 
 
 def test_the_looker_is_told_what_may_be_shown_by_the_films_category():
