@@ -111,3 +111,14 @@ def test_a_correction_whose_spec_did_not_change_keeps_waiting():
 def test_the_correction_no_longer_promises_a_second_approval():
     out = VS.correct_spec(spec_store(), USER, RUN, [], 'DG1', SAID)
     assert 'then you approve it' not in out['next'] and 'recorded as approved with your words' in out['next']
+
+
+def test_the_plan_change_itself_records_the_revision_and_keeps_a_faulty_one_with_the_assistant():
+    from test_visuals_stage_pure import g
+    for change, good in ((cavity, True), (lambda spec: spec['dimensions'][1].update(tried=''), False)):
+        store = spec_store()
+        VS.correct_spec(store, USER, RUN, [], 'DG1', SAID)
+        s, _, new = plans(store, change)
+        out = g(lambda: VS.guarded(lambda: VS.new_version(store, RUN, s, new, USER, [], '')))
+        assert [r['key'] for r in out['spec_revised']] == (['DG1'] if good else []) and bool((s['spec_corrections'].get('DG1') or {}).get('fault')) is not good
+

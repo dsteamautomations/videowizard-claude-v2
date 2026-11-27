@@ -1781,10 +1781,13 @@ def _font_card(ctx):
         run['film'] = F.record(conn, ctx['user'], run, 'font', name, name, scripts=set(scripts) | {'latin'})   # the click is the operator's word: the font's name
         return {'recorded': True, 'tell': f'Font: {name}. Every drawn graphic of this film uses it.'}
     buttons = [_button(n + (' (recommended)' if i == 0 else ''), f'f{i + 1}') for i, n in enumerate(names)]
-    return _item('font:choose', 'font', 'the font of the drawn graphics', 'Which font do the drawn graphics of this film use?', run_, buttons[:4], more=buttons[4:],
+    item = _item('font:choose', 'font', 'the font of the drawn graphics', 'Which font do the drawn graphics of this film use?', run_, buttons[:4], more=buttons[4:],
                  text='\n'.join([f"- {f['name']}: {f['character']}" for f in offer] + ['', F.OTHER_FONTS + ' One font for the whole film; it is asked once.']
                                 + ([] if shown else [font_sample.NOT_AVAILABLE])),
                  show=[{'key': key, 'name': 'font-sample.png'}] if shown else [])
+    item['_typed'] = (f'A typed answer that names one of these fonts is recorded as that font\'s button. Any other typed answer is not recorded: say "{F.OTHER_FONTS}" '
+                      'and show this card again. ')   # no value can be entered: the panel's own "Other" box records nothing here
+    return item
 
 
 def _waiting_items(ctx):
@@ -2321,8 +2324,9 @@ def _public(item, summary, n_waiting, one=False):
                    + 'Post `message` as your own text, exactly as it is laid out (its heading, its lines, its totals); add nothing to it. '
                    + 'Then ask with the question tool: the question is `ask` and nothing else (never the text of `message` again); each button is an option with its `label` and its '
                    + '`description`, in this order, and no others. The panel adds "Other" by itself: it is the operator\'s box for typing. '
-                   + (f"A typed answer that asks for a change is recorded as `--choice {typed}` with their words as `--notes`, at once, without a further question; " if typed else 'A typed answer is recorded with their words as `--quote`; ')
-                   + 'a typed answer that plainly accepts is recorded as the accepting button. '
+                   + (f"A typed answer that asks for a change is recorded as `--choice {typed}` with their words as `--notes`, at once, without a further question; " if typed else item['_typed'] if item.get('_typed') else 'A typed answer is recorded with their words as `--quote`; ')
+                   + ('' if item.get('_typed') else 'a typed answer that plainly accepts is recorded as the accepting button. ')
+                   +
                    f"Record the reply: `vw visuals decide{' --one' if one else ''} --item {item['id']} --choice <the button's choice> --quote \"<their words>\"` (`--notes` for what to change). Say nothing about what you did."}
 
 

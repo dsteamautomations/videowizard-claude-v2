@@ -41,6 +41,17 @@ def test_the_card_comes_before_the_first_brief_with_one_button_for_each_font_the
     assert item['show'] == [{'key': item['show'][0]['key'], 'name': 'font-sample.png'}] and store.files[item['show'][0]['key']] == b'\x89PNGfonts'
 
 
+def test_a_typed_answer_is_not_recorded_the_card_says_what_to_say():
+    store = motion_store()
+    how = C._public(card(store), '', 1)['how']
+    assert 'Any other typed answer is not recorded: say "Other fonts are not available." and show this card again.' in how
+    assert 'A typed answer is recorded with their words' not in how and 'plainly accepts' not in how
+    conn = FakeConn([])
+    C.next_item(conn, store, USER, NO_FONT, [])   # the card is handed out
+    with pytest.raises((Problem, ValueError), match='Not an answer to this item'):
+        g(lambda: C.answer(conn, store, USER, NO_FONT, [], 'font:choose', 'Onest', quote='Onest'))
+
+
 def test_the_sample_is_made_once_and_a_card_without_it_says_so(picture, monkeypatch):
     store = motion_store()
     card(store), card(store)
