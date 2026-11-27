@@ -316,6 +316,9 @@ def process_image(job):
                 result, error = refusal(r, req)
                 if getattr(r, '_body', None) and (r._body.get('error') or {}).get('type') == 'no_image':   # design/120: Gemini answered in words, not a picture
                     result, error = {**result, 'failure': 'no_image'}, f"{_who(req)} returned no picture: {(r._body.get('error') or {}).get('message')}"
+                silent = result.get('failure') == 'no_image' and not str(((getattr(r, '_body', None) or {}).get('error') or {}).get('message') or '').strip()   # neither a picture nor a word: not a refusal
+                if silent and (job.get('attempt') or 1) < 2:   # release 1 of 27 Nov 2026, phase 2 part D rule 4 (SK: "keep it"); a request the service rejects would fail the same way again
+                    return 'queued', result, error + ONCE_MORE, None, 1   # not a refusal: sent once more by itself; a refusal is never sent again unchanged
                 return 'failed', result, error, None, None
             durable(raw_path, r.content)
         body = json.loads(raw_path.read_text(encoding='utf-8'))
@@ -370,6 +373,9 @@ def process_image(job):
         if dispatched:
             return 'submission_unknown', {'phase': 'generate'}, f'Outcome unknown after dispatch ({exc.__class__.__name__}).', None, None
         return 'failed', {'phase': 'prepare'}, (exc.message if isinstance(exc, Problem) else f'{exc.__class__.__name__}: {exc}'), None, None
+
+
+ONCE_MORE = ' It could not be made; sent once more by itself in 1 min.'
 
 
 def refusal(r, req=None):

@@ -30,30 +30,15 @@ YARD = {'id': 'YARD', 'name': 'The yard', 'kind': 'place', 'identity': 'exact', 
 SIGNS = [{'what': 'mortar droppings', 'landmark_id': 'L1'}, {'what': 'a stack of offcuts', 'landmark_id': 'L1'}, {'what': 'footprints in the dust', 'landmark_id': 'L1'}]
 
 
-def test_a_place_shown_in_a_scene_needs_two_signs_of_use_at_its_landmarks():
+def test_a_place_shown_in_a_scene_needs_no_signs_of_use():
+    """Release 1 of 27 Nov 2026, phase 2 part B (SK): until then two or more were required, each at a landmark, and the server wrote two per
+    shot in turn (`signs_lines`); retired, see test_rel6b_signs_pure."""
     d = doc_with(rich(), pshot('VS2', 500, 1000, 'video'))
     d['elements'].append(dict(YARD))
     d['gaps'][0]['scenes'][0]['shots'][0]['element_ids'].append('YARD')
-    with pytest.raises(ValueError, match='YARD is a place the film shows: give signs_of_use, two or more'):
-        check(d)
-    d['elements'][-1]['signs_of_use'] = [SIGNS[0], {'what': 'a bucket', 'landmark_id': 'L9'}]
-    with pytest.raises(ValueError, match='L9 is not a landmark of a scene that shows YARD'):
-        check(d)
+    check(d)
     d['elements'][-1]['signs_of_use'] = SIGNS[:2]
     check(d)
-
-
-def test_two_signs_per_shot_in_turn_and_the_same_pair_for_the_same_shot():
-    d = doc_with(rich(), pshot('VS2', 500, 1000, 'video'))
-    d['elements'].append({**YARD, 'signs_of_use': SIGNS})
-    scene = d['gaps'][0]['scenes'][0]
-    for sh in scene['shots']:
-        sh['element_ids'] = sh['element_ids'] + ['YARD']
-    sess = {}
-    assert VS.signs_lines(sess, d, scene, scene['shots'][0], 'E1') == ['Signs of use: mortar droppings at the table; a stack of offcuts at the table.']
-    assert VS.signs_lines(sess, d, scene, scene['shots'][1], 'E1') == ['Signs of use: footprints in the dust at the table; mortar droppings at the table.']   # the next pair, never the one before
-    assert VS.signs_lines(sess, d, scene, scene['shots'][0], 'E1') == ['Signs of use: mortar droppings at the table; a stack of offcuts at the table.']   # the same shot keeps its pair
-    assert VS.signs_lines({}, d, scene, {**scene['shots'][0], 'element_ids': ['E1']}, 'E1') == []   # no place in frame
     assert VS._place_in(d, 'YARD', {'element_ids': []}) and not VS._place_in(d, 'E1', {'element_ids': ['BRICK']})
 
 
@@ -78,7 +63,6 @@ def test_a_keyframe_prompt_carries_the_real_light_line_and_the_lines_ride_on_the
     row = saved(gstore)['references'][out['reference_id']]
     assert 'Real light, as the footage has it: natural look.' in row['generation']['prompt']
     assert 'occupied' not in {l['check'] for l in row['server_checklist']}   # no place in that shot
-    assert VS.OCCUPIED['weight'] == 'must' and 'occupied or in use' in VS.OCCUPIED['pass_when']
 
 
 def test_the_measured_light_line_is_a_must_now(monkeypatch):

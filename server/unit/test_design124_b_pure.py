@@ -136,8 +136,7 @@ def test_a_place_staged_clean_needs_no_signs_of_use_and_gets_the_clean_line():
     d = base()
     d['elements'].append({'id': 'FLAT', 'name': 'The new flat', 'kind': 'place', 'identity': 'exact', 'requirements': 'the handed-over flat'})
     d['gaps'][0]['scenes'][0]['shots'][1]['element_ids'].append('FLAT')
-    with pytest.raises(ValueError, match='FLAT is a place the film shows: give signs_of_use'):
-        check(d)
+    check(d)   # release 1 of 27 Nov 2026, phase 2 part B: a place with no signs of use is accepted (until then refused)
     d['elements'][-1]['staged_clean'] = 'the film shows the flat at handover, spotless'
     out, _ = check(d)
     assert out['elements'][-1]['staged_clean'].startswith('the film shows')
@@ -146,7 +145,7 @@ def test_a_place_staged_clean_needs_no_signs_of_use_and_gets_the_clean_line():
     d['elements'][-1].pop('staged_clean')
     d['elements'][-1]['signs_of_use'] = [{'what': 'a bucket', 'landmark_id': 'L1'}, {'what': 'a broom', 'landmark_id': 'L1'}]
     out, _ = check(d)
-    assert VS.place_line(out, 'FLAT', out['gaps'][0]['scenes'][0]['shots'][1]) == VS.OCCUPIED
+    assert VS.place_line(out, 'FLAT', out['gaps'][0]['scenes'][0]['shots'][1]) is None   # part B: no "occupied" must line any more
     assert 'staged_clean' not in out['elements'][-1]   # absent stays absent
 
 

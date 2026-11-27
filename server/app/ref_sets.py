@@ -703,7 +703,7 @@ def set_request(plan, run, session, element, row):
         views = [{**v, 'ask': USE_ANY.format(name=name)} if v['name'] == THING[1]['name'] else v for v in views]
     sizes = [] if element.get('material_spec') else _sizes(element)   # the material spec carries its own
     material = ' '.join(V.material_sentence(m) for m in V.materials_of(plan, eid) if V.material_approved(session, m))
-    signs = [] if kind != 'place' or str(element.get('staged_clean') or '').strip() else [s for s in facts['signs'] if s][:2]
+    signs = []   # release 1 of 27 Nov 2026, phase 2 part B (SK: "Without"): a place's set shows the place itself; until then its first two signs of use
     drawn = _drawn_facts(session, eid) if sheets else []
     words = lambda label, text: [f'{label}: {_plain_words(element, text)}'] if str(text).strip() else []
     order = _authority(operator or kept, added, footage, sheets, kind != 'person')
@@ -815,14 +815,35 @@ def footage_person(session, plan, eid):
     """design/213: a person the footage shows: {'faces': the kept footage frames whose look says they show the face, the best first (a
     look that passes before a weak one, then the view order), 'child': a look says the person is a child, 'state'}. 'state': 'permitted'
     or 'stand_in' as recorded (`visuals_stage.likeness`: `session['likeness']`, `session['stand_in']`); 'ask' where a face frame is kept
-    and neither is recorded yet; None for a thing that is not a person, and for a person with no face frame and nothing recorded."""
+    and neither is recorded yet; None for a thing that is not a person, and for a person with no face frame and nothing recorded.
+    Release 1 of 27 Nov 2026, phase 2 part A (SK): 'ask' also for a real person (one who speaks in the film) the footage never shows, when a made shot shows them.
+    Retired: a real person with no face picture gets no question."""
     if (_element(plan, eid) or {}).get('kind') != 'person':
         return {'faces': [], 'child': False, 'state': None}
+    real = bool(_element(plan, eid).get('speaker')) and any(eid in (sh.get('element_ids') or []) and sh.get('visual_type') != 'footage'   # only where a picture is made of them
+                                                            for gap in plan.get('gaps') or [] for sc in all_scenes(gap) for sh in sc.get('shots') or [])
     faces = ref_find.faces_of(session, eid)
     refs = session.get('references') or {}
     child = any(((refs.get(f['ref']) or {}).get('look') or {}).get('child') is True for f in ref_find.frames_of(session, eid))
-    state = 'permitted' if V.likeness_of(session, eid) else 'stand_in' if (session.get('stand_in') or {}).get(eid) else 'ask' if faces else None
+    state = 'permitted' if V.likeness_of(session, eid) else 'stand_in' if (session.get('stand_in') or {}).get(eid) else 'ask' if faces or real else None
     return {'faces': faces, 'child': child, 'state': state}
+
+
+PERMISSION_FIRST = ('{name} ({eid}) is a real person and the operator has not answered yet: their permission, or a stand-in. The set is ordered after the answer '
+                    '(`vw visuals likeness --element {eid} --quote "<their words>"`; for a stand-in add `--stand-in`).')
+PEOPLE_WAIT = "{n} real {people} for the operator's answer (their permission, or a stand-in): {names}. No set of theirs is ordered before. Each answer is recorded in the operator's words: `vw visuals likeness --element <id> --quote \"<their words>\"` (a stand-in: add `--stand-in`)."
+
+
+def permission_waits(session, plan):
+    """Part A: the people whose answer is still missing (the permission, or a stand-in): no set of theirs is ordered before it
+    (`visuals_stage._queue_sets`)."""
+    return [e for e in (plan or {}).get('elements') or [] if footage_person(session, plan, e['id'])['state'] == 'ask']
+
+
+def people_wait(session, plan):
+    """Part A: the sentence the status and the next-step line say each time while a person's answer is missing; '' when none is."""
+    waits = permission_waits(session, plan)
+    return PEOPLE_WAIT.format(n=len(waits), people='person waits' if len(waits) == 1 else 'people wait', names=', '.join(e.get('name') or e['id'] for e in waits)) if waits else ''
 
 
 def footage_beside(session, element, inputs):

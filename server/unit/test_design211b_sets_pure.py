@@ -191,15 +191,10 @@ def test_each_thing_is_placed_in_the_scene_of_its_own_first_shot_never_the_films
     assert nowhere['parts']['place'] == '' and f'Setting: {RS.NO_PLACE}' in nowhere['prompt'] and first not in nowhere['prompt']
 
 
-def test_a_place_gets_its_first_two_signs_of_use_unless_it_is_staged_clean():
+def test_a_places_set_is_made_without_signs_of_use():
+    """Release 1 of 27 Nov 2026, phase 2 part B (SK: "Without"); until then its first two signs, unless staged clean."""
     r = request('STREET')
-    assert r['parts']['signs'] == ['tyre tracks in the sand', 'a bicycle against the wall'] and 'Signs of use: tyre tracks in the sand; a bicycle against the wall.' in r['prompt']
-    plan = F.plan()
-    el('STREET', plan)['signs_of_use'].append({'landmark_id': 'gate', 'what': 'a third trace'})
-    assert request('STREET', plan=plan)['parts']['signs'] == ['tyre tracks in the sand', 'a bicycle against the wall']
-    el('STREET', plan)['staged_clean'] = 'shown at the handover'
-    clean = request('STREET', plan=plan)
-    assert clean['parts']['signs'] == [] and 'Signs of use' not in clean['prompt']
+    assert r['parts']['signs'] == [] and 'Signs of use' not in r['prompt']
     assert request('T_LAY')['parts']['signs'] == []
 
 

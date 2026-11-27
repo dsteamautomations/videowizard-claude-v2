@@ -54,7 +54,8 @@ def world_session(studio=''):
     doc['elements'].append({'id': 'E2', 'name': 'Burnt brick', 'kind': 'object', 'identity': 'representative', 'requirements': 'a burnt brick'})
     if studio:
         doc['foundation']['studio_background'] = studio
-    return doc, session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc))
+    return doc, session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                        round={'elements': {}})   # release 1, phase 2 part C: the round lists nothing here, so no reference holds the still
 
 
 def test_a_picture_in_the_film_is_in_its_world_unless_the_treatment_allows_a_studio(monkeypatch):

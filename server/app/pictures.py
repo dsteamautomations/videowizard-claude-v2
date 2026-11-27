@@ -79,6 +79,8 @@ W = {
     'face_when': 'no face that matches a real person in the footage pictures sent as references',
     'face_ok': ', other than {names}, whom the operator has permitted the film to show: a match with {names} is not a fault',
     'face_made': "; a face that matches the film's own made references is never a fault",
+    'person_ask': ('{name} ({eid}) is a real person who speaks in the film, a made picture shows them, and the operator has not been asked: ask the operator once whether '
+                   'they have this person\'s permission, and record their words (`vw visuals likeness --element {eid} --quote "<their words>"`; for a stand-in: add `--stand-in`).'),
     'face_ask': ('{name} ({eid}) is a person of the footage, a made picture shows them, and the operator has not been asked: ask the operator once whether made pictures may '
                  'show this person, and record their words (`vw visuals likeness --element {eid} --quote "<their words>"`; for No: add `--stand-in`). Until then a face '
                  'that matches them is a warning.'),
@@ -113,6 +115,7 @@ W = {
     'parent_card': 'Another picture is made from this one, so it is asked now, before the page. Yes also allows it as the parent of new pictures.',
     'parent_card_failed': ("Another picture is made from this one, so it is asked now, before the page. Claude's check failed a must line ({lines}): Yes approves it all the "
                            'same, and also allows it as the parent of new pictures.'),
+    'stills_wait': '{n} still{s} wait{w} for the approved reference{r} of: {names}. {it} ordered when {that} approved; no order is taken before.',
     'supplied_due': ("{n} still shot{s} wait for the operator's own picture: {rows}. Place each now: `vw upload --stage visuals --file in/<name>`, then `vw visuals asset --shot S "
                      "--file in/<name> --kind still --made \"the operator's own picture\" --quote \"<their words>\"`. No picture is made for these shots."),
     'stills_due_one': ('1 still shot has no picture asked for yet ({ids}): order it now, beside the drawn graphics (`vw visuals image --shot S --element E '
@@ -143,6 +146,8 @@ W = {
     'selected_failed': ('{shot}: its comparison with {other} failed after {shot} was selected: {words}. Tell the operator: they reject {shot} on the page or in the chat '
                         'to have it redrawn, or leave it as it is.'),
     'later_step': 'Made from a step that was corrected.',
+    'still_failed': ("{name} ({ref}), a still, did not pass Claude's check: {lines} Make it again once now, without asking the operator, with a request that fixes "
+                     "exactly that (`vw visuals image --shot {shot} --element {element} --kind keyframe …`); it is not shown meanwhile. If the next one fails too, it goes to the operator."),
     'comp_failed': ("{name} ({ref}), a component, did not pass Claude's check: {lines} It stays out of the drawing: make it again with a new request that fixes "
                     'these lines (`vw visuals image --element {element} --kind component …`).'),
     'comp_unopened': 'Claude could not open it ({why}).',
@@ -314,7 +319,8 @@ def faces_to_ask(session, plan):
     line; the stills of those shots are not named for ordering until it is answered (`ask_shots`), the other shots are not held."""
     from . import ref_sets
     people = {eid: name for sh in _made_shots(session, plan) for eid, name in _people(plan, sh).items()}
-    return [W['face_ask'].format(name=name, eid=eid) for eid, name in people.items() if ref_sets.footage_person(session, plan, eid).get('state') == 'ask']
+    asked = {eid: ref_sets.footage_person(session, plan, eid) for eid in people}
+    return [W['face_ask' if asked[eid].get('faces', True) else 'person_ask'].format(name=name, eid=eid) for eid, name in people.items() if asked[eid].get('state') == 'ask']   # phase 2 part A: a real person the footage never shows
 
 
 def _made_shots(session, plan):
@@ -401,11 +407,38 @@ def late(ref, now=None):
     return bool(at) and (now or _now()) - at >= timedelta(minutes=PICTURE_LOOK_MINUTES)
 
 
+def retry_due(session, ref, plan=None):
+    """Release 1 of 27 Nov 2026, phase 2 part D (SK, 6.16): a still's picture that Claude's check failed is made again once before the operator
+    sees anything: True for the first picture of a still shot whose look has a failed line. Never a second time (`still_retries`, written
+    when the remake is ordered or given up), never on top of a picture the operator sent back, never for a look that could not open it.
+    Retired: a still whose check failed waits for the operator before it is made again."""
+    sid = V.made_for(session, ref)
+    if (not sid or ref.get('kind') not in ('keyframe', 'isolated') or ref.get('status') != 'candidate' or ref.get('set') or 'guide_sha256' in ref
+            or not claude_checks(session, ref, plan) or older(ref) or sid in (session.get('still_retries') or {})
+            or ref.get('parent_wanted')):   # another picture was ordered from it: the operator is asked now, as before (fix set 3, A2.2)
+        return False
+    look = looked(ref)
+    if not look or look.get('not_checked') or not _failed_lines(ref):
+        return False
+    if plan is not None and not any(sh['id'] == sid and V.route_of(sh) == 'still' for _, sh in V._accepted_shots(plan, session)):
+        return False
+    return not any(r is not ref and V.made_for(session, r) == sid and r.get('status') == 'rejected' and (r.get('rejection') or {}).get('by') != 'server'
+                   for r in session['references'].values())   # the operator's own correction is the one try
+
+
+def stills_failed(session, plan):
+    """Part D: each still whose first picture failed Claude's check, said plainly with what failed: the assistant makes it again once."""
+    return [W['still_failed'].format(name=name_of(session, plan, r), ref=r['id'], lines=' '.join(_failed_lines(r)), shot=V.made_for(session, r), element=r.get('element_id') or 'E')
+            for r in session['references'].values() if retry_due(session, r, plan)]
+
+
 def offered(session, ref, plan=None, now=None):
     """C3: a picture Claude checks is offered with its look recorded, or PICTURE_LOOK_MINUTES after Claude was asked (as not checked).
-    A picture the model checked before the deploy, and any other picture: as before."""
+    A picture the model checked before the deploy, and any other picture: as before. Part D: never while it is made again by itself."""
     if not claude_checks(session, ref, plan) or older(ref):
         return True
+    if retry_due(session, ref, plan):
+        return False
     return bool(looked(ref)) or late(ref, now)
 
 
@@ -496,7 +529,7 @@ def waits_words(session, plan):
     Stamps `asked_at` on the pictures it reports (the caller saves the session)."""
     asked(session, plan)
     n = len(due(session, plan)) + len(starts_due(session, plan))   # release 1, A1: with the stills of step 7
-    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + faces_to_ask(session, plan) + components_failed(session, plan))   # release 1, A7: a person of the footage nobody was asked about
+    return ' '.join(([LOOKS_DUE.format(n=n)] if n else []) + faces_to_ask(session, plan) + components_failed(session, plan) + stills_failed(session, plan))   # release 1, A7: a person of the footage nobody was asked about
 
 
 def _big(store, session, ref_id):
@@ -637,7 +670,7 @@ def record_looks(store, user, run, outputs, pictures, by, take_rows=None):
             r.update(status='approved', approval={'by': user['id'], 'at': at, 'sha256': r['sha256'], 'quote': COMPONENT_APPROVED})
     V.save_session(store, run, session)
     left = [r['id'] for r in due(session, plan)] + [x[3]['id'] for x in starts_due(session, plan)]
-    failed = components_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent
+    failed = components_failed(session, plan) + stills_failed(session, plan)   # the critic's review (5): a failed component is said, with its lines, never silent; phase 2 part D: a failed still too
     return {'recorded': recorded, 'refused': refused, 'left': left, **na_log(na),
             'then': ' '.join([LOOKS_DUE.format(n=len(left)) if left else LOOKS_NONE] + failed).strip()}
 
@@ -1156,6 +1189,8 @@ def _pictures_state(session, plan, mine, now, need=1):
     if any(r['status'] == 'generating' for r in live):
         return 'redo' if any(r.get('status') in ('rejected', 'failed') for r in mine) else 'making'
     made = [r for r in live if r['status'] == 'candidate' and r.get('sha256')]
+    if any(retry_due(session, r, plan) for r in made):
+        return 'redo'   # phase 2 part D: its check failed: made again once before the operator sees it
     if any(not offered(session, r, plan, now) for r in made):
         return 'checking'
     if live:
@@ -1306,6 +1341,7 @@ def expected(session, plan, take_rows, now=None):
         if not kind:
             continue
         sid, job, due, turn = sh['id'], None, '', ('', '')
+        held = V.refs_waited(session, plan, sh) if kind == 'still' else []
         if sid in (session.get('selections') or {}) or sid in (session.get('assets') or {}):
             state, due = _selected_state(session, plan, sid, take_rows) if kind == 'drawn' and sid in (session.get('selections') or {}) else ('answered', '')   # F12
         elif kind == 'drawn':
@@ -1324,6 +1360,7 @@ def expected(session, plan, take_rows, now=None):
                 turn, due = ('', ''), ' '.join(x for x in (due, wait if turn[0] else '') if x)
         out.append({'kind': kind, 'id': sid, 'name': V.coded(names, sid), 'state': STATE[state], **({'job': job} if job else {}), **({'due': due} if due else {}),
                     **({'supplied': sh['supplied']} if kind == 'still' and sh.get('supplied') else {}),   # release 3 (N4): it waits for the operator's own picture
+                    **({'waits_for': [e.get('name') or e['id'] for e in held]} if held else {}),   # phase 2 part C: the things whose approved reference it waits for
                     **({'turn': turn[0]} if turn[0] else {}), **({'waits_on': turn[1]} if turn[1] else {})})
     names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
     by = {}
@@ -1355,8 +1392,17 @@ def status_line(items):
 def stills_due(items, hold=()):
     """design/221 row 19: the still shots with no picture asked for yet, said in the tool's next-step line until each is ordered.
     The critic's point 10c: `hold` (`ask_shots`): the shots whose person the operator must be asked about first are not named."""
-    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i['id'] not in hold and not i.get('supplied')]
+    ids = [i['id'] for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i['id'] not in hold and not i.get('supplied') and not i.get('waits_for')]   # phase 2 part C: only the stills that are due
     return (W['stills_due_one'] if len(ids) == 1 else W['stills_due']).format(n=len(ids), ids=', '.join(ids)) if ids else ''
+
+
+def stills_wait(items):
+    """Release 1 of 27 Nov 2026, phase 2 part C: the stills that wait for the references of what they show, counted, each thing named once."""
+    rows = [i for i in items if i['kind'] == 'still' and i['state'] == STATE['none'] and i.get('waits_for') and not i.get('supplied')]
+    names = list(dict.fromkeys(n for i in rows for n in i['waits_for']))
+    one, ref1 = len(rows) == 1, len(names) == 1
+    return W['stills_wait'].format(n=len(rows), s='' if one else 's', w='s' if one else '', r='' if ref1 else 's', names=', '.join(names), it='It is' if one else 'They are',
+                                   that='that is' if ref1 else 'those are') if rows else ''
 
 
 def supplied_due(items):

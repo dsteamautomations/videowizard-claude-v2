@@ -446,6 +446,35 @@ def round_close(conn, store, user, run, outputs, quote):
     return {**out, 'tell': (f"{len(out.get('queued') or [])} reference set(s) are now being made, about ₹{out.get('cost_inr', 0):g}. " if out.get('queued') else '') + NOTHING}
 
 
+def _people_card(ctx):
+    """Release 1 of 27 Nov 2026, phase 2 part A (SK): the chat's one card for every person whose answer is missing (`ref_sets.permission_waits`):
+    each with their name, where the film uses them and their face picture where the footage has one; the two answers of before, for all of
+    them at once. Both are recorded through `visuals_stage.likeness`, as the page's line of each person does. None when nobody waits."""
+    from . import ref_sets
+    session, plan, run, conn, store, user, outputs = ctx['session'], ctx['plan'], ctx['run'], ctx['conn'], ctx['store'], ctx['user'], ctx['outputs']
+    waits = ref_sets.permission_waits(session, plan)
+    if not waits:
+        return None
+    where = {**_shot_words(session, plan), '#': _gap_numbers(plan)}
+    rows, pics = [], []
+    for e in waits:
+        shown = ref_sets.footage_person(session, plan, e['id'])
+        face = next((f for f in shown['faces'] if f in session['references']), None)
+        if face:
+            pics.append({'_key': _ref_key(run, face)})
+        rows.append(f"{e.get('name') or e['id']}: " + '; '.join(x for x in (_used(ref_sets.thing_facts(plan, session, e), where), WORDS['people_shown' if face else 'people_none'],
+                                                                    WORDS['people_child'] if shown['child'] else '') if x) + '.')
+
+    def run_(choice, quote, words):
+        V.need(choice == 'standin_all' or words, WORDS['permit_words'])
+        for e in waits:
+            V.likeness(store, user, run, outputs, e['id'], words or quote, conn=conn, stand_in=choice == 'standin_all')
+        return {'stored': [e['id'] for e in waits]}
+    return _v2_item('people:' + '-'.join(e['id'] for e in waits), 'reference', 'References', WORDS['people_title'], WORDS['people_ask'], run_,
+                    [_button(WORDS['permit'], 'permit_all', words=True, tell=WORDS['permit_hint']), _button(WORDS['standin'], 'standin_all')],
+                    {'text': '\n'.join([WORDS['people_head']] + rows), **({'pics': pics} if pics else {})}, _key='refs:people')
+
+
 def _round_items(ctx, every=False):
     """The reference round's questions. The chat asks one at a time and leaves out what is answered or waits on something else. `every`
     (design/210, the page): every thing of step 1, the answered ones too, each answer only kept (the page closes the step once, after the last
@@ -458,7 +487,9 @@ def _round_items(ctx, every=False):
         return []
     step, names, kinds, items = V._round_pass(session, rd), _names(plan), _kinds(plan), []
     if V.round_v2(session):   # design/211: a round made after the references step was rebuilt; an older round runs the code below, unchanged
-        return _round_v2(ctx, every, step)
+        items = _round_v2(ctx, every, step)
+        card = None if every else _people_card(ctx)   # release 1 of 27 Nov 2026, phase 2 part A: the chat asks all the real people on one card, first
+        return ([card] if card else []) + items
     elements = [(eid, row) for eid, row in rd['elements'].items() if eid in kinds]   # what the operator is asked about: the things the plan names
     if step == 1:
         _everything, elements, frames_of, stamps, held = _round1(session, plan)
@@ -834,6 +865,11 @@ WORDS = {
     'loading': 'The pictures of this step are being loaded: {lines}, about {minutes}. This page fills itself: there is no need to reload it.',
     'loading_late': 'This is taking longer than expected. Nothing is lost and the page still fills itself: wait a little longer, or ask the assistant once its turn in the chat has ended.',
     # design/213: a person the footage shows (step 1): the permission is asked, nothing else
+    'likeness_ask_none': 'This person speaks in the film and there is no picture of them. Do you have their permission to make pictures of them?',
+    'say_permit_none': 'I have their permission: "{words}". The set is made from the description, or from their photo when you give one.',
+    'people_ask': 'do you have their permission to make pictures of them?', 'people_title': 'The real people of the film',
+    'people_head': 'These people speak in the film. No set of theirs is made before your answer; the other sets are not held. If the answer differs from person to person, say it for each in your own words.',
+    'people_none': 'there is no picture of them', 'people_shown': 'your footage shows them', 'people_child': 'a child: the permission of a parent or guardian is meant',
     'likeness_ask': 'Your footage shows this person. Do you have their permission to make pictures of them?',
     'likeness_ask_child': 'Your footage shows this person, a child. Do you have the permission of a parent or guardian to make pictures of them?',
     'permit': 'I have their permission',
@@ -1030,10 +1066,11 @@ def _auto(kinds, eid, row, frames, fnd):
 def _auto_held(store, run, session, plan, elements, stamps, held):
     """The step-1 answers kept, with the answer of every thing that needs none (`_auto`) and has none of the operator's: a set is made.
     Nothing is stored for them: the same answer is found again until the step is recorded."""
-    from . import ref_find
+    from . import ref_find, ref_sets
     kinds, found = _kinds(plan), ref_find.found_all(store, run, session, plan)
     auto = {eid: {'verdict': 'approve', 'quote': WORDS['auto_kept'], 'frames': stamps[eid], 'words': '', 'pics': {}, 'auto': True}
-            for eid, row in elements if eid not in held and _auto(kinds, eid, row, ref_find.frames_of(session, eid), found.get(eid))}
+            for eid, row in elements if eid not in held and _auto(kinds, eid, row, ref_find.frames_of(session, eid), found.get(eid))
+            and ref_sets.footage_person(session, plan, eid)['state'] != 'ask'}   # phase 2 part A: a real person is asked first
     return {**auto, **held}
 
 
@@ -1082,9 +1119,9 @@ def _round_v2(ctx, every, step):
             drawn = (session.get('drawings') or {}).get(eid, {}).get('status') == 'approved'
             makes = person or drawn or not (frames or mine)   # as `visuals_stage._from_footage` decides
             closest = None if frames else fnd.get('closest')
-            auto = _auto(kinds, eid, row, frames, fnd)
-            shown = ref_sets.footage_person(session, plan, eid) if person and frames else {}   # design/213: a person whose kept footage picture shows the face: the permission is asked, nothing else
-            permit = shown.get('state') == 'ask'
+            shown = ref_sets.footage_person(session, plan, eid) if person else {}   # design/213: a person whose kept footage picture shows the face: the permission is asked, nothing else
+            permit = shown.get('state') == 'ask'   # release 1 of 27 Nov 2026, phase 2 part A: also a real person the footage never shows
+            auto = _auto(kinds, eid, row, frames, fnd) and not permit
             # what the server records, as before design/212: (its older label, the stored choice, what it does). The stored round keeps these choices.
             opts = [('Have a set made', 'approve', 'set') if makes else ('Use my picture as the reference' if mine else 'Use it as the reference', 'approve', 'footage')]
             if frames and not makes:
@@ -1132,7 +1169,7 @@ def _round_v2(ctx, every, step):
             acts.sort(key=lambda x: not (sug and x[1] == sug and x[0] != WORDS['add_words']))   # the suggested answer first
             tick = {}   # the answers that need a picture kept, with what the click is told when none is
             if permit:
-                case, tick = 'likeness', {'permit': WORDS['tick_set']}
+                case, tick = 'likeness', {'permit': WORDS['tick_set']} if frames else {}
             elif case == 'footage' and not makes:
                 tick = {'use': WORDS['tick_use'], 'set': WORDS['tick_set'], 'fix': WORDS['tick_set']}
             elif case == 'closest' and any(x[1] == 'use' for x in acts):
@@ -1146,7 +1183,7 @@ def _round_v2(ctx, every, step):
                     **({'search': {'text': said, 'why': why}} if not frames and said and not mine else {}),
                     **({'rec': {'do': rec, 'label': tag, 'reason': str(row.get('reason') or ''), **({'choice': sug} if sug else {})}} if rec else {}),
                     **({'warnings': warnings} if warnings else {}), **({'pics': pics} if pics else {}), **({'tick': tick} if tick else {}),
-                    **({'likeness': {'ask': WORDS['likeness_ask_child' if shown.get('child') else 'likeness_ask']}} if permit else {}),
+                    **({'likeness': {'ask': WORDS['likeness_ask_child' if shown.get('child') else 'likeness_ask' if frames else 'likeness_ask_none']}} if permit else {}),
                     **({'differs': WORDS['added'].format(words=row['prompt'])} if frames and row.get('prompt') else {}),   # design/213: where the plan and the footage differ, said openly
                     **({'corrections': ref_sets.corrections_shown(session, plan, eid)} if ref_sets.corrections_shown(session, plan, eid) else {}),   # design/215
                     **({'cost': _cost(f, where)} if can_leave else {}),
@@ -1157,7 +1194,7 @@ def _round_v2(ctx, every, step):
                 if permit and choice in ('permit', 'standin'):   # design/213: recorded through the likeness path both front ends share; a set is made either way
                     V.need(choice == 'standin' or words, WORDS['permit_words'])
                     kept_ = [p['ref'] for p in frames if marks.get(p['ref']) not in ('not', 'off') and not (p['ref'] in start_off and marks.get(p['ref']) != 'on')]
-                    V.need(choice == 'standin' or kept_, WORDS['tick_set'])   # the permission is for the pictures ticked: with none there is nothing to make the set from
+                    V.need(choice == 'standin' or kept_ or not frames, WORDS['tick_set'])   # the permission is for the pictures ticked: with none there is nothing to make the set from
                     V.likeness(store, user, run, outputs, eid, words or quote, conn=conn, stand_in=choice == 'standin')
                     if choice == 'permit':   # design/213 review: the ticks are kept exactly as "Make a set" keeps them: only the ticked frames feed the likeness; the words of permission are not words for the picture
                         again = next(i for i in _round_items(_ctx(conn, store, user, run, outputs), every=True) if i.get('_eid') == eid)
@@ -1211,8 +1248,8 @@ def _round_v2(ctx, every, step):
                 V.save_session(store, run, s)
                 out = None if every else round_close(conn, store, user, run, outputs, quote)
                 return out if out is not None else {'stored': eid}
-            ask = WORDS['likeness_ask_child' if shown.get('child') else 'likeness_ask'] if permit else WORDS['ask_person'] if person else WORDS['ask_set'] if makes else WORDS['ask_mine'] if mine else WORDS['ask_footages' if len(frames) > 1 else 'ask_footage']
-            said = {'permit': (WORDS['say_permit'], WORDS['permit_hint']), 'standin': (WORDS['say_standin1'], '')}
+            ask = WORDS['likeness_ask_child' if shown.get('child') else 'likeness_ask' if frames else 'likeness_ask_none'] if permit else WORDS['ask_person'] if person else WORDS['ask_set'] if makes else WORDS['ask_mine'] if mine else WORDS['ask_footages' if len(frames) > 1 else 'ask_footage']
+            said = {'permit': (WORDS['say_permit' if frames else 'say_permit_none'], WORDS['permit_hint']), 'standin': (WORDS['say_standin1'], '')}
             button = lambda x: {**_button(x[0], x[1], words=x[2], tell=(WORDS['permit_hint'] if x[1] == 'permit' else WORDS['fix_tell']) if x[2] else ''), **({'small': True} if x[3] else {}),
                                 **({'go': WORDS['go_set']} if x[1] == 'fix' else {}),   # design/215: the words box's own button, sent by the server
                                 **({'note': WORDS['set_hint']} if x[1] == 'set' and case == 'footage' and can_use else {}),   # only where a picture exists and may be used as it is
@@ -2439,7 +2476,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)
-        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.supplied_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
+        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.stills_wait(six), P.supplied_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
         from . import core

@@ -90,12 +90,12 @@ def test_the_later_checks_come_in_the_same_answer_each_recorded():
         s['element_ids'] = ['E1', 'ROOM', 'YARD']
     e = refused(d)
     text = str(e)
-    assert text.startswith('5 things to fix:')
-    for part in ('shot I1 is a image', 'ROOM is a place the film shows: give signs_of_use', 'YARD: L9 is not a landmark of a scene that shows YARD',
+    assert text.startswith('3 things to fix:')   # release 1 of 27 Nov 2026, phase 2 part B: the two faults of a place's signs of use are gone
+    for part in ('shot I1 is a image',
                  'shot I2: return_of names an earlier shot of this plan (NOPE is not one)', 'shot I3 returns to I2: say what differs'):
         assert part in text
     d['gaps'][0]['scenes'][0]['shots'][0].pop('states')   # the later checks alone: still all of them together
-    assert len(refused(d).errors) == 4
+    assert len(refused(d).errors) == 2
 
 
 def test_a_broken_scene_head_does_not_blame_the_places_signs_of_use():

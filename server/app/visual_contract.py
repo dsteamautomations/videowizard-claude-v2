@@ -1167,14 +1167,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                 need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
             warnings += timing_warnings(gap.gap_id, gap_shots, window.get('timing'), fps)   # design/89 A3
     # design/207 (SK, 16 Nov 2026): the checks that came one a round after everything else are recorded with the rest, one fault per place and per returning shot
-    for e in plan.elements:   # design/111 F18: a place the film shows carries its signs of use, each at a landmark of a scene that shows it
-        if e.id in place_marks and not e.staged_clean.strip():   # design/124-b item 4: a place staged clean, with its reason, carries none
-            try:
-                need(len(e.signs_of_use) >= 2, f'{e.id} is a place the film shows: give signs_of_use, two or more traces of work or living, each at one of its landmarks.')
-                for s in e.signs_of_use:
-                    need(s.landmark_id in place_marks[e.id], f'{e.id}: {s.landmark_id} is not a landmark of a scene that shows {e.id} (signs_of_use).')
-            except _Collected:
-                continue
+    # release 1 of 27 Nov 2026, phase 2 part B (SK): a place's `signs_of_use` are accepted and used nowhere; until then two or more were required, each at a landmark
     for shot in returns:   # design/89 H7: a return is reimagined, with what differs
         if shot.return_of:
             try:

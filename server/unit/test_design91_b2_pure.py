@@ -217,6 +217,7 @@ def test_a_picture_for_a_named_shot_carries_its_claims_words_state_and_facts(mon
     """N6, N8, N14: never the opposite of a claim; the words; the state carried over; the element's facts."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
     doc_, sess = scene_session()
+    sess['round'] = {'elements': {}}   # release 1, phase 2 part C: the round lists nothing here, so no reference holds the still
     store = store_with(sess, doc_)
     body = {'request_id': 'k1', 'element_id': 'E2', 'name': 'bricks', 'kind': 'keyframe', 'subject': 'bricks', 'prompt': 'Bricks in a stack.', 'shot_id': 'IM1'}
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)

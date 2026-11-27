@@ -345,6 +345,7 @@ def test_a_stills_picture_carries_the_size_sentence_and_its_must_line_and_a_refe
     s = saved(store)
     s['accepted'] = accepted(doc)
     s['references']['F1']['status'] = 'approved'
+    s['round'] = {'elements': {}}   # release 1, phase 2 part C: the round lists nothing here, so no reference holds the still
     VS.save_session(store, NEW, s)
     conn = FakeConn([])
     out = VS.generate_image(conn, store, USER, NEW, [], {'request_id': 'q1', 'element_id': 'E1', 'kind': 'keyframe', 'shot_id': 'IM1', 'name': 'plinth', 'subject': 'the plinth',

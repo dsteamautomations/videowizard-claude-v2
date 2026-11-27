@@ -2143,42 +2143,20 @@ def illustrative_share(plan):
 
 # ---------- design/111 F18: the place in use, the real light of the footage ----------
 
-OCCUPIED = {'check': 'occupied', 'weight': 'must', 'pass_when': 'the place looks occupied or in use: traces of work or living at its landmarks, nothing showroom-clean or empty'}
-
-
 def _place_in(plan, element_id, shot):
     kinds = {e['id']: e['kind'] for e in plan.get('elements') or []}
     return any(kinds.get(i) == 'place' for i in [element_id] + list(shot.get('element_ids') or []))
 
 
 def place_line(plan, element_id, shot):
-    # design/124-b item 4: the place's must line: occupied or in use, or clean and unused where every place in frame is staged clean with its reason
+    """design/124-b item 4: the must line of a place staged clean with its reason: clean and unused. Release 1 of 27 Nov 2026, phase 2 part B
+    (SK): no other place gets a line. Retired: "the place looks occupied or in use ... nothing showroom-clean or empty" on every picture of
+    a place, and two signs of use written into every still (`signs_lines`): the same tools came into every picture of a site, and a picture
+    the operator cleaned failed. A shot's own words say what it shows."""
     places = [e for e in plan.get('elements') or [] if e['kind'] == 'place' and e['id'] in [element_id] + list(shot.get('element_ids') or [])]
-    if not places:
-        return None
-    if all(str(e.get('staged_clean') or '').strip() for e in places):
+    if places and all(str(e.get('staged_clean') or '').strip() for e in places):
         return {'check': 'clean', 'weight': 'must', 'pass_when': 'clean and unused, as planned (' + '; '.join(e['staged_clean'].strip().rstrip('.') for e in places) + '): no traces of work or living'}
-    return OCCUPIED
-
-
-def signs_lines(session, plan, scene, shot, element_id):
-    """Two signs of use per shot, from the places in frame, taken in turn (the next shot gets the next pair); a shot keeps the pair it was given."""
-    elements = {e['id']: e for e in plan.get('elements') or []}
-    places = [elements[i] for i in dict.fromkeys([element_id] + list(shot.get('element_ids') or [])) if i in elements and elements[i]['kind'] == 'place' and elements[i].get('signs_of_use')]
-    if not places:
-        return []
-    chosen = session.setdefault('signs', {})
-    if shot['id'] not in chosen:
-        pick = []
-        for p in places:
-            pool, cur = p['signs_of_use'], session.setdefault('signs_cursor', {}).get(p['id'], 0)
-            pick += [pool[(cur + i) % len(pool)] for i in range(min(2, len(pool)))]
-            session['signs_cursor'][p['id']] = (cur + 2) % len(pool)   # ponytail: round robin; a place with two signs repeats its pair, add more signs to vary
-            if len(pick) >= 2:
-                break
-        chosen[shot['id']] = pick[:2]
-    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
-    return ['Signs of use: ' + '; '.join(f"{s['what']} at {marks.get(s['landmark_id'], s['landmark_id'])}" for s in chosen[shot['id']]) + '.'] if chosen[shot['id']] else []
+    return None
 
 
 def real_light_line(store, session, scene=None):
@@ -2744,7 +2722,7 @@ def round_status(session, plan):
     for each of its states, the server's; the tool prints it and adds no line of its own."""
     if round_v2(session):
         from . import ref_sets
-        return ref_sets.status_of(session)
+        return ' '.join(x for x in (ref_sets.people_wait(session, plan), ref_sets.status_of(session)) if x) or None   # part A: said each time while a person's answer is missing
     return round_due(session, plan)
 
 
@@ -2772,6 +2750,26 @@ def mark_kept(session, run):
 
 def golden_of(session, element_id):
     return (session.get('golden') or {}).get(element_id)
+
+
+def refs_waited(session, plan, shot):
+    """Release 1 of 27 Nov 2026, phase 2 part C (SK): the things a still shot shows whose reference is not approved yet: the still is due only
+    when this is empty. A thing holds its still while the reference round has not begun, or lists it and has no approved picture of it (its
+    set, its golden picture, or the footage picture the operator approved). It holds nothing when it is drawn or a living extra (no
+    reference set), when the round does not list it, or when the operator left it without a reference.
+    Why: on VW-25 all 19 stills were ordered during the first question of the references step; 15 were sent back (6.2).
+    Retired: every still ordered as soon as the plan exists."""
+    rd = session.get('round')
+    rows = (rd or {}).get('elements') or {}
+    elements, out = {e['id']: e for e in plan.get('elements') or []}, []
+    for eid in dict.fromkeys(shot.get('element_ids') or []):
+        e = elements.get(eid)
+        if not e or e.get('kind') in ('graphic', 'animal') or (rd is not None and (eid not in rows or rows[eid].get('ignored'))):
+            continue
+        if not (golden_of(session, eid) or any(r.get('element_id') == eid and r.get('status') == 'approved' and r.get('kind') in ('sheet', 'frame', 'supplied')
+                                               for r in session['references'].values())):
+            out.append(e)
+    return out
 
 
 def golden_due(session, plan):
@@ -3275,11 +3273,12 @@ def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=F
     from . import ref_find
     faces = ref_find.faces_of(session, element_id)   # design/213: the footage shows this person's face
     stamp = {'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
-    if stand_in and not likeness_of(session, element_id) and (not faces or (session.get('stand_in') or {}).get(element_id)):   # nothing to remove: no record, no log line
+    asked = bool(faces or element.get('speaker'))   # release 1 of 27 Nov 2026, phase 2 part A: a real person is asked too, so their stand-in is recorded
+    if stand_in and not likeness_of(session, element_id) and (not asked or (session.get('stand_in') or {}).get(element_id)):   # nothing to remove: no record, no log line
         return {'element_id': element_id, 'likeness': False, 'next': f'{element_id} is already a stand-in: no permission is recorded for this person. Nothing was changed.'}
     name, had = element.get('name') or element_id, bool(likeness_of(session, element_id))
     if stand_in:
-        if faces:
+        if asked:
             session.setdefault('stand_in', {})[element_id] = stamp
         (session.get('likeness') or {}).pop(element_id, None)
         if (session['references'].get(golden_of(session, element_id) or '') or {}).get('kind') in ('supplied', 'frame'):   # the photo is no longer the starting picture
@@ -4139,6 +4138,9 @@ def _queue_sets(conn, store, user, run, outputs, eids):
         if round_v2(session):   # design/211: the server writes the whole request (ref_sets.set_request); the operator's words are placed there, nothing is appended here
             prompt = row['prompt']
             from . import ref_sets
+            if element.get('kind') == 'person' and ref_sets.footage_person(session, plan, eid)['state'] == 'ask':   # release 1 of 27 Nov 2026, phase 2 part A: the answer first; the other sets go on
+                errors[eid] = ref_sets.PERMISSION_FIRST.format(name=element.get('name') or eid, eid=eid)
+                continue
             if element.get('kind') == 'place' and 'things' not in row:   # design/216b: a place waits for Claude's list of its things; never ordered on a guess
                 row.pop('held', None)
                 row['things_due'] = True
@@ -4988,6 +4990,10 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
                 need(False, f"{p['id']} was approved with a failed must line ({', '.join(failed)}): the operator decides first; the question is on its card (`vw visuals answer --item {p['id']} …`).")
     found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
     named = found[3] if found else None
+    if named is not None and route_of(named) == 'still' and body['kind'] in ('keyframe', 'isolated') and not body.get('golden') and not body.get('fix_of'):
+        held = refs_waited(session, plan, named)   # release 1 of 27 Nov 2026, phase 2 part C: a still is ordered only after the references of what it shows
+        need(not held, f"{named['id']} waits for the approved reference of {', '.join(e.get('name') or e['id'] for e in held)}: a still picture is made after the references "
+                       'of what it shows are approved. Nothing was ordered; the server names it as due when they are.')
     if named is not None:   # design/119 rule 5: a reference goes in only when its thing is in the shot (the style, the start chain and a person in frame excepted)
         allowed = set(named.get('element_ids') or []) | {body['element_id'], STYLE}
         for p in parents:
@@ -5121,11 +5127,6 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
         lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements']) + height_lines(found[2])   # design/119 rule 8
         if height_sentence(found[2]) and not body.get('fix_of'):
             body = {**body, 'prompt': with_composed(body['prompt'], height_sentence(found[2]))}
-        sg = signs_lines(session, plan, found[2], found[3], body['element_id'])   # design/111 F18: two signs of use, the place in use
-        if sg:
-            lines.append({'check': 'signs of use', 'weight': 'must', 'pass_when': sg[0][len('Signs of use: '):].rstrip('.') + ': both visible at their places'})
-            if not body.get('fix_of'):
-                body = {**body, 'prompt': with_composed(body['prompt'], sg[0])}
         pl = place_line(plan, body['element_id'], found[3])   # design/124-b item 4
         if pl:
             lines.append(pl)
@@ -5140,8 +5141,17 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
-    check_cap(conn, run, session, image_price_inr(run, provider='gemini' if is_set else None) * variants * ((len(body.get('views') or ()) or SET_MAX) if is_set else 1),   # design/213: a set is counted by its pictures (a place of a round posted from now on: one)
-              'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
+    from . import pictures as _pictures   # release 1 of 27 Nov 2026, phase 2 part D: this order is the one remake of a still whose check failed
+    retried = next((r for r in session['references'].values() if named is not None and body['kind'] in ('keyframe', 'isolated') and not body.get('fix_of')
+                    and made_for(session, r) == named['id'] and _pictures.retry_due(session, r, plan)), None)
+    try:
+        check_cap(conn, run, session, image_price_inr(run, provider='gemini' if is_set else None) * variants * ((len(body.get('views') or ()) or SET_MAX) if is_set else 1),   # design/213: a set is counted by its pictures (a place of a round posted from now on: one)
+                    'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
+    except Problem as e:
+        if retried:   # at the cost limit there is no remake: the first picture goes to the operator with its failed lines
+            session.setdefault('still_retries', {})[named['id']] = {'of': retried['id'], 'gave_up': str(getattr(e, 'message', None) or e)}
+            save_session(store, run, session)
+        raise
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):
@@ -5152,6 +5162,11 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
             session['references'][made[-1]['reference_id']]['server_checklist'] = lines
         if found:   # design/91 N9: the check measures its light against the footage beside the shot's gap
             session['references'][made[-1]['reference_id']].update(shot_id=named['id'], gap_id=found[1]['gap_id'])
+    if retried:   # part D: counted once; the first picture stays as the earlier try
+        at = datetime.now(timezone.utc).isoformat()
+        lines_ = ' '.join(_pictures._failed_lines(retried))
+        session.setdefault('still_retries', {})[named['id']] = {'of': retried['id'], 'by': made[0]['reference_id'], 'lines': lines_, 'at': at}
+        retried.update(status='rejected', rejection={'notes': f"Made again once by itself: Claude's check failed: {lines_}", 'quote': '', 'by': 'server', 'at': at})
     save_session(store, run, session)
     return {**made[0], **({'reference_ids': [m['reference_id'] for m in made], 'job_ids': [m['job_id'] for m in made]} if variants == 2 else {}), **({'warnings': warns} if warns else {})}
 
@@ -8617,7 +8632,7 @@ def status(conn, store, run, outputs, repair=True):
     six = pictures.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/221 row 18: the line of counts of step 6
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
-    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()), pictures.supplied_due(six),
+    step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()), pictures.stills_wait(six), pictures.supplied_due(six),
                                  takes.starts(session, plan, take_rows) if seven else '') if x)   # release 1, D1: what of step 7 can start now, together
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
