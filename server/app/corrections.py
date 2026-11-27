@@ -257,7 +257,7 @@ def _queue(conn, store, run, session, shot_id, c, spec):
               'correction_id': c['id'], 'source': {k: src[k] for k in ('job_id', 'key', 'sha256')}, 'pictures': spec.get('pictures') or [], 'effective_prompt': spec['text'],
               'provider': gen['provider'], 'model': gen['model'], 'aspect_ratio': gen['aspect_ratio'], 'resolution': VERSION_SIZE, 'duration_seconds': src['seconds'], 'placement': placement,
               **({'cut_s': float(spec['cut_s'])} if spec['kind'] == 'remake' else {})}
-    identity = VS.digest(record)
+    identity = VS.own_identity(record)
     if spec['kind'] == 'remake':
         record['clip_key'] = VS.key(run, f'takes/{identity}.clip.mp4')
     k = VS.key(run, f'takes/{identity}.request.json')

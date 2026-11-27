@@ -582,9 +582,10 @@ def take_price():
     return VS.video_price(video_generators.GUIDE['resolution'])
 
 
-def same_of(render_sha, still_sha, prompt, plan_digest):
-    """The request's identity: the same guide, still and words for the same plan is never sent twice (the critic's S4: for another plan it is another request)."""
-    return digest({'guide': render_sha, 'still': still_sha, 'prompt': prompt, 'plan': plan_digest})
+def same_of(render_sha, still_sha, prompt, shot_print):
+    """The request's identity: the same guide, still and words for the same shot is never sent twice. Release 1 of 27 Nov 2026, part I row 2:
+    the shot's own fingerprint (until then the whole plan's, the critic's S4: after a change to another shot the same take could be paid again)."""
+    return digest({'guide': render_sha, 'still': still_sha, 'prompt': prompt, 'shot': shot_print})
 
 
 def shoot(conn, store, user, run, outputs, shot_id, quote, again=False, same=False):
@@ -611,7 +612,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False, same=Fal
     if open_job:
         raise Problem(409, 'JOB_OPEN', 'A take for this shot is still open; wait, recover or resolve it first.', job_id=str(open_job['id']))
     prompt = card['prompt']
-    same_id = same_of(render['sha256'], still['sha256'], prompt, digest(plan))
+    same_id = same_of(render['sha256'], still['sha256'], prompt, VS.shot_print(plan, shot_id))
     before = [t for t in g.get('takes') or [] if t.get('same') == same_id]
     if before and not same:
         was = next((j for j in VS.take_jobs(conn, run, shot_id) if str(j['id']) == str(before[-1].get('job_id'))), None)
@@ -630,7 +631,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False, same=Fal
               'duration_seconds': seconds, 'recipe': g.get('recipe'),
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': session['source']['fps'],
                             'duration_seconds': str((shot['end_frame'] - shot['start_frame']) / fps), 'exact_seconds': (shot['end_frame'] - shot['start_frame']) / fps}}
-    identity = digest(record)
+    identity = VS.own_identity(record)
     k = VS.key(run, f'takes/{identity}.request.json')
     VS.save_json(store, k, record)
     session['preparations'][shot_id] = {'preparation_id': identity, 'key': k, 'guide': True}

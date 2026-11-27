@@ -89,6 +89,14 @@ def session_of(store, run, outputs, create=False):
             'reviews': {}, 'selections': {}, 'assets': {}, 'recorded_gaps': {}, 'repeat_rules': 'refuse'}   # design/89: a session begun before batch 1 is warned instead
 
 
+def own_identity(record):
+    """Release 1 of 27 Nov 2026, part I rows 2 and 3 (SK): the identity of a request for a render, a take or a correction: everything it is made
+    from, its own shot's fingerprint included (`shot_print`), the whole plan left out. A change to another shot leaves the identity as it
+    was, so nothing is rendered or paid twice. Retired: the identity with the fingerprint of the whole plan (`plan_digest`), which is kept
+    on the record for reading and decides nothing."""
+    return digest({k: v for k, v in record.items() if k != 'plan_digest'})
+
+
 def shot_prints(plan):
     """Issue 17 (R2, SK 25 Nov 2026): {shot id: the fingerprint of what a video or a render of the shot is made from}: the shot, its scene and its gap
     without their shots, the things it shows with the facts about them, and the part every gap shares (the foundation, the sequence rules)."""
@@ -6366,7 +6374,7 @@ def prepare_take(store, user, run, outputs, body):
     record.update(take_prompt_fields(run, plan_full, planned, fps, record['duration_seconds']))   # design/128 T1, T2, T4
     form += take_prompt_warnings(plan_full, planned, body['motion_prompt'], timeline_sent=bool(record.get('timeline')))   # design/128 T3
     record['effective_prompt'] = motion_text(record)
-    identity = digest(record)
+    identity = own_identity(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)
     pair = None
     if changes and e:   # design/91 N1: Gemini lists what differs; a difference no change explains is marked, never refused
@@ -6603,7 +6611,7 @@ def render_drawn(conn, store, user, run, outputs, body):
                'claims': shot.get('claims') or [], 'relationships': (spec or {}).get('relationships') or [], 'view': spec_view(shot)[0] if spec else None,
                'spec': {'dimensions': (spec or {}).get('dimensions') or []},   # design/117 P2: the sizes checked against the scene's text at render
                'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
-    identity = digest(request)
+    identity = own_identity(request)
     key_ = key(run, f'takes/{identity}.drawn.json')
     save_json(store, key_, request)
     same = [j for j in take_jobs(conn, run, shot['id']) if j.get('provider') == 'drawn' and (j.get('request') or {}).get('preparation_id') == identity and j['status'] not in ('failed', 'rejected', 'cancelled')]
@@ -7398,7 +7406,7 @@ def render_motion(conn, store, user, run, outputs, body):
     need(not missing, '; '.join(f'the project does not show the label "{l}" word for word' for l in missing) + ': fix the text in the project or the label in the plan.')
     lost = motion.missing_selectors(files, [c['selector'] for c in (shot.get('scene_motion') or {}).get('cues') or []])
     need(not lost, f"the plan's cues name {', '.join(lost)}, which the project does not have (an element id).")
-    identity = digest(request)
+    identity = own_identity(request)
     key_ = key(run, f'takes/{identity}.motion.json')
     save_json(store, key_, request)
     frames, exact = request['frames'], request['placement']['exact_seconds']
