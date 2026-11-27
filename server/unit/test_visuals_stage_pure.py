@@ -36,6 +36,22 @@ class FakeStore:
         return {'key': key}
 
 
+class _Current(str):
+    """Release 1 of 27 Nov 2026, part B: a made job's stamp of its own shot (`shot_print`) for the tests that build a job by hand and are not
+    about old work: it equals the shot's fingerprint in whatever plan the test builds, as a job ordered on the plan in force does. A test
+    about old work gives the stamp itself (`visuals_stage.shot_print(plan, shot)`)."""
+    __hash__ = str.__hash__
+
+    def __eq__(self, other):
+        return other is not None
+
+    def __ne__(self, other):
+        return other is None
+
+
+CURRENT = _Current('made on the plan in force')
+
+
 class FakeConn:
     """vw2_jobs rows for the spend ledger; inserts are recorded."""
 

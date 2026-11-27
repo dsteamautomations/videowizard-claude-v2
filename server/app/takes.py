@@ -89,7 +89,7 @@ W = {
 }
 PAGE = {   # layout.words.takes: the page's chrome (the page holds no words of its own)
     'todo': 'Needs your answer', 'answered_head': 'Answered earlier', 'coming': 'Could not be made', 'nothing': W['nothing'], 'state_open': 'needs your answer',
-    'done': {'select': 'Accepted', 'again': 'Correction ordered'}, 'more': 'See all {n}', 'words_label': 'The words spoken during this shot',
+    'done': {'select': 'Accepted', 'again': 'Correction ordered'}, 'more': 'See all {n}', 'words_label': 'Voiceover',
     'film': 'See it in the film', 'film_head': 'In the film', 'before': 'Where the shot before ends', 'after': 'Where the shot after begins', 'this_take': 'This take',
     'compare_only': 'Shown to compare. Nothing here needs an answer.', 'compare_from': 'The one before', 'compare_new': 'The new one', 'play_both': W['play_both'],
     'details': 'Details', 'd_still': W['still'],
@@ -181,9 +181,9 @@ def starts(session, plan, take_rows):
 # ---------- each shot's state, the line of counts, when the page opens ----------
 
 def _stale(session, plan, job):
-    """A take shot for another plan than the film has now: `select_take` refuses it. A take queued before design/222 names no plan and is read as before.
-    Issue 17 (R2): only when its own shot is not the same in both plans (`V.other_plan`)."""
-    return V.other_plan(session, plan, job)
+    """A take Select would refuse as made for another plan (`visuals_stage.select_gate`, release 1 of 27 Nov 2026, part B: the one gate): its own
+    shot is not as it was when the take was ordered, or the take carries no stamp of its shot (made before the release)."""
+    return bool(V.select_gate(session, plan, job.get('unit'), job.get('request') or {}, job))
 
 
 def _ready_to_shoot(g):

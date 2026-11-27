@@ -33,9 +33,9 @@ def test_a_drawings_line_shows_where_it_sits_the_words_and_what_it_shows_above_i
     pg = live(browser, d)
     block = pg.evaluate(PAIRS)[0]
     assert block['title'].endswith('Shot G1-S1 (G1-S1)')                                   # the name, its code last
-    assert block['pairs'][:2] == [['The words under it', 'words'], ['Shows', 'the box and its lid']]
+    assert block['pairs'][:2] == [['Voiceover', 'words'], ['Shows', 'the box and its lid']]
     body = pg.locator('#list .item .body').first.inner_text()
     where = d['lines'][0]['rows'][0][1]
     assert where.startswith('In the film at') and where in body
-    assert body.index(where) < body.index('The words under it') < body.index('Shows') < body.index(d['lines'][0]['ask'])   # above the parts and the question
+    assert body.index(where) < body.index('Voiceover') < body.index('Shows') < body.index(d['lines'][0]['ask'])   # above the parts and the question
     assert not pg.errors

@@ -229,16 +229,16 @@ def test_a_drawings_spec_says_where_it_sits_the_words_under_it_and_what_it_shows
     store, conn = spec_film([None, drawing()], change=change)
     v = view_of(store, conn, 'G1-S2')
     assert v['title'] == 'Title 1, shot 2 (G1-S2)' and v['name'] == 'Title 1, shot 2'
-    assert v['rows'] == [['', 'In the film at 0:02.0 to 0:04.0 (2.0 s) · Gap G1, Title 1'], ['The words under it', 'Fillers replace the tension zone.'], ['Shows', 'two tiles side by side']]
+    assert v['rows'] == [['', 'In the film at 0:02.0 to 0:04.0 (2.0 s) · Gap G1, Title 1'], ['Voiceover', 'Fillers replace the tension zone.'], ['Shows', 'two tiles side by side']]
     assert v['item'] == f"spec:G1-S2:{V.spec_digest(drawing())[:10]}"   # the id is the spec's own: the rows are not part of it
     item = next(i for i in chat(store, conn) if i['id'] == v['item'])
     assert item['question'] == 'Title 1, shot 2 (G1-S2): are the parts right?'
-    assert item['text'].splitlines()[:3] == ['- In the film at 0:02.0 to 0:04.0 (2.0 s) · Gap G1, Title 1', '- The words under it: Fillers replace the tension zone.', '- Shows: two tiles side by side']   # a list: plain lines run together in the chat
+    assert item['text'].splitlines()[:3] == ['- In the film at 0:02.0 to 0:04.0 (2.0 s) · Gap G1, Title 1', '- Voiceover: Fillers replace the tension zone.', '- Shows: two tiles side by side']   # a list: plain lines run together in the chat
     assert 'Drawn as: a cutaway' in item['text']
     out = C._public(item, '', 1)
     assert out['ask'] == 'Title 1, shot 2: are the parts right?' and '### Title 1, shot 2 (G1-S2)' in out['message']   # the button panel names the drawing
     other = view_of(store, conn, 'G2-S1')   # a titled shot with no `depicts`: its title, and no Shows row
-    assert other['title'] == 'Shot G2-S1 (G2-S1)' and [r[0] for r in other['rows']] == ['', 'The words under it']
+    assert other['title'] == 'Shot G2-S1 (G2-S1)' and [r[0] for r in other['rows']] == ['', 'Voiceover']
 
 
 def test_a_shot_with_no_narration_says_none_and_another_script_is_shown_as_written():
@@ -246,7 +246,7 @@ def test_a_shot_with_no_narration_says_none_and_another_script_is_shown_as_writt
         plan['gaps'][0]['scenes'][0]['shots'][0]['narration'] = ''
         plan['gaps'][1]['scenes'][0]['shots'][0]['narration'] = TAMIL
     store, conn = spec_film([drawing(), drawing()], change=change)
-    assert view_of(store, conn, 'G1-S1')['rows'][1] == ['The words under it', 'none'] and view_of(store, conn, 'G2-S1')['rows'][1] == ['The words under it', TAMIL]
+    assert view_of(store, conn, 'G1-S1')['rows'][1] == ['Voiceover', 'none'] and view_of(store, conn, 'G2-S1')['rows'][1] == ['Voiceover', TAMIL]
 
 
 def test_a_title_with_marks_of_its_own_still_splits_into_the_name_and_the_question_and_a_long_name_is_cut_at_80():
@@ -278,7 +278,7 @@ def test_the_pages_open_spec_line_carries_the_rows_and_the_name():
     store, conn = spec_film([drawing(depicts_note=None)], change=lambda plan: plan['gaps'][0]['scenes'][0]['shots'][0].update(depicts='the box and its lid'))
     line = page(store, conn)['lines'][0]
     assert line['title'] == 'Shot G1-S1 (G1-S1)' and line['state'] == 'open'
-    assert line['rows'] == [['', 'In the film at 0:00.0 to 0:04.0 (4.0 s) · Gap G1, Title 1'], ['The words under it', 'words'], ['Shows', 'the box and its lid']]
+    assert line['rows'] == [['', 'In the film at 0:00.0 to 0:04.0 (4.0 s) · Gap G1, Title 1'], ['Voiceover', 'words'], ['Shows', 'the box and its lid']]
 
 
 def test_a_row_that_cannot_be_worked_out_is_left_out_and_the_card_still_asks(monkeypatch):
@@ -307,7 +307,7 @@ def test_the_card_of_the_drawing_at_the_end_of_the_shot_has_the_name_and_the_two
     out = C._public(card, '', 1)
     assert f'({sid})' in card['question'] and not card['question'].startswith(sid + ':')   # the name in words, the code last
     assert out['ask'].startswith('Is it right?') and '### ' in out['message'] and f'({sid}): this is the drawing as it stands at the end of the shot' in out['message']
-    assert card['text'].splitlines()[0].startswith('- In the film at ') and card['text'].splitlines()[1].startswith('- The words under it: ') and len(card['text'].splitlines()) == 2
+    assert card['text'].splitlines()[0].startswith('- In the film at ') and card['text'].splitlines()[1].startswith('- Voiceover: ') and len(card['text'].splitlines()) == 2
 
 
 # ---------- R8: what was accepted for the drawing ----------

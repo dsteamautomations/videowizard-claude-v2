@@ -80,10 +80,11 @@ class Film:
         return [c[1:] for c in self.calls if c[0] == name]
 
     # ---------- the store ----------
-    def save(self, s):
+    def save(self, s, store=None):
+        """`store`: the store a stood-in server function was handed (release 1 of 27 Nov, part G: a page visit keeps what it read, so a write goes through it)."""
         s = {'source': {'from': 'first_cut', 'fps': '25', 'resolution': '1920x1080', 'plan_digest': 'pd', 'gaps': {}}, **s,
              'versions': [{'version': 1, 'file': {'key': f"{RUN['id']}/visuals/plan-v1.json"}, 'plan_digest': s['current'], 'warnings': []}]}
-        self.store.files[SESSION] = json.dumps(s).encode('utf-8')
+        (store or self.store).put(SESSION, json.dumps(s).encode('utf-8'))
         for ref in s['references'].values():
             if ref.get('key'):
                 self.store.files.setdefault(ref['key'], png())
@@ -96,10 +97,10 @@ class Film:
     def session(self):
         return json.loads(self.store.files[SESSION])
 
-    def change(self, fn):
+    def change(self, fn, store=None):
         s = self.session()
         fn(s)
-        self.save(s)
+        self.save(s, store)
 
     # ---------- the two front ends ----------
     def ctx(self):
@@ -147,7 +148,7 @@ class Film:
         """Step 1 recorded: the fixture's own next state stands in for what part B does."""
         self.note('round_done', copy.deepcopy(verdicts), quote)
         self.state = 'making'
-        self.save(F.session('making'))
+        self.save(F.session('making'), store)
         return {'pass': 'making', 'kept': True, 'queued': list(F.FIRST), 'errors': {}, 'cost_inr': 3 * F.SET_PRICE, 'then': ref_sets.GO1_MAKING.format(k=3, x='105', r=2)}
 
     def round_sets(self, store, user, run, outputs, verdicts, quote, conn=None, partial=False, each=False):
@@ -180,7 +181,7 @@ class Film:
             s['references'][ref_id]['status'] = 'rejected'
             if self.next_frame:
                 s['references'][self.next_frame['id']] = self.next_frame
-        self.change(do)
+        self.change(do, store)
         return {'next': self.next_frame['id'] if self.next_frame else None}
 
     def that_is_it(self, conn, store, user, run, outputs, eid, trial, quote):
@@ -188,7 +189,7 @@ class Film:
         t = F.trials()['trials'][trial]
         look = {**t['looks'][eid], 'verdict': 'weak'}
         self.change(lambda s: s['references'].update({f'f-{eid}-it': {'id': f'f-{eid}-it', 'element_id': eid, 'kind': 'frame', 'status': 'candidate', 'key': t['key'], 'view': look['view'], 'look': look,
-                                                                    'weak': True, 'trial': trial}}))
+                                                                    'weak': True, 'trial': trial}}), store)
         return {'ref': f'f-{eid}-it'}
 
 

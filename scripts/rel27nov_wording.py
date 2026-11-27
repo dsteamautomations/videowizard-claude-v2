@@ -3,6 +3,7 @@
 Part F (the operator's answer to the assistant's own question is followed): the command of a question names `--keeps`, the one choice that
 leaves the item as it is; after any other answer the server holds the item until a plan change proposed with `--answers` applies it (the
 server's own replies say so; nothing more is written here).
+Part H (every card names its shot by its voiceover words): one sentence for the assistant's own chat text (+18 words).
 Registered in scripts/c1_split_v3.py after minor_edit. Exact anchors; applying twice changes nothing. Run once: python scripts/rel27nov_wording.py"""
 import json
 from pathlib import Path
@@ -12,6 +13,9 @@ P = ROOT / 'server' / 'procedures' / 'v3.json'
 
 COMMON = [   # (the words before, the words now) in the common part
     ('--choices "a|b" [--cost <INR>]`;', '--choices "a|b" [--cost <INR>] [--keeps "<the choice that changes nothing>"]`;'),
+    # part H (every card names its shot by its voiceover; the server cannot see the assistant's own chat text, so the instruction says it)
+    ('is accepted with that answer, with no second card.',
+     'is accepted with that answer, with no second card. In your own chat text, name a shot by its words and its voiceover, never by its code alone.'),
 ]
 
 

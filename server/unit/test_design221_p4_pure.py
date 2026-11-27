@@ -17,7 +17,7 @@ from test_design217_browser_pure import CAVITIES, browser, doc, go, inside, page
 from test_design217_together_pure import RUN as RUN217, USER as USER217, emit, server   # noqa: F401 (`server` is the fixture)
 from test_design221_p1_pure import NEW, edit_plan, edit_session, visuals
 from test_design221_p2_pure import EVEN, LEAVES, SOLID, upload, verdict
-from test_visuals_stage_pure import USER, g, saved
+from test_visuals_stage_pure import CURRENT, USER, g, saved
 
 ROOT = Path(__file__).resolve().parents[2]
 V2 = {'v': 2, 'pass': 'complete', 'elements': {}}   # a film whose reference round is of today's kind: step 6 is answered on the page
@@ -39,7 +39,7 @@ def key(n, sid='IM1', status='candidate', look=True, **over):
 
 
 def drawn_job(jid='job-7', status='ready', unit='MO1'):
-    return {'id': jid, 'run_id': 'run-1', 'unit': unit, 'provider': 'drawn', 'status': status, 'cost': None, 'request': {'kind': 'motion', 'request_key': f'run-1/takes/{jid}.motion.json'},
+    return {'id': jid, 'run_id': 'run-1', 'unit': unit, 'provider': 'drawn', 'status': status, 'cost': None, 'request': {'kind': 'motion', 'request_key': f'run-1/takes/{jid}.motion.json', 'shot_print': CURRENT},
             'result': {'key': f'run-1/takes/{jid}.mp4', 'sheet_key': f'run-1/takes/{jid}-sheet.jpg', 'sha256': 'x' * 64, 'bytes': 1, 'evidence': {'timing_matches_placement': True}}}
 
 

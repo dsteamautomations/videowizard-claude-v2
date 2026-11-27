@@ -623,7 +623,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False, same=Fal
     VS.check_cap(conn, run, session, seconds * take_price(), f'a {seconds} s take')
     gen = video_generators.GUIDE
     fps = float(session['source']['fps'])
-    record = {'contract': 'videowizard-guide-take-v1', 'kind': 'guide', 'run_id': str(run['id']), 'shot_id': shot_id, 'plan_digest': digest(plan), 'attempt': len(g.get('takes') or []) + 1,
+    record = {'contract': 'videowizard-guide-take-v1', 'kind': 'guide', 'run_id': str(run['id']), 'shot_id': shot_id, 'plan_digest': digest(plan), 'shot_print': VS.shot_print(plan, shot_id), 'attempt': len(g.get('takes') or []) + 1,
               'guide': {'key': render['guide_key'], 'sha256': render['sha256'], 'seconds': seconds, 'scene_sha256': g['sha256']},
               'start_image': {'reference_id': still['id'], 'sha256': still['sha256'], 'key': still['key'], 'mime_type': 'image/png', 'width': still.get('width'), 'height': still.get('height')},
               'prompt': g['take_prompt']['prompt'], 'effective_prompt': prompt, 'provider': gen['provider'], 'model': gen['model'], 'aspect_ratio': gen['aspect_ratio'], 'resolution': gen['resolution'],
@@ -635,7 +635,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False, same=Fal
     VS.save_json(store, k, record)
     session['preparations'][shot_id] = {'preparation_id': identity, 'key': k, 'guide': True}
     job_id = _queue(conn, run, shot_id, 'video', {'kind': 'take', 'preparation_id': identity, 'request_key': k, 'provider': gen['provider'], 'model': gen['model'], 'duration_seconds': seconds,
-                                                  'resolution': gen['resolution'], 'plan_digest': record['plan_digest']})   # design/222: the page counts a take shot for another plan as "must be made again"
+                                                  'resolution': gen['resolution'], 'plan_digest': record['plan_digest'], 'shot_print': record['shot_print']})   # release 1 of 27 Nov 2026, part B: its own shot's fingerprint; design/222: the page counts a take shot for another plan as "must be made again"
     g.setdefault('takes', []).append({'job_id': job_id, 'same': same_id, 'camera': camera, 'preparation_id': identity, 'quote': str(quote).strip(), 'by': user['id'], 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'take sent', 'job_id': job_id, 'model': gen['model'], 'seconds': seconds, 'prompt': prompt, 'guide_sha256': render['sha256'], 'still_sha256': still['sha256'],

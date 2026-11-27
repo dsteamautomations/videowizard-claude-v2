@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from app import chat_flow as CF, guide as G, guide_worker as GW, page_flow as PF, pictures as P, takes as T, visuals_stage as V
+from test_visuals_stage_pure import CURRENT   # release 1 of 27 Nov 2026, part B: a hand-built job is of the plan in force
 
 HERE = Path(__file__).resolve().parent
 FIXTURE = json.loads((HERE / 'd222_takes_round.json').read_text(encoding='utf-8'))
@@ -26,7 +27,7 @@ def plan(*shots, title='Housing at work'):
 
 def job(jid, sid='S1', status='ready', sha=SHA, at='2026-11-19T10:00:00+00:00', **req):
     return {'id': jid, 'run_id': 'run-1', 'unit': sid, 'provider': 'video', 'status': status, 'updated_at': at, 'created_at': at,
-            'request': {'kind': 'take', 'request_key': f'run-1/visuals/takes/{jid}.request.json', 'duration_seconds': 6, **req},
+            'request': {'kind': 'take', 'request_key': f'run-1/visuals/takes/{jid}.request.json', 'duration_seconds': 6, 'shot_print': CURRENT, **req},
             'result': {'key': f'run-1/visuals/takes/{jid}.mp4', 'sha256': sha, 'bytes': 1, 'evidence': {'duration_seconds': 6.04, 'timing_matches_placement': True}} if status == 'ready' else {}}
 
 

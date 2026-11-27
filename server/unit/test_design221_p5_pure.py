@@ -138,7 +138,7 @@ STALE = 'must be rendered again (the plan or the shared parts changed)'
 
 def ready(plan_digest, used=None):
     j = drawn_job()
-    return {**j, 'request': {**j['request'], 'plan_digest': plan_digest, **({'parts': used} if used is not None else {})}}
+    return {**j, 'request': {**j['request'], 'plan_digest': plan_digest, **({'shot_print': 'of an older plan'} if plan_digest == 'an older plan' else {}), **({'parts': used} if used is not None else {})}}
 
 
 def test_a_drawing_rendered_on_an_older_plan_must_be_rendered_again_in_the_counts_and_the_next_step():

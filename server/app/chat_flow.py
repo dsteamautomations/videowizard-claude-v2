@@ -41,10 +41,11 @@ def _button(label, choice, words=False, tell=''):
     return {'label': label, 'choice': choice, **({'needs_words': True} if words else {}), **({'tell': tell} if tell else {})}
 
 
-def _item(ident, kind, position, question, run, buttons, text='', show=(), more=(), name=''):
-    """`name`: the shot's name the question begins with (VW-25 issue 7): the question is split after it, whatever marks the name holds."""
+def _item(ident, kind, position, question, run, buttons, text='', show=(), more=(), name='', head=''):
+    """`name`: the shot's name the question begins with (VW-25 issue 7): the question is split after it, whatever marks the name holds.
+    `head` (release 1 of 27 Nov 2026, part H): the heading of the card's shot or shots (`pictures.heading_text`): their voiceover."""
     return {'id': ident, 'kind': kind, 'position': position, 'question': question, 'text': text, 'show': list(show), 'buttons': list(buttons)[:4],
-            **({'other_choices': list(more)} if more else {}), **({'_name': name} if name else {}), '_run': run}
+            **({'other_choices': list(more)} if more else {}), **({'_name': name} if name else {}), **({'_head': head} if head else {}), '_run': run}
 
 
 def _ref_key(run, ref_id):
@@ -1690,7 +1691,7 @@ def _layout_items(ctx):
                                     _button('Change the shot', 'change', words=True, tell='Ask the operator what the shot should become: cut into shorter shots, another angle, or left out.')],
                                    text=f'The checker still finds: {guide.finding(g)}.',
                                    show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in (d.get('views') or []) if d.get('sha256') == g['sha256']],
-                                   name=V.coded(shot_names, sid)))
+                                   name=V.coded(shot_names, sid), head=P.heading_text(session, plan, [sid])))
     return items
 
 
@@ -1748,10 +1749,12 @@ def _waiting_items(ctx):
             line = P.question_line(session, plan, it, q, ref) if w.get('step') != 'references' and len(choices) <= 4 and not (ref and P.video_shot(session, plan, ref)) else None
             shown = [b['label'] for b in line['buttons']] if line else choices   # the critic's review (6): the chat says the page's words, with no amount
             buttons = [_button(c[:40], f'c{i + 1}') for i, c in enumerate(shown)]   # a question always has two or more (the server refuses fewer)
+            about = [x for x in V._holds(store, session, it) if x in shot_names] if plan else []   # part H: the shot, or the shots that show the thing
+            seen = [_pic(run, it, f'question-{it}')] if ref and ref.get('sha256') else [x for x in (P.shot_picture(session, sid) for sid in about[:3]) if x]
             item = _item(f'question:{it}', 'question', where, line['ask'] if line else q['question'],
                          lambda choice, quote, words, it=it, choices=choices: V.answer(store, user, run, outputs, it, words or choices[int(choice[1:]) - 1]), buttons[:4],
                          text='\n'.join(f'- {c}' for c in shown) if len(shown) > 4 or any(len(c) > 40 for c in shown) else '', more=buttons[4:],
-                         show=[_pic(run, it, f'question-{it}')] if ref and ref.get('sha256') else [])
+                         show=seen, head=(f'{title(about[0])}\n' if len(about) == 1 else '') + P.heading_text(session, plan, about, most=3) if about else '')
             if line:   # design/217: a question about a made picture is a line of step 6; a size or fact question stays in the chat
                 item['_line'] = line
             items.append(item)
@@ -1786,7 +1789,8 @@ def _waiting_items(ctx):
                 iid, bare, against = P.marked(f"picture:{ref['id']}:{str(ref.get('sha256'))[:10]}", view)
                 item = _item(iid, 'picture', where, f'{what}: is this picture right?', run_,
                              [_button('Yes', 'yes'), _button('No', 'no'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')],
-                             text=P.chat_text({'check': view}), show=[_pic(run, ref['id'], f"picture-{ref['id']}")])
+                             text=P.chat_text({'check': view}), show=[_pic(run, ref['id'], f"picture-{ref['id']}")],
+                             head=P.heading_text(session, plan, [x for x in [V.made_for(session, ref)] if x in shot_names]))
             item.update(_bare=bare, _against=against)
             items.append(item)
         elif kind == 'graphics to approve':
@@ -1872,7 +1876,7 @@ def _waiting_items(ctx):
             items.append(_item(f"held:{group}:{str(rec.get('sha256'))[:10]}:{rec.get('round')}", 'held drawing', where,
                                f"{title(group)}: held after round {rec.get('round')}: {len(musts)} must rule{' still fails' if len(musts) == 1 else 's still fail'}. What do you decide?",
                                run_, buttons, text='\n'.join('- ' + m for m in musts),
-                               show=[{'key': k, 'name': f'{group}-{n}'} for k, n in ((res.get('key'), 'drawing.mp4'), (res.get('sheet_key'), 'frames.jpg')) if k], name=title(group)))
+                               show=[{'key': k, 'name': f'{group}-{n}'} for k, n in ((res.get('key'), 'drawing.mp4'), (res.get('sheet_key'), 'frames.jpg')) if k], name=title(group), head=P.heading_text(session, plan, [group])))
         elif kind in ('drawing spec to approve', 'material spec to approve'):
             key = V.material_key(group) if kind.startswith('material') else group
             specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once
@@ -1962,7 +1966,7 @@ def _waiting_items(ctx):
                 buttons = [_button('Select', 'select', words=hold, tell=why_hold + ': ask the operator why it is right for the film all the same.'),
                            _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with it.')] + ([_button('Take the effect away', 'no-effect')] if fin else [])
             iid, bare, against = P.marked(f"take:{job['id']}", line['check'], line['held']) if line else (f"take:{job['id']}", None, False)   # the critic's point 2: a drawn graphic of step 6
-            item = _item(iid, 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show, name=title(group))
+            item = _item(iid, 'take', where, f"{title(group)}: is this {'drawing' if drawn else 'take'} right for the film?", run_, buttons, text=text, show=show, name=title(group), head=P.heading_text(session, plan, [group]))
             if line:
                 item.update(_line=line, _bare=bare, _against=against)
             items.append(item)
@@ -1996,7 +2000,8 @@ def _guide_items(ctx):
                                f'{title}: this still starts the shot. On the first picture, does every person and thing sit on the red outlines?', run_,
                                [_button('Approve', 'approve'), _button('Reject', 'reject', words=True, tell='Ask the operator what is wrong with the still.')], show=show,
                                # the check's line and its warnings: the operator may approve against them; A1: then what the layout changed from the plan, and its notes
-                               text=chr(10).join(x for x in [P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else ''] + guide.layout_lines(g) if x), name=title))
+                               text=chr(10).join(x for x in [P.chat_text({'check': P.look_view(still)}) if V.round_v2(session) else ''] + guide.layout_lines(g) if x), name=title,
+                               head=P.heading_text(session, plan, [sid])))
             continue
         if not g.get('take_prompt') or sid in session['selections']:
             continue
@@ -2022,30 +2027,56 @@ def _guide_items(ctx):
                                (f"{title}: the take could not be made. {why} Send the same request once more? It costs about ₹{card['cost_inr']:g}." if again
                                 else f"{title}: make the take now? It is {card['seconds']} s and costs about ₹{card['cost_inr']:g}."), run_,
                                [_button('Send it again' if again else 'Shoot', 'shoot'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
-                               text=str(card.get('look_for') or ''), show=show, name=title))
+                               text=str(card.get('look_for') or ''), show=show, name=title, head=P.heading_text(session, plan, [sid])))
     return items + ([] if checking else words)
 
 
+def _gap_mark(session, shots):
+    """What a gap is made of now: the chosen video or the placed still of each of its shots. A comment on the gap waits until this changes."""
+    return V.digest([[s['id'], (session['selections'].get(s['id']) or {}).get('job_id'), (session['assets'].get(s['id']) or {}).get('reference_id') or (session['assets'].get(s['id']) or {}).get('key')] for s in shots])
+
+
+def gap_waits(session):
+    """Release 1 of 27 Nov 2026, part H: the next-step sentence for each gap the operator did not record yet, with their comment."""
+    rows = [(gid, w.get('words') if isinstance(w, dict) else w) for gid, w in (session.get('chat_record_wait') or {}).items() if gid not in (session.get('recorded_gaps') or {})]
+    return ' '.join(f'Gap {gid} is not recorded: the operator said "{words}". Change what they ask; the gap is then asked again.' for gid, words in rows)
+
+
 def _record_items(ctx):
+    """The gap card. Release 1 of 27 Nov 2026, part H (SK, question 8): it shows every shot of the gap in order, each with its name, its
+    voiceover and its picture; "Not yet" needs a comment, and a comment given with "Record it" is treated as "Not yet": a comment always means
+    something should change. The gap is asked again once a shot of it has another video or still. Retired: the card with text only."""
     session, plan = ctx['session'], ctx['plan']
     if not plan:
         return []
     asked, items = session.get('chat_record_wait') or {}, []
     for gap in plan['gaps']:
         gid = gap['gap_id']
-        if gid not in session['accepted'] or gid in session['recorded_gaps'] or gid in asked:
+        if gid not in session['accepted'] or gid in session['recorded_gaps']:
             continue
         shots = V.shots_of(plan, session, gid)
-        if shots and all(s['id'] in session['selections'] or s['id'] in session['assets'] for s in shots):
-            def run_(choice, quote, words, gid=gid):
-                if choice == 'record':
-                    return V.record_gaps(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], [gid], quote)
-                s = V.session_of(ctx['store'], ctx['run'], ctx['outputs'])
-                s.setdefault('chat_record_wait', {})[gid] = words
-                V.save_session(ctx['store'], ctx['run'], s)
-                return {'for_the_assistant': words}
-            items.append(_item(f'record:{gid}', 'record', 'Recording', f"Gap {gid}{' · ' + gap['title'] if gap.get('title') else ''}: every shot of it is chosen. Record it into the film?", run_,
-                               [_button('Record it', 'record'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')]))
+        if not (shots and all(s['id'] in session['selections'] or s['id'] in session['assets'] for s in shots)):
+            continue
+        mark, waits = _gap_mark(session, shots), asked.get(gid)
+        if waits is not None and (not isinstance(waits, dict) or waits.get('mark') == mark):
+            continue   # their comment stands until the gap is made of something else
+
+        def run_(choice, quote, words, gid=gid, mark=mark):
+            words = ' '.join(str(words or '').split())
+            if choice == 'record' and not words:
+                return V.record_gaps(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], [gid], quote)
+            V.need(words, 'Say what should change in this gap before it is recorded, in your own words.')
+            s = V.session_of(ctx['store'], ctx['run'], ctx['outputs'])
+            s.setdefault('chat_record_wait', {})[gid] = {'words': words, 'mark': mark}
+            V.save_session(ctx['store'], ctx['run'], s)
+            return {'for_the_assistant': words}
+        ids = [s['id'] for s in shots]
+        names = V.shot_names(plan, session)
+        head = (f'{V.coded(names, ids[0])}\n' if len(ids) == 1 else '') + P.heading_text(session, plan, ids)
+        items.append(_item(f'record:{gid}:{mark[:10]}' if waits is not None else f'record:{gid}', 'record', 'Recording',
+                           f"Gap {gid}{' · ' + gap['title'] if gap.get('title') else ''}: every shot of it is chosen. Record it into the film?", run_,
+                           [_button('Record it', 'record'), _button('Not yet', 'wait', words=True, tell='Ask the operator what should change first.')],
+                           text=P.W['gap_comment'], show=[x for x in (P.shot_picture(session, sid) for sid in ids) if x], head=head))
     return items
 
 
@@ -2192,7 +2223,12 @@ def _message(item, summary):
     in one step. The question itself comes after, short."""
     subject, _ask = _split(item['question'], item.get('_name', ''))
     hint = '> To ask for a change in one step, choose **Other** and type what should change.' if _typed(item) else ''
-    parts = [f"**{item['position']}**", f'### {subject}' if subject else '', _paragraphs(item.get('text')), f'*{summary}*' if summary else '', hint]
+    line = item.get('_line') or {}
+    head = item.get('_head') or (f"{P.W['words_head']} {P.voiceover(line['words']) or P.W['no_voiceover']}" if isinstance(line.get('words'), str) and (line['words'] or line.get('where')) else '')   # part H: every card of a shot says its voiceover
+    said = str(item.get('text') or '')
+    if head and (head in said or (line.get('words') and str(line['words']) in said)):
+        head = ''   # the card's own text already carries it: never twice
+    parts = [f"**{item['position']}**", f'### {subject}' if subject else '', head, _paragraphs(item.get('text')), f'*{summary}*' if summary else '', hint]
     return '\n\n'.join(x for x in parts if x)
 
 
@@ -2414,7 +2450,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if show:
             V.save_session(store, run, session)
             out['show'], out['show_how'] = show, SHOW_FIRST
-    due = V.unapplied_line(session or {})   # release 1 of 27 Nov 2026, part F: an answer not applied is said first, every time
+    due = ' '.join(x for x in (V.unapplied_line(session or {}), gap_waits(session or {})) if x)   # release 1 of 27 Nov 2026, parts F and H: an answer not applied, a gap that waits for a change: said first, every time
     if due:
         out['then'] = due + (' ' + out['then'] if out.get('then') else '')
     return out

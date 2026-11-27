@@ -6,6 +6,7 @@ the operator gave on the page, in one call, through the same decision functions 
 
 The server stays the record. The page is a form: an answer counts only when the operator says "done" in the chat and the assistant sends it here.
 An answer names the item it was given to; an item's id holds its text's digest, so an answer to an older text of a line is ignored by name."""
+import time
 import hashlib
 import json
 from collections import Counter
@@ -1255,10 +1256,50 @@ def _page(conn, store, user, run, outputs):
                     'The Direction is accepted. The assistant writes the gap lines now; they will appear here.' if alone else 'Answer each line, then say done in the chat.'}
 
 
+class _Visit:
+    """Release 1 of 27 Nov 2026, part G: the store as one "done" of the page sees it. A stored file is read once in the visit; what the visit
+    writes is written at once, as before, and kept, so reading it back costs nothing. Everything else goes to the store itself. The run's
+    lock is held for the whole call, so nothing else writes this run's record meanwhile.
+    Why: on VW-25 a "done" with 30 answers took 286 s. The run's state (two reads of the store, 0.3 to 1.5 s on the live server) was loaded
+    again before every answer and again inside every answer, and the step's list of items was rebuilt each time.
+    Retired: the run's state read from the store again before every answer of one visit."""
+
+    def __init__(self, inner):
+        self.inner, self.seen, self.reads, self.writes = inner, {}, 0, 0
+
+    def get(self, key):
+        if key not in self.seen:
+            self.seen[key] = self.inner.get(key)   # a file that is missing raises and is not kept
+            self.reads += 1
+        return self.seen[key]
+
+    def put(self, key, data, *args, **kw):
+        out = self.inner.put(key, data, *args, **kw)
+        self.writes += 1
+        if isinstance(data, bytes):
+            self.seen[key] = data
+        else:
+            self.seen.pop(key, None)
+        return out
+
+    def delete(self, keys):
+        for k in [keys] if isinstance(keys, str) else list(keys):
+            self.seen.pop(k, None)
+        return self.inner.delete(keys)
+
+    def count(self):
+        return {'reads': self.reads, 'writes': self.writes}
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+
 def page_record(conn, store, user, run, outputs, answers):
     """Every answer the operator gave on the page, recorded in one call. The Direction first: when it is not simply accepted, the gap answers sent
     with it are dropped (every gap is written again from the new Direction). An answer to an item that is no longer open, or whose text changed,
-    is named as stale and changes nothing. A refusal is kept for its line and the other answers are still recorded."""
+    is named as stale and changes nothing. A refusal is kept for its line and the other answers are still recorded.
+    Release 1 of 27 Nov 2026, part G: the store is read through `_Visit` for this call; `took` and the log line say how long it took."""
+    started, store = time.monotonic(), _Visit(store)
     answers = [a for a in answers or [] if isinstance(a, dict)]
     answers.sort(key=lambda a: 3 if a.get('key') == 'sets:rest' and a.get('choice') == 'rest_out' else {'motion': 0, 'direction': 1, 'shared': 1, 'refs:proposals': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps; design/213 review: "leave some out" after the sets judged in the same visit (it is refused while one is unjudged)
     recorded, stale, refused, dropped, tell = [], [], [], [], ''
@@ -1426,5 +1467,6 @@ def page_record(conn, store, user, run, outputs, answers):
                                     T.C.due(here['session'], here['plan'], rows) if here['plan'] else '',
                                     PICTURES_LEFT.format(n=left) if now['step'] == T.W['step'] and left else now['then'] if now.get('closed') else TAKES_DONE) if x)
     said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
+    took = {'answers': len(answers), 'seconds': round(time.monotonic() - started, 1), **getattr(store, 'count', lambda: {'reads': 0, 'writes': 0})()}   # part G: measured on every "done"
     return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
-            'log': said or 'nothing answered'}   # design/205: the record call's own log line
+            'took': took, 'log': said + f"; {took['answers']} answer(s) in {took['seconds']} s, {took['reads']} file(s) read, {took['writes']} written" if said else 'nothing answered'}   # design/205: the record call's own log line

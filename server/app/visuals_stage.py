@@ -80,7 +80,7 @@ def save_json(store, k, value):
 
 def session_of(store, run, outputs, create=False):
     try:
-        return _with_shot_prints(store, load_json(store, key(run, 'session.json')))
+        return load_json(store, key(run, 'session.json'))
     except Problem:
         if not create:
             raise Problem(409, 'NOT_ALLOWED', 'Run `vw visuals prepare` first.')
@@ -104,27 +104,44 @@ def shot_prints(plan):
     return {sid: digest({'made_from': m, 'shared': shared}) for sid, m in made.items()}
 
 
-def _with_shot_prints(store, session):
-    """Issue 17 (R2): a plan version recorded before 0.128.4 gets its shots' fingerprints from its file, once (they are kept with the next save).
-    A file that cannot be read adds nothing: work made on that version counts as old, as before."""
-    for v in session.get('versions') or []:
-        if 'shots' not in v:
-            try:
-                v['shots'] = shot_prints(load_json(store, v['file']['key'])['document'])
-            except (Problem, KeyError, TypeError, ValueError):
-                pass
-    return session
+_PRINTS = []   # the plan last fingerprinted and its shots' fingerprints: a page asks once per render and video of one plan
 
 
-def other_plan(session, plan, job):
-    """Issue 17 (R2): this video or render was made on another plan AND what it was made from is not the same there as in the plan now: its own
-    shot's fingerprint (`shot_prints`) differs, or the version it was made on is unknown or has none. Work that names no plan is read as before.
-    Retired: any new plan version made every unaccepted video and every render of the film old (the whole plan's fingerprint was compared)."""
-    made_on = (job.get('request') or {}).get('plan_digest')
-    if not made_on or made_on == digest(plan):
-        return False
-    was = next((v.get('shots') or {} for v in session.get('versions') or [] if v.get('plan_digest') == made_on), {}).get(job.get('unit'))
-    return not was or was != shot_prints(plan).get(job.get('unit'))
+def shot_print(plan, shot_id):
+    """Release 1 of 27 Nov 2026, part B: the fingerprint of one shot in this plan (`shot_prints`), None when the plan does not hold the shot.
+    A render and a video record it when they are ordered (`shot_print` in the request)."""
+    if not _PRINTS or _PRINTS[0] is not plan:
+        _PRINTS[:] = [plan, shot_prints(plan)]
+    return _PRINTS[1].get(shot_id)
+
+
+OLD_WORK = {'drawn': 'The plan changed since this drawing was rendered; render it again (`vw visuals draw --shot S`).',
+            'motion': 'The plan changed since this drawing was rendered; render it again (`vw motion render --shot S`).',
+            'guide': 'The plan changed since this take was shot; make the shot again from its guide (`vw guide status --shot {shot}`).',
+            'older': 'The plan, references or generator changed since this take was prepared; prepare a current take.'}
+
+
+def select_gate(session, plan, shot_id, made, job=None):
+    """Release 1 of 27 Nov 2026, part B (SK, question 7): the one check that says whether finished work may still go into the film: '' when it
+    may, else the refusal's words. `select_take` asks it before it records; the page and the chat card ask it for every finished drawing and
+    video, so they never offer what Select refuses. It records nothing and reads only what is loaded. `made`: what the work recorded when it
+    was ordered (the request file, or the job's request): `shot_print`, the fingerprint of its own shot then; for a drawing, the shared parts
+    it placed. Work is old when that fingerprint is not the shot's fingerprint in the plan now; work with no stamp (made before this release)
+    counts as old. An unexpected error is said for that item, never raised: the other items are still shown.
+    Retired: Select's three comparisons of the whole plan, the page's own rule kept apart (`other_plan`), the plan version deciding anything."""
+    try:
+        kind = made.get('kind') if made.get('kind') in ('drawn', 'motion') else 'guide' if made.get('kind') in GUIDE_KINDS + ('take',) else 'older'
+        if not made.get('shot_print') or made['shot_print'] != shot_print(plan, shot_id):
+            return OLD_WORK[kind].format(shot=shot_id)
+        if kind == 'motion':   # design/221 row 1: a drawing rendered with parts that are not the approved ones now is rendered again
+            used = made.get('parts') or {}
+            used = used['used'] if isinstance(used.get('used'), dict) else used   # the request file keeps {key, used}; the job's request keeps the parts used
+            now = {x['id']: x.get('digest') for x in (session.get('motion_parts_approved') or {}).get('parts') or []}
+            if any(now.get(pid) != dg for pid, dg in used.items()):
+                return MOTION_PARTS_CHANGED.format(shot=shot_id)
+        return ''
+    except Exception as exc:   # one item that cannot be checked never blanks the page
+        return f'{shot_id} could not be checked ({exc.__class__.__name__}: {exc}). Tell the builder.'
 
 
 def save_session(store, run, session):
@@ -774,7 +791,7 @@ def new_version(store, run, session, plan, user, warnings, answers=''):
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     pk = save_json(store, key(run, f'plan-v{version}.json'), record)
     identity = digest(plan)
-    session['versions'].append({'version': version, 'file': pk, 'plan_digest': identity, 'warnings': warnings, 'shots': shot_prints(plan)})   # issue 17 (R2)
+    session['versions'].append({'version': version, 'file': pk, 'plan_digest': identity, 'warnings': warnings})   # release 1 of 27 Nov 2026, part B: no fingerprints of its shots; the work carries its own
     session['current'] = identity
     was = set(session.get('was_accepted') or {})
     kept, quiet, asked = _carry_acceptances(session, plan, version, prev, answer)
@@ -6330,6 +6347,7 @@ def prepare_take(store, user, run, outputs, body):
         need(abs(a - b) <= 0.01 * a, f"The start ({s['width']}x{s['height']}) and the end ({e['width']}x{e['height']}) differ in aspect ratio; "
                                      "generate the end from the start at the start's own size, or pick a start of the film's frame.")
     record = {'contract': 'videowizard-video-request-v1', 'run_id': str(run['id']), 'shot_id': body['shot_id'], 'plan_digest': base['plan_digest'],
+              'shot_print': shot_print(plan_full, body['shot_id']),   # release 1 of 27 Nov 2026, part B
               'base_preparation_digest': base['preparation_digest'], 'motion_prompt': body['motion_prompt'], 'subject_reconciliation': body['subject_reconciliation'],
               'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration), 'camera_move': shot.get('camera_move') or '',   # design/112 S4
               'aspect_ratio': aspect_of(run, outputs, 'take', body),   # design/139 R1: the AI video shape
@@ -6511,13 +6529,10 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     reviews = session['reviews'].get(str(job_id), [])
     need(reviews and reviews[-1]['decision'] == 'accepted', 'Select only a take whose latest review is accepted.')
     prep = load_json(store, job['request']['request_key'])
-    if prep.get('kind') in ('drawn', 'motion'):   # design/113 E3: a drawing stands on the plan it was rendered from; design/130: so does a motion drawing
-        again = '`vw motion render --shot S`' if prep.get('kind') == 'motion' else '`vw visuals draw --shot S`'
-        need(prep.get('plan_digest') == digest(current_plan(store, session)), f'The plan changed since this drawing was rendered; render it again ({again}).')
-        made = (session.get('motion_projects') or {}).get(prep.get('sha256') or '') if prep.get('kind') == 'motion' else None
-        if made:   # design/221 row 1: a drawing rendered with parts that are not the approved ones now is rendered again, not rebuilt
-            from . import motion
-            need((prep.get('parts') or {}).get('used') == parts_in_force(session, motion.unpack(store.get(made['key']))).get('used'), MOTION_PARTS_CHANGED.format(shot=job['unit']))
+    plan = current_plan(store, session)
+    refusal = select_gate(session, plan, job['unit'], prep, job)   # release 1 of 27 Nov 2026, part B: the one gate, the page's too
+    need(not refusal, refusal)
+    if prep.get('kind') in ('drawn', 'motion'):   # design/113 E3: a drawing stands on its own shot as it was rendered; design/130: so does a motion drawing
         failed = [l.get('check') for l in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('must_failed') or []]   # design/117 answer 1: held after the loop
         need(not failed or str(notes or '').strip(), f"This drawing is held: {', '.join(failed)} still failed after the server's passes. Select it with --notes saying why it is taken anyway, or reject it with what to change.")
         if prep.get('kind') == 'motion':   # design/130 §4 step 6: a motion drawing is selected after a clean fact check of the project it was rendered from
@@ -6528,17 +6543,11 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
             changed = stale_brief(store, run, outputs, session, prep.get('sha256'), job['unit'])   # design/221 (the critic's A2): a pass on an older brief is no pass
             need(not changed or str(notes or '').strip(), MOTION_BRIEF_CHANGED.format(shot=job['unit'], names=', '.join(f'"{k}"' for k in changed))
                  + ' Or select it with --notes saying why it is taken anyway.')
-        context = prep['plan_digest']
-    elif prep.get('kind') in GUIDE_KINDS:   # integration step D: a take made from a guide stands on the plan it was shot for. design/223: nobody checks it, so nothing of a check is asked;
+    elif prep.get('kind') in GUIDE_KINDS:   # integration step D: a take made from a guide. design/223: nobody checks it, so nothing of a check is asked;
         # and only a video at the version size goes into the film (a 360p take gets its full-size copy first)
-        need(prep.get('plan_digest') == digest(current_plan(store, session)), f"The plan changed since this take was shot; make the shot again from its guide (`vw guide status --shot {job['unit']}`).")
         from . import corrections
         need(corrections.final(job), f"This take is {corrections.size_of(job)}: the film takes its {corrections.VERSION_SIZE} video. Accept it on the page (or `vw visuals decide`): its full-size video is made and shown first.")
-        context = prep['plan_digest']
-    else:
-        live = packet(store, run, outputs, job['unit'], session)
-        need(live['preparation_digest'] == prep['base_preparation_digest'], 'The plan, references or generator changed since this take was prepared; prepare a current take.')
-        context = live['preparation_digest']
+    context = prep.get('shot_print')   # what the selection stands on: its own shot, as the work was made from it
     session['selections'][job['unit']] = {'job_id': str(job_id), 'review_id': reviews[-1]['id'], 'preparation_id': job['request']['preparation_id'], 'context_digest': context,
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id'],
                                           **take_in_point(prep, job, in_s)}
@@ -6587,7 +6596,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     frames = shot['end_frame'] - shot['start_frame']
     exact = Fraction(frames) / Fraction(str(fps))
     request = {'kind': 'drawn', 'shot_id': shot['id'], 'scene': {'sha256': sv['sha256'], 'actions': sv.get('actions') or []}, 'svg_key': row['key'], 'width': W, 'height': H, 'fps': str(fps),
-               'frames': frames, 'cues': cues, 'images': images, 'plan_digest': digest(plan), 'style_key': style['key'] if style else None,
+               'frames': frames, 'cues': cues, 'images': images, 'plan_digest': digest(plan), 'shot_print': shot_print(plan, shot['id']), 'style_key': style['key'] if style else None,
                'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
                **({'font_key': session['font']['key'], 'font_name': Path(session['font']['name']).stem} if session.get('font') else {}),
                **({'film_font': next(iter(film_font_files(run))), 'font_name': film.font(run)} if film_font_files(run) else {}),   # design/139 R13
@@ -6603,7 +6612,8 @@ def render_drawn(conn, store, user, run, outputs, body):
         save_session(store, run, session)
         return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this scene (nothing changed): see it on the Takes step.'}
     row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
-                        (run['id'], shot['id'], Jsonb({'kind': 'drawn', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': float(exact)}))).fetchone()
+                        (run['id'], shot['id'], Jsonb({'kind': 'drawn', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': float(exact),
+                                                       'shot_print': request['shot_print']}))).fetchone()   # release 1 of 27 Nov 2026, part B
     save_session(store, run, session)
     return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames,
             'next': f'Rendering {frames} frames, free: the server reads a sheet of every frame, fixes the scene up to twice, then shows the drawing and its sheet on the Takes step; '
@@ -7339,7 +7349,8 @@ def _motion_request(store, session, run, shot_id, sha=None):
         **({'note': {'text': note, 'fonts': note_fonts, 'colour': note_colour(plan, run)}} if note else {}),
         'kind': 'motion', 'shot_id': shot['id'], 'sha256': sha, 'project_key': row['key'], 'width': W, 'height': H, 'fps': str(fps), 'frames': frames,
         'images': images, 'fonts': fonts, 'labels': labels, 'sidecar': motion.sidecar(seconds, [c['selector'] for c in cues or []]),
-        'plan_digest': digest(plan), 'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
+        'plan_digest': digest(plan), 'shot_print': shot_print(plan, shot['id']),   # release 1 of 27 Nov 2026, part B: its own shot's fingerprint
+        'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
         'claims': shot.get('claims') or [], 'relationships': (spec or {}).get('relationships') or [], 'view': spec_view(shot)[0] if spec else None,
         'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
 
@@ -7398,7 +7409,7 @@ def render_motion(conn, store, user, run, outputs, body):
         return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this project (nothing changed): it is on the Pictures and drawn graphics step (`vw visuals page`).'}
     row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
                         (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact,
-                                                       'sha256': request['sha256'], 'plan_digest': request['plan_digest'],   # design/221 (the critic's points 3, 4): the step-6 count reads
+                                                       'sha256': request['sha256'], 'plan_digest': request['plan_digest'], 'shot_print': request['shot_print'],   # design/221 (the critic's points 3, 4): the step-6 count reads
                                                        'parts': (request.get('parts') or {}).get('used') or {}}))).fetchone()   # which project it rendered and whether it went stale
     save_session(store, run, session)
     return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames, **({'finish': request['finish'], 'tell_the_operator': motion.finish_words(request['finish'])} if request.get('finish') else {}),

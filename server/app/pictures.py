@@ -48,7 +48,8 @@ W = {
     # (design/35 rows 275, 276): the warning is in view before the buttons, and Yes or Select records at once as approved against the check
     'against_note': "Used all the same: the operator's one click, with the warning in view.", 'log_against': 'approved against the check: {faults}',
     'log_against_drawn': 'selected against the check: {why}',
-    'where': 'In the film at {start} to {end} ({secs} s) · {gap}', 'words_head': 'The words under it:', 'try': 'Try {n}',
+    'where': 'In the film at {start} to {end} ({secs} s) · {gap}', 'words_head': 'Voiceover:', 'no_voiceover': 'no voiceover under this shot',
+    'gap_comment': 'A comment means something should change: the gap is then not recorded, whichever button you press.', 'try': 'Try {n}',
     'foot_still': 'Your footage: click one to see it beside the new picture', 'foot_still_try': 'Your footage and the earlier try: click one to see it beside the new picture',
     'foot_steps': 'Your footage: click one to see it beside the steps', 'foot_steps_try': 'Your footage and the earlier try: click one to see it beside the steps',
     'foot_drawn': 'Your footage: click one to see it beside the drawing',
@@ -871,7 +872,7 @@ def _t(frames, fps):
 
 def where(session, plan, shot_id):
     """The film-time line of a shot, its gap, and the words under it."""
-    fps = float(Fraction(str(V._fps(session) or 25)))
+    fps = float(Fraction(str((V._fps(session) if session.get('source') else None) or 25)))   # a card's heading never fails for the film's frame rate
     name = V.coded(V.shot_names(plan, session), shot_id)   # VW-25 issue 7: the shot in words, its code last
     for gap, sh in V._accepted_shots(plan, session):
         if sh['id'] == shot_id:
@@ -879,6 +880,65 @@ def where(session, plan, shot_id):
             return {'where': W['where'].format(start=_t(sh['start_frame'], fps), end=_t(sh['end_frame'], fps), secs=f"{(sh['end_frame'] - sh['start_frame']) / fps:.1f}", gap=gap_words),
                     'at': _t(sh['start_frame'], fps), 'words': str(sh.get('narration') or ''), 'shot': sh, 'gap': gap, 'name': name}
     return {'where': '', 'at': '', 'words': '', 'shot': None, 'gap': None, 'name': name}
+
+
+VOICEOVER_MAX = 400   # characters of a shot's voiceover on a card; longer is cut at a sentence end
+
+
+def voiceover(words):
+    """Release 1 of 27 Nov 2026, part H: the narration spoken during a shot, whole; a long one is cut at the last sentence end inside
+    VOICEOVER_MAX (at a word when it has none), with "…". Any script is shown as written."""
+    text = ' '.join(str(words or '').split())
+    if len(text) <= VOICEOVER_MAX:
+        return text
+    head = text[:VOICEOVER_MAX]
+    ends = [m.end() for m in re.finditer(r'[.!?।။。](?=\s)', head)]
+    return (head[:ends[-1]] if ends else head[:head.rfind(' ')] if ' ' in head else head) + ' …'
+
+
+def heading(session, plan, shot_id):
+    """Part H (SK, 27 Nov 2026: a code tells the operator nothing; the voiceover does): the one heading of a shot, for every card and page line:
+    its name in words with the code last, and the voiceover spoken during it ("no voiceover under this shot" when there is none)."""
+    w = where(session, plan, shot_id)
+    return {'name': w['name'], 'voiceover': voiceover(w['words']) or W['no_voiceover']}
+
+
+def heading_text(session, plan, shot_ids, most=None):
+    """The heading as a card's text. One shot: its voiceover (the card's question begins with its name). Several: each shot's name and
+    voiceover, in the order given; with `most`, the first `most` and then how many more."""
+    ids = list(shot_ids or [])
+    if not ids:
+        return ''
+    head = W['words_head']
+    if len(ids) == 1:
+        return f"{head} {heading(session, plan, ids[0])['voiceover']}"
+    shown = ids[:most] if most else ids
+    rows = [f"- {h['name']}\n  {head} {h['voiceover']}" for h in (heading(session, plan, sid) for sid in shown)]
+    left = len(ids) - len(shown)
+    return '\n'.join(rows + ([f"and {left} more shot{'' if left == 1 else 's'}."] if left else []))
+
+
+def shot_picture(session, shot_id):
+    """Part H: the picture that stands for a shot on a card, where one exists: the still placed in the film, else the chosen video's frame
+    sheet (or the video), else the approved still of its AI video, else its newest made picture. {key, name} or None; nothing is made for it."""
+    refs = session.get('references') or {}
+    asset = (session.get('assets') or {}).get(shot_id) or {}
+    ref = refs.get(asset.get('reference_id') or '')
+    if ref and ref.get('key'):
+        return {'key': ref['key'], 'name': f'{shot_id}.png'}
+    sel = (session.get('selections') or {}).get(shot_id) or {}
+    if sel:
+        sheet = ((session.get('take_checks') or {}).get(str(sel.get('job_id'))) or {}).get('sheet_key')
+        if sheet:
+            return {'key': sheet, 'name': f'{shot_id}-frames.jpg'}
+        if (sel.get('take') or {}).get('key'):
+            return {'key': sel['take']['key'], 'name': f'{shot_id}.mp4'}
+    still = next((st for st in reversed(((session.get('guides') or {}).get(shot_id) or {}).get('stills') or []) if st.get('status') == 'approved' and st.get('key')), None)
+    if still:
+        return {'key': still['key'], 'name': f'{shot_id}-still.png'}
+    mine = [r for r in refs.values() if r.get('key') and r.get('status') in ('approved', 'candidate') and V.made_for(session, r) == shot_id]
+    best = next((r for r in reversed(mine) if r.get('status') == 'approved'), mine[-1] if mine else None)
+    return {'key': best['key'], 'name': f'{shot_id}.png'} if best else None
 
 
 def footage(session, gap):
@@ -1128,14 +1188,10 @@ def _ts(v):
 
 
 def _stale(session, plan, job):
-    """design/221 (the critic's point 4): a render made on another plan, or with shared parts that are not the approved ones now; a render row from
-    before 0.117.0 names neither and is read as before. ponytail: compares the parts the render placed; a part the project starts to place only
-    because a new upload added its id is caught by select_take."""
-    req = job.get('request') or {}
-    if V.other_plan(session, plan, job):   # issue 17 (R2): another plan, and this shot is not the same in it
-        return True
-    now = {p['id']: p.get('digest') for p in (session.get('motion_parts_approved') or {}).get('parts') or []}
-    return any(now.get(pid) != dg for pid, dg in (req.get('parts') or {}).items())
+    """A render Select would refuse (`visuals_stage.select_gate`, release 1 of 27 Nov 2026, part B: the one gate): its own shot is not as it was
+    when it was rendered, the shared parts it placed are not the approved ones now, or it carries no stamp of its shot (made before the release).
+    Retired: the page's own rule (the plan version looked up, the parts compared here)."""
+    return bool(V.select_gate(session, plan, job.get('unit'), job.get('request') or {}, job))
 
 
 def _failed_render(session, sid, rows, last):

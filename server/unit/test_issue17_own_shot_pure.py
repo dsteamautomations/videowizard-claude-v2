@@ -6,7 +6,9 @@ before, not yet accepted, became "must be made again (the plan changed)" and cou
 video or a render remembered the fingerprint of the whole plan. Now each plan version keeps a fingerprint per shot (the shot, its scene and its
 part of the film without their other shots, the things it shows and their facts, the part every gap shares), and work made on another version is
 old only when its own shot's fingerprint differs. The older way (any new plan version made every unaccepted video and every render of the film
-old) is retired. Without a database."""
+old) is retired.
+Release 1 of 27 Nov 2026, part B: the work itself now records its own shot's fingerprint when it is ordered (`shot_print`), so nothing is
+looked up by plan version; work with no stamp counts as old. The tests give the stamp. Without a database."""
 import copy
 import json
 
@@ -43,7 +45,7 @@ def shots(p):
 
 
 def made_on(p, sid='S1'):
-    return [job('j1', sid=sid, plan_digest=V.digest(p))]
+    return [job('j1', sid=sid, shot_print=V.shot_print(p, sid))]   # as ordered on this plan
 
 
 def test_a_change_to_another_shot_leaves_the_video_as_made_and_it_can_be_accepted(held, monkeypatch):
@@ -97,7 +99,7 @@ def test_a_change_to_what_the_shot_does_not_show_leaves_it(held, change):
     assert [i['state'] for i in T.expected(s, p, made_on(one), NOW)][0] == T.STATE['done']
 
 
-def test_the_work_is_compared_with_the_version_it_was_made_on_not_the_one_before(held):
+def test_the_work_is_compared_with_the_shot_as_it_was_made_from_not_with_the_version_before(held):
     one = base()
     two = changed(one, lambda q: shots(q)[0].update(narration='Changed in version 2'))
     three = changed(two, lambda q: shots(q)[1].update(narration='Only the other shot changed in version 3'))
@@ -110,19 +112,19 @@ def test_the_work_is_compared_with_the_version_it_was_made_on_not_the_one_before
     assert not T._stale(s, p, made_on(one)[0]) and T._stale(s, p, made_on(two)[0])
 
 
-def test_a_version_that_is_unknown_or_has_no_shot_fingerprints_is_old_as_before(held):
+def test_work_with_no_stamp_or_whose_shot_left_the_plan_is_old(held):
     one = base()
     s, p = film(one, changed(one, lambda q: shots(q)[1].update(narration='x')))
-    assert T._stale(s, p, job('j1', plan_digest='another plan'))        # no version of this film
-    assert not T._stale(s, p, job('j1'))                                # work that names no plan is read as before
-    del s['versions'][0]['shots']                                       # the earlier version's file could not be read
-    assert T._stale(s, p, made_on(one)[0])
-    assert T._stale(film(one, changed(one, lambda q: shots(q).pop(0)))[0], changed(one, lambda q: shots(q).pop(0)), made_on(one)[0])   # the shot left the plan
+    assert T._stale(s, p, job('j1', shot_print='the fingerprint of another shot'))
+    assert T._stale(s, p, job('j1', shot_print=''))                     # made before the release: no stamp
+    assert T._stale(s, p, job('j1', shot_print='', plan_digest=V.digest(p)))   # the plan it names decides nothing
+    gone = changed(one, lambda q: shots(q).pop(0))
+    assert T._stale(film(one, gone)[0], gone, made_on(one)[0])          # the shot left the plan
 
 
 def test_a_render_of_a_drawn_graphic_follows_the_same_rule():
     one = base()
-    render = {'unit': 'S1', 'request': {'kind': 'motion', 'plan_digest': V.digest(one)}}
+    render = {'unit': 'S1', 'request': {'kind': 'motion', 'shot_print': V.shot_print(one, 'S1')}}
     for change, old in [(lambda q: shots(q)[1].update(narration='x'), False), (lambda q: shots(q)[0].update(narration='x'), True),
                         (lambda q: q['foundation'].update(treatment='x'), True)]:
         s, p = film(one, changed(one, change))
@@ -132,17 +134,13 @@ def test_a_render_of_a_drawn_graphic_follows_the_same_rule():
     assert P._stale(s, p, {**render, 'request': {**render['request'], 'parts': {'part-a': 'old'}}})   # the shared parts test stays
 
 
-def test_a_new_plan_version_keeps_its_shots_fingerprints_and_an_older_one_gets_them_from_its_file():
+def test_a_plan_version_keeps_no_fingerprints_of_its_shots_any_more():
+    """Release 1 of 27 Nov 2026, part B: the work carries its own stamp, so a plan version keeps none and no older plan file is read for them."""
     doc = plan_doc([plan_shot('AN1', 0, 500, 'animation', states=[{'what_appears': x, 'hold_s': 5} for x in 'abcd'])], [plan_shot('VS1', 900, 1150, 'video')])
     store = store_with(stored_session())
     V.treatment(store, USER, FILM, [], {**TREATMENT, 'direction': 'Show the hollow inside the wall.'}, 'yes')
     V.propose(FakeConn(), store, USER, FILM, [], doc)
     stored = json.loads(store.files['run-1/visuals/plan-v1.json'])['document']
-    assert saved(store)['versions'][0]['shots'] == V.shot_prints(stored) and set(V.shot_prints(stored)) == {'AN1', 'VS1'}
-    old = saved(store)
-    del old['versions'][0]['shots']   # a version recorded before this release
-    store.files['run-1/visuals/session.json'] = json.dumps(old).encode('utf-8')
-    assert V.session_of(store, FILM, [])['versions'][0]['shots'] == V.shot_prints(stored)
-    del store.files['run-1/visuals/plan-v1.json']   # its file cannot be read: nothing is added, nothing fails
-    assert 'shots' not in V.session_of(store, FILM, [])['versions'][0]
+    assert 'shots' not in saved(store)['versions'][0] and set(V.shot_prints(stored)) == {'AN1', 'VS1'}
+    assert not hasattr(V, '_with_shot_prints')
     assert V.shot_prints({'gaps': [], 'elements': []}) == {}

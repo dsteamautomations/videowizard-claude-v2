@@ -32,7 +32,7 @@ def test_s4_a_take_for_an_older_plan_is_on_the_page_and_cannot_be_selected(held)
     s['guides'].update(S1=guide(takes=['j1']))
     s['take_checks'].update(j1=rec(look=look()))
     held(s, p)
-    rows = [job('j1', plan_digest='another plan')]
+    rows = [job('j1', shot_print='of another plan')]
     assert T.complete(T.expected(s, p, rows, NOW))                         # it does not keep the page closed
     line = line_of(s, p, rows)
     assert [b['choice'] for b in line['buttons']] == ['again'] and line['takes'][0]['short'] == T.W['stale']   # design/223: it cannot be accepted; the operator says what should change

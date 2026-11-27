@@ -253,7 +253,7 @@ def _queue(conn, store, run, session, shot_id, c, spec):
     src, gen = c['source'], video_generators.GUIDE
     plan = VS.current_plan(store, session)
     placement = (VS.load_json(store, src['request_key']) or {}).get('placement') if src.get('request_key') else None
-    record = {'contract': 'videowizard-version-v1', 'kind': spec['kind'], 'route': c['route'], 'run_id': str(run['id']), 'shot_id': shot_id, 'plan_digest': VS.digest(plan),
+    record = {'contract': 'videowizard-version-v1', 'kind': spec['kind'], 'route': c['route'], 'run_id': str(run['id']), 'shot_id': shot_id, 'plan_digest': VS.digest(plan), 'shot_print': VS.shot_print(plan, shot_id),
               'correction_id': c['id'], 'source': {k: src[k] for k in ('job_id', 'key', 'sha256')}, 'pictures': spec.get('pictures') or [], 'effective_prompt': spec['text'],
               'provider': gen['provider'], 'model': gen['model'], 'aspect_ratio': gen['aspect_ratio'], 'resolution': VERSION_SIZE, 'duration_seconds': src['seconds'], 'placement': placement,
               **({'cut_s': float(spec['cut_s'])} if spec['kind'] == 'remake' else {})}
@@ -264,7 +264,7 @@ def _queue(conn, store, run, session, shot_id, c, spec):
     VS.save_json(store, k, record)
     session.setdefault('preparations', {})[shot_id] = {'preparation_id': identity, 'key': k, 'guide': True}
     job_id = guide._queue(conn, run, shot_id, 'video', {'kind': 'take', 'route': c['route'], 'version': spec['kind'], 'preparation_id': identity, 'request_key': k, 'provider': gen['provider'],
-                                                        'model': gen['model'], 'duration_seconds': src['seconds'], 'resolution': VERSION_SIZE, 'plan_digest': record['plan_digest'], 'from_job': src['job_id']})
+                                                        'model': gen['model'], 'duration_seconds': src['seconds'], 'resolution': VERSION_SIZE, 'plan_digest': record['plan_digest'], 'shot_print': record['shot_print'], 'from_job': src['job_id']})
     c.setdefault('jobs', []).append(job_id)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'version sent', 'job_id': job_id, 'route': c['route'], 'version': spec['kind'], 'reason': c.get('reason') or '', 'words': c.get('words') or '',
                                                     'from_job': src['job_id'], 'answered_job': c['job_id'], 'prompt': spec['text'], 'pictures': [p['id'] for p in spec.get('pictures') or []],

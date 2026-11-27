@@ -10,6 +10,7 @@ import pytest
 
 from app import corrections as C, guide as G, takes as T, video_generators as VG, video_providers as VP, visuals_stage as V
 from app.errors import Problem
+from test_visuals_stage_pure import CURRENT   # release 1 of 27 Nov 2026, part B: a hand-built job is of the plan in force
 
 RUN, USER = {'id': 'run-1', 'code': 'VW-99'}, {'id': 'u1', 'name': 'Op'}
 NOW = datetime(2026, 11, 22, 12, 0, tzinfo=timezone.utc)
@@ -28,7 +29,7 @@ def plan(*shots):
 
 def job(jid, sid='S1', status='ready', size='360p', at='2026-11-22T10:00:00+00:00', error=None, **req):
     return {'id': jid, 'run_id': 'run-1', 'unit': sid, 'provider': 'video', 'status': status, 'updated_at': at, 'created_at': at, 'error': error,
-            'request': {'kind': 'take', 'request_key': f'run-1/visuals/takes/{jid}.request.json', 'duration_seconds': 5, **({'resolution': size} if size else {}), **req},
+            'request': {'kind': 'take', 'request_key': f'run-1/visuals/takes/{jid}.request.json', 'duration_seconds': 5, 'shot_print': CURRENT, **({'resolution': size} if size else {}), **req},
             'result': {'key': f'run-1/visuals/takes/{jid}.mp4', 'sha256': jid.ljust(64, '0'), 'bytes': 1, 'evidence': {'duration_seconds': 5.04, 'timing_matches_placement': True}} if status == 'ready' else {}}
 
 
@@ -673,7 +674,7 @@ def test_the_chat_says_once_what_was_ordered_with_its_seconds_and_amount(held):
 
 def test_a_video_made_for_an_earlier_plan_cannot_be_accepted(held):
     s, p = session(), plan(shot('S1'))
-    box = held(s, p, [job('j1', plan_digest='another plan')])
+    box = held(s, p, [job('j1', shot_print='of another plan')])
     assert [i['state'] for i in T.expected(s, p, box['rows'], NOW)] == ['must be made again (the plan changed)']
     assert 'earlier plan' in refused(lambda: answer(box, 'select'))
 

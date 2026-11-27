@@ -15,6 +15,7 @@ pytest.importorskip('playwright.sync_api')
 from app import chat_flow as CF, page_flow as PF, pictures as P, visuals_stage as V
 from test_design217_browser_pure import ROUND as FIXTURE, answers, browser, go, page, saved   # noqa: F401 (`browser` is the fixture)
 from test_design217_server_pure import RUN, USER, plan, ref, session
+from test_visuals_stage_pure import CURRENT   # release 1 of 27 Nov 2026, part B: a hand-built job is of the plan in force
 
 NOW = datetime.now(timezone.utc)
 SHA = {k: k[0] * 64 for k in ('a', 'b', 'c', 'd', 'e', 'f')}
@@ -56,7 +57,7 @@ def film():
     s['motion_checks'] = {'D1': [{'sha256': 'p' * 64, 'round': 3, 'rules': [{'rule': f'rule {n}', 'pass': True} for n in range(53)], 'stranger': ['0.1 s: a wall section.']}],
                           'D2': [{'sha256': 'q' * 64, 'round': 2, 'rules': [{'rule': f'rule {n}', 'pass': n > 1} for n in range(53)], 'stranger': ['0 s: a slab.']}]}
     s['assets'] = {}
-    take = lambda jid, unit, fin, rk: {'id': jid, 'unit': unit, 'provider': 'drawn', 'status': 'ready', 'request': {'kind': 'motion', 'request_key': rk},
+    take = lambda jid, unit, fin, rk: {'id': jid, 'unit': unit, 'provider': 'drawn', 'status': 'ready', 'request': {'kind': 'motion', 'request_key': rk, 'shot_print': CURRENT},
                                        'result': {'key': f'run-1/takes/{jid}.mp4', 'sha256': jid * 8, 'sheet_key': f'run-1/takes/{jid}-sheet.jpg',
                                                   'evidence': {'timing_matches_placement': True, 'exact_seconds': 4.8}, 'finish': fin}}
     jobs = [take('j1', 'D1', ['grain', 'vignette'], 'rk1'), take('j2', 'D2', [], 'rk2')]
