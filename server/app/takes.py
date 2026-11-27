@@ -28,7 +28,8 @@ W = {
     'say_resend': 'The same request is sent once more when you say done.',
     'end_select': 'Take {n} accepted, in the film at {at}.', 'end_copy': 'Take {n} accepted; its full-size video is made.', 'end_again': 'Take {n} corrected: "{words}"',
     'end_resend': 'The same request sent once more.',
-    'hint_again': 'What is wrong with it? Say it in plain words.', 'go_again': 'Send these words', 'need_words': 'Write what is wrong first. The correction is made from these words.',
+    'hint_again': ('What is wrong with it? Say what you see, where, and what should be there instead. A correction can change things in the picture and what happens; '
+                   'it cannot change the camera (no zoom, no pan, no steadier camera).'), 'go_again': 'Send these words', 'need_words': 'Write what is wrong first. The correction is made from these words.',
     'paid': 'A new video is paid. Its price is said in the chat when you say done; nothing is ordered before that.',
     'log_short': ', shorter than its place in the film',
     'said': 'You said: {words}',
@@ -54,6 +55,10 @@ W = {
     'page_now': 'Every take is made: the operator answers them on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. ',
     'help': ['Each shot on the left has one take to answer. Play it. Accept it, or say what is wrong with it in plain words. Answer in any order, then say done in the chat.',
              'Nobody has checked these takes: they are shown as they were made. You are the judge.',
+             # SK, 27 Nov 2026 (VW-25: two of twelve takes ended at "no route" on a camera complaint): what a correction can change, said before the operator writes
+             'A correction can change a thing in the picture (an object, a surface, a colour, a size, something to add or remove) and what happens (the action, the movement, '
+             'how it ends). It cannot change the camera: every AI video shot has one camera, held still with a slight handheld movement, with no zoom and no pan. '
+             'Say what you see, where, and what should be there instead.',
              'You are never asked for seconds, a cause or a way to correct. Say what you see and what should be there instead; Claude chooses how it is corrected.',
              'A first take is small. When you accept it, its full-size video is made; you see the two side by side before it goes in the film.',
              'A corrected take is shown beside the one it was made from: "Play both together" plays the two at once. Accept it, or say what is still wrong. There is no limit on rounds.',
