@@ -52,6 +52,7 @@ def extract(filename, data):
         raise
     except Exception:
         raise ExtractionError('This document could not be read. Try an unlocked PDF, DOCX or UTF-8 text copy.') from None
+    text = text.replace('\r\n', '\n').replace('\r', '\n')   # 27 Nov 2026 (sweep, intake 1): one form of line end; a Windows text file kept its own and the next step refused the script
     if len(text) > MAX_TEXT:
         raise ExtractionError('The document exceeds 200,000 characters. Split it explicitly; nothing was truncated.')
     return {'text': text, 'warnings': warnings, 'needs_readable_copy': not text.strip() or bool(missing)}

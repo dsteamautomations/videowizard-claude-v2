@@ -34,7 +34,7 @@ def proposal(ws, **over):
 
 
 def test_numbered_script_goes_to_a_file_and_the_prompt_never_does(ws):
-    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    (ws / 'in' / 'source.txt').write_bytes(SOURCE.encode())   # bytes: on Windows write_text makes other line ends, and the test compares the file's own digest
     out = intake_prepare(ws, PROC, prior, earlier_titles=[{'code': 'VW-3', 'title': 'All About Rat-Trap Bond Masonry - Documentary Explainer'}])
     numbered = (ws / 'work' / 'intake-numbered.md').read_text(encoding='utf-8')
     assert numbered.startswith('1: Scene 1: The yard\n2: \n3: Narration: Earth blocks')
@@ -198,3 +198,15 @@ def test_record_keeps_the_documents_visual_lines_per_scene(ws):
                                                          {'heading': 'Scene 2: Two', 'lines': ['A roof.'], 'narration_starts': 'Second scene words.'}]
     assert stages_text.visual_lines('Just words.\n', []) == []
     assert stages_text.visual_lines('Seen: a kiln\nWords.\n', [{'line': 1, 'kind': 'visual_note', 'why': ''}]) == [{'heading': '', 'lines': ['Seen: a kiln'], 'narration_starts': 'Words.'}]
+
+
+@pytest.mark.parametrize('line_end', ['\r\n', '\r'])   # Windows (Notepad and most Windows editors), and the old Mac form
+def test_a_text_script_with_other_line_ends_is_recorded_and_read_back_by_the_next_step(ws, line_end):
+    """Sweep of 27 Nov 2026, intake finding 1 (SK: operators work on Windows too): the line ends stayed in the cleaned script, so the brief and the
+    script step refused it as "differs from the recorded one" on every machine."""
+    (ws / 'in' / 'source.txt').write_bytes(SOURCE.replace('\n', line_end).encode('utf-8'))
+    out = intake_prepare(ws, PROC, prior)
+    assert out['lines'] == 11 and out['characters'] == len(SOURCE)
+    proposal(ws)
+    summary = intake_record(ws, PROC, prior, title='T', client='VK')['summary']
+    assert '\r' not in stages_text.cleaned_script(ws, {'summary': summary}) and summary['kept_lines'] == 2
