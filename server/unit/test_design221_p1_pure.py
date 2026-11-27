@@ -248,7 +248,7 @@ def test_the_rule_writer_writes_no_rule_the_server_checks_and_its_questions_apar
 
 def test_the_chats_ai_video_items_say_step_7():
     src = Path(C.__file__).read_text(encoding='utf-8')
-    assert "'Step 7, AI video: the still'" in src and "'Step 7, AI video: the take'" in src and "'Step 7, AI video: a layout that did not pass its check'" in src
+    assert "'Step 7, AI video: the still'" in src and "'Step 7, AI video: the take'" in src and "'Step 7, AI video: a layout that did not pass its check'" not in src   # release 1 of 27 Nov 2026, phase 4 part A: the held-layout card is retired too
     assert "'Step 7, AI video: the layout drawing of the shot'" not in src   # A1 (25 Nov 2026): that card is retired; the held layout's card is the layout card left
     assert "'AI video, the" not in src
 

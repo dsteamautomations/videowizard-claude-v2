@@ -111,6 +111,29 @@ HELD_NOT = 'This layout does not wait for this answer any more (`vw visuals next
 JUDGED = 'This scene of {shot} is already judged (round {round}: {how}): a scene gets one verdict. {then}'
 
 
+GOES_ON = 'the third failed check in a row: the layout goes on as it is, by the server (the operator never approves a layout)'
+HELD_RETIRED = ('The card of a layout that failed its check three times is retired (SK, 27 Nov 2026): the operator never approves a layout. '
+                'The layout goes on as it is and the still is ordered. Run `vw visuals next`.')
+
+
+def go_on(conn, store, run, session, shot_id, g):
+    """Release 1 of 27 Nov 2026, phase 4 part A (SK: "the operator never approves a Blender layout, in this step or any other"): after the third
+    failed check in a row the server takes the layout as it is, by itself: what the held card's "Use this layout as it is" did. Recorded as the
+    server's decision with the checker's finding, in the shot's record and the run's log. The session is changed, not saved.
+    Retired: the held-layout card and its three answers (`held_answer`, kept for a layout held before this release)."""
+    from . import runlog
+    rnd, found = int(g['verdicts'][-1].get('round') or 0), finding(g, 99)
+    who = {'quote': GOES_ON, 'by': 'server', 'by_name': 'server', 'at': now()}
+    d = _ensure_drawing(store, run, session, g, VS.load_json(store, g['key']))
+    g['accepted'] = {'sha256': g['sha256'], 'round': rnd, 'finding': found, **who}
+    d.update(status='approved', verdict={'approved': True, 'against_check': True, 'notes': '', **who})
+    _render(conn, store, run, shot_id, g)
+    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'held layout: use (the server)', 'round': rnd, 'sha256': g['sha256'], 'finding': found, 'by': 'server', 'by_name': 'server'})
+    runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'shot {shot_id}', 'rule': 'release 1 of 27 Nov 2026, phase 4 part A',
+                        'entry': f'the layout failed its check {MAX_ROUNDS} times in a row and goes on as it is, against its check: {found}'[:3800],
+                        'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
+
+
 def held_answer(conn, store, user, run, outputs, shot_id, sha256, choice, quote, notes=''):
     """The operator's answer on a held layout (one flow: the chat's card calls this). `use`: the layout goes on as it is, against its check: it
     counts as checked and approved and its guide is rendered. `again`: three more rounds. `change`: their words on what the shot becomes; the
@@ -369,8 +392,12 @@ def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, not
                                                   f'(`vw guide still --shot {shot_id} --file …`).' if r.get('status') == 'ready' else RENDER_NEXT.format(shot=shot_id)))
     elif not passed:
         # release 2, the critic's point 2: the third failure in a row holds the shot (until then: "show the operator what is still open" from round 2, with no card and no gate; design/35 row 293)
-        out['next'] = (f'Round {rnd} failed, the third check in a row: the shot is held and the operator is asked in the chat (`vw visuals next`). Send no new scene of it until they answer. '
-                       'Still open: ' + '; '.join(failed) if held(g) else 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.')
+        if held(g):   # phase 4 part A: the server goes on by itself; nobody is asked about a layout
+            go_on(conn, store, run, session, shot_id, g)
+            out['next'] = (f'Round {rnd} failed, the third check in a row: the layout goes on as it is, by the server; the operator is not asked about a layout. '
+                           f'{RENDER_NEXT.format(shot=shot_id)} Still open on the layout: ' + '; '.join(failed))
+        else:
+            out['next'] = 'Change the scene (one thing at a time) and upload it again: `vw guide scene`.'
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'guide check', 'round': rnd, 'pass': bool(passed), 'failed': failed, 'notes': str(notes or '')[:2000], 'by': user['id'], 'by_name': user.get('name') or ''})
     return out

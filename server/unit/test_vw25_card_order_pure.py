@@ -62,16 +62,8 @@ def test_the_steps_are_asked_in_this_order(chat):
     assert chat['asked'][:len(STEPS)] == list(STEPS)
 
 
-def test_a_step_6_card_comes_before_the_layout_cards_and_they_before_step_7(chat):
-    held(chat, 'S1'), held(chat, 'S2'), parts(chat), card(chat, '_guide_items', 'still:S9:x', 'still')
-    out = chat['next']()
-    assert ids(out) == ['1'] and out['item']['kind'] == 'shared parts'                     # today's fault: the layout cards went ahead and the drawn graphics did not start
-    out = chat['answer']('parts:1')
-    assert ids(out) == ['S1'] and out['item']['kind'] == 'held layout' and 'group' not in out   # then the layout cards, one at a time (until 25 Nov 2026: the passed layouts' cards, together; retired, A1)
-    out = chat['answer'](f'layout-held:S1:{"c" * 10}')
-    assert ids(out) == ['S2'] and 'group' not in out
-    out = chat['answer'](f'layout-held:S2:{"c" * 10}')
-    assert ids(out) == ['S9'] and out['item']['kind'] == 'still'                           # then step 7's own cards
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_a_step_6_card_comes_before_the_layout_cards_and_they_before_step_7
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 def test_with_nothing_of_step_6_waiting_the_held_layout_cards_come_one_at_a_time_in_the_films_order(chat):
@@ -86,31 +78,12 @@ def test_with_nothing_of_step_6_waiting_the_held_layout_cards_come_one_at_a_time
     assert ids(chat['next']()) == ['S0']
 
 
-def test_an_open_held_layout_card_is_answered_before_a_step_6_card_and_another_layout_that_became_ready(chat):
-    """Until 25 Nov 2026 this was proved on an open group of layout drawings, answered in any order; retired (A1): a layout card is open alone."""
-    held(chat, 'S1')
-    assert ids(chat['next']()) == ['S1']
-    parts(chat), held(chat, 'S4')                                                          # a step 6 card and one more held layout become ready while the card is open
-    assert ids(chat['next']()) == ['S1']                                                   # asked again: the same card, not the newer one
-    assert OPEN in refused(lambda: chat['answer']('parts:1'))                              # the newer card is not the open one
-    assert OPEN in refused(lambda: chat['answer'](f'layout-held:S4:{"c" * 10}'))           # nor a layout that was never handed out
-    assert refused(lambda: chat['answer'](f'shot-drawing:S1:{"b" * 10}')) == G.DRAWING_RETIRED + ' Run `vw visuals next`.'   # the retired card: refused by name
-    assert chat['session']['chat_item']['id'] == f'layout-held:S1:{"c" * 10}' and chat['answers'] == []   # the open card stays the open one
-    out = chat['answer'](f'layout-held:S1:{"c" * 10}')
-    assert ids(out) == ['1'] and out['item']['kind'] == 'shared parts'                     # answered: the step 6 card is next
-    assert ids(chat['answer']('parts:1')) == ['S4']                                        # then the layout that became ready
-    assert chat['answers'] == [f'layout-held:S1:{"c" * 10}', 'parts:1']
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_an_open_held_layout_card_is_answered_before_a_step_6_card_and_another_layout_that_became_ready
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
-def test_one_open_layout_card_stays_the_open_one(chat):
-    held(chat, 'S1')
-    assert ids(chat['next']()) == ['S1']
-    parts(chat)
-    assert ids(chat['next']()) == ['S1']                                                   # the card on the operator's screen is not replaced
-    said = refused(lambda: chat['answer']('parts:1'))
-    assert OPEN in said and 'layout-held:S1' in said
-    out = chat['answer'](f'layout-held:S1:{"c" * 10}', 'yes')
-    assert ids(out) == ['1'] and 'chat_item' in chat['session'] and 'group' not in chat['session']['chat_item']
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_one_open_layout_card_stays_the_open_one
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 def test_an_open_layout_card_that_no_longer_waits_gives_way(chat):
@@ -124,13 +97,8 @@ def test_an_open_layout_card_that_no_longer_waits_gives_way(chat):
     assert out['item']['id'] == f'layout-held:S1:{"d" * 10}'                               # then S1's new card, in the film's order
 
 
-def test_one_at_a_time_only_the_card_handed_out_is_open(chat):
-    held(chat, 'S1'), held(chat, 'S2')
-    assert ids(chat['next'](many=False)) == ['S1']
-    parts(chat)
-    out = chat['answer'](f'layout-held:S1:{"c" * 10}', many=False)
-    assert ids(out) == ['1']                                                               # S2 was never handed out: the step 6 card is next
-    assert ids(chat['answer']('parts:1', many=False)) == ['S2']
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_one_at_a_time_only_the_card_handed_out_is_open
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 def test_a_group_of_still_end_frames_is_as_before(chat):
@@ -141,17 +109,7 @@ def test_a_group_of_still_end_frames_is_as_before(chat):
     assert ids(out) == ['D2'] and 'group' not in chat['session']['chat_item']              # the rest is handed out afresh, as before this change
 
 
-def test_the_layout_cards_are_made_in_their_own_function(monkeypatch):
-    p = plan(shot('S1', start=0), shot('S2', start=130))
-    guide = lambda sha: {'sha256': sha, 'verdicts': [{'pass': True}], 'drawing': {'status': 'proposed', 'sha256': sha, 'views': [{'id': 'camera', 'labelled_key': 'k/' + sha}]}}
-    s = {'guides': {'S2': guide('2' * 64), 'S1': guide('1' * 64)}}
-    monkeypatch.setattr(V, '_accepted_shots', lambda p_, s_: [(g, sh) for g in p_['gaps'] for sc in g['scenes'] for sh in sc['shots']])
-    ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
-    assert CF._drawing_items(ctx) == []                                                    # older way retired: none of them is made here
-    assert CF._layout_items(ctx) == []                                                     # a layout that passed its check: no card (until 25 Nov 2026: `shot-drawing:`; retired, A1)
-    for g in s['guides'].values():                                                         # the third failed check in a row: held
-        g['verdicts'] = [{'pass': False, 'round': G.MAX_ROUNDS, 'looks': [{'look': 'nothing floats', 'pass': False}]}]
-    assert CF._drawing_items(ctx) == []
-    assert [i['id'].split(':')[:2] for i in CF._layout_items(ctx)] == [['layout-held', 'S1'], ['layout-held', 'S2']]   # the film's order
-    assert all(i['id'].startswith(CF.LAYOUT) for i in CF._layout_items(ctx)) and CF.LAYOUT == ('layout-held:',) and not 'shot-drawing:S1:x'.startswith(CF.LAYOUT)
-    assert CF._layout_items({**ctx, 'plan': None}) == [] and CF._layout_items({**ctx, 'session': {}}) == []   # no plan, or no AI video: none
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_the_layout_cards_are_made_in_their_own_function
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
+
+

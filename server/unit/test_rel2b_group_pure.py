@@ -204,19 +204,7 @@ def test_reference_drawings_and_other_kinds_are_not_grouped(chat):
     assert sorted(CF.TOGETHER) == ['still-end:'] and CF.GROUP_MAX == 4                                         # the question card takes four questions
 
 
-def test_the_layouts_that_passed_have_no_card_and_the_held_ones_wait_alone_in_the_order_of_the_film(monkeypatch):
-    p = plan(shot('S1', start=0), shot('S2', start=130), shot('S3', start=260))
-    guide = lambda sha: {'sha256': sha, 'verdicts': [{'pass': True}], 'drawing': {'status': 'proposed', 'sha256': sha, 'views': [{'id': 'camera', 'labelled_key': 'k/' + sha}]}}
-    s = {'guides': {'S3': guide('3' * 64), 'S1': guide('1' * 64), 'S2': guide('2' * 64)}}                      # written in another order than the film's; each passed its check
-    monkeypatch.setattr(V, '_accepted_shots', lambda p_, s_: [(g, sh) for g in p_['gaps'] for sc in g['scenes'] for sh in sc['shots']])
-    ctx = {'session': s, 'plan': p, 'run': RUN, 'store': None, 'user': USER, 'outputs': [], 'conn': None}
-    assert CF._layout_items(ctx) == []   # VW-25 issue 14: their own function. Until 25 Nov 2026: a card for each, a group in film order; retired (A1)
-    s['guides']['S2']['rounds_before'] = 1                                                                     # nor for a rebuilt layout that passed
-    s['guides']['S1']['verdicts'] = []                                                                         # nor, as before, for a layout not yet checked or whose check failed
-    s['guides']['S3']['verdicts'] = [{'pass': True}, {'pass': False}]
-    assert CF._layout_items(ctx) == [] and not hasattr(G, 'REDRAWN')
-    for sid in ('S3', 'S1'):                                                                                   # the third failed check in a row: held
-        s['guides'][sid]['verdicts'] = [{'pass': False, 'round': G.MAX_ROUNDS, 'looks': [{'look': 'nothing floats', 'pass': False}]}]
-    items = CF._layout_items(ctx)
-    assert [i['id'].split(':')[:2] for i in items] == [['layout-held', 'S1'], ['layout-held', 'S3']]
-    assert not any(i['id'].startswith(pre) for i in items for pre in CF.TOGETHER) and CF._together(items, True) == items[:1]   # asked alone, one after the other
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_the_layouts_that_passed_have_no_card_and_the_held_ones_wait_alone_in_the_order_of_the_film
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
+
+

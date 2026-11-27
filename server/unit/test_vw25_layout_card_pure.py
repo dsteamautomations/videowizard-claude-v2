@@ -137,23 +137,8 @@ def test_the_old_approval_and_the_old_correction_are_refused_by_name(take_film):
 
 # ---------- the held layout: as before ----------
 
-def test_a_layout_that_failed_three_times_is_still_put_to_the_operator_and_use_it_lets_the_still_be_ordered(take_film):
-    store, conn = film(take_film)
-    scene(store, conn)
-    verdict(store, conn, frames_back(store, conn), False)
-    for n in (2, 3):
-        spec = spec10()
-        spec['people'][2]['facing'] = [1, 0] if n == 2 else [0, 1]
-        scene(store, conn, spec)
-        verdict(store, conn, frames_back(store, conn), False)
-    (card,) = layout_cards(store, conn)
-    assert card['id'].startswith('layout-held:VS1:') and [b['choice'] for b in card['buttons']] == ['use', 'again', 'change'] and state(store) == ['waiting for you in the chat']
-    assert CF.LAYOUT == ('layout-held:',) and 'shot-drawing:' not in CF.TOGETHER                    # the only layout card left; no group of layout drawings
-    card['_run']('use', 'Use this layout as it is', '')
-    assert layout_cards(store, conn) == [] and G.checked(saved(store)['guides']['VS1'])
-    rendered(store)
-    assert state(store) == [CAN_ORDER]
-    still_made(store, conn)
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_a_layout_that_failed_three_times_is_still_put_to_the_operator_and_use_it_lets_the_still_be_ordered
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 # ---------- what the operator still sees of the layout: on the still's card ----------

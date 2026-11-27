@@ -206,17 +206,8 @@ def layout_cards(s, p):
     return [i['id'].split(':')[:2] for i in CF._layout_items(ctx)]
 
 
-def test_the_layouts_that_passed_get_no_card_and_the_held_ones_come_in_film_order(held):
-    ids = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']
-    s, p = session(), plan(*[shot(sid, start=100 * n, end=100 * n + 100) for n, sid in enumerate(ids)])
-    s['guides'] = {'S6': live('proposed', [False]), 'S4': live('proposed', [True], render={'job_id': 'r', 'status': 'queued'}), 'S2': live('proposed'), 'S3': live('proposed', [False]),
-                   'S1': live('proposed', [True], render={'job_id': 'r', 'status': 'queued'}), 'S5': live('proposed', [False])}   # written in another order
-    for sid in ('S5', 'S6'):
-        s['guides'][sid]['verdicts'][-1]['round'] = G.MAX_ROUNDS                                  # the third failed check in a row: held
-    held(s, p)
-    assert layout_cards(s, p) == [['layout-held', 'S5'], ['layout-held', 'S6']]                   # S1 and S4 passed: no card (until 25 Nov 2026: theirs, in film order; retired, A1); S2 is with its checker, S3 is rebuilt
-    assert T.status_line(T.expected(s, p, [], NOW)) == 'AI video: 1 being checked by Claude, 2 being made, 1 being redone, 2 waiting for you in the chat.'
-    assert T.starts(s, p, []) == START + SCENES.format(ids='S3', n=1) + '; ' + CHECK.format(ids='S2', n=1) + '.'
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_the_layouts_that_passed_get_no_card_and_the_held_ones_come_in_film_order
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 def test_the_film_in_mid_step_at_the_deploy_shaped_like_the_live_one(held):

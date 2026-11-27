@@ -1715,20 +1715,7 @@ def _layout_items(ctx):
         for sid in [sid for sid in shots if sid in session['guides']]:   # release 1: in film order (release 2, B4b: the order a group of them keeps; design/35 row 291)
             g = session['guides'][sid]
             d = g.get('drawing') or {}
-            if guide.held(g):   # release 2, the critic's point 2: the third check in a row failed: one card, the latest layout drawing, the finding, three answers
-                def run_(choice, quote, words, sid=sid, sha=g['sha256'], found=guide.finding(g, 99)):
-                    out = guide.held_answer(conn, store, user, run, outputs, sid, sha, choice, quote, words)
-                    _decided(conn, run, user, 'shot ' + sid, f'a layout held after {guide.MAX_ROUNDS} failed checks in a row (answered in the chat)',
-                             {'use': f'the layout used as it is, against its check: {found}', 'again': 'the layout tried once more: three more rounds',
-                              'change': f'the shot is to change: "{words}"'}[choice], words or quote)
-                    return out
-                items.append(_item(f"layout-held:{sid}:{g['sha256'][:10]}", 'held layout', 'Step 7, AI video: a layout that did not pass its check',
-                                   f"{V.coded(shot_names, sid)}: the layout of this shot failed its check {guide.MAX_ROUNDS} times in a row. What should happen to it?", run_,
-                                   [_button('Use this layout as it is', 'use'), _button('Try once more', 'again'),
-                                    _button('Change the shot', 'change', words=True, tell='Ask the operator what the shot should become: cut into shorter shots, another angle, or left out.')],
-                                   text=f'The checker still finds: {guide.finding(g)}.',
-                                   show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in (d.get('views') or []) if d.get('sha256') == g['sha256']],
-                                   name=V.coded(shot_names, sid), head=P.heading_text(session, plan, [sid])))
+            pass   # release 1 of 27 Nov 2026, phase 4 part A: no layout card is left (the held-layout card is retired: `guide.go_on`)
     return items
 
 
@@ -2629,6 +2616,7 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     any order). Any other item is refused by name; so is the layout drawing's card, retired (A1, SK 25 Nov 2026)."""
     from . import guide
     V.need(not str(item_id).startswith('shot-drawing:'), guide.DRAWING_RETIRED + ' Run `vw visuals next`.')   # a card shown before the change, answered after it
+    V.need(not str(item_id).startswith('layout-held:'), guide.HELD_RETIRED)   # release 1 of 27 Nov 2026, phase 4 part A
     ctx = _ctx(conn, store, user, run, outputs)
     items, _summary, _ = _candidates(ctx)
     handed = ctx['session'].get('chat_item') or {}

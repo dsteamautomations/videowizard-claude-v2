@@ -74,59 +74,20 @@ def test_2_the_first_and_the_second_failed_check_are_rebuilt_with_no_card(take_f
         assert 'change the scene' in G.status(conn, store, NEW, [], 'VS1')['next']                         # the status says what the line says
 
 
-def test_2_the_third_failed_check_in_a_row_holds_the_shot_with_one_card(take_film):
-    store, conn = held3(take_film)
-    g = saved(store)['guides']['VS1']
-    assert G.held(g) and said(store) == '' and state(store) == ['waiting for you in the chat']             # not named for a rebuild
-    (card,) = held_cards(store, conn)
-    assert [i['id'] for i in cards(store, conn)] == [card['id']]                                           # the one layout card
-    assert card['id'] == f"layout-held:VS1:{g['sha256'][:10]}" and card['kind'] == 'held layout' and card['position'] == 'Step 7, AI video: a layout that did not pass its check'
-    assert card['question'].endswith(': the layout of this shot failed its check 3 times in a row. What should happen to it?')
-    assert card['text'] == f'The checker still finds: {FINDING}.'
-    assert [(b['label'], b['choice'], bool(b.get('needs_words'))) for b in card['buttons']] == [('Use this layout as it is', 'use', False), ('Try once more', 'again', False),
-                                                                                                ('Change the shot', 'change', True)]
-    assert len(card['show']) == 2 and all('-plain' not in f['key'] for f in card['show'])                 # the latest layout drawing, both sheets
-    assert all(CF._says(b['label']) for b in card['buttons'])                                             # each button says what happens
-    assert refused(lambda: scene(store, conn, variant(3))) == HELD_GATE                                    # the gate: no fourth scene without the operator
-    assert G.status(conn, store, NEW, [], 'VS1')['next'].startswith('The check of this scene failed for the third time in a row (nothing floats): the shot is held')
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_2_the_third_failed_check_in_a_row_holds_the_shot_with_one_card
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
-def test_2_use_it_as_it_is_counts_as_checked_and_approved_against_the_check(take_film):
-    store, conn = held3(take_film)
-    (card,) = held_cards(store, conn)
-    out = card['_run']('use', 'Use it, it reads fine.', '')
-    g = saved(store)['guides']['VS1']
-    assert G.checked(g) and not G.rebuild(g) and not G.held(g) and g['drawing']['status'] == 'approved' and g['drawing']['verdict']['against_check'] is True
-    assert g['render']['status'] == 'queued' and 'against its check' in out['next']                          # rendered as after a pass
-    assert cards(store, conn) == [] and state(store) == ['being made'] and said(store) == ''
-    logs = [p for sql, p in conn.sql if 'insert into vw2_log' in sql]
-    assert len(logs) == 1 and 'used as it is, against its check: nothing floats' in str(logs[0]) and 'Use it, it reads fine.' in str(logs[0])   # the operator's decision, in the log
-    rendered(store)
-    assert 'the stills of VS1 (1)' in said(store)                                                           # and on to its still, with no further card
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_2_use_it_as_it_is_counts_as_checked_and_approved_against_the_check
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
-def test_2_try_once_more_allows_three_more_rounds(take_film):
-    store, conn = held3(take_film)
-    held_cards(store, conn)[0]['_run']('again', 'Try once more', '')
-    assert said(store) == START + REBUILD.format(ids='VS1', n=1) + '.' and state(store) == ['being redone'] and held_cards(store, conn) == []
-    for n in (3, 4):
-        round_(store, conn, n)
-        assert held_cards(store, conn) == [] and state(store) == ['being redone']
-    round_(store, conn, 5)                                                                                   # the sixth failure: the third since their word
-    assert len(held_cards(store, conn)) == 1 and state(store) == ['waiting for you in the chat']
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_2_try_once_more_allows_three_more_rounds
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
-def test_2_change_the_shot_needs_the_operators_words_and_the_line_says_what_to_do(take_film):
-    store, conn = held3(take_film)
-    (card,) = held_cards(store, conn)
-    assert next(b for b in card['buttons'] if b['choice'] == 'change')['tell'] == 'Ask the operator what the shot should become: cut into shorter shots, another angle, or left out.'
-    assert 'what the shot becomes' in refused(lambda: card['_run']('change', 'Change the shot', ''))
-    card['_run']('change', 'Change the shot', 'Cut it in two: the walk, then the door.')
-    assert held_cards(store, conn) == [] and said(store) == '' and state(store) == ['being redone']         # not named for a rebuild by itself
-    assert due(store).endswith('(VS1): its layout failed its check 3 times in a row and the operator said what the shot becomes: "Cut it in two: the walk, then the door.". '
-                               'Do that: a plan revision when the shot is cut, shortened, left out or becomes another kind of shot; a new scene (`vw guide scene`) when it stays one AI video shot.')
-    scene(store, conn, variant(3))                                                                           # a new scene is taken again; the words are not said twice
-    assert due(store) == ''
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_2_change_the_shot_needs_the_operators_words_and_the_line_says_what_to_do
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 def test_2_a_pass_at_round_2_goes_on_with_no_card(take_film):
@@ -140,20 +101,8 @@ def test_2_a_pass_at_round_2_goes_on_with_no_card(take_film):
     assert state(store) == [CAN_ORDER]
 
 
-def test_2_a_live_film_whose_third_failure_came_before_this_release_is_held_at_once(take_film):
-    store, conn = film(take_film)
-    scene(store, conn)
-    sha = frames_back(store, conn)
-    s = saved(store)
-    g = s['guides']['VS1']                                                                                   # as the older server left it: two rounds on earlier scenes, the third failed on this one
-    g['rounds_before'] = 2
-    g['verdicts'] = [{'round': 3, 'sha256': sha, 'pass': False, 'looks': [{'look': 'nothing floats', 'pass': False, 'where': 'the brush, above the board'}]}]
-    V.save_session(store, NEW, s)
-    assert len(held_cards(store, conn)) == 1 and said(store) == '' and state(store) == ['waiting for you in the chat']
-    g['verdicts'][0]['round'] = 2                                                                            # the second failure only: rebuilt, as before
-    g['rounds_before'] = 1
-    V.save_session(store, NEW, s)
-    assert held_cards(store, conn) == [] and said(store) == START + REBUILD.format(ids='VS1', n=1) + '.'
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_2_a_live_film_whose_third_failure_came_before_this_release_is_held_at_once
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 # ---------- point 8: one verdict per scene ----------

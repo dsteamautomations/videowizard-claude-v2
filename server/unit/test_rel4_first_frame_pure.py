@@ -90,16 +90,8 @@ def test_a_pass_queues_the_first_frame_and_then_the_video(take_film):
     assert nxt(store, conn).endswith('The first frame of VS1 is being made (free, under a minute of rendering); the still can be ordered when it is ready.')
 
 
-def test_the_use_it_as_it_is_answer_queues_the_same_two_jobs(take_film):
-    store, conn = R1.film(take_film)
-    for n in range(3):
-        spec = spec10()
-        spec['people'][2]['facing'] = [[0, 1], [1, 0], [-1, 0]][n]
-        scene(store, conn, spec)
-        R1.verdict(store, conn, frames_back(store, conn), False)
-    g = saved(store)['guides']['VS1']
-    out = GD.held_answer(conn, store, USER, NEW, [], 'VS1', g['sha256'], 'use', 'Use it.')
-    assert kinds(conn)[-2:] == ['guide-frame1', 'guide-render'] and 'against its check' in out['next'] and 'first frame' in out['next']
+# Retired with release 1 of 27 Nov 2026, phase 4 part A (SK: the operator never approves a layout): test_the_use_it_as_it_is_answer_queues_the_same_two_jobs
+# (the held-layout card is gone; the server goes on by itself: unit/test_rel8a_no_layout_pure.py)
 
 
 # ---------- the still on the first frame; the take on the video ----------
