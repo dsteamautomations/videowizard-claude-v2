@@ -27,7 +27,8 @@ def take_film():
             for sh in sc['shots']:
                 if sh['id'] == 'VS1':
                     sh['narration'] = SAID
-    refs = {'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
+    refs = {'R0': {'id': 'R0', 'kind': 'sheet', 'element_id': 'E1', 'status': 'approved', 'key': 'run-1/visuals/references/R0.png', 'sha256': 'sha-R0'},   # phase 4 part C: the plinth's approved reference (a still waits for it)
+            'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
     return new_store(doc, refs, accepted=accepted(doc)), TakeConn()
 
 

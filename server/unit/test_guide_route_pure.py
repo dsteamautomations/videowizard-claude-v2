@@ -67,7 +67,8 @@ def prices(monkeypatch):
 @pytest.fixture
 def film():
     doc = doc_with(KILN, MASON)
-    refs = {'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'},
+    refs = {'R0': {'id': 'R0', 'kind': 'sheet', 'element_id': 'E1', 'status': 'approved', 'key': 'run-1/visuals/references/R0.png', 'sha256': 'sha-R0'},   # phase 4 part C: the plinth's approved reference (a still waits for it)
+            'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'},
             'R2': {'id': 'R2', 'kind': 'sheet', 'element_id': 'P1', 'status': 'candidate', 'key': 'run-1/visuals/references/R2.png', 'sha256': 'sha-R2'}}
     return new_store(doc, refs, accepted=accepted(doc)), Conn()
 
@@ -498,7 +499,8 @@ def card(**states):
 @pytest.fixture
 def take_film():
     doc = doc_with(KILN, MASON)
-    refs = {'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
+    refs = {'R0': {'id': 'R0', 'kind': 'sheet', 'element_id': 'E1', 'status': 'approved', 'key': 'run-1/visuals/references/R0.png', 'sha256': 'sha-R0'},   # phase 4 part C: the plinth's approved reference (a still waits for it)
+            'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
     return new_store(doc, refs, accepted=accepted(doc)), TakeConn()
 
 

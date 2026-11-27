@@ -171,7 +171,7 @@ def test_a_layout_that_changed_nothing_and_has_no_notes_leaves_the_stills_card_a
     still_made(store, conn)
     card = still_card(store, conn)
     assert 'Changed from the plan' not in card['text'] and 'Notes:' not in card['text'] and G.layout_lines(saved(store)['guides']['VS1']) == []
-    assert [b['label'] for b in card['buttons']] == ['Approve', 'Reject']
+    assert [b['choice'] for b in card['buttons']] == ['approve', 'reject']   # phase 4 part B: the approving button carries the take's price
     s = saved(store)
     s['guides']['VS1']['drawing'].update(sha256='an earlier scene', changes=['An old line.'])       # a drawing of another scene says nothing of this one
     assert G.layout_lines(s['guides']['VS1']) == []

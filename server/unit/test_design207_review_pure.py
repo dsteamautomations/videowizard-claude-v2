@@ -59,6 +59,7 @@ def test_one_function_says_why_a_persons_picture_is_not_sent():
 def guide_store(refs, **over):
     import test_guide_route_pure as GR
     doc = doc_with(KILN, MASON)
+    refs = {'R0': {'id': 'R0', 'kind': 'sheet', 'element_id': 'E1', 'status': 'approved', 'key': 'run-1/visuals/references/R0.png', 'sha256': 'sha-R0'}, **refs}   # release 1 of 27 Nov 2026, phase 4 part C: the plinth's approved reference (a still waits for it)
     store, conn = new_store(doc, refs, accepted=accepted(doc), **over), GR.Conn()
     GR.rendered(store, conn)
     for rid in refs:

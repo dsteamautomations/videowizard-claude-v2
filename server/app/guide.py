@@ -425,6 +425,35 @@ def _input(store, run, session, shot_id, p, people):
     return VS.cropped_parent(store, run, row, p.get('crop')), str(p['job']).strip()
 
 
+PLACE_VIEW = 'Take the camera angle, the framing and every position from Image 1 only, never from this picture.'
+PLACE_JOB = 'the place ({name}): keep its walls, floor, surfaces, colours and fixed things. ' + PLACE_VIEW
+REFS_WAIT = ('{shot} waits for the approved reference of {names}: the picture that starts an AI video shot is made after the references of what it shows are approved. '
+             'Nothing was ordered; the server names it as due when they are.')
+
+
+def with_places(session, plan, shot, parents):
+    """Release 1 of 27 Nov 2026, phase 4 part C (SK): the pictures of a still's request with the approved picture of each place the shot names,
+    added by the server with its job in the server's own words: the place's golden picture, else the first approved picture of its set. A picture
+    the assistant already named is not added twice: its job gets the sentence about the camera angle. A place the operator left without a
+    reference adds nothing. Why: four stills of VW-25 showed a place other than the references.
+    Retired: a still of an AI video shot made with no picture of its place."""
+    out, refs = [dict(p) for p in parents], session.get('references') or {}
+    ok = lambda r: bool(r) and r.get('status') == 'approved' and r.get('key')
+    for e in plan.get('elements') or []:
+        if e.get('kind') != 'place' or e['id'] not in (shot.get('element_ids') or []):
+            continue
+        gold = refs.get(VS.golden_of(session, e['id']) or '')
+        row = gold if ok(gold) else next((r for r in refs.values() if r.get('element_id') == e['id'] and r.get('kind') in ('sheet', 'frame', 'supplied') and ok(r)), None)
+        if not row:
+            continue
+        named = next((p for p in out if p.get('id') == row['id']), None)
+        if named is None:
+            out.append({'id': row['id'], 'job': PLACE_JOB.format(name=e.get('name') or e['id'])})
+        elif PLACE_VIEW not in str(named.get('job') or ''):
+            named['job'] = str(named.get('job') or '').strip().rstrip('.') + '. ' + PLACE_VIEW
+    return out
+
+
 def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, repair_of=None, region=None, look=None):
     """The still of a shot: GPT image 2.6 whatever the film's picture AI (SK, 10 Nov); Image 1 is the guide's first frame; then the given approved pictures,
     each with its job; the layout numbers are written by the server from the scene. With `repair_of` and `region`: a masked repair of one wrong part."""
@@ -455,6 +484,10 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         parts = {'your words': len(words)}
     else:
         need(isinstance(parents, list), 'parents: a list of {"id", "job", "crop"?}.')
+        plan_, _, _, shot_ = VS.guarded(lambda: VS.locate(store, session, shot_id))
+        held_ = VS.refs_waited(session, plan_, shot_)   # phase 4 part C rule 4 (SK: everything the shot shows): as a still picture's (phase 2 part C)
+        need(not held_, REFS_WAIT.format(shot=shot_id, names=', '.join(e.get('name') or e['id'] for e in held_)))
+        parents = with_places(session, plan_, shot_, parents)
         people = VS.people_of(VS.guarded(lambda: VS.current_plan(store, session)))
         pairs = [_input(store, run, session, shot_id, p, people) for p in parents]
         sheets = [{'id': f"shot-drawing-{v['id']}-{g['sha256'][:12]}", 'key': v['plain_key'], 'sha256': v['plain_sha256']} for v in d['views']]

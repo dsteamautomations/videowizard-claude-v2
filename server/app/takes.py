@@ -103,8 +103,8 @@ PAGE = {   # layout.words.takes: the page's chrome (the page holds no words of i
 
 STATE = {'none': 'not started', 'chat': 'waiting for you in the chat', 'making': 'being made', 'checking': 'being checked by Claude', 'redo': 'being redone', 'fix': 'being corrected',
          'done': 'made', 'answered': 'answered', 'failed': 'could not be made', 'stale': 'must be made again (the plan changed)', 'cap': 'waiting for the cost limit',
-         'video': 'waiting for the layout video', 'still': 'first frame ready: the still can be ordered'}   # release 4: the layout video renders behind the still. "being checked by Claude" is a still's state (its check is unchanged); design/223: a take is never checked
-ORDER = ('done', 'answered', 'checking', 'making', 'still', 'video', 'redo', 'fix', 'cap', 'stale', 'chat', 'failed', 'none')   # the order of the counts in the line
+         'video': 'waiting for the layout video', 'still': 'first frame ready: the still can be ordered', 'refs': 'waiting for its references'}   # release 4: the layout video renders behind the still. "being checked by Claude" is a still's state (its check is unchanged); design/223: a take is never checked
+ORDER = ('done', 'answered', 'checking', 'making', 'still', 'refs', 'video', 'redo', 'fix', 'cap', 'stale', 'chat', 'failed', 'none')   # the order of the counts in the line
 COMPLETE = (STATE['done'], STATE['answered'], STATE['failed'], STATE['stale'])   # a take that could not be made never keeps the page closed; the critic's S4: nor one made for an earlier plan
 
 
@@ -172,11 +172,18 @@ def starts(session, plan, take_rows):
     order = [sid for sid in shots if sid in guides and open_(sid) and _still_due(guides[sid]) and not jobs_of(take_rows, sid)]
     hold = P.ask_shots(session, plan) if order else ()   # point 10c: the question is said by `pictures.waits_words` (`faces_to_ask`), first in the same next-step line
     order = [sid for sid in order if sid not in hold]
+    by_id = {sh['id']: sh for _, sh, _, _ in rows}
+    waits = {sid: V.refs_waited(session, plan, by_id[sid]) for sid in order}   # phase 4 part C rule 4: a still is due only when the references of what it shows are approved
+    order = [sid for sid in order if not waits[sid]]
+    held_ = [sid for sid in waits if waits[sid]]
+    names = list(dict.fromkeys(e.get('name') or e['id'] for sid in held_ for e in waits[sid]))
+    wait_line = P.W['stills_wait'].format(n=len(held_), s='' if len(held_) == 1 else 's', w='s' if len(held_) == 1 else '', r='' if len(names) == 1 else 's', names=', '.join(names),
+                                          it='It is' if len(held_) == 1 else 'They are', that='that is' if len(names) == 1 else 'those are') if held_ else ''
     words = [sid for sid in shots if sid in guides and open_(sid) and not guides[sid].get('take_prompt') and any(mine(guides[sid], st) and st.get('status') == 'approved' for st in guides[sid].get('stills') or [])]
     stills = {x[1]['id'] for x in P.starts_due(session, plan)}
     what = [W[k].format(ids=', '.join(ids), n=len(ids)) for k, ids in (('start_scenes', none), ('start_rebuild', again), ('start_guides', check), ('start_order', order), ('start_words', words),
                                                                          ('start_stills', [x for x in shots if x in stills])) if ids]
-    return P.W['start_now'].format(what='; '.join(what)) if what else ''
+    return ' '.join(x for x in (P.W['start_now'].format(what='; '.join(what)) if what else '', ('AI video: ' + wait_line) if wait_line else '') if x)
 
 # ---------- each shot's state, the line of counts, when the page opens ----------
 
@@ -273,8 +280,8 @@ def _state(session, plan, sh, take_rows, now):
         return 'chat', None, False   # a card waits in the chat: the still, or the word to make the take
     if _video_waits(g):
         return 'video', None, False   # release 4: the still is approved and the words are written: only the layout video is awaited
-    if _still_due(g):
-        return 'still', None, False   # release 4: its first frame is ready, its still can be ordered
+    if _still_due(g):   # phase 4 part C rule 4: due only when the references of what the shot shows are approved
+        return ('refs' if V.refs_waited(session, plan, sh) else 'still'), None, False   # release 4: its first frame is ready, its still can be ordered
     return 'making', None, False
 
 

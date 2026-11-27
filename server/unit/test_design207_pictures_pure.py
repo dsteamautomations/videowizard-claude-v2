@@ -364,7 +364,8 @@ def test_a_guide_stills_prompt_carries_the_size_sentence():
     import test_guide_route_pure as GR
     doc = sized(doc_with(KILN, MASON), 'VS1', 1, 'P1')
     doc['gaps'][1]['scenes'][0]['shots'][0]['element_ids'] = ['E1']   # the fixture's scene has a box for the plinth only; the sentence reads compare_to, not the list
-    refs ={'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
+    refs ={'R0': {'id': 'R0', 'kind': 'sheet', 'element_id': 'E1', 'status': 'approved', 'key': 'run-1/visuals/references/R0.png', 'sha256': 'sha-R0'},   # phase 4 part C: a still waits for the plinth's approved reference
+           'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
     store, conn = new_store(doc, refs, accepted=accepted(doc)), GR.Conn()
     GR.rendered(store, conn)
     store.files['run-1/visuals/references/R1.png'] = b'png'
