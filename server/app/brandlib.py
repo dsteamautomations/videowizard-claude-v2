@@ -169,9 +169,9 @@ def repeats(conn, store, run, clips, ffmpeg='ffmpeg'):
             continue
         if not rows:
             continue
-        fp = fingerprint(store, run, c, ffmpeg) or []
+        fp = [a for a in fingerprint(store, run, c, ffmpeg) or [] if a is not None]   # defect 71: a plain frame has no fingerprint
         for r in rows:
-            if r['sha256'] != c['sha256'] and any(lookalike.distance(a, b) <= BITS_CLIP for a in fp for b in r['fingerprint'] or []):
+            if r['sha256'] != c['sha256'] and any(lookalike.distance(a, b) <= BITS_CLIP for a in fp for b in r['fingerprint'] or [] if b is not None):
                 found.append({'clip_id': c['id'], 'name': c['name'], 'library_name': r['name'], 'films': r['films'], 'kind': 'looks the same'})
                 break
     return found

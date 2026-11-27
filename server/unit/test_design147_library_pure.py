@@ -116,6 +116,14 @@ def test_repeats_are_found_by_file_and_by_look_and_never_for_an_older_film(monke
     assert B.repeats(RowsConn(lib), None, OLD, clips) == [] and B.repeats(RowsConn(lib), None, {**RUN, 'client_id': None}, clips) == []
 
 
+def test_a_frame_too_flat_to_fingerprint_is_skipped_on_either_side(monkeypatch):
+    """Defect 71 (VW-26, 27 Nov 2026): a plain frame (a black start of a clip) has no fingerprint (None); `vw analysis start` answered 500."""
+    lib = [{'sha256': 'a' * 64, 'name': 'yard.mp4', 'films': ['VW-12'], 'generic': True, 'fingerprint': [None, 0b1111]}]
+    monkeypatch.setattr(B, 'fingerprint', lambda store, run, clip, ffmpeg='ffmpeg': {'C2.mp4': [None, 0b1110], 'C3.mp4': [None]}[clip['name']])
+    clips = [{'id': 'b2', 'name': 'C2.mp4', 'sha256': 'b' * 64}, {'id': 'c3', 'name': 'C3.mp4', 'sha256': 'c' * 64}]   # two plain frames are not a look-alike
+    assert [(f['name'], f['kind']) for f in B.repeats(RowsConn(lib), None, RUN, clips)] == [('C2.mp4', 'looks the same')]
+
+
 def test_the_operator_decides_once_keep_or_skip():
     found = [{'clip_id': 'a1', 'name': 'C1.mp4', 'library_name': 'yard.mp4', 'films': ['VW-12'], 'kind': 'the same file'}]
     with pytest.raises(Problem) as e:
