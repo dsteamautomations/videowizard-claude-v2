@@ -2124,6 +2124,34 @@ def gap_waits(session):
     return ' '.join(f'Gap {gid} is not recorded: the operator said "{words}". Change what they ask; the gap is then asked again.' for gid, words in rows)
 
 
+def _footage_items(ctx):
+    """Release 1 of 27 Nov 2026, phase 4 part E (SK): a footage shot with no clip is asked by a card of its own: the shot's name and voiceover,
+    up to three stretches (the gap's clip candidates of the plan, or the assistant's proposals) each with its clip, its seconds and what the plan
+    says of it, one button each and "None of these" with words. The answer fills the shot with the operator's words (`fill_clip`).
+    Words only: the server makes no picture of a clip's frame without a job. Retired: a footage shot with no card, found only when its gap
+    could not be recorded."""
+    session, plan, run, store, user, outputs = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs']
+    items, names = [], V.shot_names(plan, session) if plan else {}
+    for gap, sh in V.footage_open(session, plan):
+        rows = V.clip_proposals(store, run, session, outputs, gap, sh)
+        if not rows:
+            continue
+        sid, title = sh['id'], V.coded(names, sh['id'])
+
+        def run_(choice, quote, words, sid=sid, rows=rows):
+            if choice == 'none':
+                return V.none_of_clips(store, user, run, outputs, sid, rows, words)
+            r = rows[int(choice[1:]) - 1]
+            return V.fill_clip(store, user, run, outputs, sid, r['clip_id'], r['in_s'], quote)
+        mark = hashlib.sha256(json.dumps([[r['clip_id'], r['in_s']] for r in rows]).encode()).hexdigest()[:10]
+        items.append(_item(f'footage:{sid}:{mark}', 'footage', 'Footage: a clip for a shot', f'{title}: which of your clips goes here?', run_,
+                           [_button(f"{r['name']}, from {r['in_s']:g} s", f'c{n}') for n, r in enumerate(rows, 1)]
+                           + [_button('None of these clips', 'none', words=True, tell='Ask the operator which clip, or which moment of a clip, they want instead.')],
+                           text=chr(10).join(f"{n}. {r['name']}, {r['in_s']:g} to {r['out_s']:g} s" + (f": {r['why']}" if r.get('why') else '') for n, r in enumerate(rows, 1)),
+                           name=title, head=P.heading_text(session, plan, [sid])))
+    return items
+
+
 def _record_items(ctx):
     """The gap card. Release 1 of 27 Nov 2026, part H (SK, question 8): it shows every shot of the gap in order, each with its name, its
     voiceover and its picture; "Not yet" needs a comment, and a comment given with "Record it" is treated as "Not yet": a comment always means
@@ -2220,7 +2248,7 @@ def _candidates(ctx):
             return left, '', note
     # design/200: a drawing set is approved before the pictures made from it. Issue 14: step 6's own cards before the layout cards of AI video
     # (until 25 Nov 2026 the layout cards were first: the shared parts waited and the drawn graphics did not start; retired)
-    for step in (_drawing_items, _round_items, _waiting_items, _layout_items, _guide_items, _record_items):
+    for step in (_drawing_items, _round_items, _waiting_items, _layout_items, _guide_items, _footage_items, _record_items):
         items = step(ctx)
         if items:
             return items, str(items[0].get('_summary') or '') if items[0].get('_v2') else '', note   # design/211 review: a v2 round's first question says once what holds for the whole step
@@ -2272,7 +2300,7 @@ def _paragraphs(text):
 
 SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to change', 'Yes': 'It is right', 'No': 'It is wrong; another is made', 'Correct it': 'I will ask you what to correct',
         'None of these': 'None is right; the set is made again', 'Select': 'Use it in the film', 'Reject': 'I will ask you what is wrong with it', 'Approve': 'It is right; go on',
-        'Approve and shoot': 'The picture is right; its take is made (paid)', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
+        'Approve and shoot': 'The picture is right; its take is made (paid)', 'None of these clips': 'I will ask you which clip or moment you want', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
         'Leave it out': 'This thing gets no reference', 'No reference needed': 'No reference of it; its shots are made without one',
         'Go on without a reference': 'No set of it; its shots are made without a reference',
         'Correct every picture of it': 'Its pictures are corrected with your words, and the words go into every later picture of this thing', 'Make again': 'The set is made again; Claude rewrites the request first', 'Make a set with words': 'A set is made with your words; it comes back to you to judge',
@@ -2289,7 +2317,7 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
 
 def _says(label):
     label = label.split(' (paid')[0]   # design/211: a paid button carries its price
-    return SAYS.get(label) or (SAYS['Approve and shoot'] if label.startswith('Approve and shoot') else 'This one becomes the reference' if label.startswith('Use ') else 'The whole set is right' if label.startswith('Approve all ') else   # design/216
+    return SAYS.get(label) or (SAYS['Approve and shoot'] if label.startswith('Approve and shoot') else 'This stretch fills the shot' if re.search(r', from [0-9.]+ s$', label) else 'This one becomes the reference' if label.startswith('Use ') else 'The whole set is right' if label.startswith('Approve all ') else   # design/216
                                SAYS['Make again'] if label.startswith('Make all ') else 'Use this picture as the reference' if label.startswith('Approve ') else
                                'No set of them; their shots are made without a reference' if label.startswith('Do not make ') else
                                'The sets that wait are made now, in one go' if label.startswith('Make the other ') else '')
@@ -2522,7 +2550,7 @@ def next_item(conn, store, user, run, outputs, one=False, many=False):
         if more:
             out['then'] = more + (' ' + out['then'] if out.get('then') else '')
         six = P.expected(session, plan, rows)
-        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.stills_wait(six), P.supplied_due(six), P.stuck_due(six)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
+        due = ' '.join(x for x in (P.drawn_due(six), P.starts(six), P.stills_due(six, P.ask_shots(session, plan)), P.stills_wait(six), P.supplied_due(six), P.stuck_due(six), V.footage_due(store, run, session, plan, outputs)) if x)   # design/221 row 19: the stills are ordered at the start of step 6; a failed or stale render is said; fix set A1.4: what can start now
         if due:
             out['then'] = (out['then'] + ' ' if out.get('then') else '') + due
         from . import core

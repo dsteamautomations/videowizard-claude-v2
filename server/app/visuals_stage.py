@@ -8572,14 +8572,102 @@ def _start_images(store, session):
     return out
 
 
+# ---------- release 1 of 27 Nov 2026, phase 4 part E (SK): a footage shot is named and asked from the first day ----------
+
+QUOTE_NEEDED = "Give the operator's own words (--quote)."
+FOOTAGE_DUE = '{name} is a footage shot and has no clip yet. Propose one to three stretches for it: `vw visuals clip --shot {shot} --propose "<clip>@<seconds>, …"`.'
+FOOTAGE_NONE = ('{name} is a footage shot and has no clip yet. The operator said none of the stretches shown: "{words}". Propose one to three other stretches: '
+                '`vw visuals clip --shot {shot} --propose "<clip>@<seconds>, …"`.')
+FOOTAGE_ASKED = '{name} is a footage shot: its clip is asked of the operator on a card (`vw visuals next`).'
+
+
+def clip_named(store, run, outputs, word):
+    """(id, clip) of the clip a word names: its id, else its file name (this film's own clips first, then the client's library; defect 59).
+    An unknown word, or a file name two clips share, is refused with the film's clips, each with its name and id.
+    Retired: "Unknown clip C." with nothing more, and a file name refused."""
+    clips = {**library_clips(store, run), **media_clips(outputs)}
+    word = str(word or '').strip()
+    if word in clips:
+        return word, clips[word]
+    same = [cid for cid, c in clips.items() if str(c.get('name') or '').lower() == word.lower()]
+    listed = '; '.join(f"{c.get('name')} (id {cid})" for cid, c in clips.items()) or 'none'
+    need(same, f'No clip of this film is called {word!r}. Its clips: {listed}.')
+    need(len(same) == 1, f"{len(same)} clips are called {word!r}: give the id. " + '; '.join(f"{clips[c].get('name')} (id {c})" for c in same) + '.')
+    return same[0], clips[same[0]]
+
+
+def _shot_seconds(session, shot):
+    return _sec(shot['end_frame'] - shot['start_frame'], session['source'].get('fps') or 25)
+
+
+def footage_open(session, plan):
+    """The accepted footage shots that have no clip (nor a frame) yet: [(gap, shot)], in film order."""
+    return [(gap, sh) for gap, sh in _accepted_shots(plan, session) if sh.get('visual_type') == 'footage' and sh['id'] not in (session.get('assets') or {})] if plan else []
+
+
+def clip_proposals(store, run, session, outputs, gap, shot):
+    """The stretches put to the operator for a footage shot, up to three: the assistant's own (`propose_clips`), else the gap's clip candidates of
+    the plan that are long enough for the shot and lie inside their clip. [] when there is none, or when the operator said "None of these" of
+    exactly these. Each: {clip_id, name, in_s, out_s, why}."""
+    own = (session.get('clip_proposals') or {}).get(shot['id']) or {}
+    seconds = _shot_seconds(session, shot)
+    if own.get('stretches'):
+        rows = own['stretches']
+    else:
+        clips, rows = {**library_clips(store, run), **media_clips(outputs)}, []
+        for c in gap.get('candidates') or []:
+            clip = clips.get(c.get('media_id'))
+            if c.get('use') == 'clip' and clip and c['end_s'] - c['start_s'] >= seconds - 1e-3 and c['start_s'] + seconds <= float(clip.get('duration_s') or 0) + 1e-3:
+                rows.append({'clip_id': c['media_id'], 'name': clip.get('name') or c.get('source_name'), 'in_s': float(c['start_s']), 'out_s': round(float(c['start_s']) + seconds, 3), 'why': c.get('evidence') or ''})
+    rows = rows[:3]
+    return [] if own.get('none') and own.get('none_of') == [[r['clip_id'], r['in_s']] for r in rows] else rows
+
+
+def propose_clips(store, user, run, outputs, shot_id, stretches):
+    """The assistant's proposals for a footage shot: one to three stretches, each a clip (its id or file name) and a start second, with a few
+    words on what it shows. Each is checked as `fill_clip` checks it; the server then asks the operator on a card."""
+    session = session_of(store, run, outputs)
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    need(shot['visual_type'] == 'footage', f"shot {shot_id} is a {shot['visual_type']}: stretches are proposed for a footage shot.")
+    need(isinstance(stretches, list) and 1 <= len(stretches) <= 3, 'Propose one to three stretches.')
+    seconds, rows = _shot_seconds(session, shot), []
+    for st in stretches:
+        cid, clip = clip_named(store, run, outputs, st.get('clip'))
+        in_s = float(st.get('at_s') or 0)
+        out_s = round(in_s + seconds, 3)
+        need(in_s >= 0 and out_s <= float(clip.get('duration_s') or 0) + 1e-3, f"The stretch {in_s:.2f}–{out_s:.2f} s lies outside clip {clip.get('name')} ({clip.get('duration_s')} s); the shot is {seconds:g} s long.")
+        rows.append({'clip_id': cid, 'name': clip.get('name') or cid, 'in_s': in_s, 'out_s': out_s, 'why': str(st.get('why') or '').strip()})
+    session.setdefault('clip_proposals', {})[shot_id] = {'stretches': rows, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'shot_id': shot_id, 'proposed': rows, 'next': 'The server asks the operator on a card: `vw visuals next`.'}
+
+
+def none_of_clips(store, user, run, outputs, shot_id, rows, words):
+    """The operator's "None of these" on the card of a footage shot: their words are kept, and the shot stays named until other stretches are proposed."""
+    session = session_of(store, run, outputs)
+    session.setdefault('clip_proposals', {})[shot_id] = {'none': str(words).strip(), 'none_of': [[r['clip_id'], r['in_s']] for r in rows], 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'for_the_assistant': str(words).strip()}
+
+
+def footage_due(store, run, session, plan, outputs):
+    """Part E, rule 1: each footage shot with no clip, said in the status line and the next-step line from the moment its gap is accepted."""
+    names, out = shot_names(plan, session) if plan else {}, []
+    for gap, sh in footage_open(session, plan):
+        own = (session.get('clip_proposals') or {}).get(sh['id']) or {}
+        asked = clip_proposals(store, run, session, outputs, gap, sh)
+        out.append((FOOTAGE_ASKED if asked else FOOTAGE_NONE if own.get('none') else FOOTAGE_DUE).format(name=coded(names, sh['id']), shot=sh['id'], words=own.get('none')))
+    return ' '.join(out)
+
+
 def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=None, crop=None):
-    """design/89 B3: a moving stretch of an original clip fills a still or a video shot, from its in point for exactly the shot's length."""
+    """design/89 B3: a moving stretch of an original clip fills a still or a video shot, from its in point for exactly the shot's length.
+    Phase 4 part E: the clip is named by its id or its file name (`clip_named`); a missing quote is refused in plain words."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     need(shot['visual_type'] in ('image', 'video', 'footage'), f"shot {shot_id} is a {shot['visual_type']}: a clip stretch fills a footage, still or video shot, never a graphic.")   # design/124-b item 1
-    clip = media_clips(outputs).get(clip_id) or library_clips(store, run).get(clip_id)   # defect 59: this film's own clip first, else a clip of the client's library
-    need(clip, f'Unknown clip {clip_id}.')
-    need((quote or '').strip(), 'The operator reply is required.')
+    clip_id, clip = clip_named(store, run, outputs, clip_id)   # defect 59: this film's own clip first, else a clip of the client's library
+    need((quote or '').strip(), QUOTE_NEEDED)
     seconds = _sec(shot['end_frame'] - shot['start_frame'], session['source'].get('fps') or 25)
     in_s = float(in_s)
     out_s = round(in_s + seconds, 3)
@@ -8599,6 +8687,7 @@ def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=No
                                   **({'reuse': kept} if kept else {}), **({'repeat_warnings': warns} if warns else {})}
     session['selections'].pop(shot_id, None)
     (session.get('reuse_pending') or {}).pop(shot_id, None)
+    (session.get('clip_proposals') or {}).pop(shot_id, None)
     save_session(store, run, session)
     return {'shot_id': shot_id, 'kind': 'clip', 'clip_id': clip_id, 'in_s': in_s, 'out_s': out_s, **({'reuse': kept} if kept else {}), **({'warnings': warns} if warns else {})}
 
@@ -8751,7 +8840,7 @@ def status(conn, store, run, outputs, repair=True):
     from . import takes
     seven = takes.expected(session, plan, take_rows) if plan and round_v2(session) else []   # design/222: step 7's line of counts, beside step 6's
     step6 = ' '.join(x for x in (pictures.status_line(six), takes.status_line(seven), pictures.drawn_due(six), pictures.starts(six), pictures.stills_due(six, pictures.ask_shots(session, plan) if six else ()), pictures.stills_wait(six), pictures.supplied_due(six),
-                                 takes.starts(session, plan, take_rows) if seven else '', pictures.stuck_due(six), pictures.stuck_due(seven)) if x)   # release 1, D1: what of step 7 can start now, together
+                                 takes.starts(session, plan, take_rows) if seven else '', pictures.stuck_due(six), pictures.stuck_due(seven), footage_due(store, run, session, plan, outputs) if plan else '') if x)   # release 1, D1: what of step 7 can start now, together
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3

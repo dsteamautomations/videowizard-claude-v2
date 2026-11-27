@@ -299,9 +299,10 @@ class StillBody(Write):
 
 class ClipBody(Write):   # design/89 B3
     shot_id: str
-    clip_id: str
-    in_s: float = Field(ge=0)
-    quote: str = Field(min_length=1)
+    clip_id: str = ''
+    in_s: float = Field(default=0, ge=0)
+    quote: str | None = ''   # phase 4 part E: a missing quote is refused by the server in plain words (`visuals_stage.QUOTE_NEEDED`), never "Input should be a valid string"
+    propose: list[dict] | None = None   # phase 4 part E: the assistant's stretches for a footage shot: [{clip, at_s, why}]
     reuse: str | None = None
     considered: str | None = None
     crop: list[float] | None = None
@@ -2186,6 +2187,8 @@ def visuals_unplace(run_id: UUID, body: UnplaceBody, user=User, conn=DB):   # de
 
 @app.post('/api/runs/{run_id}/visuals/clip')
 def visuals_clip(run_id: UUID, body: ClipBody, user=User, conn=DB):   # design/89 B3
+    if body.propose is not None:   # phase 4 part E: the assistant proposes; the server asks the operator on a card
+        return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose_clips(storage(), user, run, outputs, body.shot_id, body.propose))
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.fill_clip(storage(), user, run, outputs, body.shot_id, body.clip_id, body.in_s, body.quote,
                                                                                                {'reason': body.reuse, 'considered': body.considered}, body.crop))
 

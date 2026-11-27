@@ -3274,8 +3274,19 @@ def cmd_visuals(a):
         out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote or ''})
         emit(out, 0, out.get('next') or f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")
     if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
+        if a.shot and getattr(a, 'propose', None):   # release 1 of 27 Nov 2026, phase 4 part E: the assistant's stretches for a footage shot; the server asks the operator on a card
+            rows = []
+            for part in [p.strip() for p in a.propose.split(',') if p.strip()]:
+                clip, _, at = part.rpartition('@')
+                if not clip:
+                    emit({'action': 'refused', 'message': 'Each stretch is `<clip>@<seconds>`, for example `--propose "C0051.MP4@12.5, C0052.MP4@3"` (one to three).'}, 2)
+                rows.append({'clip': clip.strip(), 'at_s': _number(at.strip(), '--propose')})
+            out = write(base + '/clip', {'shot_id': a.shot, 'propose': rows})
+            emit(out, 0, f"{len(rows)} stretch(es) proposed for shot {a.shot}. {out.get('next', '')}")
         if not a.shot or not a.clip or a.at is None:
             emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)
+        if not str(a.quote or '').strip():
+            emit({'action': 'refused', 'message': "Give the operator's own words (--quote)."}, 2)
         out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': _number(a.at, '--at'), 'quote': a.quote, **_reuse_fields(a)})
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
     if a.what == 'reuse':   # design/207 (D2): retired by name (the older way, design/89 H7: the operator approved a proposed reuse with their words)
@@ -4229,7 +4240,7 @@ def build_parser():
     s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--duplicates', choices=['keep', 'skip'], help="start: the operator's one answer on clips the client's library already holds (design/147)"); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.add_argument('--waive', action='append'); s.set_defaults(fn=cmd_analysis)
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--propose', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--keeps', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded', '--answers'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
