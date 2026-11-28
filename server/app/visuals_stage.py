@@ -8912,7 +8912,7 @@ def record_next(plan, recorded_gaps, skipped):
     if skipped:
         return 'finish the skipped gaps, then record again'
     if all(g['gap_id'] in recorded_gaps for g in plan['gaps']):
-        return "`vw delivery bundle` (the editor's package, before the assembly)"
+        return "`vw overlays start` (the text overlays, the last step of visuals), then `vw delivery bundle` (the editor's package, before the assembly)"
     return '`vw next`'
 
 

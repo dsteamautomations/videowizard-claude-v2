@@ -83,28 +83,36 @@ def save_session(store, run, session):
     return session
 
 
-def early_inputs(outputs):
-    """design/132 E2: what the editor's early package was made from: the master plan and each gap's recorded visuals output."""
+def early_inputs(outputs, overlays=''):
+    """design/132 E2: what the editor's early package was made from: the master plan and each gap's recorded visuals output; and, when the film
+    has text overlays (28 Nov 2026), their fingerprint (overlay_stage.package_digest)."""
     master = S2._output(outputs, 'master') or {}
     return {'master_digest': (master.get('summary') or {}).get('plan_digest'),
-            'gaps': {o['unit']: str(o['id']) for o in outputs if o['stage'] == 'visuals' and o['unit']}}
+            'gaps': {o['unit']: str(o['id']) for o in outputs if o['stage'] == 'visuals' and o['unit']}, **({'overlays': overlays} if overlays else {})}
 
 
-def package_first(session, outputs):
+def package_first(session, outputs, overlays=''):
     """design/132 E1 (SK, 2 Nov 2026): the editor's package first, then the assembly. Refused without an early package that matches the recorded visuals."""
     first = "The editor's package comes first: run `vw delivery bundle`, then the assembly."
     b = (session or {}).get('bundle') or {}
     if not b.get('early'):
         raise Problem(409, 'NOT_ALLOWED', first)
-    was, now = b.get('inputs'), early_inputs(outputs)
+    was, now = b.get('inputs'), early_inputs(outputs, overlays)
     if was == now:
         return
+    if was and {k: v for k, v in was.items() if k != 'overlays'} == {k: v for k, v in now.items() if k != 'overlays'}:
+        raise Problem(409, 'NOT_ALLOWED', "The text overlays changed after the editor's package; run `vw delivery bundle` again, then the assembly.")
     if not was:
         raise Problem(409, 'NOT_ALLOWED', "The editor's package was made before this release; run `vw delivery bundle` again, then the assembly.")
     if was.get('master_digest') != now['master_digest']:
         raise Problem(409, 'NOT_ALLOWED', "The master plan changed after the editor's package; run `vw delivery bundle` again, then the assembly.")
     changed = sorted(g for g in set(was['gaps']) | set(now['gaps']) if was['gaps'].get(g) != now['gaps'].get(g))
     raise Problem(409, 'NOT_ALLOWED', f"{', '.join(changed)} {'was' if len(changed) == 1 else 'were'} recorded again after the editor's package; run `vw delivery bundle` again, then the assembly.")
+
+
+def _overlays(store, run):
+    from .. import overlay_stage
+    return overlay_stage.package_digest(overlay_stage.session_of(store, run))
 
 
 HANDOVER = '`vw delivery check`, `vw delivery download`, then `vw delivery open`'
@@ -226,7 +234,7 @@ def prepare(conn, store, user, run, outputs):
     pk = S2._package(store, s2)
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     session = session_of(store, run, create=True)
-    package_first(session, outputs)   # design/132
+    package_first(session, outputs, _overlays(store, run))   # design/132; the overlays as the package carries them
     fills = {}
     found = []   # ticket 12: find every fill's file before probing any, so a missing file fails in seconds, not after the downloads
     visuals_assets = None
@@ -339,7 +347,7 @@ def stabilize(store, user, run, sub_clip_id, choice):
 def build(conn, store, user, run, outputs):
     """The assembly plan: master events (with stabilisation decisions within the zoom cap) and gap fills with their choices."""
     session = session_of(store, run)
-    package_first(session, outputs)   # design/132
+    package_first(session, outputs, _overlays(store, run))   # design/132; the overlays as the package carries them
     master_o = S2._output(outputs, 'master')
     plan, _ = S2._file(store, master_o, f"master-v{master_o['summary']['version']}.json")
     s2 = S2.session_of(store, run)
@@ -431,7 +439,10 @@ def render(conn, store, user, run):
     assembly, entry = current(store, session)
     _refresh(conn, session)   # handover H4: the job row says whether the film is already there
     done = session['renders'].get('assembly') or {}
-    if done.get('status') == 'ready' and done.get('digest') == entry['digest'] and done.get('result'):
+    from .. import overlay_stage
+    laid = overlay_stage.film_rows(overlay_stage.session_of(store, run))   # text overlays, 28 Nov 2026: laid over the joined film; a changed overlay is a new film
+    laid_digest = S2.digest(laid)[:8] if laid else ''
+    if done.get('status') == 'ready' and done.get('digest') == entry['digest'] and done.get('result') and (done.get('overlays') or '') == laid_digest:
         save_session(store, run, session)
         return {'job_id': done['job_id'], 'version': entry['version'], 'frames': done.get('frames'), 'paid': False, 'ready': True,
                 'next': 'the film of this build is already rendered; nothing was queued: `vw assembly fetch`, then the operator watches and listens'}
@@ -468,15 +479,15 @@ def render(conn, store, user, run):
                               'hold_last_frame': ev['end_policy'] == 'hold_last', 'a2': [], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4"),
                               'dissolve_into_next': ev.get('dissolve_into_next') or 0})   # design/71 P4
     open_job = session['renders'].get('assembly')
-    if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == entry['digest']:
+    if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == entry['digest'] and (open_job.get('overlays') or '') == laid_digest:
         raise Problem(409, 'JOB_OPEN', 'The assembly film is already rendering.', job_id=open_job['job_id'])
     plan = {'kind': 'assembly', 'items': items, 'timeline': pk['timeline'], 'narration_key': s2['package']['narration_key'], 'narration': s2['package'].get('narration'), 'version': entry['version'], 'digest': entry['digest'],
-            'out_key': key(run, f"assembly-v{entry['version']}-{entry['digest'][:8]}.mp4"), 'upload_normalised': True}   # design/46 11.1: its own kind, the full size
+            'out_key': key(run, f"assembly-v{entry['version']}-{entry['digest'][:8]}{'-o' + laid_digest if laid else ''}.mp4"), 'upload_normalised': True, 'overlays': laid}   # design/46 11.1: its own kind, the full size
     frames = sum(int(it.get('timeline_frames') or 0) for it in items)   # design/46 11.4
     rk = S2.save_json(store, key(run, f"render-assembly-v{entry['version']}.json"), plan)
     job = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'assembly','assembly','render',%s, gen_random_uuid()) returning id",
                        (run['id'], Jsonb({'kind': 'render', 'film': 'assembly', 'plan_key': rk['key'], 'out_key': plan['out_key']}))).fetchone()
-    session['renders']['assembly'] = {'job_id': str(job['id']), 'status': 'queued', 'digest': entry['digest'], 'version': entry['version'], 'out_key': plan['out_key'], 'frames': frames}
+    session['renders']['assembly'] = {'job_id': str(job['id']), 'status': 'queued', 'digest': entry['digest'], 'version': entry['version'], 'out_key': plan['out_key'], 'frames': frames, 'overlays': laid_digest}
     save_session(store, run, session)
     return {'job_id': str(job['id']), 'version': entry['version'], 'frames': frames, 'paid': False, 'next': 'wait with `vw assembly status --wait 900`, then fetch; the operator watches and listens'}
 

@@ -44,7 +44,7 @@ def lines(events=EVENTS, vis=VIS, fmt=None):
 def test_each_rule_writes_its_line_when_its_trigger_is_there():
     got = {(r['rule'], r['shot']): r for r in lines()}
     assert 'palm fronds sway' in got[('E5', 'VS1')]['line'] and ('E5', 'IM1') in got and ('E5', 'AN1') not in got and ('E5', 'FR1') not in got
-    assert "'25 %'" in got[('E6', 'VS1')]['line']
+    assert ('E6', 'VS1') not in got   # retired, 28 Nov 2026: text over a shot is made in the overlays step, or left out by the operator's choice
     assert 'brighter by 0.20' in got[('E7', 'IM1')]['line'] and '0.52' in got[('E8', 'IM1')]['line'] and 'a ladder at the right edge' in got[('E10', 'IM1')]['line']
     assert '1 AI take is 720p' in got[('E11', '')]['line'] and ('E16', '') in got and ('E13', '') in got and ('E15', '') in got
     assert got[('E7', 'IM1')]['where'] == '00:14' and got[('E7', 'IM1')]['kind'] == 'look' and got[('E5', 'VS1')]['kind'] == 'sound'

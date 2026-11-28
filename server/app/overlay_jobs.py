@@ -126,3 +126,25 @@ def process(store, request, folder, still=None, clip=None, frame_of=frame_of):
         return 'failed', {}, f'The overlay picture could not be made: the shot\'s frame could not be read ({e.__class__.__name__}).', cost, None
     status, result, error = (still or globals()['still'])(row, page, ground, Path(folder) / 'project', request['out_key'], store)
     return status, ({**result, 'ground': 'shot' if data else 'plain'} if status == 'ready' else result), error, cost, None
+
+
+def lay_args(film, overlays, out, fps):
+    """FFmpeg's arguments to lay the transparent clips over the film, in the order given (a later one lies over an earlier one). The sound is copied.
+    overlays: [{'path', 'record_in_frame', 'frames'}]."""
+    args, chain, last = ['-y', '-v', 'error', '-i', str(film)], [], '0:v'
+    for i, o in enumerate(overlays, 1):
+        a, b = o['record_in_frame'] / float(fps), (o['record_in_frame'] + o['frames']) / float(fps)
+        args += ['-itsoffset', f'{a:.6f}', '-i', str(o['path'])]
+        chain.append(f"[{last}][{i}:v]overlay=eof_action=pass:enable='between(t,{a:.6f},{b:.6f})'[v{i}]")
+        last = f'v{i}'
+    return args + ['-filter_complex', ';'.join(chain), '-map', f'[{last}]', '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'fast', '-crf', '16', '-pix_fmt', 'yuv420p', str(out)]
+
+
+def lay(film, overlays, out, fps):
+    """The proof film with its overlays (part H). Returns `out`; the film itself when there is no overlay."""
+    if not overlays:
+        return Path(film)
+    r = subprocess.run([FFMPEG(), *lay_args(film, overlays, out, fps)], capture_output=True, text=True, timeout=3600)
+    if r.returncode or not Path(out).exists():
+        raise OSError(f'the overlays could not be laid over the film: {(r.stderr or r.stdout)[-300:]}')
+    return Path(out)

@@ -53,6 +53,15 @@ def process(job):
         t0 = time.monotonic()
         cache = (CACHE / str(job['run_id']) / 'cache') if plan['kind'] in R.DELIVERED else None   # design/46 11.7: reused across versions, removed at close
         film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'], plan.get('narration'), cache=cache)
+        if plan.get('overlays'):   # text overlays, 28 Nov 2026 (part H): the approved clips over the joined film, the sound untouched
+            from .. import overlay_jobs
+            laid = []
+            for o in plan['overlays']:
+                p = work / f"overlay-{o['id']}.mov"
+                p.write_bytes(store.get(o['key']))
+                laid.append({**o, 'path': p})
+            film = overlay_jobs.lay(film, laid, work / 'film-with-overlays.mp4', plan['timeline']['fps'])
+            record['overlays'] = len(laid)
         record['elapsed_s'] = round(time.monotonic() - t0, 1)   # design/43 7.2: the measured speed feeds the tool's estimate
         record['frames_per_s'] = round(record['frames'] / record['elapsed_s'], 1) if record['elapsed_s'] > 0 else None
         data = film.read_bytes()

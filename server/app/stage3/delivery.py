@@ -152,10 +152,7 @@ def editors_table(events, fps, vis, fmt=None):
         add = lambda k, rule, line: rows.append({'kind': k, 'rule': rule, 'where': where, 'shot': sid, 'line': line})
         add('sound', 'E5', 'layer sound under it: near, middle, far, from what the scene shows' + (f" ({v['ambient']})" if v.get('ambient') else ''))
         if kind == 'AI video':
-            takes += ev.get('source') == 'take'
-            m = NUMBER.search(v.get('narration') or '')
-            if m:
-                add('text', 'E6', f"'{m.group(0).strip()}' is spoken over a video shot: overlay it in the edit; it is not drawn in the take")
+            takes += ev.get('source') == 'take'   # rule E6 ("a number is spoken over a video shot: overlay it in the edit") is retired, 28 Nov 2026: text over a shot is made in the overlays step, or left out by the operator's choice
         failed = {l.get('check'): l.get('seen') or '' for l in v.get('check_lines') or [] if l.get('pass') is False}
         if 'light and colour' in failed:
             add('look', 'E7', failed['light and colour'] + ': match the grade by eye')
@@ -263,24 +260,34 @@ def bundle(conn, store, user, run, outputs):
         files.append({'role': 'brand', 'name': 'Graphics/' + f['name'], 'key': f['key'], 'sha256': f['sha256'], 'bytes': f['bytes']})
     checklist = checklist_of(asm_o['summary'], pk_flat, master_o['summary'], brief=brief_summary) + brand_lines(card, {f['kind']: 'Graphics/' + f['name'] for f in brand['files']})
     vis = visuals_info(store, run, outputs)   # design/105
+    from .. import overlay_stage
+    overlay_rows = overlay_stage.package_rows(overlay_stage.session_of(store, run))   # text overlays, 28 Nov 2026
+    for o in overlay_rows:
+        files.append({'role': 'overlay', 'name': o['file'], **{k: o[k] for k in ('key', 'sha256', 'bytes')}})
     fps = pk['timeline']['fps']
     table = editors_table(assembly['events'], fps, vis, ((brief_summary.get('production') or {}).get('format')))
     shots = ai_shots(assembly['events'], fps, vis)
     md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n' + editors_table_md(table)
     checklist = checklist + [{'section': 'editor', 'kind': r['kind'], 'rule': r['rule'], 'where': r['where'], 'shot': r['shot'], 'item': r['line']} for r in table]
+    checklist += [{'section': 'editor', 'kind': 'text', 'rule': 'overlay', 'where': _tc(o['record_in_frame'], fps), 'shot': None,
+                   'item': f"text overlay {o['id']} \"{o['text']}\" is on track Overlays {o['track']} ({o['file']}); the approved film already shows it"} for o in overlay_rows]
     csv_text = media_pool_csv(pk).encode('utf-8')
     events = resolve_events(assembly, pk, master, clips)
-    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots), camera=any(e.get('clip_id') for e in events)).encode('utf-8')
+    from .early import OVERLAYS_NOTE
+    open_edit = (open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots), camera=any(e.get('clip_id') for e in events))
+                 + (OVERLAYS_NOTE.format(n=len(overlay_rows), s='' if len(overlay_rows) == 1 else 's')
+                    + 'The approved film already shows them: switch the overlay tracks off when comparing the timeline with it.\n' if overlay_rows else '')).encode('utf-8')
     pieces = [{'file': layout('narration', 'narration.mp3'), 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
               for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': assembly['duration_frames'], 'timeline_start_frame': 0}])]
     used = [e['clip_id'] for e in events if e.get('clip_id')]
     cuts_per_clip = {cid: used.count(cid) for cid in set(used)}
-    timeline_files = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, asm_o['summary'].get('finishing') or [], assembly.get('sfx_cues') or [], assembly['duration_frames']).encode('utf-8'), 'application/xml'),
+    timeline_files = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, asm_o['summary'].get('finishing') or [], assembly.get('sfx_cues') or [], assembly['duration_frames'], overlays=overlay_rows).encode('utf-8'), 'application/xml'),
                       f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
                       'Relink-list.csv': (TL.relink_csv(clips.values(), set(used), cuts_per_clip).encode('utf-8'), 'text/csv')}   # design/107 slice 1; defect 59: a library clip is a camera file to relink too
     generated = {**timeline_files, 'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
                  'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown'),
-                 **({'AI-shots.md': (ai_shots_md(shots).encode('utf-8'), 'text/markdown')} if shots else {})}   # design/105 E-c
+                 **({'AI-shots.md': (ai_shots_md(shots).encode('utf-8'), 'text/markdown')} if shots else {}),   # design/105 E-c
+                 **({'Overlays.csv': (overlay_stage.overlays_csv(overlay_rows, fps).encode('utf-8'), 'text/csv')} if overlay_rows else {})}
     for name, (data, mime) in generated.items():
         k = key(run, 'delivery/' + name)
         store.put(k, data, mime)
@@ -288,7 +295,8 @@ def bundle(conn, store, user, run, outputs):
     manifest = {'contract': CONTRACT_BUNDLE, 'run': run['code'], 'client': run.get('client'), 'created_at': datetime.now(timezone.utc).isoformat(), 'film_sha256': film['sha256'],
                 'assembly_digest': asm_o['summary']['assembly_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': events, 'narration_pieces': pieces,
                 'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': assembly['duration_frames'], 'cuts': len(events),   # design/107: what Step D checks against
-                'camera_copies': media_o['summary'].get('copies')}   # design/107 §6: the delivery reminds the operator to relink
+                'camera_copies': media_o['summary'].get('copies'),   # design/107 §6: the delivery reminds the operator to relink
+                'overlays': [{k: o[k] for k in ('id', 'file', 'record_in_frame', 'record_out_frame', 'track')} for o in overlay_rows]}
     mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
@@ -355,16 +363,20 @@ def bundle_early(conn, store, user, run, outputs, session):
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
     session['bundle'] = {'manifest': mk, 'film_sha256': None, 'early': True, 'files': len(files), 'bytes': sum(f['bytes'] for f in files),
-                         'inputs': early_inputs(outputs)}   # design/132 E2: the assembly's gate compares these
+                         'inputs': early_inputs(outputs, overlay_stage.package_digest(overlay_session))}   # design/132 E2: the assembly's gate compares these
     save_session(store, run, session)
     return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'early': True, 'cuts': len(events),
             'next': early_next(bool(used))}
 
 
+ASSEMBLY_NEXT = ('the package is made. Next on this computer: the assembly and the proof film (`vw assembly prepare`); person A watches the film and hands over after it. '
+                 'For person B on the editing computer, after the hand-over: ')
+
+
 def early_next(camera):
     """What follows the early package. SK, 23 Nov 2026: a cut with no camera file asks for no folder of originals."""
-    return ("the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download` (no camera copies by default), then `vw delivery open --originals \"<folder>\"` on Resolve Studio."
-            if camera else "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download`, then `vw delivery open` on Resolve Studio.")
+    return (ASSEMBLY_NEXT + "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download` (no camera copies by default), then `vw delivery open --originals \"<folder>\"` on Resolve Studio."
+            if camera else ASSEMBLY_NEXT + "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download`, then `vw delivery open` on Resolve Studio.")
 
 
 NAMES = {'youtube': 'YouTube', 'tiktok': 'TikTok', 'linkedin': 'LinkedIn', 'twitter': 'X'}

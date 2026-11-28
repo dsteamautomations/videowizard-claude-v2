@@ -389,3 +389,16 @@ def overlays_csv(rows, fps):
         w.writerow([r['id'], r['file'], r['kind'], r['text'], tc(r['record_in_frame'], fps), tc(r['record_out_frame'], fps), f"{r['record_in_frame'] / float(fps):g}",
                     f"{r['record_out_frame'] / float(fps):g}", f"Overlays {r['track']}", r['card'], r['motion'], r['place']])
     return out.getvalue()
+
+
+def package_digest(session):
+    """What the package and the proof film compare: the approved overlays with their clips; '' when the film has none."""
+    rows = package_rows(session)
+    return S2.digest([{k: r[k] for k in ('id', 'sha256', 'record_in_frame', 'record_out_frame')} for r in rows]) if rows else ''
+
+
+def film_rows(session):
+    """The overlays as the proof film lays them: in the order of the list, so of two that overlap the later one of the list lies on top."""
+    by_id = {r['id']: r for r in package_rows(session)}
+    return [{'id': r['id'], 'key': by_id[r['id']]['key'], 'record_in_frame': by_id[r['id']]['record_in_frame'], 'frames': by_id[r['id']]['frames']}
+            for r in session.get('rows') or [] if r['id'] in by_id]

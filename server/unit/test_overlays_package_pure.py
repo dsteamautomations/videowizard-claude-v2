@@ -68,3 +68,117 @@ def test_the_open_edit_text_says_where_the_overlays_are_only_when_there_are_some
     with_ = E.open_edit_text('VW-30', camera=False, overlays=3)
     assert 'Media/Overlays/' in with_ and 'Overlays.csv' in with_ and 'transparent' in with_
     assert 'Media/Overlays/' not in E.open_edit_text('VW-30', camera=False)
+
+
+# ---------- build step 7 (part H) and the comparisons ----------
+
+import shutil
+import subprocess
+
+import pytest
+
+from app import overlay_jobs as J
+from app.errors import Problem
+from app.stage3 import assembly as A
+
+
+def test_the_fingerprint_of_the_overlays_changes_with_a_clip_and_is_empty_without_any():
+    assert S.package_digest({'start': {'answer': 'none'}, 'rows': []}) == ''
+    d = S.package_digest(SESSION)
+    changed = {**SESSION, 'rows': [rec('O01', 20, 70)] + SESSION['rows'][1:]}
+    assert len(d) == 64 and S.package_digest(changed) != d and S.package_digest(SESSION) == d
+
+
+def test_the_proof_film_lays_the_overlays_in_the_order_of_the_list():
+    session = {**SESSION, 'rows': [SESSION['rows'][2], SESSION['rows'][0], SESSION['rows'][4]]}
+    assert [(r['id'], r['record_in_frame'], r['frames']) for r in S.film_rows(session)] == [('O03', 70, 50), ('O01', 20, 45)]
+    assert S.film_rows(session)[0]['key'] == 'r1/visuals/overlays/O03.mov'
+
+
+OUTPUTS = [{'stage': 'master', 'unit': None, 'id': 'm', 'summary': {'plan_digest': 'p'}}, {'stage': 'visuals', 'unit': 'G1', 'id': 'v1', 'summary': {}}]
+
+
+def test_a_package_made_before_an_overlay_changed_is_out_of_date():
+    bundle = {'bundle': {'early': True, 'inputs': A.early_inputs(OUTPUTS, 'd1')}}
+    assert A.package_first(bundle, OUTPUTS, 'd1') is None
+    with pytest.raises(Problem) as e:
+        A.package_first(bundle, OUTPUTS, 'd2')
+    assert 'text overlays changed' in e.value.message and '`vw delivery bundle`' in e.value.message
+
+
+def test_a_film_without_overlays_compares_as_before():
+    assert A.early_inputs(OUTPUTS) == {'master_digest': 'p', 'gaps': {'G1': 'v1'}} and A.early_inputs(OUTPUTS, '') == A.early_inputs(OUTPUTS)
+    assert A.package_first({'bundle': {'early': True, 'inputs': A.early_inputs(OUTPUTS)}}, OUTPUTS, '') is None
+
+
+def test_the_command_lays_each_clip_at_its_moment_and_copies_the_sound():
+    args = J.lay_args('film.mp4', [{'path': 'a.mov', 'record_in_frame': 25, 'frames': 50}, {'path': 'b.mov', 'record_in_frame': 50, 'frames': 25}], 'out.mp4', 25)
+    fc = args[args.index('-filter_complex') + 1]
+    assert args[args.index('a.mov') - 3:args.index('a.mov')] == ['-itsoffset', '1.000000', '-i'] and "[0:v][1:v]overlay=eof_action=pass:enable='between(t,1.000000,3.000000)'[v1]" in fc
+    assert "[v1][2:v]overlay" in fc and args[args.index('-map') + 1] == '[v2]' and '0:a?' in args and args[args.index('-c:a') + 1] == 'copy'
+    assert J.lay('film.mp4', [], 'out.mp4', 25).name == 'film.mp4'
+
+
+@pytest.mark.skipif(not shutil.which('ffmpeg'), reason='needs ffmpeg')
+def test_a_real_film_shows_the_overlay_only_during_its_moment(tmp_path, monkeypatch):
+    monkeypatch.setattr(J, 'FFMPEG', lambda: 'ffmpeg')
+    ff = lambda *a: subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', *a], check=True)
+    ff('-f', 'lavfi', '-i', 'color=c=black:s=320x180:d=4:r=25', '-f', 'lavfi', '-i', 'sine=d=4', '-shortest', '-pix_fmt', 'yuv420p', str(tmp_path / 'film.mp4'))
+    ff('-f', 'lavfi', '-i', 'color=c=white@1.0:s=320x180:d=1:r=25,format=yuva444p10le,geq=lum=940:cb=512:cr=512:a=if(lt(X\\,160)\\,1023\\,0)',
+       '-c:v', 'prores_ks', '-profile:v', '4444', '-pix_fmt', 'yuva444p10le', str(tmp_path / 'o.mov'))
+    out = J.lay(tmp_path / 'film.mp4', [{'path': tmp_path / 'o.mov', 'record_in_frame': 50, 'frames': 25}], tmp_path / 'out.mp4', 25)
+
+    def grey(t, x):
+        raw = subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(t), '-i', str(out), '-frames:v', '1', '-vf', f'crop=2:2:{x}:90,format=gray', '-f', 'rawvideo', '-'], capture_output=True, check=True).stdout
+        return raw[0]
+    assert grey(1.0, 40) < 40 and grey(2.5, 40) > 200 and grey(2.5, 280) < 40 and grey(3.5, 40) < 40   # before, during (left half only: the right is transparent), after
+    probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', str(out)], capture_output=True, text=True).stdout.split()
+    assert sorted(probe) == ['audio', 'video']
+
+
+# ---------- parts I and J: the instruction ----------
+
+def steps_of(name, footage):
+    import json
+    from pathlib import Path
+    from app import core
+    d = core.for_footage(json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8')), footage)
+    return next(s for s in d['stages'] if s['name'] == name)['steps']
+
+
+@pytest.mark.parametrize('footage', ['own', 'none'])
+def test_the_assembly_instruction_names_the_overlays_and_moves_the_hand_over_after_the_proof_film(footage):
+    asm = steps_of('assembly', footage)
+    assert 'the text overlays are settled' in asm[0] and 'Overlays.csv' in asm[0] and 'while the overlays step is open' in asm[0]
+    assert "person B's, after the hand-over" in asm[0] and '`vw delivery check`' not in asm[0] and 'hands over after it' in asm[0]
+    assert '`vw assembly prepare`' in asm[1]
+
+
+def test_no_question_before_the_film_except_a_fill_with_an_issue():
+    asm = steps_of('assembly', 'own')
+    text = ' '.join(asm)
+    assert 'ask once' not in text and asm[2].startswith('No question before the film, with one exception.')
+    assert '"Use it as it is"' in asm[2] and '"Swap it in visuals"' in asm[2] and 'the build waits for the answer' in asm[2]
+    assert 'Trims, holds and shaky shots are not asked' in asm[2] and 'say as plain facts, asking nothing' in asm[3]
+
+
+def test_a_change_to_an_overlay_after_the_film_is_written_out():
+    last = steps_of('assembly', 'own')[-1]
+    assert '`vw overlays change O01' in last and '`vw delivery bundle` again' in last and 'the operator watches again' in last
+
+
+@pytest.mark.parametrize('footage', ['own', 'none'])
+def test_the_delivery_instruction_names_the_overlays_and_person_b(footage):
+    dl = steps_of('delivery', footage)
+    assert 'approved text overlays are in it' in dl[0] and dl[1].startswith('On the editing computer (person B, after the hand-over')
+    assert 'switch those tracks off when comparing with Approved-film.mp4' in dl[1]
+
+
+def test_after_the_last_gap_the_server_names_the_overlays_then_the_package():
+    from app import visuals_stage as VS
+    said = VS.record_next({'gaps': [{'gap_id': 'G1'}]}, {'G1': 'o'}, {})
+    assert said.index('`vw overlays start`') < said.index('`vw delivery bundle`')
+
+
+def test_after_the_package_the_server_names_the_assembly_first():
+    assert D.early_next(True).startswith('the package is made. Next on this computer: the assembly') and 'person B' in D.early_next(False)
