@@ -88,7 +88,7 @@ def look_of(given, film):
 
 
 def _reading_frames(words, fps):
-    return math.ceil(max(READ_MIN_S, READ_BASE_S + READ_WORD_S * words) * fps)
+    return math.ceil(round(max(READ_MIN_S, READ_BASE_S + READ_WORD_S * words) * fps, 6))   # rounded first: 2.2 s at 25 frames is 55, not 55.00000000000001
 
 
 def _cut_at(cuts, frame):

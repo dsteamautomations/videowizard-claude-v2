@@ -81,6 +81,10 @@ def test_from_a_spoken_word_it_comes_in_on_the_word_and_stays_long_enough_to_rea
     assert one(word=3, lines=['Now'])['end_frame'] == 20 + 38   # never under 1.5 s (37.5 frames, rounded up)
 
 
+def test_the_reading_time_is_not_a_frame_too_long_by_rounding():
+    assert one(word=3, lines=['one two three'])['end_frame'] == 20 + 55   # 2.2 s at 25 frames a second is 55 frames
+
+
 def test_it_starts_up_to_2_seconds_before_its_word_to_stay_inside_its_shot():
     r = one(word=8, lines=['Two weeks'])   # frame 70; 45 frames would end at 115, past the cut at 100: it starts at 55, 0.6 s early
     assert (r['start_frame'], r['end_frame']) == (55, 100) and r['facts'] == ['starts 0.6 s before its word']
