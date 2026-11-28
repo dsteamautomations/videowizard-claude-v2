@@ -69,12 +69,13 @@ def _entry(run_id, stage, step, body, status, response, run_code=None):
         form = '; '.join(f"{'.'.join(str(x) for x in (d.get('loc') or [])[1:]) or 'body'}: {d.get('msg')}" for d in response.get('detail') or [] if isinstance(d, dict)) \
             if isinstance(response.get('detail'), list) else str(response.get('detail') or '')
         return {**entry, 'kind': 'refusal', 'rule': str(response.get('code') or status), 'entry': f"{step} refused: {_short(response.get('message') or form, 1500)}"}
-    if response.get('status') == 'rejected' or response.get('act_on'):
+    if response.get('status') == 'rejected':   # VW-26 finding F1 (28 Nov 2026): a check that passes with flags is a step (below), not a refusal
         said = list(response.get('refusals') or []) + list(response.get('act_on') or []) + ([response['error']] if response.get('error') else [])
         return {**entry, 'kind': 'refusal', 'rule': 'check', 'entry': f"{step} rejected: " + _short('; '.join(map(str, said)), 1500)}
     made = ', '.join(f'{k} {response[k]}' for k in ('reference_id', 'job_id', 'job', 'version', 'status') if isinstance(response.get(k), (str, int)))   # `job`: the voices page's narrate-again
     said = f": {_short(response['log'], 1500)}" if isinstance(response.get('log'), str) and response['log'] else ''   # design/205: what the step returned, in a line
-    return {**entry, 'kind': 'step', 'rule': '', 'entry': step + (f' ({made})' if made else '') + said}
+    flags = ' passed with flags: ' + _short('; '.join(map(str, response['act_on'])), 1500) if response.get('act_on') else ''
+    return {**entry, 'kind': 'step', 'rule': '', 'entry': step + (f' ({made})' if made else '') + flags + said}
 
 
 def assistant_entry(run_id, stage, body):

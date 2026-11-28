@@ -293,7 +293,7 @@ def test_a_list_sentence_shown_by_fewer_events_than_things_is_flagged_never_refu
     assert out['refusals'] == []
     assert [f for f in out['flags'] if 'N18' in f] == [
         'OPTION #1: N18 list: step BEAT_01.S1 (The mix takes sand, cement, lime, tiles, bowls, shells, jell) names about 8 things and has 3 shots and blanks under it: '
-        'check that each thing named has its picture, its blank or its note']
+        'check that each thing named has its picture, its blank or its note. Look once, change what needs it, then go on: this flag never blocks, and a note does not clear it']
     assert V.answer_flags(out['flags'])['act_on'].count(next(f for f in out['flags'] if 'N18' in f)) == 1   # a flag to act on, said in full
 
 

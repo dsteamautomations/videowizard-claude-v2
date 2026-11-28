@@ -308,7 +308,7 @@ def validate_options(doc, package, policy):
                 under = sum(1 for a, z in spans if a < s['end_frame'] and s['start_frame'] < z)
                 if things >= 4 and under < things:
                     flags.append(f"OPTION #{n}: N18 list: step {sid} ({s['text'][:60]}) names about {things} things and has {under} shots and blanks under it: "
-                                 'check that each thing named has its picture, its blank or its note')
+                                 'check that each thing named has its picture, its blank or its note. Look once, change what needs it, then go on: this flag never blocks, and a note does not clear it')   # VW-26 finding F1 (28 Nov 2026): the assistant sent the check seven more times to clear it
         for kept in o.get('carries_over') or []:   # design/91 N14: the state the step before left is still visible
             for k, e in enumerate(events, 1):
                 lm = (rows.get(e.get('sub_clip_id')) or {}).get('landmarks') or []

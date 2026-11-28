@@ -25,6 +25,13 @@ def test_a_check_that_comes_back_rejected_is_logged_with_its_flags():
     assert e['kind'] == 'refusal' and 'G12' in e['entry'] and 'B1 pre-roll' in e['entry']
 
 
+def test_a_check_that_passes_with_flags_is_a_step_not_a_refusal():   # VW-26 finding F1 (28 Nov 2026): the log read as blocked for 14 minutes
+    e = L.entry_from(f'/api/runs/{RUN}/options/check', {'request_id': 'r4'}, 200, {'status': 'valid', 'act_on': ['OPTION #1: N18 list: step BEAT_01.S2'], 'for_information': ''})
+    assert e['kind'] == 'step' and e['rule'] == '' and 'passed with flags' in e['entry'] and 'N18 list' in e['entry'] and 'rejected' not in e['entry'] and 'refused' not in e['entry']
+    e = L.entry_from(f'/api/runs/{RUN}/options/propose', {'request_id': 'r5'}, 201, {'version': 2, 'act_on': ['B1 pre-roll']})
+    assert e['kind'] == 'step' and 'version 2' in e['entry'] and 'B1 pre-roll' in e['entry']
+
+
 def test_the_stage_comes_from_the_path_or_the_body():
     assert L.entry_from(f'/api/runs/{RUN}/output', {'request_id': 'a', 'stage': 'brief', 'accepted_quote': 'approved'}, 201, {})['stage'] == 'brief'
     assert L.entry_from(f'/api/runs/{RUN}/film', {'request_id': 'a', 'key': 'shape', 'value': 'vertical', 'quote': 'vertical'}, 200, {})['stage'] == 'media'
