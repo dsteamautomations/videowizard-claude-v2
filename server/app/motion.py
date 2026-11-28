@@ -428,6 +428,14 @@ def render(folder, fps, out):
     return Path(out)
 
 
+def render_mov(folder, fps, out):
+    """A transparent clip (text overlays, 28 Nov 2026): HyperFrames' mov is ProRes 4444 with the page's own transparency."""
+    r = run(['render', '--format', 'mov', '--fps', str(fps), '--workers', '2', '--quiet', '-o', str(out)], folder)
+    if r.returncode or not Path(out).exists():
+        raise RuntimeError(f'render failed: {(r.stderr or r.stdout)[-300:]}')
+    return Path(out)
+
+
 def frames_png(mp4, indexes):
     """The contact sheet's frames, {index: png}, read from the rendered movie."""
     s = settings()
