@@ -119,3 +119,10 @@ def test_the_procedure_puts_the_package_before_the_assembly():
     asm, dl = st['assembly']['steps'], st['delivery']['steps']
     assert '`vw delivery bundle`' in asm[0] and "editor's package" in asm[0] and '`vw assembly prepare`' in asm[1]
     assert 'again' in dl[0] and 'approved film' in dl[0]
+
+
+@pytest.fixture(autouse=True)
+def overlays_settled(monkeypatch):
+    """Text overlays (28 Nov 2026): these tests are about the package; the overlays step is answered "No overlays in this film"."""
+    from app import overlay_stage
+    monkeypatch.setattr(overlay_stage, 'session_of', lambda store, run: {'start': {'answer': 'none'}})

@@ -393,3 +393,10 @@ def test_the_journey_computer_a_then_computer_b_redoes_nothing(film):
     assert all('ask' not in x['next'] for x in (b, pr, bu, re_))                                    # nothing asked
     assert after['versions'] == before['versions'] and after['current'] == before['current'] and after['bundle'] == before['bundle']
     assert report(store, conn)['handover'] == p['handover']                                         # the next step is still the hand-over
+
+
+@pytest.fixture(autouse=True)
+def overlays_settled(monkeypatch):
+    """Text overlays (28 Nov 2026): these tests are about the package; the overlays step is answered "No overlays in this film"."""
+    from app import overlay_stage
+    monkeypatch.setattr(overlay_stage, 'session_of', lambda store, run: {'start': {'answer': 'none'}})

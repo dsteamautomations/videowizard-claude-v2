@@ -190,3 +190,10 @@ def test_the_library_round_keeps_the_fingerprint_of_the_package_file_it_wrote(mo
     kept, raw = json.loads(store.files['run-1/stage2/session.json'])['package'], store.files[key]
     assert b'L9:SUB_01' in raw and kept['sha256'] == hashlib.sha256(raw).hexdigest() and kept['bytes'] == len(raw) and kept['key'] == key
     assert kept['digest'] == 'plan-digest'   # the library adds rows; it is not a new prepare
+
+
+@pytest.fixture(autouse=True)
+def overlays_settled(monkeypatch):
+    """Text overlays (28 Nov 2026): these tests are about the package; the overlays step is answered "No overlays in this film"."""
+    from app import overlay_stage
+    monkeypatch.setattr(overlay_stage, 'session_of', lambda store, run: {'start': {'answer': 'none'}})

@@ -4133,6 +4133,83 @@ def cmd_film(a):
     emit(write(f"/api/runs/{m['run_id']}/film", body))
 
 
+def _overlays_shown(m, out):
+    """The stills of the overlays saved beside the chat, and the lines to say: facts only, the operator judges."""
+    files = []
+    for o in out.get('overlays') or []:
+        if o.get('still'):
+            o['still_file'] = _download(m, o['still'], f"work/chat/overlay-{o['id']}.jpg")
+            if o['state'] == 'proposed':
+                files.append(o['still_file'])
+    lines = [f"{o['id']} ({o['state']}): {o['kind']} \"{' / '.join(o['lines'])}\", {o['shot']}, {o['start_s']:g} to {o['end_s']:g} s, {o['place'] if isinstance(o['place'], str) else 'at the marked spot'}, {o['motion']}"
+             + (f"; {'; '.join(o['facts'])}" if o['facts'] else '') + (f". Why: {o['why']}" if o.get('why') else '') for o in out.get('overlays') or []]
+    say = ' | '.join(lines) or 'No overlay is proposed yet.'
+    if out.get('busy'):
+        say += f" The server is still drawing {', '.join(out['busy'])}: run `vw overlays show` again in a moment."
+    if out.get('failed'):
+        say += ' Could not be drawn: ' + '; '.join(f'{k}: {v}' for k, v in out['failed'].items()) + '.'
+    say += (' The package waits for: ' + '; '.join(out['open']) + '.') if out.get('open') else " The overlays are settled: the editor's package can be made (`vw delivery bundle`)."
+    emit({**out, 'show_files': files}, 0, say + ' Show each waiting overlay with its picture and its facts; say no judgment of your own. The operator answers Approve, Change (their words, or a marked picture), '
+         'Remove, or "Approve all as shown": `vw overlays approve|remove O01`, `vw overlays change O01 --file <row.json>`, `vw overlays approve-all`, each with --quote.')
+
+
+def cmd_overlays(a):
+    """Text overlays (28 Nov 2026). `vw overlays start` shows the one start card (kinds, cards as sample pictures, motions in words, the application's fonts, the
+    defaults); `--answer defaults|change|none [--kinds a,b] [--look '<json>'] --quote` records the answer. `vw overlays list --file <list.json>` records the
+    assistant's list; `vw overlays show` shows it with the pictures; `vw overlays approve|remove|change O01`, `vw overlays approve-all` record the operator's word."""
+    m = active()
+    if a.what == 'show':
+        return _overlays_shown(m, call('GET', f"/api/runs/{m['run_id']}/overlays", wait=120))
+    if a.what == 'list':
+        doc = load_json(Path(a.file)) if a.file and Path(a.file).exists() else None
+        if not isinstance(doc, dict):
+            emit({'action': 'refused', 'message': 'Give the list as a file: `vw overlays list --file work/overlays/list.json`, holding {"overlays": [ … ]}.'}, 2)
+        return _overlays_shown(m, write(f"/api/runs/{m['run_id']}/overlays/list", {'document': doc}))
+    if a.what in ('approve', 'remove', 'change', 'approve-all'):
+        if not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': "Ask the operator, then pass their own words with --quote."}, 2)
+        body = {'decision': a.what, 'quote': a.quote, **({'overlay': a.overlay} if a.overlay else {})}
+        if a.what == 'change':
+            row = load_json(Path(a.file)) if a.file and Path(a.file).exists() else None
+            if not isinstance(row, dict):
+                emit({'action': 'refused', 'message': 'Give the changed overlay whole, as a file: `vw overlays change O01 --file work/overlays/O01.json`.'}, 2)
+            body['row'] = row
+        return _overlays_shown(m, write(f"/api/runs/{m['run_id']}/overlays/decide", body))
+    if not a.answer:
+        out = call('GET', f"/api/runs/{m['run_id']}/overlays/start")
+        import base64 as _b64
+        folder = workspace(m['code']) / 'work' / 'chat'
+        folder.mkdir(parents=True, exist_ok=True)
+        shown = []
+        for c in out['cards']:
+            data = c.pop('base64', None)
+            if data:
+                path = folder / f"overlay-card-{c['id']}.jpg"
+                path.write_bytes(_b64.b64decode(data))
+                shown.append(str(path))
+        emit({**out, 'show_files': shown}, 0, 'Show the operator this one card: the kinds, the sample pictures of the cards, the motions in words, the fonts, the defaults. '
+             'Everything on it is a suggestion; the operator decides. A reference picture of their own card: read it and write its settings in --look. '
+             'Record their answer with `vw overlays start --answer defaults|change|none --quote "<their words>"`.')
+    if not (a.quote or '').strip():
+        emit({'action': 'refused', 'message': "Ask the operator, then pass their own words with --quote."}, 2)
+    body = {'answer': a.answer, 'quote': a.quote}
+    if a.kinds is not None:
+        body['kinds'] = [k.strip() for k in a.kinds.split(',') if k.strip()]
+    if a.look:
+        try:
+            body['look'] = json.loads(a.look)
+        except ValueError:
+            emit({'action': 'refused', 'message': "--look takes JSON, for example '{\"card\": \"cream\", \"motion\": \"fade\"}'."}, 2)
+    out = write(f"/api/runs/{m['run_id']}/overlays/start", body)
+    guide = out.pop('guide', None)
+    if not guide:
+        emit(out, 0, "Recorded: no overlays in this film. The editor's package can be made (`vw delivery bundle`).")
+    path = workspace(m['code']) / 'work' / 'overlays' / 'guide.md'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(guide, encoding='utf-8')
+    emit(out, 0, f'Recorded. Read {path} (advice on what to suggest and how to write the list), write the list for the kinds the operator kept, and record it with `vw overlays list --file <file>`.')
+
+
 def set_aside(units):
     """design/183: the clips the server set aside because the analysis model refused them: [{unit, name, reason}]."""
     return [{'unit': u['unit'], 'name': (u.get('summary') or {}).get('name') or u.get('name') or u['unit'], 'reason': ((u.get('summary') or {}).get('note') or '').replace('Set aside by the server: ', '')}
@@ -4310,6 +4387,8 @@ def build_parser():
     s.add_argument('--show', action='store_true'); s.set_defaults(fn=cmd_log)
     s = sub.add_parser('library', help='the brand-generic library (design/147): show, mark, unmark, remark'); s.add_argument('what', choices=['show', 'mark', 'unmark', 'remark'])
     s.add_argument('--generic', help='mark: the clip names to mark brand-generic, comma-separated; empty for none'); s.add_argument('--clip'); s.add_argument('--quote'); s.set_defaults(fn=cmd_library)
+    s = sub.add_parser('overlays', help='the text overlays (28 Nov 2026): the start card and its answer'); s.add_argument('what', choices=['start', 'list', 'show', 'approve', 'remove', 'change', 'approve-all']); s.add_argument('overlay', nargs='?'); s.add_argument('--file')
+    s.add_argument('--answer', choices=['defaults', 'change', 'none']); s.add_argument('--kinds'); s.add_argument('--look'); s.add_argument('--quote'); s.set_defaults(fn=cmd_overlays)
     for key, helptext in (('category', "the film's video category, read from the script and confirmed by the operator (design/137)"),
                           ('shape', "the film's shape, then the AI video shape, from the clip count (design/139 R1); with no value: the count and the recommendation"),
                           ('colours', 'the colours the operator prefers when the client card has none, or "no preference" (design/139 R3)'),

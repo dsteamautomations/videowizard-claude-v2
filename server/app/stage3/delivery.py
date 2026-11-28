@@ -307,6 +307,10 @@ def bundle_early(conn, store, user, run, outputs, session):
     missing = E.gaps_missing(plan, outputs)
     if missing:
         raise Problem(409, 'NOT_ALLOWED', f"The package waits for every shot: {', '.join(missing)} {'has' if len(missing) == 1 else 'have'} no recorded visuals yet (`vw visuals record --gap G`).")
+    from .. import overlay_stage
+    overlay_session = overlay_stage.session_of(store, run)
+    overlay_stage.gate(overlay_session)   # text overlays, 28 Nov 2026: the package waits until the step is settled
+    overlay_rows = overlay_stage.package_rows(overlay_session)
     s2 = S2.session_of(store, run)
     pk = S2._package(store, s2)
     fps = pk['timeline']['fps']
@@ -323,6 +327,8 @@ def bundle_early(conn, store, user, run, outputs, session):
                       **({'source_film': c['library_from']} if c.get('library_from') else {})})   # design/147 L3
     for f in ai_files:
         files.append({'role': 'ai', 'name': layout('ai', f['name']), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
+    for o in overlay_rows:
+        files.append({'role': 'overlay', 'name': o['file'], **{k: o[k] for k in ('key', 'sha256', 'bytes')}})
     mf = next(x for x in master_o['files'] if x['name'] == f"master-v{master_o['summary']['version']}.json")
     files.append({'role': 'plan', 'name': 'Plans/' + mf['name'], **{k: mf[k] for k in ('key', 'sha256', 'bytes')}})
     pieces = [{'file': layout('narration', 'narration.mp3'), 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
@@ -331,18 +337,20 @@ def bundle_early(conn, store, user, run, outputs, session):
     nar = pk.get('narration') or {}
     cues = E.cues(nar.get('sentences') or [], nar.get('words') or [], fps)
     captions = E.srt(cues, fps)
-    generated = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, [], [], plan['duration_frames'], reference=False, captions=cues).encode('utf-8'), 'application/xml'),
+    generated = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, [], [], plan['duration_frames'], reference=False, captions=cues, overlays=overlay_rows).encode('utf-8'), 'application/xml'),
                  f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
                  f"{run['code']}.srt": (captions.encode('utf-8'), 'text/plain'), 'Cut-list.csv': (E.cut_list_csv(events, fps).encode('utf-8'), 'text/csv'),
                  'Relink-list.csv': (TL.relink_csv(clips.values(), set(used), cuts_per_clip).encode('utf-8'), 'text/csv'),
-                 'OPEN-EDIT.md': (E.open_edit_text(run['code'], camera=bool(used)).encode('utf-8'), 'text/markdown')}
+                 'OPEN-EDIT.md': (E.open_edit_text(run['code'], camera=bool(used), overlays=len(overlay_rows)).encode('utf-8'), 'text/markdown'),
+                 **({'Overlays.csv': (overlay_stage.overlays_csv(overlay_rows, fps).encode('utf-8'), 'text/csv')} if overlay_rows else {})}
     for name, (data, mime) in generated.items():
         k = key(run, 'delivery/' + name)
         store.put(k, data, mime)
         files.append({'role': 'generated', 'name': layout('generated', name), 'key': k, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)})
     manifest = {'contract': CONTRACT_BUNDLE, 'run': run['code'], 'client': run.get('client'), 'created_at': datetime.now(timezone.utc).isoformat(), 'early': True, 'film_sha256': None,
                 'master_digest': master_o['summary']['plan_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': events, 'narration_pieces': pieces,
-                'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': plan['duration_frames'], 'cuts': len(events), 'camera_copies': media_o['summary'].get('copies')}
+                'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': plan['duration_frames'], 'cuts': len(events), 'camera_copies': media_o['summary'].get('copies'),
+                'overlays': [{k: o[k] for k in ('id', 'file', 'record_in_frame', 'record_out_frame', 'track')} for o in overlay_rows]}
     mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
@@ -468,6 +476,8 @@ def layout(role, name, fills=None):
         return ('Media/AI/' if name in (fills or set()) else 'Media/Camera/Stabilised/') + name
     if role == 'narration':
         return 'Media/Voiceover/' + name
+    if role == 'overlay':   # text overlays, 28 Nov 2026: the transparent clips
+        return 'Media/Overlays/' + name
     if role == 'ai':   # design/115: the raw AI files of the early package
         return 'Media/AI/' + name
     if role == 'generated' and name.rsplit('.', 1)[-1] in ('fcpxml', 'edl', 'drp', 'drt'):

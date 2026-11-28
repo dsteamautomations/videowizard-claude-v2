@@ -32,7 +32,7 @@ def _path(src):
     return src[len(REL):] if src.startswith(REL) else src[len('file://'):] if src.startswith('file://') else src
 
 
-def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames, reference=True, captions=None):
+def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames, reference=True, captions=None, overlays=None):
     """design/107 §5. events: delivery.resolve_events rows (file, kind, source/record frames, source_fps, zoom, pan, tilt, rotation, colour group, marker, a2).
     One gap the length of the film is the primary story; every cut, the voiceover (lane -1), the nat sound (lane -2) and the switched-off reference track
     (lane 2) connect to it, so every offset is a film time."""
@@ -114,6 +114,10 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames,
         txt = ET.SubElement(cap, 'text', placement='bottom')
         ET.SubElement(txt, 'text-style', ref=f'ts{i}').text = c['text']
         ET.SubElement(ET.SubElement(cap, 'text-style-def', id=f'ts{i}'), 'text-style', font='Noto Sans', fontSize='48', fontColor='1 1 1 1', alignment='center')   # a style def is scoped to its caption
+    for o in overlays or []:   # text overlays, 28 Nov 2026: each transparent clip on its track above the picture (1), the reference (2) and the captions (3)
+        aid = asset(o['file'], 'movie', fps, o['frames'], silent=True)
+        ET.SubElement(gap, 'asset-clip', ref=aid, lane=str(3 + o['track']), offset=_t(Fraction(o['record_in_frame']) / fps), name=f"Overlay {o['id']}", start='0s',
+                      duration=_t(Fraction(o['frames']) / fps), format=main, enabled='1')
     ET.indent(root)
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE fcpxml>\n' + ET.tostring(root, encoding='unicode')
 

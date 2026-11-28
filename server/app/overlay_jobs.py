@@ -89,3 +89,40 @@ def still(row, page, base, folder, key, store, gsap=None, font_bytes=_font_bytes
         return 'failed', {}, f'The overlay picture could not be made: {e}'[:500]
     store.put(key, data, 'image/jpeg')
     return 'ready', {'key': key, 'bytes': len(data)}, None
+
+
+def frame_of(data, picture, at_s, folder, width, height):
+    """The picture under a still, as bytes: the shot's own picture, the frame of its movie at `at_s`, or a plain ground when the shot has no file here."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    if data and picture:
+        return data
+    out = folder / 'base.png'
+    if data:
+        (folder / 'base-src').write_bytes(data)   # ponytail: the whole file is fetched for one frame; a proxy or a ranged read if camera files of gigabytes are ever read here
+        args = ['-ss', f'{at_s:g}', '-i', str(folder / 'base-src')]
+    else:
+        args = ['-f', 'lavfi', '-i', f'color=c=0x555555:s={width}x{height}']
+    subprocess.run([FFMPEG(), '-y', '-v', 'error', *args, '-frames:v', '1', str(out)], check=True, capture_output=True, timeout=300)
+    return out.read_bytes()
+
+
+def process(store, request, folder, still=None, clip=None, frame_of=frame_of):
+    """One queued overlay request (overlay_stage.requests), made. Free. Returns (status, result, error, cost, retry_in) like every worker job."""
+    cost = {'provider': 'motion', 'inr': 0}
+    row, page = request['row'], request['page']
+    if request['kind'] == 'overlay-clip':
+        status, result, error = (clip or globals()['clip'])(row, page, Path(folder) / 'project', request['out_key'], store)
+        return status, result, error, cost, None
+    base, data = request.get('base'), None
+    if base:
+        try:
+            data = store.get(base['key'])
+        except Exception:   # noqa: BLE001  the shot's file is not on the server (a camera original kept on the laptop): the still is shown on a plain ground
+            data = None
+    try:
+        ground = frame_of(data, bool(base and base['picture']), (base or {}).get('at_s') or 0, Path(folder) / 'base', page['width'], page['height'])
+    except (OSError, subprocess.SubprocessError) as e:
+        return 'failed', {}, f'The overlay picture could not be made: the shot\'s frame could not be read ({e.__class__.__name__}).', cost, None
+    status, result, error = (still or globals()['still'])(row, page, ground, Path(folder) / 'project', request['out_key'], store)
+    return status, ({**result, 'ground': 'shot' if data else 'plain'} if status == 'ready' else result), error, cost, None

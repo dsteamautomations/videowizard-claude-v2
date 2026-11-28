@@ -918,6 +918,9 @@ def process_motion_tool(job):
     request = {}
     try:
         request = json.loads(store.get(req['request_key']).decode('utf-8'))
+        if request['kind'] in ('overlay-still', 'overlay-clip'):   # text overlays, 28 Nov 2026: the still on the shot's frame, the transparent clip
+            from . import overlay_jobs
+            return overlay_jobs.process(store, request, SPOOL / jid)
         if request['kind'] == 'motion-check':   # design/221 row 9: the check judges the helper's drawing without the server's note
             return 'ready', motion.check(_motion_folder(store, request, SPOOL / jid / 'project', note=False)), None, {'provider': 'motion', 'inr': 0}, None
         project = _motion_folder(store, request, SPOOL / jid / 'project')

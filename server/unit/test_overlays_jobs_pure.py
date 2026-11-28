@@ -144,3 +144,54 @@ def test_laying_a_transparent_picture_on_a_frame_gives_a_picture_of_the_films_si
     J.compose(tmp_path / 'base.png', tmp_path / 'over.png', tmp_path / 'out.jpg', 1280, 720)
     size = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', str(tmp_path / 'out.jpg')], capture_output=True, text=True).stdout.strip()
     assert size == '1280,720'
+
+
+# ---------- one queued request, made (build step 5) ----------
+
+class Fetch(Store):
+    def get(self, key):
+        return self[key][0]
+
+
+REQ = {'kind': 'overlay-still', 'overlay': 'O01', 'page': PAGE, 'out_key': 'r/visuals/overlays/O01.jpg', 'base': {'key': 'r/a.png', 'picture': True, 'at_s': 0}}
+
+
+def made(seen):
+    def fn(row_, page, *rest):
+        seen.append(rest)
+        return 'ready', {'key': rest[-2]}, None
+    return fn
+
+
+def test_a_still_request_is_drawn_on_the_shots_own_picture(tmp_path):
+    store, seen = Fetch({'r/a.png': (b'PICTURE', 'image/png')}), []
+    out = J.process(store, {**REQ, 'row': row()}, tmp_path, still=made(seen), frame_of=lambda data, picture, at_s, folder, w, h: data if picture else b'FRAME ' + data)
+    assert out == ('ready', {'key': 'r/visuals/overlays/O01.jpg', 'ground': 'shot'}, None, {'provider': 'motion', 'inr': 0}, None) and seen[0][0] == b'PICTURE'
+    J.process(store, {**REQ, 'row': row(), 'base': {'key': 'r/a.png', 'picture': False, 'at_s': 2.4}}, tmp_path, still=made(seen), frame_of=lambda data, picture, at_s, folder, w, h: b'FRAME at %g' % at_s)
+    assert seen[1][0] == b'FRAME at 2.4'
+
+
+def test_a_shot_whose_file_is_not_on_the_server_gets_a_plain_ground_and_says_so(tmp_path):
+    seen = []
+    for base in (None, {'key': 'r/missing.mp4', 'picture': False, 'at_s': 1}):
+        out = J.process(Fetch(), {**REQ, 'row': row(), 'base': base}, tmp_path, still=made(seen), frame_of=lambda data, picture, at_s, folder, w, h: b'PLAIN' if data is None else data)
+        assert out[0] == 'ready' and out[1]['ground'] == 'plain' and seen[-1][0] == b'PLAIN'
+
+
+def test_a_clip_request_is_made_as_the_transparent_clip(tmp_path):
+    seen = []
+    out = J.process(Fetch(), {'kind': 'overlay-clip', 'overlay': 'O01', 'row': row(), 'page': PAGE, 'out_key': 'r/visuals/overlays/O01.mov'}, tmp_path, clip=made(seen))
+    assert out[0] == 'ready' and out[1] == {'key': 'r/visuals/overlays/O01.mov'} and out[3] == {'provider': 'motion', 'inr': 0}
+
+
+def test_a_failed_still_is_passed_on_as_failed(tmp_path):
+    out = J.process(Fetch(), {**REQ, 'row': row(), 'base': None}, tmp_path, still=lambda *a: ('failed', {}, 'The overlay picture could not be made: no chrome'), frame_of=lambda *a: b'P')
+    assert out[:3] == ('failed', {}, 'The overlay picture could not be made: no chrome')
+
+
+@pytest.mark.skipif(not shutil.which('ffmpeg'), reason='needs ffmpeg')
+def test_the_plain_ground_and_a_movies_frame_are_real_pictures(tmp_path, monkeypatch):
+    monkeypatch.setattr(J, 'FFMPEG', lambda: 'ffmpeg')
+    assert J.frame_of(None, False, 0, tmp_path / 'a', 640, 360)[:4] == b'\x89PNG'
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=s=320x180:d=2:r=25', str(tmp_path / 'm.mp4')], check=True)
+    assert J.frame_of((tmp_path / 'm.mp4').read_bytes(), False, 1.0, tmp_path / 'b', 640, 360)[:4] == b'\x89PNG'

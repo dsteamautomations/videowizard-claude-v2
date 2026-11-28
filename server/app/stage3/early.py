@@ -165,8 +165,13 @@ NO_CAMERA = (   # SK, 23 Nov 2026: what the words lose when the cut has no camer
      "and what the operator decided at review (a trim, another clip). ", ''))
 
 
-def open_edit_text(code, camera=True):
-    text = _open_edit_text(code)
+OVERLAYS_NOTE = ("\n## Text overlays\n\n`Media/Overlays/` holds {n} text overlay{s}, each a transparent clip (ProRes 4444) the operator approved. The timeline places each on a track above the picture, "
+                 "at its own moment; two that show at once sit on separate tracks. `Overlays.csv` lists each with its words, its in and out, its track, its card, motion and place. "
+                 "If the import drops a clip or its transparency, place it from `Overlays.csv` (in the clip's attributes, alpha: straight). Move, retime or switch off any of them as the edit needs.\n")
+
+
+def open_edit_text(code, camera=True, overlays=0):
+    text = _open_edit_text(code) + (OVERLAYS_NOTE.format(n=overlays, s='' if overlays == 1 else 's') if overlays else '')
     for a, b in () if camera else NO_CAMERA:
         assert a in text, a[:60]
         text = text.replace(a, b)

@@ -2410,6 +2410,98 @@ def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
     return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.record(conn, storage(), user, run, body.quote), 201)
 
 
+class OverlayStart(Write):
+    answer: str
+    kinds: list[str] | None = None
+    look: dict | None = None
+    quote: str = Field(min_length=1, max_length=2000)
+
+
+def _overlay_film(run, outputs):
+    """What the start card needs of the film: its font and the scripts it is written in."""
+    return {'font': film.font(run), 'scripts': sorted(_film_scripts(outputs)) or ['latin']}
+
+
+@app.get('/api/runs/{run_id}/overlays/start')
+def overlays_start_card(run_id: UUID, user=User, conn=DB):
+    """Text overlays (28 Nov 2026): the one start card, with the sample pictures of the cards and what is recorded."""
+    import base64
+    from . import overlay_stage
+    run = core.load_run(conn, user, run_id)
+    card = overlay_stage.start_card(_overlay_film(run, core.current_outputs(conn, run['id'])), overlay_stage.kept_look(storage(), run.get('client_id')))
+    for c in card['cards']:
+        p = Path(__file__).resolve().parents[1] / c['sample']
+        c['base64'] = base64.b64encode(p.read_bytes()).decode() if p.exists() else None
+    return Response({**card, 'recorded': overlay_stage.session_of(storage(), run).get('start')})
+
+
+@app.post('/api/runs/{run_id}/overlays/start')
+def overlays_start_answer(run_id: UUID, body: OverlayStart, user=User, conn=DB):
+    from . import overlay_stage
+
+    def fn(run, outputs):
+        session = overlay_stage.session_of(storage(), run)
+        problems = overlay_stage.answer(storage(), run, session, {'answer': body.answer, 'kinds': body.kinds, 'look': body.look}, _overlay_film(run, outputs))
+        if problems:
+            raise Problem(422, 'OVERLAY_START', problems[0])
+        guide = (Path(__file__).resolve().parents[1] / 'procedures' / 'overlay-guide.md').read_text(encoding='utf-8') if body.answer != 'none' else None
+        return {'start': session['start'], 'open': overlay_stage.open_points(session), **({'guide': guide} if guide else {})}
+    return _s2(conn, user, run_id, ('visuals', 'assembly'), body, fn)
+
+
+class OverlayList(Write):
+    document: dict
+
+
+class OverlayDecision(Write):
+    overlay: str | None = None        # O01; none with "approve-all"
+    decision: str                     # approve, remove, change, approve-all
+    row: dict | None = None           # change: the overlay written whole
+    quote: str = Field(min_length=1, max_length=2000)
+
+
+@app.get('/api/runs/{run_id}/overlays')
+def overlays_show(run_id: UUID, user=User, conn=DB):
+    """Text overlays: the list with each overlay's still picture, what the worker is busy with, what the editor's package still waits for."""
+    from . import overlay_stage
+    run = core.load_run(conn, user, run_id)
+    film_, page, _events, _keys = overlay_stage.context(storage(), run, core.current_outputs(conn, run['id']))
+    return Response(overlay_stage.report(conn, storage(), run, overlay_stage.session_of(storage(), run), film_, page))
+
+
+@app.post('/api/runs/{run_id}/overlays/list', dependencies=[Depends(size_guard)])
+def overlays_list(run_id: UUID, body: OverlayList, user=User, conn=DB):
+    from . import overlay_stage
+
+    def fn(run, outputs):
+        store = storage()
+        film_, page, events, keys = overlay_stage.context(store, run, outputs)
+        session = overlay_stage.session_of(store, run)
+        out = overlay_stage.propose(store, run, session, body.document, film_)
+        if out['problems']:
+            raise Problem(422, 'OVERLAY_LIST', 'The list was not recorded. ' + ' | '.join(out['problems']), problems=out['problems'])
+        return overlay_stage.after(conn, store, run, session, film_, page, events, keys, out['to_draw'])
+    return _s2(conn, user, run_id, ('visuals', 'assembly'), body, fn)
+
+
+@app.post('/api/runs/{run_id}/overlays/decide', dependencies=[Depends(size_guard)])
+def overlays_decide(run_id: UUID, body: OverlayDecision, user=User, conn=DB):
+    from . import overlay_stage
+
+    def fn(run, outputs):
+        store = storage()
+        film_, page, events, keys = overlay_stage.context(store, run, outputs)
+        session = overlay_stage.session_of(store, run)
+        if body.decision == 'approve-all':
+            out = {'problems': [], 'to_draw': [], 'approved': overlay_stage.approve_all(store, run, session)}
+        else:
+            out = overlay_stage.decide(store, run, session, body.overlay or '', body.decision, film_, body.row)
+        if out['problems']:
+            raise Problem(422, 'OVERLAY_DECISION', out['problems'][0])
+        return overlay_stage.after(conn, store, run, session, film_, page, events, keys, out['to_draw'])
+    return _s2(conn, user, run_id, ('visuals', 'assembly'), body, fn)
+
+
 @app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
 def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
     return _s2(conn, user, run_id, ('assembly', 'delivery'), body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)   # design/115 H1: the early package at the assembly step
