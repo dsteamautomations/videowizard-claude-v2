@@ -1765,7 +1765,7 @@ def cmd_analysis(a):
     if a.what == 'start':   # design/42 6.2: camera audio comes from the media stage unless given; the film type is optional
         body = {'understand_audio': a.understand_audio != 'no', 'exclude': a.exclude or [], 'again': a.again, 'duplicates': getattr(a, 'duplicates', None),   # design/147 L2
                 **({'camera_audio': a.camera_audio} if a.camera_audio else {}), **({'film_type': a.film_type} if a.film_type else {})}
-        out = write(f'/api/runs/{run}/analysis/start', body)
+        out = write(f'/api/runs/{run}/analysis/start', body, wait=600)   # VW-26, 28 Nov 2026: the first start compares every clip with the client's library before it answers; 60 s read as "Failed"
         source = 'from the media stage' if out.get('camera_audio_source') == 'media' else 'as given'
         waived = f"; risk flags waived from the brief (no safety rules): {', '.join(out['waived_risk_flags'])}" if out.get('waived_risk_flags') else ''   # design/60 L20
         emit(out, 0, f"Analysis started: one paid Gemini request per clip (the model is the one `vw next` names for the analysis stage; this line names none, so it cannot go out of date); "
