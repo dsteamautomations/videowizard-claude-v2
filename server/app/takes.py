@@ -57,7 +57,7 @@ W = {
              'Nobody has checked these takes: they are shown as they were made. You are the judge.',
              # SK, 27 Nov 2026 (VW-25: two of twelve takes ended at "no route" on a camera complaint): what a correction can change, said before the operator writes
              'A correction can change a thing in the picture (an object, a surface, a colour, a size, something to add or remove) and what happens (the action, the movement, '
-             'how it ends). It cannot change the camera: every AI video shot has one camera, held still with a slight handheld movement, with no zoom and no pan. '
+             'how it ends). It cannot change the camera: every AI video shot has one camera, held still on a tripod, with no shake, no zoom and no pan. '
              'Say what you see, where, and what should be there instead.',
              'You are never asked for seconds, a cause or a way to correct. Say what you see and what should be there instead; Claude chooses how it is corrected.',
              'A first take is small. When you accept it, its full-size video is made; you see the two side by side before it goes in the film.',

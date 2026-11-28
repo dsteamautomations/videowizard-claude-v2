@@ -17,7 +17,7 @@ Three things BUILD.md settles before you look:
 - People who overlap in the picture: when BUILD.md lists that overlap as a standing warning of the scene check, it is known and the operator is told before the take. It is not a failed look 3. An overlap BUILD.md does not list fails look 3, and so does a box that hides the acting hand or the thing it works on.
 - A thing may travel along a path, as a person does. Check it against its path as BUILD.md gives it: in the first frame it stands where the path starts, in the last where the path ends, and it moved along one line (look 8). A thing on a path is not a floating thing (look 5) while it rests on the ground or on what carries it.
 
-The whole picture shifts by a few pixels between the frames (up to about ten at this size), walls and ground included. That is deliberate: the server gives the guide's camera a tiny handheld drift so the footage does not look locked off. It is never a fault and never a failed look; judge everything else against the picture as it stands in each frame.
+The camera stands still: judge everything against the picture as it stands in each frame.
 
 Make every one of these looks, literally, on the frames:
 

@@ -396,6 +396,15 @@ def next_for(conn, run):
             nxt['stage3'] = assembly.progress(session, outputs)
         except Exception:   # the report never blocks `next`, which every stage 3 write reads first
             nxt['stage3'] = None
+    if nxt.get('stage') == 'assembly':   # SK, 28 Nov 2026: the open text overlays step is named here too
+        try:
+            from . import overlay_stage
+            from .storage import storage
+            line = overlay_stage.first_line(storage(), run)
+            if line:
+                nxt['do_first'] = line
+        except Exception:   # noqa: BLE001  the line never blocks `next`
+            pass
     if nxt.get('stage') == 'voice':   # design/52 B: what the voices page holds (pick, narrations, direction, final)
         try:
             from . import voices

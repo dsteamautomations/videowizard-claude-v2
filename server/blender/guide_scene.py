@@ -7,7 +7,7 @@
 #
 # What the building blocks reproduce (the consultant's finished film and our own runs): box people with black face and chest marks
 # (front = local -Y) and a purple back and nape (layout B), bar arms from the shoulder to the hand point, a prop keyed to the hand that holds it on every frame, a walk bob,
-# a camera held still with a tiny handheld drift, a sun and a plain sky. Positions at every moment come from guide_spec, the same module
+# a camera held still (no drift: SK, 28 Nov 2026), a sun and a plain sky. Positions at every moment come from guide_spec, the same module
 # the checks before spend use. A piece of the set on a `path` (design/207) is keyed on every frame as a walker's root is.
 # Layout B (SK, 20 Nov 2026): in the flat look every person has the yellow side stripes; a piece or a prop with a `front` has a black panel there and a purple one at its back, in both looks.
 import json
@@ -148,7 +148,7 @@ def main():
         if pr.get('front'):
             fronts(pr['id'], (-s[0] / 2, -s[1] / 2, -s[2] / 2), (s[0] / 2, s[1] / 2, s[2] / 2), pr['front'], props[-1][1])
 
-    # ---- the camera: held still, tiny handheld drift ----
+    # ---- the camera: held still, as on a tripod (SK, 28 Nov 2026: the tiny drift is removed for every film) ----
     bpy.ops.object.camera_add()
     cam = bpy.context.object
     sc.camera = cam
@@ -156,9 +156,6 @@ def main():
     cam.data.lens = float(spec['camera']['lens'])
     cam.rotation_mode = 'QUATERNION'
     cpos, caim = Vector(spec['camera']['position']), Vector(spec['camera']['aim'])
-
-    def shake(t, a, s):
-        return Vector((a * (math.sin(1.7 * t + s) + 0.5 * math.sin(4.3 * t + 2 * s)), a * 0.6 * math.sin(2.3 * t + 3 * s), a * (math.sin(2.9 * t + s) + 0.4 * math.sin(6.1 * t))))
 
     # ---- every moving thing keyed on every frame ----
     walked = {p['id']: 0.0 for p, _, _ in people}
@@ -199,8 +196,7 @@ def main():
                 r[2] += G._turn(s, t)
             o.rotation_euler = r
             o.keyframe_insert('rotation_euler', frame=f)
-        p_ = cpos + shake(t, 0.003, 0.7)
-        a_ = caim + shake(t, 0.006, 2.3)
+        p_, a_ = cpos, caim
         cam.location = p_
         cam.rotation_quaternion = (a_ - p_).to_track_quat('-Z', 'Y')
         cam.keyframe_insert('location', frame=f)

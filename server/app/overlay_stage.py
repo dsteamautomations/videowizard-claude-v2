@@ -116,6 +116,12 @@ def open_points(session):
             for r in session.get('rows') or [] if r['state'] == 'proposed' or (r['state'] == 'approved' and not r.get('clip'))]
 
 
+def first_line(store, run):
+    """What `vw next` says while the step is open and the assembly is next: a chat that starts again finds the step without a refused package. None once settled."""
+    points = open_points(session_of(store, run))
+    return f"First the text overlays, the last step of visuals, before the editor's package: {'; '.join(points)}. Start with `vw overlays start`." if points else None
+
+
 def gate(session):
     points = open_points(session)
     if points:

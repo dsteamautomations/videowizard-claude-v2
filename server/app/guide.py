@@ -26,7 +26,7 @@ STILL_OPEN = ('The FIRST image is a rough 3D layout made of plain coloured boxes
               'Every piece of the place stays exactly where its box is, at the same size.')
 TAKE_OPEN = ('Edit the video. It is a rough 3D blocking render made of plain coloured boxes. Turn it into real footage of the place, people and light in the image, '
              'in its exact look. The image is exactly the first frame. Keep every movement, path, position and timing of the video exactly, and keep the camera exactly '
-             'as in the video (held still, tiny handheld drift). One continuous shot: no cuts, no zoom, real-time speed, no slow motion. The small black squares on box '
+             'as in the video (held still on a tripod: no shake, no drift). One continuous shot: no cuts, no zoom, real-time speed, no slow motion. The small black squares on box '
              'people mark their face and chest, and the purple squares their back, so they show which way each person faces. Never show the boxes; no 3D-render look, no captions, no subtitles.')
 # layout B (SK, 20 Nov 2026): said only when the shot's video was rendered flat (its render records the look); the first frame and the still keep EEVEE's light
 FLAT_LINE = ('The video is drawn in flat colours with thin black outlines only to mark the layout; the footage shows neither: '
